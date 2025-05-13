@@ -13,6 +13,7 @@ import GeneralSettings from "./pages/settings/General";
 import MembersSettings from "./pages/settings/Members";
 import PlansSettings from "./pages/settings/Plans";
 import BillingSettings from "./pages/settings/Billing";
+import ApiKeys from "./pages/settings/ApiKeys";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="members" element={<MembersSettings />} />
             <Route path="plans" element={<PlansSettings />} />
             <Route path="billing" element={<BillingSettings />} />
+            <Route path="api-keys" element={<ApiKeys />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
