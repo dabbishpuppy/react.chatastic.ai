@@ -57,7 +57,7 @@ const Settings = () => {
           </div>
 
           {/* Content Area */}
-          <div className="flex-1">
+          <div className="flex-1 overflow-hidden">
             <Outlet />
           </div>
         </div>
