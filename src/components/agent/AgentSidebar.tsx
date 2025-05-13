@@ -7,7 +7,6 @@ import {
   Settings, 
   Zap,
   Share,
-  ChevronDown,
   Plus
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -29,11 +28,38 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   const navigate = useNavigate();
   const { agentId } = useParams();
 
-  // Mock data for agents - would be fetched from API in a real app
-  const mockAgents = [
-    { id: "1", name: "Customer Support Agent" },
-    { id: "2", name: "Sales Assistant" },
-    { id: "3", name: "Technical Support" },
+  // Use the same agent data as shown on the Dashboard
+  const agents = [
+    {
+      id: "1",
+      name: "Wonder AI",
+      image: "/placeholder.svg",
+      color: "bg-violet-600",
+    },
+    {
+      id: "2",
+      name: "Agora AI",
+      image: "/placeholder.svg", 
+      color: "bg-amber-100",
+    },
+    {
+      id: "3",
+      name: "PristineBag AI",
+      image: "/placeholder.svg",
+      color: "bg-rose-400",
+    },
+    {
+      id: "4",
+      name: "AI Kundeservice",
+      image: "/placeholder.svg",
+      color: "bg-black",
+    },
+    {
+      id: "5",
+      name: "theballooncompany.com",
+      image: "/placeholder.svg",
+      color: "bg-white",
+    }
   ];
 
   const menuItems = [
@@ -83,7 +109,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
             <SelectValue placeholder="Select an agent" />
           </SelectTrigger>
           <SelectContent>
-            {mockAgents.map((agent) => (
+            {agents.map((agent) => (
               <SelectItem key={agent.id} value={agent.id}>
                 {agent.name}
               </SelectItem>
