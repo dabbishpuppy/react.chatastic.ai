@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   NavigationMenu,
@@ -13,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import UsageStats from "@/components/UsageStats";
 
@@ -52,6 +51,14 @@ const agentCards = [
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("agents");
+  const navigate = useNavigate();
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === "settings") {
+      navigate("/settings/general");
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -87,7 +94,7 @@ const Dashboard = () => {
                   <NavigationMenuItem>
                     <NavigationMenuLink 
                       className={`${navigationMenuTriggerStyle()} ${activeTab === "settings" ? "bg-accent/50" : ""}`}
-                      onClick={() => setActiveTab("settings")}
+                      onClick={() => handleTabChange("settings")}
                     >
                       Settings
                     </NavigationMenuLink>
@@ -168,13 +175,6 @@ const Dashboard = () => {
           )}
 
           {activeTab === "usage" && <UsageStats />}
-          
-          {activeTab === "settings" && (
-            <div className="max-w-6xl mx-auto">
-              <h1 className="text-3xl font-bold mb-8">Settings</h1>
-              <p>Settings content will go here.</p>
-            </div>
-          )}
         </div>
       </div>
     </div>
