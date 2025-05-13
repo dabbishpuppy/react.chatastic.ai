@@ -1,12 +1,19 @@
 
-import React from "react";
+import React, { useState } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChatSection from "@/components/agent/ChatSection";
 import ConversationView from "@/components/agent/ConversationView";
 import LLMSettingsPanel from "@/components/agent/LLMSettingsPanel";
+import { Conversation } from "@/components/activity/ConversationData";
 
 const AgentEnvironment: React.FC = () => {
+  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+
+  const handleCloseConversation = () => {
+    setActiveConversation(null);
+  };
+
   return (
     <AgentPageLayout defaultActiveTab="playground" defaultPageTitle="Playground">
       <Tabs defaultValue="chat" className="w-full">
@@ -20,7 +27,10 @@ const AgentEnvironment: React.FC = () => {
               <ChatSection />
             </div>
             <div className="w-64 border-l">
-              <ConversationView />
+              <ConversationView 
+                conversation={activeConversation}
+                onClose={handleCloseConversation}
+              />
             </div>
           </div>
         </TabsContent>
