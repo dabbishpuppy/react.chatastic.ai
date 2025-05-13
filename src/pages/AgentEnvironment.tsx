@@ -41,7 +41,7 @@ const AgentEnvironment = () => {
           className="flex-1 p-6 overflow-auto bg-gray-50 flex justify-center"
           style={{ backgroundSize: "20px 20px", backgroundImage: "radial-gradient(circle, #d0d0d0 1px, rgba(0, 0, 0, 0) 1px)" }}
         >
-          <div className="w-full max-w-3xl">
+          <div className="w-full max-w-[30rem]">
             <ChatSection initialMessages={initialMessages} />
           </div>
         </div>
