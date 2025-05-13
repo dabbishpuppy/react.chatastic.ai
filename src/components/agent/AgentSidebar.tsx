@@ -1,11 +1,13 @@
+
 import React from "react";
 import { 
   Activity, 
   BarChart2, 
   FileText, 
   Settings, 
-  Zap, 
-  Link as LinkIcon
+  Zap,
+  Embed, 
+  Share 
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -24,8 +26,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
     { id: "sources", label: "Sources", icon: <FileText size={18} /> },
     { id: "actions", label: "Actions", icon: <Zap size={18} /> },
-    { id: "integrations", label: "Integrations", icon: <LinkIcon size={18} /> },
-    { id: "connect", label: "Connect", icon: <LinkIcon size={18} /> },
+    { id: "connect", label: "Connect", icon: <Share size={18} /> },
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
   ];
 
@@ -42,7 +43,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       navigate(`/agent/${agentId}/sources`);
     } else if (tabId === "actions") {
       navigate(`/agent/${agentId}/actions`);
-    } else if (tabId === "integrations") {
+    } else if (tabId === "connect") {
       navigate(`/agent/${agentId}/integrations`);
     }
     // Other tabs can be added as they are implemented
