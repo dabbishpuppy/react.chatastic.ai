@@ -3,20 +3,10 @@ import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-
-interface Message {
-  sender: "user" | "agent";
-  content: string;
-  timestamp: string;
-}
+import { Conversation } from "@/components/activity/ConversationData";
 
 interface ConversationViewProps {
-  conversation: {
-    id: string;
-    title: string;
-    messages: Message[];
-    startedAt: string;
-  } | null;
+  conversation: Conversation | null;
   onClose: () => void;
 }
 
