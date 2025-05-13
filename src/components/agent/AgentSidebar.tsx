@@ -1,4 +1,3 @@
-
 import React from "react";
 import { 
   Activity, 
@@ -26,9 +25,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "activity", label: "Activity", icon: <Activity size={18} /> },
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
     { id: "sources", label: "Sources", icon: <FileText size={18} /> },
-    { id: "actions", label: "Actions", icon: <Zap size={18} />, badge: "New" },
-    { id: "integrations", label: "Integrations", icon: <LinkIcon size={18} />, badge: "New" },
-    { id: "contacts", label: "Contacts", icon: <Users size={18} />, badge: "New" },
+    { id: "actions", label: "Actions", icon: <Zap size={18} /> },
+    { id: "integrations", label: "Integrations", icon: <LinkIcon size={18} /> },
     { id: "connect", label: "Connect", icon: <LinkIcon size={18} /> },
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
   ];
@@ -66,11 +64,6 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
         >
           <span className="mr-3 text-gray-500">{item.icon}</span>
           {item.label}
-          {item.badge && (
-            <span className="ml-auto px-1.5 py-0.5 text-xs bg-violet-600 text-white rounded">
-              {item.badge}
-            </span>
-          )}
         </button>
       ))}
     </div>
