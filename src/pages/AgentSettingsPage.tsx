@@ -62,14 +62,14 @@ const AgentSettingsPage: React.FC = () => {
     <AgentPageLayout defaultActiveTab="" defaultPageTitle="Settings">
       <div className="flex flex-col p-6 bg-[#f5f5f5] -m-6">
         {/* Horizontal Tabs */}
-        <div className="bg-white p-2 rounded-lg mb-6">
+        <div className="bg-white p-2 rounded-lg mb-6 w-full max-w-full overflow-hidden">
           <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="w-full flex justify-start bg-gray-50 p-1">
+            <TabsList className="w-full flex justify-start bg-gray-50 p-1 overflow-x-auto hide-scrollbar">
               {menuItems.map((item) => (
                 <TabsTrigger
                   key={item.id}
                   value={item.id}
-                  className="flex items-center data-[state=active]:bg-white"
+                  className="flex items-center data-[state=active]:bg-white whitespace-nowrap"
                 >
                   {item.icon}
                   {item.label}
@@ -80,7 +80,7 @@ const AgentSettingsPage: React.FC = () => {
         </div>
         
         {/* Settings content */}
-        <div className="flex-1">
+        <div className="flex-1 w-full max-w-full overflow-hidden">
           <Routes>
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="general" element={<GeneralSettings />} />
