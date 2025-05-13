@@ -19,6 +19,7 @@ import UsagePage from "./pages/Usage";
 import ActivityPage from "./pages/ActivityPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SourcesPage from "./pages/SourcesPage";
+import ActionsPage from "./pages/ActionsPage";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
           <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
           <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
+          <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
           <Route path="/settings" element={<Settings />}>
             <Route index element={<GeneralSettings />} />
             <Route path="general" element={<GeneralSettings />} />

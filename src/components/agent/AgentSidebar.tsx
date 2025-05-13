@@ -43,6 +43,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       navigate(`/agent/${agentId}/analytics`);
     } else if (tabId === "sources") {
       navigate(`/agent/${agentId}/sources`);
+    } else if (tabId === "actions") {
+      navigate(`/agent/${agentId}/actions`);
     }
     // Other tabs can be added as they are implemented
   };
