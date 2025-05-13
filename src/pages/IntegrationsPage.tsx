@@ -4,14 +4,16 @@ import AgentPageLayout from "./AgentPageLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Embed, Share, integrations } from "@/lib/utils";
+import { integrations } from "@/lib/utils";
+import EmbedTab from "@/components/connect/EmbedTab";
+import ShareTab from "@/components/connect/ShareTab";
 
 const IntegrationsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("integrations");
+  const [activeTab, setActiveTab] = useState("embed");
 
   return (
     <AgentPageLayout defaultActiveTab="connect" defaultPageTitle="Connect">
-      <Tabs defaultValue="integrations" className="w-full" onValueChange={setActiveTab}>
+      <Tabs defaultValue="embed" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="mb-4 grid w-full grid-cols-3">
           <TabsTrigger value="embed">Embed</TabsTrigger>
           <TabsTrigger value="share">Share</TabsTrigger>
@@ -19,11 +21,11 @@ const IntegrationsPage: React.FC = () => {
         </TabsList>
         
         <TabsContent value="embed" className="mt-4">
-          <Embed />
+          <EmbedTab />
         </TabsContent>
         
         <TabsContent value="share" className="mt-4">
-          <Share />
+          <ShareTab />
         </TabsContent>
         
         <TabsContent value="integrations" className="mt-4">
