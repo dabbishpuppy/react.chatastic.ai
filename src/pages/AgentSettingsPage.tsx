@@ -1,30 +1,87 @@
 
 import React from "react";
 import TopNavBar from "@/components/layout/TopNavBar";
-import AgentSettingsSidebar from "@/components/agent/AgentSettingsSidebar";
-import { useParams, Outlet } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AgentGeneralSettings from "@/components/agent/settings/GeneralSettings";
+import AISettings from "@/components/agent/settings/AISettings";
+import ChatInterfaceSettings from "@/components/agent/settings/ChatInterfaceSettings";
+import SecuritySettings from "@/components/agent/settings/SecuritySettings";
+import LeadsSettings from "@/components/agent/settings/LeadsSettings";
+import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
+import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
+import { 
+  Settings, 
+  Bot, 
+  MessageSquare, 
+  Shield, 
+  Users, 
+  Bell, 
+  Globe 
+} from "lucide-react";
 
 const AgentSettingsPage: React.FC = () => {
-  const { settingsTab = "general" } = useParams();
+  const { agentId, settingsTab = "general" } = useParams();
+  const navigate = useNavigate();
+  
+  const tabs = [
+    { id: "general", label: "General", icon: <Settings className="w-4 h-4 mr-2" /> },
+    { id: "ai", label: "AI", icon: <Bot className="w-4 h-4 mr-2" /> },
+    { id: "chat-interface", label: "Chat Interface", icon: <MessageSquare className="w-4 h-4 mr-2" /> },
+    { id: "security", label: "Security", icon: <Shield className="w-4 h-4 mr-2" /> },
+    { id: "leads", label: "Leads", icon: <Users className="w-4 h-4 mr-2" /> },
+    { id: "notifications", label: "Notifications", icon: <Bell className="w-4 h-4 mr-2" /> },
+    { id: "custom-domains", label: "Custom Domains", icon: <Globe className="w-4 h-4 mr-2" /> },
+  ];
+
+  const handleTabChange = (value: string) => {
+    navigate(`/agent/${agentId}/settings/${value}`);
+  };
+
+  // Render the appropriate component based on the current tab
+  const renderTabContent = () => {
+    switch (settingsTab) {
+      case "general":
+        return <AgentGeneralSettings />;
+      case "ai":
+        return <AISettings />;
+      case "chat-interface":
+        return <ChatInterfaceSettings />;
+      case "security":
+        return <SecuritySettings />;
+      case "leads":
+        return <LeadsSettings />;
+      case "notifications":
+        return <NotificationsSettings />;
+      case "custom-domains":
+        return <CustomDomainsSettings />;
+      default:
+        return <AgentGeneralSettings />;
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
       <TopNavBar />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar */}
-        <div className="w-64 border-r overflow-y-auto bg-white">
-          <div className="p-6">
-            <h1 className="text-2xl font-bold">Settings</h1>
-          </div>
-          <AgentSettingsSidebar activeTab={settingsTab} />
-        </div>
-
-        {/* Main content */}
-        <div className="flex-1 p-6 overflow-auto">
-          <div className="max-w-4xl">
-            <Outlet />
-          </div>
+      <div className="flex flex-col flex-1 overflow-hidden p-6">
+        <div className="max-w-4xl mx-auto w-full">
+          <h1 className="text-2xl font-bold mb-6">Settings</h1>
+          
+          <Tabs value={settingsTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="mb-6 w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id} className="flex items-center justify-center">
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            
+            <div className="mt-6">
+              {renderTabContent()}
+            </div>
+          </Tabs>
         </div>
       </div>
     </div>
