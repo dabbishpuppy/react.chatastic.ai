@@ -16,16 +16,17 @@ const AgentEnvironment: React.FC = () => {
   return (
     <AgentPageLayout defaultActiveTab="playground" defaultPageTitle="Playground">
       <div className="w-full h-full flex overflow-hidden">
-        <div className="flex-1 p-6 overflow-hidden bg-[#f9f9f9]">
-          {/* Main chat area with dotted background pattern */}
-          <div 
-            className="w-full h-full rounded-lg overflow-hidden bg-white"
-            style={{ 
-              backgroundImage: 'radial-gradient(#e0e0e0 1px, transparent 1px)', 
-              backgroundSize: '16px 16px',
-              backgroundPosition: '0 0',
-            }}
-          >
+        <div 
+          className="flex-1 p-6 overflow-hidden"
+          style={{ 
+            backgroundImage: 'radial-gradient(#e0e0e0 1px, transparent 1px)', 
+            backgroundSize: '16px 16px',
+            backgroundPosition: '0 0',
+            backgroundColor: '#f9f9f9'
+          }}
+        >
+          {/* White chat container on top of dotted background */}
+          <div className="w-full h-full rounded-lg overflow-hidden bg-white shadow-sm border border-gray-100">
             <ChatSection />
           </div>
         </div>
