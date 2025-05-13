@@ -43,9 +43,8 @@ const App = () => (
           <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
           <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
           
-          {/* Agent Settings Routes */}
-          <Route path="/agent/:agentId/settings" element={<AgentSettingsPage />} />
-          <Route path="/agent/:agentId/settings/:settingsTab" element={<AgentSettingsPage />} />
+          {/* Agent Settings Routes - Fix nested routes with wildcard */}
+          <Route path="/agent/:agentId/settings/*" element={<AgentSettingsPage />} />
           
           {/* Admin Settings Routes */}
           <Route path="/settings" element={<Settings />}>

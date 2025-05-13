@@ -10,17 +10,23 @@ import SecuritySettings from "@/components/agent/settings/SecuritySettings";
 import LeadsSettings from "@/components/agent/settings/LeadsSettings";
 import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
 import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
+import AvatarSettings from "@/components/agent/settings/AvatarSettings";
 
 const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
   const location = useLocation();
   const currentPath = location.pathname;
-  const settingsPath = `/agent/${agentId}/settings`;
   
   // Extract the active tab from the URL
   const getActiveTab = () => {
-    const pathParts = currentPath.split('/');
-    return pathParts[pathParts.length - 1];
+    const parts = currentPath.split('/');
+    // Get the last non-empty segment of the URL
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (parts[i] && parts[i] !== "settings") {
+        return parts[i];
+      }
+    }
+    return "general";
   };
 
   return (
@@ -35,13 +41,14 @@ const AgentSettingsPage: React.FC = () => {
         <div className="flex-1">
           <Routes>
             <Route path="/" element={<Navigate to="general" replace />} />
-            <Route path="/general" element={<GeneralSettings />} />
-            <Route path="/ai" element={<AISettings />} />
-            <Route path="/chat-interface" element={<ChatInterfaceSettings />} />
-            <Route path="/security" element={<SecuritySettings />} />
-            <Route path="/leads" element={<LeadsSettings />} />
-            <Route path="/notifications" element={<NotificationsSettings />} />
-            <Route path="/custom-domains" element={<CustomDomainsSettings />} />
+            <Route path="general" element={<GeneralSettings />} />
+            <Route path="ai" element={<AISettings />} />
+            <Route path="chat-interface" element={<ChatInterfaceSettings />} />
+            <Route path="security" element={<SecuritySettings />} />
+            <Route path="leads" element={<LeadsSettings />} />
+            <Route path="notifications" element={<NotificationsSettings />} />
+            <Route path="custom-domains" element={<CustomDomainsSettings />} />
+            <Route path="avatar" element={<AvatarSettings />} />
           </Routes>
         </div>
       </div>
