@@ -13,7 +13,8 @@ const IntegrationsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="connect" defaultPageTitle="Connect">
-      <div className="p-6 bg-[#f5f5f5] overflow-hidden min-h-screen">
+      <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
+        <h1 className="text-3xl font-bold mb-6">Connect</h1>
         <div className="bg-white rounded-lg p-6">
           <Tabs defaultValue="embed" onValueChange={setActiveTab}>
             <TabsList className="mb-4">

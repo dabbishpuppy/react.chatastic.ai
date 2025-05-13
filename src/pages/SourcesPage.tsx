@@ -10,7 +10,8 @@ import QATab from "@/components/sources/QATab";
 const SourcesPage: React.FC = () => {
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Sources">
-      <div className="p-6 bg-[#f5f5f5] overflow-hidden min-h-screen">
+      <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
+        <h1 className="text-3xl font-bold mb-6">Sources</h1>
         <Tabs defaultValue="text" className="bg-white rounded-lg p-6">
           <TabsList>
             <TabsTrigger value="text">Text</TabsTrigger>

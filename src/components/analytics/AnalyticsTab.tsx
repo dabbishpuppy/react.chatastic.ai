@@ -20,9 +20,9 @@ const AnalyticsTab: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#f5f5f5] min-h-screen -m-6 p-8">
+    <div className="bg-[#f5f5f5] min-h-screen p-8">
+      <h1 className="text-3xl font-bold mb-6">Analytics</h1>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold">Analytics</h1>
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <Select 
             value={selectedAgent} 

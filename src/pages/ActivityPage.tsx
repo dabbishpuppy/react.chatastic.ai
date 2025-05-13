@@ -19,18 +19,21 @@ const ActivityPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="activity" defaultPageTitle="Activity">
-      <div className="flex flex-1 h-full p-8 bg-[#f5f5f5] overflow-hidden">
-        <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
-          <ChatLogsTab onConversationClick={handleConversationClick} />
-        </div>
-        {selectedConversation && (
-          <div className="w-1/3 min-w-[320px]">
-            <ConversationView 
-              conversation={selectedConversation} 
-              onClose={handleCloseConversation} 
-            />
+      <div className="flex flex-col p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
+        <h1 className="text-3xl font-bold mb-6">Activity</h1>
+        <div className={`flex flex-1 ${selectedConversation ? "pr-4" : ""} overflow-hidden`}>
+          <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
+            <ChatLogsTab onConversationClick={handleConversationClick} />
           </div>
-        )}
+          {selectedConversation && (
+            <div className="w-1/3 min-w-[320px]">
+              <ConversationView 
+                conversation={selectedConversation} 
+                onClose={handleCloseConversation} 
+              />
+            </div>
+          )}
+        </div>
       </div>
     </AgentPageLayout>
   );
