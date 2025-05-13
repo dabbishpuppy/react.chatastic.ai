@@ -35,11 +35,9 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
           <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 p-6 overflow-auto">
-          <div className="max-w-7xl">
-            {children}
-          </div>
+        {/* Main content - removed padding from here */}
+        <div className="flex-1 overflow-auto">
+          {children}
         </div>
       </div>
     </div>
