@@ -1,14 +1,13 @@
 
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from "@/components/ui/navigation-menu";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 
 interface AgentsDropdownProps {
   isActive: boolean;
@@ -39,44 +38,54 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
     }
   ];
 
+  const [selectedAgent, setSelectedAgent] = useState<string>("Agents");
+  const location = useLocation();
+  
+  // Check if we're on an agent page and extract the ID
+  React.useEffect(() => {
+    const match = location.pathname.match(/\/agent\/(\d+)/);
+    if (match) {
+      const agentId = match[1];
+      const agent = agents.find(a => a.id === agentId);
+      if (agent) {
+        setSelectedAgent(agent.name);
+      }
+    }
+  }, [location.pathname]);
+
+  const handleAgentSelect = (agentName: string) => {
+    setSelectedAgent(agentName);
+  };
+
   return (
-    <NavigationMenu>
-      <NavigationMenuList>
-        <NavigationMenuItem>
-          <NavigationMenuTrigger 
-            className={isActive ? 'bg-accent/50' : 'hover:bg-accent/30'}
+    <DropdownMenu>
+      <DropdownMenuTrigger 
+        className={`px-3 py-2 rounded-md inline-flex items-center gap-1 ${isActive ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
+      >
+        {selectedAgent}
+        <ChevronDown size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {agents.map(agent => (
+          <DropdownMenuItem key={agent.id} asChild>
+            <Link 
+              to={`/agent/${agent.id}`}
+              onClick={() => handleAgentSelect(agent.name)}
+            >
+              {agent.name}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuItem asChild className="border-t mt-1 pt-1">
+          <Link 
+            to="/dashboard" 
+            onClick={() => handleAgentSelect("Agents")}
           >
-            Agents
-          </NavigationMenuTrigger>
-          <NavigationMenuContent className="bg-white">
-            <ul className="grid w-[200px] p-2">
-              {agents.map(agent => (
-                <li key={agent.id}>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to={`/agent/${agent.id}`}
-                      className="block select-none space-y-1 rounded-md p-3 hover:bg-accent hover:text-accent-foreground"
-                    >
-                      {agent.name}
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-              ))}
-              <li className="border-t mt-2 pt-2">
-                <NavigationMenuLink asChild>
-                  <Link 
-                    to="/dashboard" 
-                    className="block select-none space-y-1 rounded-md p-3 hover:bg-accent hover:text-accent-foreground"
-                  >
-                    View All Agents
-                  </Link>
-                </NavigationMenuLink>
-              </li>
-            </ul>
-          </NavigationMenuContent>
-        </NavigationMenuItem>
-      </NavigationMenuList>
-    </NavigationMenu>
+            View All Agents
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 

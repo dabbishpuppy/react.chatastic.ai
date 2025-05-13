@@ -1,15 +1,13 @@
 
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from "@/components/ui/navigation-menu";
-import { cn } from "@/lib/utils";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 
 const TeamsDropdown: React.FC = () => {
   // Sample teams data
@@ -31,45 +29,54 @@ const TeamsDropdown: React.FC = () => {
     }
   ];
 
+  const [selectedTeam, setSelectedTeam] = useState<string>("Teams");
+  const location = useLocation();
+  
+  // Check if we're on a team page and extract the ID
+  React.useEffect(() => {
+    const match = location.pathname.match(/\/team\/(\d+)/);
+    if (match) {
+      const teamId = match[1];
+      const team = teams.find(t => t.id === teamId);
+      if (team) {
+        setSelectedTeam(team.name);
+      }
+    }
+  }, [location.pathname]);
+
+  const handleTeamSelect = (teamName: string) => {
+    setSelectedTeam(teamName);
+  };
+
   return (
-    <NavigationMenu>
-      <NavigationMenuList>
-        <NavigationMenuItem>
-          <NavigationMenuTrigger className="hover:bg-accent/30">
-            Teams
-          </NavigationMenuTrigger>
-          <NavigationMenuContent className="bg-white">
-            <ul className="grid w-[200px] p-2">
-              {teams.map(team => (
-                <li key={team.id}>
-                  <NavigationMenuLink asChild>
-                    <Link 
-                      to={`/team/${team.id}`}
-                      className={cn(
-                        "block select-none space-y-1 rounded-md p-3 hover:bg-accent hover:text-accent-foreground",
-                        team.active && "font-semibold"
-                      )}
-                    >
-                      {team.name} {team.active && "✓"}
-                    </Link>
-                  </NavigationMenuLink>
-                </li>
-              ))}
-              <li className="border-t mt-2 pt-2">
-                <NavigationMenuLink asChild>
-                  <Link 
-                    to="/teams/create" 
-                    className="block select-none space-y-1 rounded-md p-3 hover:bg-accent hover:text-accent-foreground"
-                  >
-                    Create Team
-                  </Link>
-                </NavigationMenuLink>
-              </li>
-            </ul>
-          </NavigationMenuContent>
-        </NavigationMenuItem>
-      </NavigationMenuList>
-    </NavigationMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="px-3 py-2 rounded-md inline-flex items-center gap-1 hover:bg-accent/30">
+        {selectedTeam}
+        <ChevronDown size={16} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {teams.map(team => (
+          <DropdownMenuItem key={team.id} asChild>
+            <Link 
+              to={`/team/${team.id}`}
+              onClick={() => handleTeamSelect(team.name)}
+              className="flex items-center justify-between"
+            >
+              {team.name}
+              {team.active && <span>✓</span>}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuItem asChild className="border-t mt-1 pt-1">
+          <Link 
+            to="/teams/create" 
+            onClick={() => handleTeamSelect("Teams")}
+          >
+            Create Team
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
