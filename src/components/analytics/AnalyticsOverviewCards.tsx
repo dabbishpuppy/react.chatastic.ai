@@ -11,7 +11,7 @@ interface AnalyticsCardProps {
 
 const AnalyticsCard: React.FC<AnalyticsCardProps> = ({ icon, value, label }) => {
   return (
-    <Card className="flex-1">
+    <Card className="flex-1 bg-white">
       <CardContent className="flex items-center p-6">
         <div className="mr-4 text-muted-foreground">
           {icon}

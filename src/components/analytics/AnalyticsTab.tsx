@@ -5,6 +5,7 @@ import AnalyticsOverviewCards from "./AnalyticsOverviewCards";
 import ChatsAreaChart from "./ChatsAreaChart";
 import ChatsMapChart from "./ChatsMapChart";
 import DateRangePicker from "./DateRangePicker";
+import ChatsChannelChart from "./ChatsChannelChart";
 
 const AnalyticsTab: React.FC = () => {
   const [selectedAgent, setSelectedAgent] = useState("all");
@@ -19,7 +20,7 @@ const AnalyticsTab: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="bg-[#f5f5f5] min-h-screen -m-6 p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold">Analytics</h1>
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
@@ -27,7 +28,7 @@ const AnalyticsTab: React.FC = () => {
             value={selectedAgent} 
             onValueChange={setSelectedAgent}
           >
-            <SelectTrigger className="sm:w-[180px]">
+            <SelectTrigger className="sm:w-[180px] bg-white">
               <SelectValue placeholder="Select agent" />
             </SelectTrigger>
             <SelectContent>
@@ -50,6 +51,7 @@ const AnalyticsTab: React.FC = () => {
 
       <AnalyticsOverviewCards />
       <ChatsAreaChart />
+      <ChatsChannelChart />
       <ChatsMapChart />
     </div>
   );

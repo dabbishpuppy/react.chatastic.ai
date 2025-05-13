@@ -26,7 +26,7 @@ const ChatsMapChart: React.FC = () => {
 
   // We'll use a static placeholder for now as the map component is having issues
   return (
-    <Card className="mb-8">
+    <Card className="mb-8 bg-white">
       <CardContent className="pt-6">
         <h2 className="text-xl font-semibold mb-6">Chats by country</h2>
         
@@ -60,7 +60,7 @@ const ChatsMapChart: React.FC = () => {
             </Table>
             
             <div className="flex justify-center mt-4">
-              <Button variant="outline" size="sm" className="text-xs">
+              <Button variant="outline" size="sm" className="text-xs bg-white">
                 View All
               </Button>
             </div>

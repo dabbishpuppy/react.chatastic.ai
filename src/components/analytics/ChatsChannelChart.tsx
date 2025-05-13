@@ -9,7 +9,7 @@ const data = [
 
 const ChatsChannelChart: React.FC = () => {
   return (
-    <Card className="mb-8">
+    <Card className="mb-8 bg-white">
       <CardContent className="pt-6">
         <h2 className="text-xl font-semibold mb-6">Chats by channel</h2>
         <div className="h-[300px]">
