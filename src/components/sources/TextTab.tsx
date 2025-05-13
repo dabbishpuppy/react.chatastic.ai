@@ -8,7 +8,7 @@ import { Bold, Italic, List, ListOrdered, Link2, Smile } from "lucide-react";
 
 const TextTab: React.FC = () => {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mt-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-semibold">Text</h2>
         <div className="text-right">
@@ -74,7 +74,7 @@ const TextTab: React.FC = () => {
             </Card>
           </div>
 
-          <div className="text-right">
+          <div className="text-right mt-6">
             <Button className="bg-gray-800 hover:bg-gray-700">
               Add text snippet
             </Button>
