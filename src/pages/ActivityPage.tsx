@@ -19,7 +19,7 @@ const ActivityPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="activity" defaultPageTitle="Activity">
-      <div className="flex flex-1 h-full">
+      <div className="flex flex-1 h-full p-6">
         <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
           <ChatLogsTab onConversationClick={handleConversationClick} />
         </div>

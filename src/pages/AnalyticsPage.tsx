@@ -6,7 +6,9 @@ import AnalyticsTab from "@/components/analytics/AnalyticsTab";
 const AnalyticsPage: React.FC = () => {
   return (
     <AgentPageLayout defaultActiveTab="analytics" defaultPageTitle="Analytics">
-      <AnalyticsTab />
+      <div className="p-6">
+        <AnalyticsTab />
+      </div>
     </AgentPageLayout>
   );
 };

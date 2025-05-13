@@ -25,14 +25,14 @@ const AgentSettingsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="" defaultPageTitle="Settings">
-      <div className="flex">
+      <div className="flex p-6">
         {/* Settings sidebar */}
         <div className="w-64 border-r">
           <AgentSettingsSidebar activeTab={getActiveTab()} />
         </div>
         
         {/* Settings content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 pl-6">
           <Routes>
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="/general" element={<GeneralSettings />} />
