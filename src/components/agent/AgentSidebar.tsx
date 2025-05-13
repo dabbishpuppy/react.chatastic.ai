@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React from "react";
 import { 
   Activity, 
   BarChart2, 
@@ -6,23 +7,17 @@ import {
   Settings, 
   Zap,
   Share,
-  Plus,
-  Search,
-  Check
+  ChevronDown,
+  Plus
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-} from "@/components/ui/sidebar";
-import { Input } from "@/components/ui/input";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
 interface AgentSidebarProps {
@@ -33,11 +28,12 @@ interface AgentSidebarProps {
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
   const navigate = useNavigate();
   const { agentId } = useParams();
-  const [searchQuery, setSearchQuery] = useState("");
 
-  // Mock data for teams - would be fetched from API in a real app
-  const mockTeams = [
-    { id: "1", name: "Wonderwave" },
+  // Mock data for agents - would be fetched from API in a real app
+  const mockAgents = [
+    { id: "1", name: "Customer Support Agent" },
+    { id: "2", name: "Sales Assistant" },
+    { id: "3", name: "Technical Support" },
   ];
 
   const menuItems = [
@@ -70,79 +66,61 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     }
   };
 
-  const handleCreateTeam = () => {
-    // This would open a modal or navigate to team creation page
-    console.log("Create team clicked");
+  const handleAgentChange = (value: string) => {
+    navigate(`/agent/${value}`);
+  };
+
+  const handleCreateAgent = () => {
+    navigate("/dashboard/new-agent");
   };
 
   return (
-    <Sidebar className="border-r border-gray-200">
-      <SidebarHeader className="border-b border-gray-200 p-4">
-        <div className="flex items-center relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <Input
-            placeholder="Search team..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 w-full border-gray-200"
-          />
-        </div>
-      </SidebarHeader>
-      
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-4 py-2 text-sm font-medium text-gray-500">
-            Teams
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mockTeams.map((team) => (
-                <SidebarMenuItem key={team.id}>
-                  <SidebarMenuButton 
-                    className="bg-gray-100 px-3 py-2 rounded-md flex items-center justify-between font-medium"
-                  >
-                    <span>{team.name}</span>
-                    <Check className="h-4 w-4" />
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+    <div className="pb-6 flex flex-col h-full">
+      {/* Agent selector dropdown at the top */}
+      <div className="p-4 border-b bg-gray-50">
+        <Select defaultValue={agentId} onValueChange={handleAgentChange}>
+          <SelectTrigger className="w-full bg-black text-white border-0">
+            <SelectValue placeholder="Select an agent" />
+          </SelectTrigger>
+          <SelectContent>
+            {mockAgents.map((agent) => (
+              <SelectItem key={agent.id} value={agent.id}>
+                {agent.name}
+              </SelectItem>
+            ))}
+            <div className="py-2 px-2 border-t mt-1">
+              <Button 
+                onClick={handleCreateAgent} 
+                variant="outline" 
+                size="sm" 
+                className="w-full justify-start"
+              >
+                <Plus size={16} className="mr-2" />
+                Create New Agent
+              </Button>
+            </div>
+          </SelectContent>
+        </Select>
+      </div>
 
-        <div className="px-4 py-2">
-          <Button 
-            variant="outline" 
-            className="w-full flex items-center gap-2 justify-center"
-            onClick={handleCreateTeam}
+      {/* Navigation menu */}
+      <div className="flex-1 overflow-y-auto">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            className={`w-full flex items-center px-6 py-2.5 text-sm ${
+              activeTab === item.id
+                ? "bg-gray-100 font-medium"
+                : "text-gray-700 hover:bg-gray-50"
+            }`}
+            onClick={() => handleClick(item.id, item.label)}
           >
-            <Plus className="h-4 w-4" />
-            <span>Create team</span>
-          </Button>
-        </div>
-        
-        {/* Keep the agent navigation menu for when needed */}
-        <div className="hidden">
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {menuItems.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton 
-                      isActive={activeTab === item.id}
-                      onClick={() => handleClick(item.id, item.label)}
-                    >
-                      {item.icon}
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </div>
-      </SidebarContent>
-    </Sidebar>
+            <span className="mr-3 text-gray-500">{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 };
 
