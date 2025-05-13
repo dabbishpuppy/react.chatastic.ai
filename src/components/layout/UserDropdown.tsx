@@ -20,13 +20,13 @@ const UserDropdown: React.FC = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-white">
         <DropdownMenuItem>
-          <Link to="/profile" className="w-full">Profile</Link>
+          <Link to="/profile" className="w-full text-sm">Profile</Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <Link to="/settings" className="w-full">Settings</Link>
+          <Link to="/settings" className="w-full text-sm">Settings</Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <Link to="/signout" className="w-full">Sign out</Link>
+          <Link to="/signout" className="w-full text-sm">Sign out</Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

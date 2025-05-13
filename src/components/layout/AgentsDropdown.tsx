@@ -8,7 +8,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AgentsDropdownProps {
@@ -62,10 +62,11 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger 
-        className={`px-3 py-2 rounded-md inline-flex items-center gap-1 ${isActive ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
+        className={`px-3 py-2 rounded-md inline-flex items-center gap-1.5 text-sm ${isActive ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
       >
+        <Bot size={16} />
         {selectedAgent}
-        <ChevronDown size={16} />
+        <ChevronDown size={14} />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuLabel>AGENTS</DropdownMenuLabel>
@@ -74,6 +75,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
             <Link 
               to={`/agent/${agent.id}`}
               onClick={() => handleAgentSelect(agent.name)}
+              className="text-sm"
             >
               {agent.name}
             </Link>

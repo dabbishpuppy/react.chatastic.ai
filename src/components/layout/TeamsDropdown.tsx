@@ -63,10 +63,11 @@ const TeamsDropdown: React.FC = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger 
-        className={`px-3 py-2 rounded-md inline-flex items-center gap-1 hover:bg-accent/30`}
+        className={`px-3 py-2 rounded-md inline-flex items-center gap-1.5 hover:bg-accent/30 text-sm`}
       >
+        <Users size={16} />
         {selectedTeam}
-        <ChevronDown size={16} />
+        <ChevronDown size={14} />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuLabel>TEAM</DropdownMenuLabel>
@@ -75,7 +76,7 @@ const TeamsDropdown: React.FC = () => {
             <Link 
               to={`/team/${team.id}`}
               onClick={() => handleTeamSelect(team.name)}
-              className="flex items-center justify-between"
+              className="flex items-center justify-between text-sm"
             >
               {team.name}
               {team.active && <span>✓</span>}

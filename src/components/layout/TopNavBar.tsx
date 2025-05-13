@@ -5,6 +5,7 @@ import Logo from "./Logo";
 import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
+import { LineChart, Settings, FileText, HelpCircle, Sparkles } from "lucide-react";
 
 const TopNavBar = () => {
   const location = useLocation();
@@ -40,24 +41,35 @@ const TopNavBar = () => {
             {/* Usage Link */}
             <Link 
               to="/usage" 
-              className={`px-3 py-2 rounded-md ${isActive('/usage') ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
+              className={`px-3 py-2 rounded-md text-sm flex items-center gap-1.5 ${isActive('/usage') ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
             >
+              <LineChart size={16} />
               Usage
             </Link>
             
             {/* Settings Link */}
             <Link 
               to="/settings" 
-              className={`px-3 py-2 rounded-md ${isActive('/settings') ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
+              className={`px-3 py-2 rounded-md text-sm flex items-center gap-1.5 ${isActive('/settings') ? 'bg-accent/50' : 'hover:bg-accent/30'}`}
             >
+              <Settings size={16} />
               Settings
             </Link>
           </div>
         </div>
         <div className="flex items-center space-x-6">
-          <Link to="/docs" className="text-gray-600 hover:text-gray-900">Docs</Link>
-          <Link to="/help" className="text-gray-600 hover:text-gray-900">Help</Link>
-          <Link to="/changelog" className="text-gray-600 hover:text-gray-900">Changelog</Link>
+          <Link to="/docs" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
+            <FileText size={16} />
+            Docs
+          </Link>
+          <Link to="/help" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
+            <HelpCircle size={16} />
+            Help
+          </Link>
+          <Link to="/changelog" className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
+            <Sparkles size={16} />
+            Changelog
+          </Link>
           <UserDropdown />
         </div>
       </div>
