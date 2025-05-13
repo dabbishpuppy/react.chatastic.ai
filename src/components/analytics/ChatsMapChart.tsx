@@ -1,34 +1,76 @@
 
-import React from "react";
+import React, { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
+import { scaleLinear } from "d3-scale";
 
-// We'll use a placeholder for the map chart since implementing a full map
-// would require additional libraries like react-simple-maps or mapbox
+// URL to a world map topojson file
+const geoUrl = "https://raw.githubusercontent.com/deldersveld/topojson/master/world-countries.json";
+
+// Demo data for visualization
+const countryData = [
+  { country: "United States", countryCode: "USA", coordinates: [-95.7129, 37.0902], chats: 27 },
+  { country: "Norway", countryCode: "NOR", coordinates: [8.4689, 60.4720], chats: 16 },
+  { country: "Germany", countryCode: "DEU", coordinates: [10.4515, 51.1657], chats: 14 },
+  { country: "Japan", countryCode: "JPN", coordinates: [138.2529, 36.2048], chats: 9 },
+  { country: "Brazil", countryCode: "BRA", coordinates: [-51.9253, -14.2350], chats: 5 },
+  { country: "India", countryCode: "IND", coordinates: [78.9629, 20.5937], chats: 3 },
+];
+
+// Scale for marker size based on chat count
+const chatScale = scaleLinear()
+  .domain([0, Math.max(...countryData.map(d => d.chats))])
+  .range([5, 20]);
+
 const ChatsMapChart: React.FC = () => {
-  const countryData = [
-    { country: "Norway", chats: 1 }
-  ];
-
   return (
     <Card className="mb-8">
       <CardContent className="pt-6">
         <h2 className="text-xl font-semibold mb-6">Chats by country</h2>
         
         <div className="flex flex-col lg:flex-row">
-          <div className="lg:w-2/3 h-[300px] bg-slate-100 rounded-lg mb-4 lg:mb-0 lg:mr-4 flex items-center justify-center relative">
-            <div className="text-gray-400">
-              {/* This would be replaced with an actual map component */}
-              <svg className="w-72 h-72 mx-auto opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2h2.5a2 2 0 002-2v-1a2 2 0 012-2h1.5a2 2 0 012 2v1a2 2 0 002 2h2.5a2 2 0 002-2v-1a2 2 0 012-2h1.5"></path>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2v-7"></path>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3 9l9-6 9 6m-1.5 11.25h.01"></path>
-              </svg>
-              <div className="absolute inset-0 p-6 flex items-center justify-center">
-                <p className="text-lg">World Map Visualization</p>
-              </div>
-            </div>
+          <div className="lg:w-2/3 h-[300px] mb-4 lg:mb-0 lg:mr-4 rounded-lg overflow-hidden">
+            <ComposableMap
+              projection="geoEqualEarth"
+              projectionConfig={{
+                scale: 140,
+              }}
+              style={{
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              <Geographies geography={geoUrl}>
+                {({ geographies }) =>
+                  geographies.map(geo => (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      fill="#EAEAEC"
+                      stroke="#D6D6DA"
+                      style={{
+                        default: { outline: "none" },
+                        hover: { fill: "#F5F5F5", outline: "none" },
+                        pressed: { fill: "#E6E6E6", outline: "none" },
+                      }}
+                    />
+                  ))
+                }
+              </Geographies>
+              {countryData.map(({ countryCode, coordinates, chats }) => (
+                <Marker key={countryCode} coordinates={coordinates as [number, number]}>
+                  <circle
+                    r={chatScale(chats)}
+                    fill="#8A63D2"
+                    fillOpacity={0.7}
+                    stroke="#FFFFFF"
+                    strokeWidth={1}
+                  />
+                </Marker>
+              ))}
+            </ComposableMap>
           </div>
           
           <div className="lg:w-1/3">
@@ -41,7 +83,7 @@ const ChatsMapChart: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {countryData.map((item, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={item.countryCode}>
                     <TableCell>{item.country}</TableCell>
                     <TableCell className="text-right">{item.chats}</TableCell>
                   </TableRow>
@@ -61,4 +103,4 @@ const ChatsMapChart: React.FC = () => {
   );
 };
 
-export default ChatsMapChart;
+export default memo(ChatsMapChart);
