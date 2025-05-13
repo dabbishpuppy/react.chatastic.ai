@@ -33,8 +33,8 @@ const AgentEnvironment: React.FC = () => {
             backgroundColor: '#f9f9f9'
           }}
         >
-          {/* White chat container on top of dotted background with max-width */}
-          <div className="max-w-[30rem] w-full h-full">
+          {/* White chat container on top of dotted background with max-width and padding top/bottom */}
+          <div className="max-w-[30rem] w-full h-full py-8">
             <div className="w-full h-full rounded-lg overflow-hidden bg-white shadow-sm border border-gray-100">
               <ChatSection toggleSettings={toggleSettings} />
             </div>
