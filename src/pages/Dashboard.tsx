@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { 
   NavigationMenu,
   NavigationMenuContent,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
+import UsageStats from "@/components/UsageStats";
 
 const agentCards = [
   {
@@ -50,6 +51,8 @@ const agentCards = [
 ];
 
 const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState("agents");
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
@@ -67,24 +70,24 @@ const Dashboard = () => {
                 <NavigationMenuList>
                   <NavigationMenuItem>
                     <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} bg-accent/50`}
-                      href="#agents"
+                      className={`${navigationMenuTriggerStyle()} ${activeTab === "agents" ? "bg-accent/50" : ""}`}
+                      onClick={() => setActiveTab("agents")}
                     >
                       Agents
                     </NavigationMenuLink>
                   </NavigationMenuItem>
                   <NavigationMenuItem>
                     <NavigationMenuLink 
-                      className={navigationMenuTriggerStyle()}
-                      href="#usage"
+                      className={`${navigationMenuTriggerStyle()} ${activeTab === "usage" ? "bg-accent/50" : ""}`}
+                      onClick={() => setActiveTab("usage")}
                     >
                       Usage
                     </NavigationMenuLink>
                   </NavigationMenuItem>
                   <NavigationMenuItem>
                     <NavigationMenuLink 
-                      className={navigationMenuTriggerStyle()}
-                      href="#settings"
+                      className={`${navigationMenuTriggerStyle()} ${activeTab === "settings" ? "bg-accent/50" : ""}`}
+                      onClick={() => setActiveTab("settings")}
                     >
                       Settings
                     </NavigationMenuLink>
@@ -136,31 +139,42 @@ const Dashboard = () => {
 
         {/* Main content */}
         <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">AI Agents</h1>
-              <Button>New agent</Button>
-            </div>
+          {activeTab === "agents" && (
+            <div className="max-w-6xl mx-auto">
+              <div className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold">AI Agents</h1>
+                <Button>New agent</Button>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
-              {agentCards.map(agent => (
-                <Link to={`/agent/${agent.id}`} key={agent.id}>
-                  <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                    <div className={`h-40 ${agent.color} flex items-center justify-center`}>
-                      <img 
-                        src={agent.image} 
-                        alt={agent.name} 
-                        className="w-16 h-16 object-contain" 
-                      />
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-medium text-center truncate">{agent.name}</h3>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                {agentCards.map(agent => (
+                  <Link to={`/agent/${agent.id}`} key={agent.id}>
+                    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                      <div className={`h-40 ${agent.color} flex items-center justify-center`}>
+                        <img 
+                          src={agent.image} 
+                          alt={agent.name} 
+                          className="w-16 h-16 object-contain" 
+                        />
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-medium text-center truncate">{agent.name}</h3>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === "usage" && <UsageStats />}
+          
+          {activeTab === "settings" && (
+            <div className="max-w-6xl mx-auto">
+              <h1 className="text-3xl font-bold mb-8">Settings</h1>
+              <p>Settings content will go here.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
