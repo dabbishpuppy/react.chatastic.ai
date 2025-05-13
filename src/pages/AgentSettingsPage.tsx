@@ -30,7 +30,7 @@ const AgentSettingsPage: React.FC = () => {
     { id: "chat-interface", label: "Chat Interface", icon: <MessageSquare className="w-4 h-4 mr-2" /> },
     { id: "security", label: "Security", icon: <Shield className="w-4 h-4 mr-2" /> },
     { id: "leads", label: "Leads", icon: <Users className="w-4 h-4 mr-2" /> },
-    { id: "notifications", label: "Notifications", icon: <Bell className="w-4 h-4 mr-2" /> },
+    { id: "notifications", label: "Notifications", icon: <Bell className="w-5 h-5 mr-2" /> },
     { id: "custom-domains", label: "Domains", icon: <Globe className="w-4 h-4 mr-2" /> },
   ];
 
