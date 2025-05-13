@@ -63,7 +63,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
       {/* Chat Header */}
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Avatar className="h-10 w-10 bg-black">
+          <Avatar className="h-10 w-10 bg-black border-0">
             <AvatarImage src="/placeholder.svg" alt="Agent" />
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
@@ -89,7 +89,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
             {msg.isAgent && (
-              <Avatar className="h-8 w-8 mr-2 mt-1">
+              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
                 <AvatarImage src="/placeholder.svg" alt="Agent" />
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
