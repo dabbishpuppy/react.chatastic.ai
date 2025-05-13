@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { LineChart, Settings, FileText, HelpCircle, Sparkles, User, LogOut } from "lucide-react";
+import { LineChart, Settings, User, LogOut } from "lucide-react";
 import { Users, CreditCard, KeyRound, Package } from "lucide-react";
 
 const UserDropdown: React.FC = () => {
@@ -69,25 +69,6 @@ const UserDropdown: React.FC = () => {
           <Link to="/settings/api-keys" className="w-full text-sm flex items-center gap-2">
             <KeyRound size={16} />
             API Keys
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <Link to="/docs" className="w-full text-sm flex items-center gap-2">
-            <FileText size={16} />
-            Docs
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/help" className="w-full text-sm flex items-center gap-2">
-            <HelpCircle size={16} />
-            Help
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/changelog" className="w-full text-sm flex items-center gap-2">
-            <Sparkles size={16} />
-            Changelog
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

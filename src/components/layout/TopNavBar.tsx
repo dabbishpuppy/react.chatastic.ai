@@ -5,6 +5,7 @@ import Logo from "./Logo";
 import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
+import { FileText, HelpCircle, Sparkles } from "lucide-react";
 
 const TopNavBar = () => {
   const location = useLocation();
@@ -36,6 +37,20 @@ const TopNavBar = () => {
             
             {/* Agents Dropdown */}
             <AgentsDropdown isActive={isActive('/dashboard')} />
+            
+            {/* Added back Documentation links */}
+            <Link to="/docs" className="text-gray-600 hover:text-gray-900 flex items-center gap-2">
+              <FileText size={20} />
+              Docs
+            </Link>
+            <Link to="/help" className="text-gray-600 hover:text-gray-900 flex items-center gap-2">
+              <HelpCircle size={20} />
+              Help
+            </Link>
+            <Link to="/changelog" className="text-gray-600 hover:text-gray-900 flex items-center gap-2">
+              <Sparkles size={20} />
+              Changelog
+            </Link>
           </div>
         </div>
         <div className="flex items-center">
