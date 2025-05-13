@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import Logo from "@/components/layout/Logo";
+import { Label } from "@/components/ui/label";
 
 interface AgentSidebarProps {
   activeTab: string;
@@ -103,10 +103,13 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
 
   return (
     <div className="flex flex-col h-full">
-      {/* Agent selector dropdown */}
+      {/* Agent selector dropdown with label */}
       <div className="p-4 border-b bg-gray-50">
+        <Label htmlFor="agent-select" className="block mb-2 font-medium">
+          Agents
+        </Label>
         <Select defaultValue={agentId} onValueChange={handleAgentChange}>
-          <SelectTrigger className="w-full bg-white text-black border border-gray-200">
+          <SelectTrigger id="agent-select" className="w-full bg-white text-black border border-gray-200">
             <SelectValue placeholder="Select an agent" />
           </SelectTrigger>
           <SelectContent>
@@ -130,8 +133,13 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
         </Select>
       </div>
 
-      {/* Navigation menu */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Navigation menu with section label */}
+      <div className="pt-4 px-4">
+        <Label className="text-sm font-medium text-gray-500">
+          Agent Menu
+        </Label>
+      </div>
+      <div className="flex-1 overflow-y-auto pt-2">
         {menuItems.map((item) => (
           <button
             key={item.id}
