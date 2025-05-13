@@ -14,6 +14,7 @@ import MembersSettings from "./pages/settings/Members";
 import PlansSettings from "./pages/settings/Plans";
 import BillingSettings from "./pages/settings/Billing";
 import ApiKeys from "./pages/settings/ApiKeys";
+import AgentEnvironment from "./pages/AgentEnvironment";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/agent/:agentId" element={<AgentEnvironment />} />
           <Route path="/settings" element={<Settings />}>
             <Route index element={<GeneralSettings />} />
             <Route path="general" element={<GeneralSettings />} />
