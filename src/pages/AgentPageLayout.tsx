@@ -2,6 +2,7 @@
 import React, { useState, ReactNode } from "react";
 import TopNavBar from "@/components/layout/TopNavBar";
 import AgentSidebar from "@/components/agent/AgentSidebar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AgentPageLayoutProps {
   children: ReactNode;
@@ -23,19 +24,21 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col h-screen">
       <TopNavBar />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar */}
-        <div className="w-64 border-r overflow-y-auto bg-white">
+        {/* Left sidebar with fixed height and internal scroll */}
+        <div className="w-64 border-r bg-white flex flex-col">
           <div className="p-6">
             <h1 className="text-2xl font-bold">{pageTitle}</h1>
           </div>
-          <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
+          <ScrollArea className="flex-1">
+            <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
+          </ScrollArea>
         </div>
 
-        {/* Main content - removed padding from here */}
+        {/* Main content with its own scroll */}
         <div className="flex-1 overflow-auto">
           {children}
         </div>
