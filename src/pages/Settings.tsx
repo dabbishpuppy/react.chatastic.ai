@@ -9,7 +9,7 @@ const Settings = () => {
   const { tab = "general" } = useParams();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-[#f5f5f5]">
       <TopNavBar />
 
       {/* Content */}
@@ -18,7 +18,7 @@ const Settings = () => {
 
         <div className="flex flex-col md:flex-row gap-6">
           {/* Sidebar Navigation */}
-          <div className="w-full md:w-64 space-y-2">
+          <div className="w-full md:w-64 space-y-2 bg-white p-4 rounded-lg">
             <Link 
               to="/settings/general" 
               className={`flex items-center gap-2 p-3 rounded-md hover:bg-accent ${tab === "general" ? "bg-accent" : ""}`}

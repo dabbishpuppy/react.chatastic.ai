@@ -7,8 +7,8 @@ import { Plus } from "lucide-react";
 const ActionsPage: React.FC = () => {
   return (
     <AgentPageLayout defaultActiveTab="actions" defaultPageTitle="Actions">
-      <div className="p-6">
-        <div className="flex flex-col items-center justify-center p-12 text-center">
+      <div className="p-6 bg-[#f5f5f5] -m-6">
+        <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-lg">
           <div className="mb-6 w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
             <Plus className="h-8 w-8 text-gray-500" />
           </div>

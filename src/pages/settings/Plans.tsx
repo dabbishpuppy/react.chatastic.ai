@@ -116,7 +116,7 @@ const PlansSettings: React.FC = () => {
           type="single" 
           value={billingPeriod} 
           onValueChange={(value) => value && setBillingPeriod(value as "monthly" | "yearly")} 
-          className="border rounded-full p-1"
+          className="border rounded-full p-1 bg-white"
         >
           <ToggleGroupItem value="monthly" className="rounded-full px-4">
             Monthly
@@ -130,7 +130,7 @@ const PlansSettings: React.FC = () => {
       {/* Plans grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => (
-          <Card key={plan.name} className="border">
+          <Card key={plan.name} className="border bg-white">
             <CardContent className="p-6 space-y-6">
               <div>
                 <h3 className="text-xl font-bold">{plan.name}</h3>
@@ -163,7 +163,7 @@ const PlansSettings: React.FC = () => {
 
       {/* Add-on features */}
       {addonFeatures.map((feature, index) => (
-        <div key={index} className="border rounded-lg p-6">
+        <div key={index} className="border rounded-lg p-6 bg-white">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <h3 className="font-bold text-lg">{feature.title}</h3>

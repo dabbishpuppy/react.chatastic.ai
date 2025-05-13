@@ -33,7 +33,7 @@ const ApiKeys = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-white rounded-lg">
       <div>
         <h2 className="text-2xl font-semibold mb-2">API keys</h2>
         <p className="text-muted-foreground">

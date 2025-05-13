@@ -25,7 +25,7 @@ export const ShareTab: React.FC = () => {
   
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className="bg-white">
         <CardHeader>
           <CardTitle>Share</CardTitle>
           <CardDescription>Share your agent with others</CardDescription>
