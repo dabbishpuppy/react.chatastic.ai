@@ -3,9 +3,7 @@ import {
   Activity, 
   BarChart2, 
   FileText, 
-  Plus, 
   Settings, 
-  Users, 
   Zap, 
   Link as LinkIcon
 } from "lucide-react";
@@ -13,7 +11,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 interface AgentSidebarProps {
   activeTab: string;
-  onTabChange: (tab: string) => void;
+  onTabChange: (tab: string, tabLabel: string) => void;
 }
 
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
@@ -31,8 +29,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
   ];
 
-  const handleClick = (tabId: string) => {
-    onTabChange(tabId);
+  const handleClick = (tabId: string, tabLabel: string) => {
+    onTabChange(tabId, tabLabel);
     
     if (tabId === "activity") {
       navigate(`/agent/${agentId}/activity`);
@@ -60,7 +58,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
               ? "bg-gray-100 font-medium"
               : "text-gray-700 hover:bg-gray-50"
           }`}
-          onClick={() => handleClick(item.id)}
+          onClick={() => handleClick(item.id, item.label)}
         >
           <span className="mr-3 text-gray-500">{item.icon}</span>
           {item.label}

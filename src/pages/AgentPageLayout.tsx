@@ -1,14 +1,21 @@
 
-import React, { useState } from "react";
+import React, { useState, ReactNode } from "react";
 import TopNavBar from "@/components/layout/TopNavBar";
-import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
-import AnalyticsTab from "@/components/analytics/AnalyticsTab";
 
-const AnalyticsPage: React.FC = () => {
-  const { agentId } = useParams<{ agentId: string }>();
-  const [activeTab, setActiveTab] = useState("analytics");
-  const [pageTitle, setPageTitle] = useState("Analytics");
+interface AgentPageLayoutProps {
+  children: ReactNode;
+  defaultActiveTab: string;
+  defaultPageTitle: string;
+}
+
+const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
+  children,
+  defaultActiveTab,
+  defaultPageTitle,
+}) => {
+  const [activeTab, setActiveTab] = useState(defaultActiveTab);
+  const [pageTitle, setPageTitle] = useState(defaultPageTitle);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
@@ -31,7 +38,7 @@ const AnalyticsPage: React.FC = () => {
         {/* Main content */}
         <div className="flex-1 p-6 overflow-auto">
           <div className="max-w-7xl">
-            <AnalyticsTab />
+            {children}
           </div>
         </div>
       </div>
@@ -39,4 +46,4 @@ const AnalyticsPage: React.FC = () => {
   );
 };
 
-export default AnalyticsPage;
+export default AgentPageLayout;
