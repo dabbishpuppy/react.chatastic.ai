@@ -45,7 +45,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     } else if (tabId === "connect") {
       navigate(`/agent/${agentId}/integrations`);
     } else if (tabId === "settings") {
-      navigate(`/agent/${agentId}/settings/general`);
+      navigate(`/agent/${agentId}/settings`);
     }
   };
 
