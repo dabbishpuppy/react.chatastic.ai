@@ -29,7 +29,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({ activeTab }
     { id: "chat-interface", label: "Interface", icon: <LayoutTemplate size={18} /> },
     { id: "security", label: "Security", icon: <Shield size={18} /> },
     { id: "leads", label: "Leads", icon: <Users size={18} /> },
-    { id: "notifications", label: "Notifications", icon: <Bell size={24} /> },
+    { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
     { id: "custom-domains", label: "Domains", icon: <Globe size={18} /> },
   ];
 

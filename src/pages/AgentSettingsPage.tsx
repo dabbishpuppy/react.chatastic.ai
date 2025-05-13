@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import AgentSettingsSidebar from "@/components/agent/AgentSettingsSidebar";
