@@ -12,6 +12,7 @@ import Settings from "./pages/Settings";
 import GeneralSettings from "./pages/settings/General";
 import MembersSettings from "./pages/settings/Members";
 import PlansSettings from "./pages/settings/Plans";
+import BillingSettings from "./pages/settings/Billing";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="general" element={<GeneralSettings />} />
             <Route path="members" element={<MembersSettings />} />
             <Route path="plans" element={<PlansSettings />} />
+            <Route path="billing" element={<BillingSettings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
