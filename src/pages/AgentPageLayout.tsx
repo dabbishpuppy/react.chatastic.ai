@@ -37,9 +37,7 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
         {/* Main content with its own scroll */}
         <div className="flex-1 overflow-auto">
-          <div className="p-6 border-b">
-            <h1 className="text-2xl font-bold">{pageTitle}</h1>
-          </div>
+          {/* Removed the title element from here to avoid duplication */}
           {children}
         </div>
       </div>
