@@ -4,8 +4,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import AnalyticsOverviewCards from "./AnalyticsOverviewCards";
 import ChatsAreaChart from "./ChatsAreaChart";
 import ChatsMapChart from "./ChatsMapChart";
-import ChatsChannelChart from "./ChatsChannelChart";
-import TopPagesCard from "./TopPagesCard";
 import DateRangePicker from "./DateRangePicker";
 
 const AnalyticsTab: React.FC = () => {
@@ -53,11 +51,6 @@ const AnalyticsTab: React.FC = () => {
       <AnalyticsOverviewCards />
       <ChatsAreaChart />
       <ChatsMapChart />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <TopPagesCard />
-        <ChatsChannelChart />
-      </div>
     </div>
   );
 };
