@@ -1,7 +1,6 @@
 
 import React, { useState } from "react";
 import AgentPageLayout from "./AgentPageLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChatSection from "@/components/agent/ChatSection";
 import ConversationView from "@/components/agent/ConversationView";
 import LLMSettingsPanel from "@/components/agent/LLMSettingsPanel";
@@ -16,28 +15,29 @@ const AgentEnvironment: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="playground" defaultPageTitle="Playground">
-      <Tabs defaultValue="chat" className="w-full">
-        <TabsList>
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-          <TabsTrigger value="configure">Configure</TabsTrigger>
-        </TabsList>
-        <TabsContent value="chat" className="flex flex-1 h-full overflow-hidden">
-          <div className="flex flex-1">
-            <div className="flex-1 overflow-hidden">
-              <ChatSection />
-            </div>
-            <div className="w-64 border-l">
-              <ConversationView 
-                conversation={activeConversation}
-                onClose={handleCloseConversation}
-              />
-            </div>
+      <div className="w-full h-full flex overflow-hidden">
+        <div className="flex-1 p-6 overflow-hidden bg-[#f9f9f9]">
+          {/* Main chat area with dotted background pattern */}
+          <div 
+            className="w-full h-full rounded-lg overflow-hidden bg-white"
+            style={{ 
+              backgroundImage: 'radial-gradient(#e0e0e0 1px, transparent 1px)', 
+              backgroundSize: '16px 16px',
+              backgroundPosition: '0 0',
+            }}
+          >
+            <ChatSection />
           </div>
-        </TabsContent>
-        <TabsContent value="configure">
-          <LLMSettingsPanel />
-        </TabsContent>
-      </Tabs>
+        </div>
+        
+        {/* Hide the sidebar that was previously visible */}
+        <div className="hidden">
+          <ConversationView 
+            conversation={activeConversation}
+            onClose={handleCloseConversation}
+          />
+        </div>
+      </div>
     </AgentPageLayout>
   );
 };

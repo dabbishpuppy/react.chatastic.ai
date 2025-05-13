@@ -16,7 +16,13 @@ interface ChatSectionProps {
 
 const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
   const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
+    {
+      isAgent: true,
+      content: "Hi! I'm Wonder AI. How can I help you today?",
+      timestamp: new Date().toISOString()
+    }
+  ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -52,11 +58,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-md overflow-hidden border shadow-sm">
+    <div className="flex flex-col h-full max-w-[800px] mx-auto">
       {/* Chat Header */}
-      <div className="p-4 border-b flex items-center justify-between bg-white">
+      <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Avatar className="h-10 w-10 bg-violet-600">
+          <Avatar className="h-10 w-10 bg-black">
             <AvatarImage src="/placeholder.svg" alt="Agent" />
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
@@ -66,14 +72,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
           <Button variant="ghost" size="icon" className="h-9 w-9">
             <RefreshCw className="h-5 w-5" />
           </Button>
-          <Button variant="outline" size="sm" className="ml-2">
-            Compare
-          </Button>
         </div>
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-white">
+      <div className="flex-1 overflow-y-auto p-6">
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
             {msg.isAgent && (
@@ -93,18 +96,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
       </div>
 
       {/* Chat Input */}
-      <form onSubmit={handleSubmit} className="border-t p-4 bg-white">
+      <form onSubmit={handleSubmit} className="border-t p-4">
         <div className="flex items-center w-full relative">
           <input
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Write message here..."
-            className="w-full border rounded-full px-4 py-2 pr-12 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border rounded-full px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <Button 
             type="submit" 
-            size="icon" 
+            size="sm" 
+            variant="ghost"
             className="absolute right-1 rounded-full h-8 w-8"
           >
             <SendIcon size={16} />
