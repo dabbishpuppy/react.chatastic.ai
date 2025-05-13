@@ -1,13 +1,15 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface AgentsDropdownProps {
   isActive: boolean;
@@ -66,6 +68,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
         <ChevronDown size={16} />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
+        <DropdownMenuLabel>AGENTS</DropdownMenuLabel>
         {agents.map(agent => (
           <DropdownMenuItem key={agent.id} asChild>
             <Link 
@@ -80,8 +83,11 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
           <Link 
             to="/dashboard" 
             onClick={() => handleAgentSelect("Agents")}
+            className="w-full"
           >
-            View All Agents
+            <Button variant="outline" className="w-full bg-white text-primary border border-input">
+              Create Agent
+            </Button>
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

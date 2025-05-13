@@ -5,10 +5,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { ChevronDown, Users } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 const TeamsDropdown: React.FC = () => {
   // Sample teams data
@@ -60,11 +62,14 @@ const TeamsDropdown: React.FC = () => {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="px-3 py-2 rounded-md inline-flex items-center gap-1 hover:bg-accent/30">
+      <DropdownMenuTrigger 
+        className={`px-3 py-2 rounded-md inline-flex items-center gap-1 hover:bg-accent/30`}
+      >
         {selectedTeam}
         <ChevronDown size={16} />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
+        <DropdownMenuLabel>TEAM</DropdownMenuLabel>
         {teams.map(team => (
           <DropdownMenuItem key={team.id} asChild>
             <Link 
@@ -81,8 +86,11 @@ const TeamsDropdown: React.FC = () => {
           <Link 
             to="/teams/create" 
             onClick={() => setSelectedTeam("Teams")}
+            className="w-full"
           >
-            Create Team
+            <Button variant="outline" className="w-full bg-white text-primary border border-input">
+              Create Team
+            </Button>
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
