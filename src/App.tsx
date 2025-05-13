@@ -20,6 +20,7 @@ import ActivityPage from "./pages/ActivityPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
+import IntegrationsPage from "./pages/IntegrationsPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
           <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
           <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
+          <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
           <Route path="/settings" element={<Settings />}>
             <Route index element={<GeneralSettings />} />
             <Route path="general" element={<GeneralSettings />} />

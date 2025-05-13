@@ -27,6 +27,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
     { id: "sources", label: "Sources", icon: <FileText size={18} /> },
     { id: "actions", label: "Actions", icon: <Zap size={18} />, badge: "New" },
+    { id: "integrations", label: "Integrations", icon: <LinkIcon size={18} />, badge: "New" },
     { id: "contacts", label: "Contacts", icon: <Users size={18} />, badge: "New" },
     { id: "connect", label: "Connect", icon: <LinkIcon size={18} /> },
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
@@ -45,6 +46,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       navigate(`/agent/${agentId}/sources`);
     } else if (tabId === "actions") {
       navigate(`/agent/${agentId}/actions`);
+    } else if (tabId === "integrations") {
+      navigate(`/agent/${agentId}/integrations`);
     }
     // Other tabs can be added as they are implemented
   };
