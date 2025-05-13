@@ -63,7 +63,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
       {/* Chat Header */}
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Avatar className="h-10 w-10 bg-black border-0">
+          <Avatar className="h-10 w-10 border-0">
             <AvatarImage src="/placeholder.svg" alt="Agent" />
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
