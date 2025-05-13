@@ -13,7 +13,7 @@ import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSett
 import { 
   Settings, 
   Bot, 
-  MessageSquare, 
+  LayoutTemplate, 
   Shield, 
   Users, 
   Bell, 
@@ -27,7 +27,7 @@ const AgentSettingsPage: React.FC = () => {
   const tabs = [
     { id: "general", label: "General", icon: <Settings className="w-4 h-4 mr-2" /> },
     { id: "ai", label: "AI", icon: <Bot className="w-4 h-4 mr-2" /> },
-    { id: "chat-interface", label: "Chat Interface", icon: <MessageSquare className="w-4 h-4 mr-2" /> },
+    { id: "chat-interface", label: "Interface", icon: <LayoutTemplate className="w-4 h-4 mr-2" /> },
     { id: "security", label: "Security", icon: <Shield className="w-4 h-4 mr-2" /> },
     { id: "leads", label: "Leads", icon: <Users className="w-4 h-4 mr-2" /> },
     { id: "notifications", label: "Notifications", icon: <Bell className="w-5 h-5 mr-2" /> },
