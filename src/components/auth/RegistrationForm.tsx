@@ -1,5 +1,6 @@
 
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/ui/PasswordInput";
@@ -93,9 +94,9 @@ const RegistrationForm = () => {
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600">
           Already have an account?{" "}
-          <a href="#" className="font-medium text-black hover:underline">
+          <Link to="/signin" className="font-medium text-black hover:underline">
             Sign in
-          </a>
+          </Link>
         </p>
       </div>
       
