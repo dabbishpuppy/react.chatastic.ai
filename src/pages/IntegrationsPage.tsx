@@ -13,8 +13,8 @@ const IntegrationsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="connect" defaultPageTitle="Connect">
-      <Tabs defaultValue="embed" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="mb-4 grid w-full grid-cols-3">
+      <Tabs defaultValue="embed" onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
           <TabsTrigger value="embed">Embed</TabsTrigger>
           <TabsTrigger value="share">Share</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>

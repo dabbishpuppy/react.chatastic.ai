@@ -1,4 +1,3 @@
-
 import React from "react";
 import { 
   Activity, 
@@ -6,7 +5,6 @@ import {
   FileText, 
   Settings, 
   Zap,
-  Embed, 
   Share 
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
