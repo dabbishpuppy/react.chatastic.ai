@@ -2,21 +2,25 @@
 import React, { useState } from "react";
 import TopNavBar from "@/components/layout/TopNavBar";
 import { useParams } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AgentSidebar from "@/components/agent/AgentSidebar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Zap, Search, ExternalLink } from "lucide-react";
+import { Search, Zap, ExternalLink, Puzzle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ActionsPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [activeTab, setActiveTab] = useState("actions");
+  const [activeTabView, setActiveTabView] = useState("actions");
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
   };
+
+  // Empty state - setting to true will show the empty state UI
+  const isEmpty = true;
 
   const integrations = [
     {
@@ -71,31 +75,48 @@ const ActionsPage: React.FC = () => {
           <div className="max-w-7xl">
             <h1 className="text-3xl font-bold mb-6">Actions</h1>
 
-            {/* Empty state for first time users */}
-            {integrations.length === 0 && (
-              <div className="text-center py-20">
-                <div className="rounded-full bg-gray-100 p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <Zap className="w-8 h-8 text-gray-400" />
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">Create your first action</h2>
-                <p className="text-gray-500 max-w-md mx-auto mb-6">
-                  Customize how your users interact with the chatbot,
-                  connect to an integration or create your own actions.
-                </p>
-                <div className="flex gap-4 justify-center">
-                  <Button variant="default" className="bg-black hover:bg-gray-800">
-                    Create action
-                  </Button>
-                  <Button variant="outline">
-                    View all integrations
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Tabs 
+              defaultValue="actions" 
+              value={activeTabView} 
+              onValueChange={setActiveTabView} 
+              className="w-full mb-8"
+            >
+              <TabsList>
+                <TabsTrigger value="actions" className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Actions
+                </TabsTrigger>
+                <TabsTrigger value="integrations" className="flex items-center gap-2">
+                  <Puzzle className="h-5 w-5" />
+                  Integrations
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Search and integrations list */}
-            {integrations.length > 0 && (
-              <>
+              <TabsContent value="actions" className="mt-6">
+                {/* Empty state for first time users */}
+                {isEmpty && (
+                  <div className="text-center py-20 max-w-xl mx-auto">
+                    <div className="rounded-full bg-gray-100 p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <Zap className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h2 className="text-2xl font-semibold mb-2">Create your first action</h2>
+                    <p className="text-gray-500 max-w-md mx-auto mb-6">
+                      Customize how your users interact with the chatbot,
+                      connect to an integration or create your own actions.
+                    </p>
+                    <div className="flex gap-4 justify-center">
+                      <Button className="bg-black hover:bg-gray-800">
+                        Create action
+                      </Button>
+                      <Button variant="outline" onClick={() => setActiveTabView("integrations")}>
+                        View all integrations
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="integrations" className="mt-6">
                 <div className="mb-6">
                   <div className="relative">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -132,8 +153,8 @@ const ActionsPage: React.FC = () => {
                     </Card>
                   ))}
                 </div>
-              </>
-            )}
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
