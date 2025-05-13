@@ -27,23 +27,20 @@ const AgentEnvironment = () => {
     <div className="flex flex-col min-h-screen">
       <TopNavBar />
 
-      {/* Sidebar + Main content */}
-      <SidebarProvider defaultOpen={true}>
-        <div className="flex h-screen bg-background overflow-hidden">
-          {/* Left Navigation Sidebar */}
-          <Sidebar>
-            <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
-          </Sidebar>
-
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col h-full overflow-hidden">
-            {/* Chat Container */}
-            <div className="flex-1 flex flex-col bg-gray-50 p-4 overflow-auto" style={{ backgroundSize: "20px 20px", backgroundImage: "radial-gradient(circle, #d0d0d0 1px, rgba(0, 0, 0, 0) 1px)" }}>
-              <ChatSection initialMessages={initialMessages} />
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar */}
+        <div className="w-64 border-r overflow-y-auto bg-white">
+          <div className="p-6">
+            <h1 className="text-2xl font-bold">Playground</h1>
           </div>
+          <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
-      </SidebarProvider>
+
+        {/* Main content area */}
+        <div className="flex-1 p-6 overflow-auto bg-gray-50">
+          <ChatSection initialMessages={initialMessages} />
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,8 +1,8 @@
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { RefreshCw, SendIcon } from "lucide-react";
 
 interface ChatMessage {
   isAgent: boolean;
@@ -17,6 +17,15 @@ interface ChatSectionProps {
 const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatHistory]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,67 +45,73 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
     setTimeout(() => {
       setChatHistory(prev => [...prev, {
         isAgent: true,
-        content: "I'm an AI assistant. I'm here to help you with any questions or tasks!",
+        content: "I'm Wonder AI. I'm here to help you with any questions or tasks!",
         timestamp: new Date().toISOString()
       }]);
     }, 1000);
   };
 
   return (
-    <Card className="mx-auto w-full max-w-3xl h-full bg-white overflow-hidden flex flex-col">
+    <div className="flex flex-col h-full bg-white rounded-md overflow-hidden border">
       {/* Chat Header */}
-      <div className="p-4 border-b flex items-center justify-between">
+      <div className="p-4 border-b flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
-          <Avatar className="h-8 w-8 bg-violet-600">
+          <Avatar className="h-10 w-10 bg-violet-600">
             <AvatarImage src="/placeholder.svg" alt="Agent" />
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
           <span className="font-medium">AI Customer Service</span>
         </div>
-        <Button size="icon" variant="ghost">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-9 w-9">
+            <RefreshCw className="h-5 w-5" />
+          </Button>
+          <Button variant="outline" size="sm" className="ml-2">
+            Compare
+          </Button>
+        </div>
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50" style={{ backgroundSize: "20px 20px", backgroundImage: "radial-gradient(circle, #d0d0d0 1px, rgba(0, 0, 0, 0) 1px)" }}>
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
             {msg.isAgent && (
-              <Avatar className="h-8 w-8 mr-2">
+              <Avatar className="h-8 w-8 mr-2 mt-1">
                 <AvatarImage src="/placeholder.svg" alt="Agent" />
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
             )}
             <div className={`rounded-lg p-3 max-w-[80%] ${
-              msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
+              msg.isAgent ? 'bg-white shadow-sm' : 'bg-primary text-primary-foreground'
             }`}>
               {msg.content}
             </div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Chat Input */}
-      <form onSubmit={handleSubmit} className="border-t p-4 flex gap-2">
-        <input
-          type="text"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Write message here..."
-          className="flex-1 border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-        <Button type="submit">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="rotate-90">
-            <line x1="22" y1="2" x2="11" y2="13"></line>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-          </svg>
-        </Button>
+      <form onSubmit={handleSubmit} className="border-t p-4 bg-white">
+        <div className="flex items-center w-full relative">
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Write message here..."
+            className="w-full border rounded-full px-4 py-2 pr-12 focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <Button 
+            type="submit" 
+            size="icon" 
+            className="absolute right-1 rounded-full h-8 w-8"
+          >
+            <SendIcon size={16} />
+          </Button>
+        </div>
       </form>
-    </Card>
+    </div>
   );
 };
 
