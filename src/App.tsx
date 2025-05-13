@@ -17,6 +17,7 @@ import ApiKeys from "./pages/settings/ApiKeys";
 import AgentEnvironment from "./pages/AgentEnvironment";
 import UsagePage from "./pages/Usage";
 import ActivityPage from "./pages/ActivityPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/usage" element={<UsagePage />} />
           <Route path="/agent/:agentId" element={<AgentEnvironment />} />
           <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
+          <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
           <Route path="/settings" element={<Settings />}>
             <Route index element={<GeneralSettings />} />
             <Route path="general" element={<GeneralSettings />} />

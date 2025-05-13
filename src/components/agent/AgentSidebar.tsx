@@ -1,3 +1,4 @@
+
 import React from "react";
 import { 
   Activity, 
@@ -38,6 +39,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       navigate(`/agent/${agentId}/activity`);
     } else if (tabId === "playground") {
       navigate(`/agent/${agentId}`);
+    } else if (tabId === "analytics") {
+      navigate(`/agent/${agentId}/analytics`);
     }
     // Other tabs can be added as they are implemented
   };
