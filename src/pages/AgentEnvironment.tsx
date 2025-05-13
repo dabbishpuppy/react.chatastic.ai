@@ -5,6 +5,8 @@ import ChatSection from "@/components/agent/ChatSection";
 import ConversationView from "@/components/agent/ConversationView";
 import LLMSettingsPanel from "@/components/agent/LLMSettingsPanel";
 import { Conversation } from "@/components/activity/ConversationData";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const AgentEnvironment: React.FC = () => {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -12,6 +14,10 @@ const AgentEnvironment: React.FC = () => {
 
   const handleCloseConversation = () => {
     setActiveConversation(null);
+  };
+
+  const toggleSettings = () => {
+    setShowSettings(!showSettings);
   };
 
   return (
@@ -30,15 +36,17 @@ const AgentEnvironment: React.FC = () => {
           {/* White chat container on top of dotted background with max-width */}
           <div className="max-w-[30rem] w-full h-full mx-auto p-6">
             <div className="w-full h-full rounded-lg overflow-hidden bg-white shadow-sm border border-gray-100">
-              <ChatSection />
+              <ChatSection toggleSettings={toggleSettings} />
             </div>
           </div>
         </div>
         
-        {/* Settings sidebar */}
-        <div className="w-80 border-l border-gray-200 bg-white">
-          <LLMSettingsPanel />
-        </div>
+        {/* Settings sidebar - only visible when showSettings is true */}
+        {showSettings && (
+          <div className="w-80 border-l border-gray-200 bg-white">
+            <LLMSettingsPanel />
+          </div>
+        )}
       </div>
     </AgentPageLayout>
   );

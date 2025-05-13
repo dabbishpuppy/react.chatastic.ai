@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, SendIcon } from "lucide-react";
+import { RefreshCw, SendIcon, Settings } from "lucide-react";
 
 interface ChatMessage {
   isAgent: boolean;
@@ -12,9 +12,10 @@ interface ChatMessage {
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
+  toggleSettings?: () => void;
 }
 
-const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
+const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleSettings }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
     {
@@ -71,6 +72,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="h-9 w-9">
             <RefreshCw className="h-5 w-5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9"
+            onClick={toggleSettings}
+          >
+            <Settings className="h-5 w-5" />
           </Button>
         </div>
       </div>
