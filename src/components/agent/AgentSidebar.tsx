@@ -1,4 +1,3 @@
-
 import React from "react";
 import { 
   Activity, 
@@ -10,6 +9,7 @@ import {
   Zap, 
   Link as LinkIcon
 } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 
 interface AgentSidebarProps {
   activeTab: string;
@@ -17,6 +17,9 @@ interface AgentSidebarProps {
 }
 
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
+  const navigate = useNavigate();
+  const { agentId } = useParams();
+
   const menuItems = [
     { id: "playground", label: "Playground", icon: <FileText size={18} /> },
     { id: "activity", label: "Activity", icon: <Activity size={18} /> },
@@ -28,6 +31,17 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
   ];
 
+  const handleClick = (tabId: string) => {
+    onTabChange(tabId);
+    
+    if (tabId === "activity") {
+      navigate(`/agent/${agentId}/activity`);
+    } else if (tabId === "playground") {
+      navigate(`/agent/${agentId}`);
+    }
+    // Other tabs can be added as they are implemented
+  };
+
   return (
     <div className="pb-6">
       {menuItems.map((item) => (
@@ -38,7 +52,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
               ? "bg-gray-100 font-medium"
               : "text-gray-700 hover:bg-gray-50"
           }`}
-          onClick={() => onTabChange(item.id)}
+          onClick={() => handleClick(item.id)}
         >
           <span className="mr-3 text-gray-500">{item.icon}</span>
           {item.label}
