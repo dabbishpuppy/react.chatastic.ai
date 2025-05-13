@@ -52,7 +52,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-md overflow-hidden border">
+    <div className="flex flex-col h-full bg-white rounded-md overflow-hidden border shadow-sm">
       {/* Chat Header */}
       <div className="p-4 border-b flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
@@ -73,7 +73,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50" style={{ backgroundSize: "20px 20px", backgroundImage: "radial-gradient(circle, #d0d0d0 1px, rgba(0, 0, 0, 0) 1px)" }}>
+      <div className="flex-1 overflow-y-auto p-4 bg-white">
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
             {msg.isAgent && (
@@ -83,7 +83,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [] }) => {
               </Avatar>
             )}
             <div className={`rounded-lg p-3 max-w-[80%] ${
-              msg.isAgent ? 'bg-white shadow-sm' : 'bg-primary text-primary-foreground'
+              msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
             }`}>
               {msg.content}
             </div>
