@@ -10,6 +10,7 @@ import LeadsSettings from "@/components/agent/settings/LeadsSettings";
 import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
 import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
 import AvatarSettings from "@/components/agent/settings/AvatarSettings";
+import VoiceSettings from "@/components/agent/settings/VoiceSettings";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Settings,
@@ -19,7 +20,8 @@ import {
   Users,
   Bell,
   Globe,
-  UserRound
+  UserRound,
+  Volume2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -45,6 +47,7 @@ const AgentSettingsPage: React.FC = () => {
     { id: "general", label: "General", icon: <Settings size={16} className="mr-2" /> },
     { id: "ai", label: "AI", icon: <Bot size={16} className="mr-2" /> },
     { id: "avatar", label: "Avatar", icon: <UserRound size={16} className="mr-2" /> },
+    { id: "voice", label: "Voice", icon: <Volume2 size={16} className="mr-2" /> },
     { id: "chat-interface", label: "Interface", icon: <LayoutTemplate size={16} className="mr-2" /> },
     { id: "security", label: "Security", icon: <Shield size={16} className="mr-2" /> },
     { id: "leads", label: "Leads", icon: <Users size={16} className="mr-2" /> },
@@ -92,6 +95,7 @@ const AgentSettingsPage: React.FC = () => {
             <Route path="notifications" element={<NotificationsSettings />} />
             <Route path="custom-domains" element={<CustomDomainsSettings />} />
             <Route path="avatar" element={<AvatarSettings />} />
+            <Route path="voice" element={<VoiceSettings />} />
           </Routes>
         </div>
       </div>
