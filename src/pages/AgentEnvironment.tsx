@@ -1,20 +1,11 @@
-
 import React, { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { 
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle
-} from "@/components/ui/navigation-menu";
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
 import { Card } from "@/components/ui/card";
 import { Plus, Search } from "lucide-react";
+import TopNavBar from "@/components/layout/TopNavBar";
 
 const AgentEnvironment = () => {
   const { agentId } = useParams();
@@ -58,74 +49,7 @@ const AgentEnvironment = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Header with Navigation Menu */}
-      <header className="border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <Link to="/" className="text-2xl font-bold">
-              <span className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-black text-white flex items-center justify-center rounded">C</div>
-                Wonderwave
-              </span>
-            </Link>
-            <div className="hidden md:block ml-8">
-              <NavigationMenu>
-                <NavigationMenuList>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "playground" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("playground")}
-                    >
-                      Playground
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "activity" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("activity")}
-                    >
-                      Activity
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "analytics" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("analytics")}
-                    >
-                      Analytics
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "sources" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("sources")}
-                    >
-                      Sources
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "actions" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("actions")}
-                    >
-                      Actions
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                </NavigationMenuList>
-              </NavigationMenu>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link to="#docs" className="text-gray-600 hover:text-gray-900">Docs</Link>
-            <Link to="#help" className="text-gray-600 hover:text-gray-900">Help</Link>
-            <Link to="#changelog" className="text-gray-600 hover:text-gray-900">Changelog</Link>
-            <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-          </div>
-        </div>
-      </header>
+      <TopNavBar />
 
       {/* Sidebar + Main content */}
       <SidebarProvider defaultOpen={true}>

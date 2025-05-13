@@ -1,88 +1,16 @@
 
-import React, { useState } from "react";
-import { useNavigate, useParams, Outlet } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings as SettingsIcon, Users, CreditCard, KeyRound, Package } from "lucide-react";
+import React from "react";
+import { useParams, Outlet } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { 
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle
-} from "@/components/ui/navigation-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Settings as SettingsIcon, Users, CreditCard, KeyRound, Package } from "lucide-react";
+import TopNavBar from "@/components/layout/TopNavBar";
 
 const Settings = () => {
   const { tab = "general" } = useParams();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("settings");
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === "agents") {
-      navigate("/dashboard");
-    } else if (tab === "usage") {
-      navigate("/dashboard", { state: { activeTab: "usage" } });
-    }
-  };
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <Link to="/" className="text-2xl font-bold">
-              <span className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-black text-white flex items-center justify-center rounded">C</div>
-                Wonderwave
-              </span>
-            </Link>
-            <div className="hidden md:block ml-8">
-              <NavigationMenu>
-                <NavigationMenuList>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "agents" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("agents")}
-                    >
-                      Agents
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "usage" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("usage")}
-                    >
-                      Usage
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                  <NavigationMenuItem>
-                    <NavigationMenuLink 
-                      className={`${navigationMenuTriggerStyle()} ${activeTab === "settings" ? "bg-accent/50" : ""}`}
-                      onClick={() => handleTabChange("settings")}
-                    >
-                      Settings
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                </NavigationMenuList>
-              </NavigationMenu>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link to="#docs" className="text-gray-600 hover:text-gray-900">Docs</Link>
-            <Link to="#help" className="text-gray-600 hover:text-gray-900">Help</Link>
-            <Link to="#changelog" className="text-gray-600 hover:text-gray-900">Changelog</Link>
-            <Avatar>
-              <AvatarImage src="/placeholder.svg" />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-          </div>
-        </div>
-      </header>
+      <TopNavBar />
 
       {/* Content */}
       <div className="container mx-auto px-4 py-6">
