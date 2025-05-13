@@ -8,6 +8,7 @@ import FilesTab from "@/components/sources/FilesTab";
 import TextTab from "@/components/sources/TextTab";
 import QATab from "@/components/sources/QATab";
 import WebsiteTab from "@/components/sources/WebsiteTab";
+import { Button } from "@/components/ui/button";
 import { FileText, FileUp, Link, Globe, HelpCircle, Notebook } from "lucide-react";
 
 const SourcesPage: React.FC = () => {
