@@ -5,8 +5,6 @@ import AgentPageLayout from "./AgentPageLayout";
 import AgentSettingsSidebar from "@/components/agent/AgentSettingsSidebar";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
 import AISettings from "@/components/agent/settings/AISettings";
-import VoiceSettings from "@/components/agent/settings/VoiceSettings";
-import AvatarSettings from "@/components/agent/settings/AvatarSettings";
 import ChatInterfaceSettings from "@/components/agent/settings/ChatInterfaceSettings";
 import SecuritySettings from "@/components/agent/settings/SecuritySettings";
 import LeadsSettings from "@/components/agent/settings/LeadsSettings";
@@ -39,8 +37,6 @@ const AgentSettingsPage: React.FC = () => {
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="/general" element={<GeneralSettings />} />
             <Route path="/ai" element={<AISettings />} />
-            <Route path="/voice" element={<VoiceSettings />} />
-            <Route path="/avatar" element={<AvatarSettings />} />
             <Route path="/chat-interface" element={<ChatInterfaceSettings />} />
             <Route path="/security" element={<SecuritySettings />} />
             <Route path="/leads" element={<LeadsSettings />} />
