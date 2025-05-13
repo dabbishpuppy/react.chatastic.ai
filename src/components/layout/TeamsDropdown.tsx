@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 const TeamsDropdown: React.FC = () => {
   // Sample teams data
@@ -29,11 +30,12 @@ const TeamsDropdown: React.FC = () => {
     }
   ];
 
-  const [selectedTeam, setSelectedTeam] = useState<string>("Teams");
+  const defaultTeam = teams.find(t => t.active) || teams[0];
+  const [selectedTeam, setSelectedTeam] = useState<string>(defaultTeam.name);
   const location = useLocation();
   
   // Check if we're on a team page and extract the ID
-  React.useEffect(() => {
+  useEffect(() => {
     const match = location.pathname.match(/\/team\/(\d+)/);
     if (match) {
       const teamId = match[1];
@@ -41,11 +43,19 @@ const TeamsDropdown: React.FC = () => {
       if (team) {
         setSelectedTeam(team.name);
       }
+    } else if (location.pathname.includes('/agent/')) {
+      // If we're on an agent page and no team is explicitly selected,
+      // default to the active team or first team
+      setSelectedTeam(defaultTeam.name);
     }
   }, [location.pathname]);
 
   const handleTeamSelect = (teamName: string) => {
     setSelectedTeam(teamName);
+    toast({
+      title: "Team selected",
+      description: `You switched to ${teamName}`,
+    });
   };
 
   return (
@@ -70,7 +80,7 @@ const TeamsDropdown: React.FC = () => {
         <DropdownMenuItem asChild className="border-t mt-1 pt-1">
           <Link 
             to="/teams/create" 
-            onClick={() => handleTeamSelect("Teams")}
+            onClick={() => setSelectedTeam("Teams")}
           >
             Create Team
           </Link>

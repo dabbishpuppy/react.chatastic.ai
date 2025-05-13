@@ -31,11 +31,11 @@ const TopNavBar = () => {
             </span>
           </Link>
           <div className="hidden md:flex ml-8 space-x-6">
-            {/* Agents Dropdown */}
-            <AgentsDropdown isActive={isActive('/dashboard')} />
-
-            {/* Teams Dropdown */}
+            {/* Teams Dropdown - Now first */}
             <TeamsDropdown />
+            
+            {/* Agents Dropdown - Now second */}
+            <AgentsDropdown isActive={isActive('/dashboard')} />
             
             {/* Usage Link */}
             <Link 
