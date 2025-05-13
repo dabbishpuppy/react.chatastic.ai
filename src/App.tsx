@@ -11,6 +11,7 @@ import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import GeneralSettings from "./pages/settings/General";
 import MembersSettings from "./pages/settings/Members";
+import PlansSettings from "./pages/settings/Plans";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route index element={<GeneralSettings />} />
             <Route path="general" element={<GeneralSettings />} />
             <Route path="members" element={<MembersSettings />} />
+            <Route path="plans" element={<PlansSettings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
