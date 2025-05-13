@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import Logo from "@/components/layout/Logo";
 
 interface AgentSidebarProps {
   activeTab: string;
@@ -102,7 +103,12 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
 
   return (
     <div className="pb-6 flex flex-col h-full">
-      {/* Agent selector dropdown at the top */}
+      {/* Logo at the top */}
+      <div className="p-4 flex justify-center border-b">
+        <Logo size="sm" linkToHome={true} />
+      </div>
+      
+      {/* Agent selector dropdown */}
       <div className="p-4 border-b bg-gray-50">
         <Select defaultValue={agentId} onValueChange={handleAgentChange}>
           <SelectTrigger className="w-full bg-white text-black border border-gray-200">
