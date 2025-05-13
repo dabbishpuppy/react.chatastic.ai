@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import TopNavBar from "@/components/layout/TopNavBar";
 import { Button } from "@/components/ui/button";
@@ -50,8 +49,17 @@ const chatLogs = [
   }
 ];
 
-// Mock conversations data with messages
-const mockConversations = {
+// Update the mock conversations data to ensure `sender` is properly typed as "user" | "agent"
+const mockConversations: Record<string, {
+  id: string;
+  title: string;
+  startedAt: string;
+  messages: Array<{
+    sender: "user" | "agent";
+    content: string;
+    timestamp: string;
+  }>;
+}> = {
   "1": {
     id: "1",
     title: "Hei! Våre åpningstider er som følger...",
