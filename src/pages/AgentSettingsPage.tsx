@@ -60,7 +60,7 @@ const AgentSettingsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="" defaultPageTitle="Settings">
-      <div className="flex flex-col p-6 bg-[#f5f5f5] -m-6 overflow-hidden w-full">
+      <div className="flex flex-col p-8 bg-[#f5f5f5] overflow-hidden w-full min-h-screen">
         {/* Horizontal Tabs */}
         <div className="bg-white p-2 rounded-lg mb-6 overflow-hidden">
           <Tabs value={activeTab} onValueChange={handleTabChange}>
