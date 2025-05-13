@@ -37,8 +37,10 @@ const AgentEnvironment = () => {
         </div>
 
         {/* Main content area */}
-        <div className="flex-1 p-6 overflow-auto bg-gray-50">
-          <ChatSection initialMessages={initialMessages} />
+        <div className="flex-1 p-6 overflow-auto bg-gray-50 flex justify-center">
+          <div className="w-full max-w-3xl">
+            <ChatSection initialMessages={initialMessages} />
+          </div>
         </div>
       </div>
     </div>
