@@ -94,7 +94,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
             )}
-            <div className={`rounded-lg p-3 max-w-[80%] ${
+            <div className={`rounded-lg p-3 max-w-[80%] text-sm ${
               msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
             }`}>
               {msg.content}
