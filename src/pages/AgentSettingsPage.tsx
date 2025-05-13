@@ -1,8 +1,8 @@
 
 import React from "react";
-import TopNavBar from "@/components/layout/TopNavBar";
 import { useParams, useNavigate } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AgentPageLayout from "@/pages/AgentPageLayout";
 import AgentGeneralSettings from "@/components/agent/settings/GeneralSettings";
 import AISettings from "@/components/agent/settings/AISettings";
 import ChatInterfaceSettings from "@/components/agent/settings/ChatInterfaceSettings";
@@ -61,30 +61,24 @@ const AgentSettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <TopNavBar />
-
-      <div className="flex flex-col flex-1 overflow-hidden p-6">
-        <div className="max-w-4xl mx-auto w-full">
-          <h1 className="text-2xl font-bold mb-6">Settings</h1>
+    <AgentPageLayout defaultActiveTab="settings" defaultPageTitle="Settings">
+      <div className="max-w-4xl w-full">
+        <Tabs value={settingsTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="mb-6 w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id} className="flex items-center justify-center">
+                {tab.icon}
+                <span>{tab.label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
           
-          <Tabs value={settingsTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="mb-6 w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-              {tabs.map((tab) => (
-                <TabsTrigger key={tab.id} value={tab.id} className="flex items-center justify-center">
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            
-            <div className="mt-6">
-              {renderTabContent()}
-            </div>
-          </Tabs>
-        </div>
+          <div className="mt-6">
+            {renderTabContent()}
+          </div>
+        </Tabs>
       </div>
-    </div>
+    </AgentPageLayout>
   );
 };
 

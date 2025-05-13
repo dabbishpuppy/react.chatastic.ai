@@ -22,13 +22,6 @@ import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
-import { default as AgentGeneralSettings } from "./components/agent/settings/GeneralSettings";
-import AISettings from "./components/agent/settings/AISettings";
-import ChatInterfaceSettings from "./components/agent/settings/ChatInterfaceSettings";
-import SecuritySettings from "./components/agent/settings/SecuritySettings";
-import LeadsSettings from "./components/agent/settings/LeadsSettings";
-import NotificationsSettings from "./components/agent/settings/NotificationsSettings";
-import CustomDomainsSettings from "./components/agent/settings/CustomDomainsSettings";
 
 const queryClient = new QueryClient();
 
@@ -51,16 +44,8 @@ const App = () => (
           <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
           
           {/* Agent Settings Routes */}
-          <Route path="/agent/:agentId/settings" element={<AgentSettingsPage />}>
-            <Route index element={<AgentGeneralSettings />} />
-            <Route path="general" element={<AgentGeneralSettings />} />
-            <Route path="ai" element={<AISettings />} />
-            <Route path="chat-interface" element={<ChatInterfaceSettings />} />
-            <Route path="security" element={<SecuritySettings />} />
-            <Route path="leads" element={<LeadsSettings />} />
-            <Route path="notifications" element={<NotificationsSettings />} />
-            <Route path="custom-domains" element={<CustomDomainsSettings />} />
-          </Route>
+          <Route path="/agent/:agentId/settings" element={<AgentSettingsPage />} />
+          <Route path="/agent/:agentId/settings/:settingsTab" element={<AgentSettingsPage />} />
           
           {/* Admin Settings Routes */}
           <Route path="/settings" element={<Settings />}>
