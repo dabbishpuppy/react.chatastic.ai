@@ -29,8 +29,8 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar with fixed height and internal scroll */}
-        <div className="w-64 border-r bg-white flex flex-col">
-          <ScrollArea className="flex-1">
+        <div className="w-64 border-r bg-white">
+          <ScrollArea className="h-full">
             <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
           </ScrollArea>
         </div>

@@ -102,12 +102,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   };
 
   return (
-    <div className="pb-6 flex flex-col h-full">
-      {/* Logo at the top */}
-      <div className="p-4 flex justify-center border-b">
-        <Logo size="sm" linkToHome={true} />
-      </div>
-      
+    <div className="flex flex-col h-full">
       {/* Agent selector dropdown */}
       <div className="p-4 border-b bg-gray-50">
         <Select defaultValue={agentId} onValueChange={handleAgentChange}>
