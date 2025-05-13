@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { LineChart, Settings, FileText, HelpCircle, Sparkles, User, LogOut } from "lucide-react";
+import { Users, CreditCard, KeyRound, Package } from "lucide-react";
 
 const UserDropdown: React.FC = () => {
   return (
@@ -37,6 +38,37 @@ const UserDropdown: React.FC = () => {
           <Link to="/settings" className="w-full text-sm flex items-center gap-2">
             <Settings size={16} />
             Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <Link to="/settings/general" className="w-full text-sm flex items-center gap-2">
+            <Settings size={16} />
+            General
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/settings/members" className="w-full text-sm flex items-center gap-2">
+            <Users size={16} />
+            Members
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/settings/plans" className="w-full text-sm flex items-center gap-2">
+            <Package size={16} />
+            Plans
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/settings/billing" className="w-full text-sm flex items-center gap-2">
+            <CreditCard size={16} />
+            Billing
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/settings/api-keys" className="w-full text-sm flex items-center gap-2">
+            <KeyRound size={16} />
+            API Keys
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
