@@ -44,7 +44,7 @@ const AgentEnvironment: React.FC = () => {
         {/* Settings sidebar - only visible when showSettings is true */}
         {showSettings && (
           <div className="w-80 border-l border-gray-200 bg-white">
-            <LLMSettingsPanel />
+            <LLMSettingsPanel onClose={toggleSettings} />
           </div>
         )}
       </div>

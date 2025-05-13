@@ -1,19 +1,21 @@
-
 import React, { useState } from "react";
-import { Info, RotateCcw } from "lucide-react";
+import { Info, RotateCcw, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-const LLMSettingsPanel = () => {
+const LLMSettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const [model, setModel] = useState("gpt-4o");
   const [temperature, setTemperature] = useState(0);
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-6 border-b">
+      <div className="p-6 border-b flex justify-between items-center">
         <h2 className="text-xl font-bold">AI Settings</h2>
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <X className="h-4 w-4" />
+        </Button>
       </div>
       
       <div className="flex-1 overflow-auto divide-y">

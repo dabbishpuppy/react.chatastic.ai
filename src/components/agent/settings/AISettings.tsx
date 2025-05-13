@@ -1,11 +1,10 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { X } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
 
 const AISettings: React.FC = () => {
   const [model, setModel] = useState("gpt-4o-mini");
@@ -14,8 +13,6 @@ const AISettings: React.FC = () => {
   );
   const [temperature, setTemperature] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const navigate = useNavigate();
-  const { agentId } = useParams();
 
   const handleSave = () => {
     setIsSaving(true);
@@ -29,21 +26,12 @@ const AISettings: React.FC = () => {
     }, 1000);
   };
 
-  const handleClose = () => {
-    navigate(`/agent/${agentId}`);
-  };
-
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle>AI</CardTitle>
-            <CardDescription>Configure your agent's AI settings</CardDescription>
-          </div>
-          <Button variant="ghost" size="icon" onClick={handleClose} className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
+        <CardHeader>
+          <CardTitle>AI</CardTitle>
+          <CardDescription>Configure your agent's AI settings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
