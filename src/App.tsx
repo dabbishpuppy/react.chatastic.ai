@@ -22,7 +22,7 @@ import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
-import GeneralSettings as AgentGeneralSettings from "./components/agent/settings/GeneralSettings";
+import { default as AgentGeneralSettings } from "./components/agent/settings/GeneralSettings";
 import AISettings from "./components/agent/settings/AISettings";
 import ChatInterfaceSettings from "./components/agent/settings/ChatInterfaceSettings";
 import SecuritySettings from "./components/agent/settings/SecuritySettings";
