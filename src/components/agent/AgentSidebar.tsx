@@ -105,7 +105,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       {/* Agent selector dropdown at the top */}
       <div className="p-4 border-b bg-gray-50">
         <Select defaultValue={agentId} onValueChange={handleAgentChange}>
-          <SelectTrigger className="w-full bg-black text-white border-0">
+          <SelectTrigger className="w-full bg-white text-black border border-gray-200">
             <SelectValue placeholder="Select an agent" />
           </SelectTrigger>
           <SelectContent>
