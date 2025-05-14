@@ -57,10 +57,10 @@ const Dashboard = () => {
 
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-64 border-r border-gray-200 p-4 hidden md:block">
-          <div className="mb-4">
-            <div className="relative">
+        {/* Sidebar - Removed the p-4 padding to fix white space */}
+        <div className="w-64 border-r border-gray-200 hidden md:block">
+          <div className="p-4">
+            <div className="relative mb-4">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
               <input
                 type="search"
@@ -68,20 +68,20 @@ const Dashboard = () => {
                 className="w-full border border-gray-200 py-2 pl-8 pr-4 rounded-md focus:outline-none"
               />
             </div>
-          </div>
-          
-          <div className="mb-4">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">Teams</h3>
-            <div className="bg-gray-100 px-3 py-2 rounded-md flex items-center justify-between font-medium">
-              <span>Wonderwave</span>
-              <span>✓</span>
+            
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-gray-500 mb-2">Teams</h3>
+              <div className="bg-gray-100 px-3 py-2 rounded-md flex items-center justify-between font-medium">
+                <span>Wonderwave</span>
+                <span>✓</span>
+              </div>
             </div>
-          </div>
 
-          <Button variant="outline" className="w-full flex items-center gap-2 justify-center">
-            <Plus className="h-4 w-4" />
-            <span>Create team</span>
-          </Button>
+            <Button variant="outline" className="w-full flex items-center gap-2 justify-center">
+              <Plus className="h-4 w-4" />
+              <span>Create team</span>
+            </Button>
+          </div>
         </div>
 
         {/* Main content */}

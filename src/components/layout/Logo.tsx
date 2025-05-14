@@ -23,11 +23,8 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', linkToHome = false }) => {
     </div>
   );
 
-  if (linkToHome) {
-    return <Link to="/">{LogoContent}</Link>;
-  }
-
-  return LogoContent;
+  // Always link to dashboard instead of home
+  return <Link to="/dashboard">{LogoContent}</Link>;
 };
 
 export default Logo;

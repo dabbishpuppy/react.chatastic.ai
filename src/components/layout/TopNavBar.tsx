@@ -25,7 +25,7 @@ const TopNavBar = () => {
     <header className="border-b border-gray-200">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-6">
-          <Link to="/" className="text-2xl font-bold">
+          <Link to="/dashboard" className="text-2xl font-bold">
             <span className="flex items-center gap-2">
               <div className="w-8 h-8 bg-black text-white flex items-center justify-center rounded">C</div>
               Wonderwave
