@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LayoutDashboard, User, LogOut, UserRound } from "lucide-react";
+import { ChevronDown, LayoutDashboard, User, LogOut, UserRound, Book, HelpCircle, GitPullRequest } from "lucide-react";
 
 const UserDropdown: React.FC = () => {
   return (
@@ -37,6 +37,28 @@ const UserDropdown: React.FC = () => {
           <Link to="/settings/general" className="w-full text-sm flex items-center gap-2">
             <User size={16} />
             My Account
+          </Link>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        
+        {/* New section for Docs, Help, Changelog */}
+        <DropdownMenuItem>
+          <Link to="/docs" className="w-full text-sm flex items-center gap-2">
+            <Book size={16} />
+            Docs
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/help" className="w-full text-sm flex items-center gap-2">
+            <HelpCircle size={16} />
+            Help
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/changelog" className="w-full text-sm flex items-center gap-2">
+            <GitPullRequest size={16} />
+            Changelog
           </Link>
         </DropdownMenuItem>
         
