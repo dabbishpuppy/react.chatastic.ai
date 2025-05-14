@@ -9,7 +9,8 @@ import {
   Bell, 
   Globe,
   UserRound,
-  Volume2
+  Volume2,
+  LineChart
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -28,6 +29,7 @@ const AgentSettingsSidebar: React.FC<AgentSettingsSidebarProps> = ({ activeTab }
     { id: "voice", label: "Voice", icon: <Volume2 size={18} /> },
     { id: "chat-interface", label: "Interface", icon: <LayoutTemplate size={18} /> },
     { id: "security", label: "Security", icon: <Shield size={18} /> },
+    { id: "usage", label: "Usage", icon: <LineChart size={18} /> },
     { id: "leads", label: "Leads", icon: <Users size={18} /> },
     { id: "notifications", label: "Notifications", icon: <Bell size={18} /> },
     { id: "custom-domains", label: "Domains", icon: <Globe size={18} /> },

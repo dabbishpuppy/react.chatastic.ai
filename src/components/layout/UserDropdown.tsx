@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LineChart, User, LogOut } from "lucide-react";
+import { ChevronDown, LayoutDashboard, User, LogOut } from "lucide-react";
 
 const UserDropdown: React.FC = () => {
   return (
@@ -33,18 +33,14 @@ const UserDropdown: React.FC = () => {
         
         <DropdownMenuItem>
           <Link to="/dashboard" className="w-full text-sm flex items-center gap-2">
+            <LayoutDashboard size={16} />
             Dashboard
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <Link to="/settings/general" className="w-full text-sm flex items-center gap-2">
+            <User size={16} />
             My Account
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/usage" className="w-full text-sm flex items-center gap-2">
-            <LineChart size={16} />
-            Usage
           </Link>
         </DropdownMenuItem>
         
