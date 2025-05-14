@@ -9,18 +9,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LayoutDashboard, User, LogOut } from "lucide-react";
+import { ChevronDown, LayoutDashboard, User, LogOut, UserRound } from "lucide-react";
 
 const UserDropdown: React.FC = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-1">
-        <Avatar>
-          <AvatarImage src="/placeholder.svg" />
-          <AvatarFallback className="bg-gray-200">
-            <User size={16} className="text-gray-500" />
-          </AvatarFallback>
-        </Avatar>
+        <UserRound size={20} className="text-gray-600 hover:text-gray-900" />
         <ChevronDown size={16} className="text-gray-500" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-2 bg-white">
