@@ -2,6 +2,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "./Logo";
+import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
 import { FileText, HelpCircle, Sparkles } from "lucide-react";
@@ -33,6 +34,9 @@ const TopNavBar = () => {
           <div className="hidden md:flex ml-8 space-x-6">
             {/* Teams Dropdown */}
             <TeamsDropdown />
+            
+            {/* Agents Dropdown */}
+            <AgentsDropdown isActive={isActive('/dashboard')} />
           </div>
         </div>
         <div className="flex items-center space-x-4">
