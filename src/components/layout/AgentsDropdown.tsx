@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Bot } from "lucide-react";
+import { ChevronDown, Bot, CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AgentsDropdownProps {
@@ -40,6 +40,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
   ];
 
   const [selectedAgent, setSelectedAgent] = useState<string>("Agents");
+  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const location = useLocation();
   
   // Check if we're on an agent page and extract the ID
@@ -50,7 +51,10 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
       const agent = agents.find(a => a.id === agentId);
       if (agent) {
         setSelectedAgent(agent.name);
+        setCurrentAgentId(agentId);
       }
+    } else {
+      setCurrentAgentId(null);
     }
   }, [location.pathname]);
 
@@ -73,9 +77,12 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
             <Link 
               to={`/agent/${agent.id}`}
               onClick={() => handleAgentSelect(agent.name)}
-              className="text-sm"
+              className="flex items-center justify-between text-sm w-full"
             >
               {agent.name}
+              {currentAgentId === agent.id && (
+                <CircleCheck size={16} className="text-green-500" />
+              )}
             </Link>
           </DropdownMenuItem>
         ))}
