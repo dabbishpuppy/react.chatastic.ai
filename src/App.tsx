@@ -14,6 +14,7 @@ import MembersSettings from "./pages/settings/Members";
 import PlansSettings from "./pages/settings/Plans";
 import BillingSettings from "./pages/settings/Billing";
 import ApiKeys from "./pages/settings/ApiKeys";
+import UsageSettings from "./pages/settings/Usage";
 import AgentEnvironment from "./pages/AgentEnvironment";
 import UsagePage from "./pages/Usage";
 import ActivityPage from "./pages/ActivityPage";
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="plans" element={<PlansSettings />} />
             <Route path="billing" element={<BillingSettings />} />
             <Route path="api-keys" element={<ApiKeys />} />
+            <Route path="usage" element={<UsageSettings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -1,63 +1,49 @@
 
 import React from "react";
-import { useParams, Outlet } from "react-router-dom";
-import { Link } from "react-router-dom";
-import { Settings as SettingsIcon, Users, CreditCard, KeyRound, Package } from "lucide-react";
+import { NavLink, Outlet } from "react-router-dom";
 import TopNavBar from "@/components/layout/TopNavBar";
+import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LineChart } from "lucide-react";
 
 const Settings = () => {
-  const { tab = "general" } = useParams();
+  const menuItems = [
+    { to: "/settings/general", label: "General", icon: <SettingsIcon size={18} /> },
+    { to: "/settings/usage", label: "Usage", icon: <LineChart size={18} /> },
+    { to: "/settings/members", label: "Members", icon: <Users size={18} /> },
+    { to: "/settings/plans", label: "Plans", icon: <Package size={18} /> },
+    { to: "/settings/billing", label: "Billing", icon: <CreditCard size={18} /> },
+    { to: "/settings/api-keys", label: "API Keys", icon: <Key size={18} /> },
+  ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#f5f5f5]">
+    <div className="flex flex-col min-h-screen">
       <TopNavBar />
-
-      {/* Content */}
-      <div className="container mx-auto px-4 py-6">
-        <h1 className="text-3xl font-bold mb-8">Settings</h1>
-
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Sidebar Navigation */}
-          <div className="w-full md:w-64 space-y-2 bg-white p-4 rounded-lg">
-            <Link 
-              to="/settings/general" 
-              className={`flex items-center gap-2 p-3 rounded-md hover:bg-accent ${tab === "general" ? "bg-accent" : ""}`}
-            >
-              <SettingsIcon className="h-5 w-5" />
-              <span>General</span>
-            </Link>
-            <Link 
-              to="/settings/members" 
-              className={`flex items-center gap-2 p-3 rounded-md hover:bg-accent ${tab === "members" ? "bg-accent" : ""}`}
-            >
-              <Users className="h-5 w-5" />
-              <span>Members</span>
-            </Link>
-            <Link 
-              to="/settings/plans" 
-              className={`flex items-center gap-2 p-3 rounded-md hover:bg-accent ${tab === "plans" ? "bg-accent" : ""}`}
-            >
-              <Package className="h-5 w-5" />
-              <span>Plans</span>
-            </Link>
-            <Link 
-              to="/settings/billing" 
-              className={`flex items-center gap-2 p-3 rounded-md hover:bg-accent ${tab === "billing" ? "bg-accent" : ""}`}
-            >
-              <CreditCard className="h-5 w-5" />
-              <span>Billing</span>
-            </Link>
-            <Link 
-              to="/settings/api-keys" 
-              className={`flex items-center gap-2 p-3 rounded-md hover:bg-accent ${tab === "api-keys" ? "bg-accent" : ""}`}
-            >
-              <KeyRound className="h-5 w-5" />
-              <span>API Keys</span>
-            </Link>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex-1 overflow-hidden">
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-64 border-r border-gray-200 bg-white">
+          <nav className="p-4">
+            {menuItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-2.5 my-1 text-sm rounded-md ${
+                    isActive
+                      ? "bg-gray-100 font-medium"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`
+                }
+              >
+                <span className="mr-3 text-gray-500">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+        
+        {/* Main content */}
+        <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
+          <div className="max-w-6xl mx-auto">
             <Outlet />
           </div>
         </div>
