@@ -5,7 +5,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Bot } from "lucide-react";
@@ -68,8 +67,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
         {selectedAgent}
         <ChevronDown size={14} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>AGENTS</DropdownMenuLabel>
+      <DropdownMenuContent className="w-56">
         {agents.map(agent => (
           <DropdownMenuItem key={agent.id} asChild>
             <Link 

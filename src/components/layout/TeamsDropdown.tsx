@@ -5,10 +5,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Users } from "lucide-react";
+import { ChevronDown, Users, CircleCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
@@ -69,8 +68,7 @@ const TeamsDropdown: React.FC = () => {
         {selectedTeam}
         <ChevronDown size={14} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>TEAM</DropdownMenuLabel>
+      <DropdownMenuContent className="w-56">
         {teams.map(team => (
           <DropdownMenuItem key={team.id} asChild>
             <Link 
@@ -79,7 +77,7 @@ const TeamsDropdown: React.FC = () => {
               className="flex items-center justify-between text-sm"
             >
               {team.name}
-              {team.active && <span>✓</span>}
+              {team.active && <CircleCheck size={16} className="text-green-500" />}
             </Link>
           </DropdownMenuItem>
         ))}
