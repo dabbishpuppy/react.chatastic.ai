@@ -1,7 +1,6 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +14,9 @@ const UserDropdown: React.FC = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-1">
-        <UserRound size={20} className="text-gray-600 hover:text-gray-900" />
+        <div className="w-8 h-8 rounded-full bg-[#f5f5f5] flex items-center justify-center">
+          <UserRound size={20} className="text-gray-600 hover:text-gray-900" />
+        </div>
         <ChevronDown size={16} className="text-gray-500" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64 p-2 bg-white">
