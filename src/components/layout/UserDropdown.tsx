@@ -9,38 +9,29 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
-import { LineChart, Settings, User, LogOut } from "lucide-react";
+import { ChevronDown, LineChart, Settings, User, LogOut } from "lucide-react";
 import { Users, CreditCard, KeyRound, Package } from "lucide-react";
 
 const UserDropdown: React.FC = () => {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
+      <DropdownMenuTrigger className="flex items-center gap-1">
         <Avatar>
           <AvatarImage src="/placeholder.svg" />
-          <AvatarFallback>U</AvatarFallback>
+          <AvatarFallback className="bg-gray-200">
+            <User size={16} className="text-gray-500" />
+          </AvatarFallback>
         </Avatar>
+        <ChevronDown size={16} className="text-gray-500" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-white">
-        <DropdownMenuItem>
-          <Link to="/profile" className="w-full text-sm flex items-center gap-2">
-            <User size={16} />
-            Profile
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/usage" className="w-full text-sm flex items-center gap-2">
-            <LineChart size={16} />
-            Usage
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/settings" className="w-full text-sm flex items-center gap-2">
-            <Settings size={16} />
-            Settings
-          </Link>
-        </DropdownMenuItem>
+      <DropdownMenuContent align="end" className="w-64 p-2 bg-white">
+        <div className="px-3 py-2">
+          <div className="font-medium">Wonderwave</div>
+          <div className="text-sm text-gray-500">nohman@wonderwave.no</div>
+        </div>
+        
         <DropdownMenuSeparator />
+        
         <DropdownMenuItem>
           <Link to="/settings/general" className="w-full text-sm flex items-center gap-2">
             <Settings size={16} />
@@ -48,9 +39,9 @@ const UserDropdown: React.FC = () => {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
-          <Link to="/settings/members" className="w-full text-sm flex items-center gap-2">
-            <Users size={16} />
-            Members
+          <Link to="/usage" className="w-full text-sm flex items-center gap-2">
+            <LineChart size={16} />
+            Usage
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
@@ -66,12 +57,26 @@ const UserDropdown: React.FC = () => {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem>
+          <Link to="/settings/members" className="w-full text-sm flex items-center gap-2">
+            <Users size={16} />
+            Members
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Link to="/settings" className="w-full text-sm flex items-center gap-2">
+            <Settings size={16} />
+            Team
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
           <Link to="/settings/api-keys" className="w-full text-sm flex items-center gap-2">
             <KeyRound size={16} />
             API Keys
           </Link>
         </DropdownMenuItem>
+        
         <DropdownMenuSeparator />
+        
         <DropdownMenuItem>
           <Link to="/signout" className="w-full text-sm flex items-center gap-2">
             <LogOut size={16} />
