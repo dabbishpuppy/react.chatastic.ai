@@ -7,12 +7,10 @@ import {
   Settings, 
   Zap,
   Share,
-  Link,
   Plus
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 
 interface AgentSidebarProps {
   activeTab: string;
@@ -29,7 +27,6 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
     { id: "sources", label: "Sources", icon: <FileText size={18} /> },
     { id: "actions", label: "Actions", icon: <Zap size={18} /> },
-    { id: "integrations", label: "Integrations", icon: <Link size={18} /> },
     { id: "connect", label: "Connect", icon: <Share size={18} /> },
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
   ];
@@ -49,8 +46,6 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       navigate(`/agent/${agentId}/actions`);
     } else if (tabId === "connect") {
       navigate(`/agent/${agentId}/integrations`);
-    } else if (tabId === "integrations") {
-      navigate(`/agent/${agentId}/integrations`);
     } else if (tabId === "settings") {
       navigate(`/agent/${agentId}/settings`);
     }
@@ -62,13 +57,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
 
   return (
     <div className="flex flex-col h-full">
-      {/* Navigation menu with section label */}
-      <div className="pt-4 px-4">
-        <Label className="text-sm font-medium text-gray-500">
-          Agent Menu
-        </Label>
-      </div>
-      <div className="flex-1 overflow-y-auto pt-2">
+      <div className="flex-1 overflow-y-auto pt-6">
         {menuItems.map((item) => (
           <button
             key={item.id}
