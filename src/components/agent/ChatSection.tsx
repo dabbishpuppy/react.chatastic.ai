@@ -13,9 +13,14 @@ interface ChatMessage {
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
   toggleSettings?: () => void;
+  agentName?: string;
 }
 
-const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleSettings }) => {
+const ChatSection: React.FC<ChatSectionProps> = ({ 
+  initialMessages = [], 
+  toggleSettings,
+  agentName = "AI Customer Service"
+}) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
     {
@@ -33,6 +38,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
   useEffect(() => {
     scrollToBottom();
   }, [chatHistory]);
+
+  // Update chat when initialMessages prop changes
+  useEffect(() => {
+    if (initialMessages.length > 0) {
+      setChatHistory(initialMessages);
+    }
+  }, [initialMessages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +64,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
     setTimeout(() => {
       setChatHistory(prev => [...prev, {
         isAgent: true,
-        content: "I'm Wonder AI. I'm here to help you with any questions or tasks!",
+        content: "I'm here to help you with any questions or tasks!",
         timestamp: new Date().toISOString()
       }]);
     }, 1000);
@@ -67,20 +79,22 @@ const ChatSection: React.FC<ChatSectionProps> = ({ initialMessages = [], toggleS
             <AvatarImage src="/placeholder.svg" alt="Agent" />
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
-          <span className="font-medium">AI Customer Service</span>
+          <span className="font-medium">{agentName}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="h-9 w-9">
             <RefreshCw className="h-5 w-5" />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-9 w-9"
-            onClick={toggleSettings}
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
+          {toggleSettings && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9"
+              onClick={toggleSettings}
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </div>
 
