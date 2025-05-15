@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import ChatSection from "@/components/agent/ChatSection";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 const ChatInterfaceSettings: React.FC = () => {
   const [initialMessage, setInitialMessage] = useState("👋 Hej! Jag är AI assistenten til Agora. Hva kan jeg hjelpe deg med i dag?");
+  const [messagePlaceholder, setMessagePlaceholder] = useState("Write message here...");
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [collectFeedback, setCollectFeedback] = useState(true);
   const [regenerateMessages, setRegenerateMessages] = useState(true);
@@ -19,6 +20,7 @@ const ChatInterfaceSettings: React.FC = () => {
   const [theme, setTheme] = useState("light");
   const [userBubbleAlign, setUserBubbleAlign] = useState("right");
   const [autoShowDelay, setAutoShowDelay] = useState("1");
+  const [footer, setFooter] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   
   // Initial preview message based on settings
@@ -54,10 +56,10 @@ const ChatInterfaceSettings: React.FC = () => {
   };
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-12rem)]">
+    <div className="min-h-[calc(100vh-12rem)] flex flex-col md:flex-row">
       {/* Left panel - Settings */}
-      <ResizablePanel defaultSize={60} minSize={40} className="overflow-y-auto">
-        <div className="space-y-6 pr-4">
+      <div className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-4">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Chat Interface</CardTitle>
@@ -109,6 +111,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 <Input
                   id="placeholder"
                   placeholder="Message..."
+                  value={messagePlaceholder}
+                  onChange={(e) => setMessagePlaceholder(e.target.value)}
                   className="max-w-md"
                 />
               </div>
@@ -145,10 +149,12 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 <Textarea
                   id="footer"
+                  value={footer}
+                  onChange={(e) => setFooter(e.target.value)}
                   placeholder="You can use this to add a disclaimer or a link to your privacy policy."
                   className="h-24"
                 />
-                <p className="text-xs text-gray-500">0/200 characters</p>
+                <p className="text-xs text-gray-500">{footer.length}/200 characters</p>
               </div>
               
               <div className="space-y-2">
@@ -254,28 +260,26 @@ const ChatInterfaceSettings: React.FC = () => {
             </CardContent>
           </Card>
         </div>
-      </ResizablePanel>
-      
-      {/* Resizable handle */}
-      <ResizableHandle withHandle />
+      </div>
       
       {/* Right panel - Chat Preview */}
-      <ResizablePanel defaultSize={40} minSize={30}>
-        <div className="h-full bg-gray-50 flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-md h-[700px] bg-white rounded-lg shadow overflow-hidden flex flex-col">
-            <div className="text-center py-2 text-sm text-gray-500">
+      <div className="w-full md:w-2/5 bg-gray-50 mt-6 md:mt-0">
+        <div className="h-full p-4 sticky top-0">
+          <div className="w-full max-w-md mx-auto h-[700px] bg-white rounded-lg shadow overflow-hidden flex flex-col">
+            <div className="text-center py-2 text-sm text-gray-500 border-b">
               Chat Preview
             </div>
             <div className="flex-1 overflow-hidden">
               <ChatSection 
                 initialMessages={previewMessages}
                 agentName={displayName}
+                placeholder={messagePlaceholder}
               />
             </div>
           </div>
         </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+      </div>
+    </div>
   );
 };
 

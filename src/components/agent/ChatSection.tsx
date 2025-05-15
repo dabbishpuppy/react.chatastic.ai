@@ -14,12 +14,14 @@ interface ChatSectionProps {
   initialMessages?: ChatMessage[];
   toggleSettings?: () => void;
   agentName?: string;
+  placeholder?: string;
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
   initialMessages = [], 
   toggleSettings,
-  agentName = "AI Customer Service"
+  agentName = "AI Customer Service",
+  placeholder = "Write message here..."
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
@@ -125,7 +127,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Write message here..."
+            placeholder={placeholder}
             className="w-full border rounded-full px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <Button 
