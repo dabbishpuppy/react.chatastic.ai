@@ -5,7 +5,6 @@ import Logo from "./Logo";
 import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
-import { FileText, HelpCircle, Sparkles } from "lucide-react";
 
 const TopNavBar = () => {
   const location = useLocation();
@@ -40,19 +39,6 @@ const TopNavBar = () => {
           </div>
         </div>
         <div className="flex items-center space-x-4">
-          {/* Documentation links with updated font size */}
-          <Link to="/docs" className="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-[0.875rem]">
-            <FileText size={20} />
-            Docs
-          </Link>
-          <Link to="/help" className="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-[0.875rem]">
-            <HelpCircle size={20} />
-            Help
-          </Link>
-          <Link to="/changelog" className="text-gray-600 hover:text-gray-900 flex items-center gap-2 text-[0.875rem]">
-            <Sparkles size={20} />
-            Changelog
-          </Link>
           <UserDropdown />
         </div>
       </div>

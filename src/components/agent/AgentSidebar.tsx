@@ -29,8 +29,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
     { id: "sources", label: "Sources", icon: <FileText size={18} /> },
     { id: "actions", label: "Actions", icon: <Zap size={18} /> },
-    { id: "connect", label: "Connect", icon: <Share size={18} /> },
     { id: "integrations", label: "Integrations", icon: <Link size={18} /> },
+    { id: "connect", label: "Connect", icon: <Share size={18} /> },
     { id: "settings", label: "Settings", icon: <Settings size={18} /> },
   ];
 
