@@ -42,9 +42,6 @@ const UsagePage = () => {
         {/* Main content */}
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-6xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">Usage</h1>
-            </div>
             <UsageStats />
           </div>
         </div>
