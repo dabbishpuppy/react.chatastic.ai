@@ -47,42 +47,54 @@ const chatLogs = [
 
 interface ChatLogsTabProps {
   onConversationClick: (conversationId: string) => void;
+  hideTitle?: boolean;
 }
 
-const ChatLogsTab: React.FC<ChatLogsTabProps> = ({ onConversationClick }) => {
-  const handleExport = () => {
-    toast({
-      title: "Export initiated",
-      description: "Your activity logs are being exported",
-    });
-  };
+const handleExport = () => {
+  toast({
+    title: "Export initiated",
+    description: "Your activity logs are being exported",
+  });
+};
 
-  const handleDelete = (id: string) => {
-    toast({
-      title: "Log deleted",
-      description: `Log ${id} has been deleted`,
-    });
-  };
+const handleDelete = (id: string) => {
+  toast({
+    title: "Log deleted",
+    description: `Log ${id} has been deleted`,
+  });
+};
 
+// Action buttons component that can be used independently
+const ActionButtons = () => {
+  return (
+    <>
+      <Button variant="outline" className="flex gap-1">
+        <RefreshCcw size={18} />
+        Refresh
+      </Button>
+      <Button variant="outline" className="flex gap-1">
+        <Filter size={18} />
+        Filter
+      </Button>
+      <Button onClick={handleExport} className="bg-black hover:bg-gray-800 flex gap-1">
+        Export
+        <Download size={18} />
+      </Button>
+    </>
+  );
+};
+
+const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionButtons } = ({ onConversationClick, hideTitle = false }) => {
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold">Chat logs</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex gap-1">
-            <RefreshCcw size={18} />
-            Refresh
-          </Button>
-          <Button variant="outline" className="flex gap-1">
-            <Filter size={18} />
-            Filter
-          </Button>
-          <Button onClick={handleExport} className="bg-black hover:bg-gray-800 flex gap-1">
-            Export
-            <Download size={18} />
-          </Button>
+      {!hideTitle && (
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold">Chat logs</h2>
+          <div className="flex gap-2">
+            <ActionButtons />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-lg border">
         <ScrollArea className="h-[calc(100vh-240px)]">
@@ -130,5 +142,8 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> = ({ onConversationClick }) => {
     </div>
   );
 };
+
+// Attach the ActionButtons component to ChatLogsTab
+ChatLogsTab.ActionButtons = ActionButtons;
 
 export default ChatLogsTab;
