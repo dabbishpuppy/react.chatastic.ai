@@ -21,14 +21,14 @@ const AnalyticsTab: React.FC = () => {
 
   return (
     <div className="bg-[#f5f5f5] min-h-screen p-8">
-      <h1 className="text-3xl font-bold mb-6">Analytics</h1>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Analytics</h1>
+        <div className="flex gap-4">
           <Select 
             value={selectedAgent} 
             onValueChange={setSelectedAgent}
           >
-            <SelectTrigger className="sm:w-[180px] bg-white">
+            <SelectTrigger className="w-[180px] bg-white">
               <SelectValue placeholder="Select agent" />
             </SelectTrigger>
             <SelectContent>
