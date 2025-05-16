@@ -8,12 +8,16 @@ interface AgentPageLayoutProps {
   children: ReactNode;
   defaultActiveTab: string;
   defaultPageTitle: string;
+  titleActions?: ReactNode; // Added to support optional action buttons
+  showPageTitle?: boolean; // Added to control title visibility
 }
 
 const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   children,
   defaultActiveTab,
   defaultPageTitle,
+  titleActions,
+  showPageTitle = false, // Default to not showing the title (backward compatibility)
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
   const [pageTitle, setPageTitle] = useState(defaultPageTitle);
@@ -37,7 +41,12 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
         {/* Main content with its own scroll */}
         <div className="flex-1 overflow-auto">
-          {/* Removed the title element from here to avoid duplication */}
+          {showPageTitle && (
+            <div className="flex justify-between items-center p-8 pb-0">
+              <h1 className="text-3xl font-bold">{pageTitle}</h1>
+              {titleActions}
+            </div>
+          )}
           {children}
         </div>
       </div>

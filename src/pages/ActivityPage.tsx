@@ -17,15 +17,20 @@ const ActivityPage: React.FC = () => {
     setSelectedConversation(null);
   };
 
+  const renderTitleActions = () => (
+    <div className="flex gap-2">
+      <ChatLogsTab.ActionButtons />
+    </div>
+  );
+
   return (
-    <AgentPageLayout defaultActiveTab="activity" defaultPageTitle="Activity">
-      <div className="flex flex-col p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Activity</h1>
-          <div className="flex gap-2">
-            <ChatLogsTab.ActionButtons />
-          </div>
-        </div>
+    <AgentPageLayout 
+      defaultActiveTab="activity" 
+      defaultPageTitle="Activity"
+      titleActions={renderTitleActions()}
+      showPageTitle={true}
+    >
+      <div className="flex flex-col p-8 pt-6 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <div className={`flex flex-1 ${selectedConversation ? "pr-4" : ""} overflow-hidden`}>
           <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
             <ChatLogsTab onConversationClick={handleConversationClick} hideTitle />
