@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -120,13 +121,13 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     // Call onTabChange first to ensure state is updated
     onTabChange(tabId, tabLabel);
     
-    // Then handle navigation with preventDefault to avoid auto-scrolling
+    // Then handle navigation
     if (tabId === "dashboard") {
       navigate(`/dashboard`, { replace: true });
       return;
     }
     
-    // Use replace: true to prevent scroll restoration
+    // Use replace: true to prevent scroll restoration and history build-up
     if (tabId === "activity") {
       navigate(`/agent/${agentId}/activity`, { replace: true });
     } else if (tabId === "playground") {
@@ -142,13 +143,12 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     } else if (tabId === "settings") {
       navigate(`/agent/${agentId}/settings`, { replace: true });
     }
-    
-    // Manual scroll reset handled in AgentPageLayout component
   };
 
   const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string) => {
     onTabChange(parentTabId, submenuId);
     
+    // Use replace: true to prevent history stack build-up
     if (submenuPath === "sources") {
       navigate(`/agent/${agentId}/sources?tab=${submenuId}`, { replace: true });
     } else if (submenuPath === "integrations") {

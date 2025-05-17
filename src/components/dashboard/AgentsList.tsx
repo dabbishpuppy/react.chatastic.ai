@@ -83,8 +83,8 @@ const AgentsList = ({
   // Navigate to agent's playground page
   const handleAgentClick = (agentId: string) => {
     console.log(`Navigating to agent: ${agentId}`);
-    // Force navigation to the agent's playground page
-    window.location.href = `/agent/${agentId}`;
+    // Use React Router's navigate function with {replace: true} to avoid adding to history
+    navigate(`/agent/${agentId}`, { replace: true });
   };
 
   // Make sure we have at least one valid team with an ID
