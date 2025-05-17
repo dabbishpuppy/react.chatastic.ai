@@ -20,7 +20,7 @@ export interface Agent {
 export interface Team {
   id: string;
   name: string;
-  isActive: boolean; // Changed from optional to required
+  isActive: boolean; // Required property
   agents: Agent[];
   metrics: {
     totalConversations: number;

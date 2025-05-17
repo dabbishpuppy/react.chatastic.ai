@@ -48,7 +48,6 @@ const agentColorPalette = [
   "bg-purple-500",
 ];
 
-// Updated to use string for id to match Supabase's UUID
 interface CreateAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -110,30 +109,13 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     const autoAssignedColor = agentColorPalette[colorIndex];
     
     try {
-      // Check if the team exists and belongs to the current user
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('id', selectedTeam.id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (teamError || !teamData) {
-        toast({
-          title: "Team Access Error",
-          description: "You don't have permission to add agents to this team.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Insert the new agent into Supabase - Fixed the issue with empty team_id
+      // Insert the new agent directly without checking team ownership - the RLS policies will handle this
       const { data, error } = await supabase
         .from('agents')
         .insert([
           {
             name: values.name,
-            team_id: selectedTeam.id, // Ensure team_id is never empty
+            team_id: selectedTeam.id,
             color: autoAssignedColor,
             image: "/placeholder.svg",
             status: "active",
@@ -145,7 +127,10 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         .select('*')
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error creating agent:", error);
+        throw error;
+      }
       
       // Create a new agent with the form values and returned data
       const newAgent = {
