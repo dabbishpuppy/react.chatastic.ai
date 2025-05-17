@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Cog, HelpCircle, LogOut } from "lucide-react";
+import { Cog, HelpCircle, LogOut, DollarSign, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -52,6 +52,23 @@ const SidebarActions = () => {
         </div>
       </div>
       
+      {/* Credits section */}
+      <div className="mb-4 p-2 bg-gray-50 rounded-md">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-gray-500">Credits</span>
+          <span className="text-xs font-medium">1,234</span>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="w-full text-xs h-7 mt-1 flex items-center gap-1"
+          onClick={() => navigate("/billing")}
+        >
+          <DollarSign size={14} />
+          Buy Credits
+        </Button>
+      </div>
+      
       {/* Action buttons */}
       <div className="flex items-center justify-between">
         <TooltipProvider>
@@ -64,6 +81,19 @@ const SidebarActions = () => {
               </Link>
             </TooltipTrigger>
             <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link to="/profile">
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <User size={20} />
+                </Button>
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent>Profile</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         
