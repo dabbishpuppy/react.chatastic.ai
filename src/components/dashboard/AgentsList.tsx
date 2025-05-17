@@ -4,6 +4,9 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateAgentDialog from "./CreateAgentDialog";
+import EditAgentDialog from "./EditAgentDialog";
+import DeleteAgentDialog from "./DeleteAgentDialog";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,10 +54,15 @@ const AgentsList = ({
   const [agentToEdit, setAgentToEdit] = useState<Agent | null>(null);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
+  const { toast } = useToast();
 
   // Handle creating a new agent
   const handleAgentCreated = (newAgent: Agent) => {
     setLocalAgents(prevAgents => [...prevAgents, newAgent]);
+    toast({
+      title: "Agent created",
+      description: `${newAgent.name} has been created successfully.`
+    });
   };
 
   // Functions to handle editing and deleting agents
@@ -70,6 +78,18 @@ const AgentsList = ({
     e.preventDefault();
     setAgentToDelete(agent);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleAgentEdited = (updatedAgent: Agent) => {
+    setLocalAgents(prevAgents => 
+      prevAgents.map(agent => agent.id === updatedAgent.id ? updatedAgent : agent)
+    );
+  };
+
+  const handleAgentDeleted = (agentId: number) => {
+    setLocalAgents(prevAgents => 
+      prevAgents.filter(agent => agent.id !== agentId)
+    );
   };
 
   // Use local agents if available, otherwise use the props agents
@@ -154,19 +174,12 @@ const AgentsList = ({
         onAgentCreated={handleAgentCreated}
       />
       
-      {/* Placeholder for future EditAgentDialog and DeleteAgentDialog components */}
-      {/* When implementing those components, uncomment and complete these sections */}
-      {/*
       {agentToEdit && (
         <EditAgentDialog
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           agent={agentToEdit}
-          onAgentEdited={(updatedAgent) => {
-            setLocalAgents(prevAgents => 
-              prevAgents.map(agent => agent.id === updatedAgent.id ? updatedAgent : agent)
-            );
-          }}
+          onAgentEdited={handleAgentEdited}
         />
       )}
 
@@ -175,14 +188,9 @@ const AgentsList = ({
           open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
           agent={agentToDelete}
-          onAgentDeleted={(agentId) => {
-            setLocalAgents(prevAgents => 
-              prevAgents.filter(agent => agent.id !== agentId)
-            );
-          }}
+          onAgentDeleted={handleAgentDeleted}
         />
       )}
-      */}
     </div>
   );
 };
