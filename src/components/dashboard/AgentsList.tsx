@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -80,8 +79,9 @@ const AgentsList = ({
     );
   };
 
-  // Navigate to agent page
+  // Navigate to agent page - ensure it goes to the Playground
   const handleAgentClick = (agentId: string) => {
+    // Navigate directly to the agent's playground page
     navigate(`/agent/${agentId}`);
   };
 
