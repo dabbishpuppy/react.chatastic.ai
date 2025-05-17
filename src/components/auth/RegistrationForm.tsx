@@ -1,25 +1,57 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const RegistrationForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   const { toast } = useToast();
   const { signUp, networkAvailable } = useAuth();
   const navigate = useNavigate();
+  
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      setNetworkError(null);
+    };
+    
+    const handleOffline = () => {
+      setIsOffline(true);
+      setNetworkError("You are currently offline. Please check your internet connection.");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Set initial status
+    setIsOffline(!navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!networkAvailable) {
+    // Clear previous network errors
+    setNetworkError(null);
+    
+    if (isOffline || !networkAvailable) {
+      setNetworkError("Network connection unavailable. Please check your internet connection.");
       toast({
         title: "Network error",
         description: "Please check your internet connection.",
@@ -47,6 +79,14 @@ const RegistrationForm = () => {
       });
       navigate('/signin');
     } catch (error: any) {
+      console.error("Registration error:", error);
+      
+      // Check if it's a network error
+      if (!navigator.onLine || error.message?.includes("Network") || 
+          error.message?.includes("network") || error.message === "Failed to fetch") {
+        setNetworkError(error.message || "Network error. Please check your connection and try again.");
+      }
+      
       toast({
         title: "Registration failed",
         description: error.message || "An unexpected error occurred",
@@ -60,6 +100,16 @@ const RegistrationForm = () => {
   return (
     <div className="w-full max-w-md mx-auto">
       <h1 className="text-2xl font-bold text-center mb-8">Get started for free</h1>
+      
+      {/* Network error alert */}
+      {(networkError || isOffline) && (
+        <Alert variant="destructive" className="mb-6 bg-red-100 border-red-200">
+          <AlertDescription className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            {networkError || "Network error. Please check your internet connection."}
+          </AlertDescription>
+        </Alert>
+      )}
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
@@ -104,7 +154,7 @@ const RegistrationForm = () => {
         <Button
           type="submit"
           className="w-full bg-black hover:bg-gray-800 text-white"
-          disabled={isSubmitting || !networkAvailable}
+          disabled={isSubmitting || isOffline || !networkAvailable}
         >
           {isSubmitting ? "Signing up..." : "Sign up"}
         </Button>
@@ -135,11 +185,17 @@ const RegistrationForm = () => {
             variant="outline"
             className="w-full border-gray-300 flex items-center justify-center space-x-2"
             onClick={() => {
+              if (isOffline || !networkAvailable) {
+                setNetworkError("Network connection unavailable. Please check your internet connection.");
+                return;
+              }
+              
               toast({
                 title: "Google sign up",
                 description: "Google authentication is not yet implemented.",
               });
             }}
+            disabled={isOffline || !networkAvailable}
           >
             <svg className="w-5 h-5" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4ZM24 4C35.0457 4 44 12.9543 44 24C44 29.6325 42.0187 34.7927 38.6451 38.6451" stroke="#EA4335" strokeWidth="4" />
