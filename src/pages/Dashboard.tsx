@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -148,6 +149,26 @@ const Dashboard = () => {
     setSelectedTeam(newTeam);
   };
 
+  const handleTeamEdited = (updatedTeam) => {
+    setTeamsData(prevTeams => prevTeams.map(team => 
+      team.id === updatedTeam.id ? updatedTeam : team
+    ));
+    
+    if (selectedTeam.id === updatedTeam.id) {
+      setSelectedTeam(updatedTeam);
+    }
+  };
+
+  const handleTeamDeleted = (teamId) => {
+    const updatedTeams = teamsData.filter(team => team.id !== teamId);
+    setTeamsData(updatedTeams);
+    
+    // If the currently selected team was deleted, select another one
+    if (selectedTeam.id === teamId && updatedTeams.length > 0) {
+      setSelectedTeam(updatedTeams[0]);
+    }
+  };
+
   const handleAgentCreated = (newAgent) => {
     // Add the new agent to the currently selected team
     setTeamsData(prevTeams => prevTeams.map(team => 
@@ -171,8 +192,6 @@ const Dashboard = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Removed the TopNavBar */}
-
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
         <DashboardSidebar
@@ -183,6 +202,8 @@ const Dashboard = () => {
           toggleSection={toggleSection}
           onTeamCreated={handleTeamCreated}
           onAgentCreated={handleAgentCreated}
+          onTeamEdited={handleTeamEdited}
+          onTeamDeleted={handleTeamDeleted}
         />
 
         {/* Main content - with bg-[#f5f5f5] */}
