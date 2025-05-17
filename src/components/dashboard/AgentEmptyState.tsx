@@ -4,22 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bot, Plus } from 'lucide-react';
 import CreateAgentDialog from './CreateAgentDialog';
+import { Agent } from '@/hooks/useTeamsAndAgents';
 
 interface AgentEmptyStateProps {
   teamName?: string;
-  onCreateAgent: (agent: {
-    id: string; // Changed from number to string to match Supabase UUID
-    name: string;
-    image: string;
-    color: string;
-    status: string;
-    metrics: {
-      conversations: number;
-      responseTime: string;
-      satisfaction: number;
-    };
-    teamId: string;
-  }) => void;
+  onCreateAgent: (agent: Agent) => void;
 }
 
 const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAgent }) => {
@@ -30,7 +19,14 @@ const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAge
     id: '',
     name: teamName || '',
     isActive: true,
-    agents: []
+    agents: [],
+    metrics: {
+      totalConversations: 0,
+      avgResponseTime: "0.0s",
+      usagePercent: 0,
+      apiCalls: 0,
+      satisfaction: 0
+    }
   };
 
   return (

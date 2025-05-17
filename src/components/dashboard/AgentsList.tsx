@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -7,33 +6,13 @@ import CreateAgentDialog from "./CreateAgentDialog";
 import EditAgentDialog from "./EditAgentDialog";
 import DeleteAgentDialog from "./DeleteAgentDialog";
 import { useToast } from "@/hooks/use-toast";
+import { Agent, Team } from "@/hooks/useTeamsAndAgents";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-
-interface Agent {
-  id: string; // Using string type for ID to match Supabase UUID
-  name: string;
-  image: string;
-  color: string;
-  status?: string;
-  teamId?: string;
-  metrics?: {
-    conversations: number;
-    responseTime: string;
-    satisfaction: number;
-  };
-}
-
-interface Team {
-  id: string;
-  name: string;
-  isActive: boolean;
-  agents: Agent[];
-}
 
 interface AgentsListProps {
   agents: Agent[];
@@ -80,12 +59,14 @@ const AgentsList = ({
     setIsDeleteDialogOpen(true);
   };
 
+  // Handle editing a agent
   const handleAgentEdited = (updatedAgent: Agent) => {
     setLocalAgents(prevAgents => 
       prevAgents.map(agent => agent.id === updatedAgent.id ? updatedAgent : agent)
     );
   };
 
+  // Handle deleting a agent
   const handleAgentDeleted = (agentId: string) => {
     setLocalAgents(prevAgents => 
       prevAgents.filter(agent => agent.id !== agentId)

@@ -4,33 +4,20 @@ import TeamsList from "./TeamsList";
 import AgentsList from "./AgentsList";
 import SidebarActions from "./SidebarActions";
 import Logo from "@/components/layout/Logo";
-
-interface Team {
-  id: string;
-  name: string;
-  isActive: boolean;
-  agents: Agent[];
-}
-
-interface Agent {
-  id: string; // Changed from number to string to match Supabase UUID
-  name: string;
-  image: string;
-  color: string;
-}
+import { Team, Agent } from "@/hooks/useTeamsAndAgents";
 
 interface DashboardSidebarProps {
   teams: Team[];
-  selectedTeam: Team;
+  selectedTeam: Team | null;
   expandedSections: {
     teams: boolean;
     agents: boolean;
   };
   onTeamSelect: (team: Team) => void;
   toggleSection: (section: string) => void;
-  onTeamCreated?: (team: Team) => void;
-  onAgentCreated?: (agent: Agent) => void;
-  onTeamEdited?: (team: Team) => void;
+  onTeamCreated?: (team: any) => void;
+  onAgentCreated?: (agent: any) => void;
+  onTeamEdited?: (team: any) => void;
   onTeamDeleted?: (teamId: string) => void;
 }
 
@@ -60,12 +47,14 @@ const DashboardSidebar = ({
             onTeamSelect={onTeamSelect}
           />
           
-          <AgentsList 
-            agents={selectedTeam.agents}
-            teams={teams}
-            isExpanded={expandedSections.agents}
-            onToggleExpand={() => toggleSection('agents')}
-          />
+          {selectedTeam && (
+            <AgentsList 
+              agents={selectedTeam.agents}
+              teams={teams}
+              isExpanded={expandedSections.agents}
+              onToggleExpand={() => toggleSection('agents')}
+            />
+          )}
         </div>
       </div>
       

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -6,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import CreateTeamDialog from "./CreateTeamDialog";
 import EditTeamDialog from "./EditTeamDialog";
 import DeleteTeamDialog from "./DeleteTeamDialog";
+import { Team } from "@/hooks/useTeamsAndAgents";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,17 +13,9 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 
-interface Team {
-  id: string;
-  name: string;
-  isActive: boolean;
-  agents: any[];
-  metrics?: any;
-}
-
 interface TeamsListProps {
   teams: Team[];
-  selectedTeam: Team;
+  selectedTeam: Team | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onTeamSelect: (team: Team) => void;
@@ -62,7 +54,7 @@ const TeamsList = ({
     );
     
     // Update the selected team if it was edited
-    if (selectedTeam.id === updatedTeam.id) {
+    if (selectedTeam?.id === updatedTeam.id) {
       onTeamSelect(updatedTeam);
     }
   };
@@ -73,7 +65,7 @@ const TeamsList = ({
     setLocalTeams(updatedTeams);
     
     // Select another team if the currently selected team was deleted
-    if (selectedTeam.id === teamId && updatedTeams.length > 0) {
+    if (selectedTeam?.id === teamId && updatedTeams.length > 0) {
       onTeamSelect(updatedTeams[0]);
     }
   };
@@ -114,7 +106,7 @@ const TeamsList = ({
           <div 
             key={team.id}
             className={`px-3 py-2 rounded-md flex items-center justify-between cursor-pointer transition-colors duration-200 ${
-              selectedTeam.id === team.id 
+              selectedTeam?.id === team.id 
                 ? "bg-gray-100 font-medium" 
                 : "hover:bg-gray-50"
             }`}
