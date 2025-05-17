@@ -10,9 +10,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   // This warning will help developers understand what's happening
 }
 
+// Create Supabase client with available credentials
+let supabase;
+
 try {
-  // Create Supabase client with available credentials
-  export const supabase = createClient(
+  supabase = createClient(
     supabaseUrl || 'https://your-supabase-url.supabase.co',
     supabaseAnonKey || 'your-anon-key', 
     {
@@ -28,6 +30,9 @@ try {
   console.error("❌ Failed to initialize Supabase client:", error);
   throw new Error("Failed to initialize Supabase client. Please check your configuration.");
 }
+
+// Export the client
+export { supabase };
 
 // Types for our Supabase database tables
 export type Team = {
