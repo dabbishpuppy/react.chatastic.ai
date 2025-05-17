@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import PageTransition from "@/components/layout/PageTransition";
@@ -30,6 +30,12 @@ import AgentSettingsPage from "./pages/AgentSettingsPage";
 import CreateTeamPage from "./pages/CreateTeamPage";
 
 const queryClient = new QueryClient();
+
+// Redirect component that extracts the agentId from the URL
+const AgentRedirect = () => {
+  const { agentId } = useParams();
+  return <Navigate to={`/playground/${agentId}`} replace />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -111,9 +117,7 @@ const App = () => (
             } />
             
             {/* Maintain backward compatibility with old routes */}
-            <Route path="/agent/:agentId" element={
-              <Navigate to={`/playground/${location.pathname.split('/')[2]}`} replace />
-            } />
+            <Route path="/agent/:agentId" element={<AgentRedirect />} />
             
             {/* Agent Settings Routes - Using wildcard for nested routes */}
             <Route path="/playground/:agentId/settings/*" element={
@@ -154,4 +158,3 @@ const App = () => (
 );
 
 export default App;
-
