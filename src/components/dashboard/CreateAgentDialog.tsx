@@ -25,6 +25,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Team } from "@/hooks/useTeamsAndAgents";
 
 // Define the form schema - removed teamId requirement
 const formSchema = z.object({
@@ -46,13 +47,6 @@ const agentColorPalette = [
   "bg-indigo-600",
   "bg-purple-500",
 ];
-
-interface Team {
-  id: string;
-  name: string;
-  isActive?: boolean;
-  agents: any[];
-}
 
 // Updated to use string for id to match Supabase's UUID
 interface CreateAgentDialogProps {
@@ -81,7 +75,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   onAgentCreated,
 }) => {
   const navigate = useNavigate();
-  const { user } = useAuth(); // Add this to get the current user
+  const { user } = useAuth();
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
   
   const form = useForm<FormValues>({
