@@ -1,8 +1,9 @@
+
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Search, DollarSign, User, LogOut, ChevronDown, ChevronUp, Users } from "lucide-react";
+import { Plus, DollarSign, User, LogOut, ChevronDown, ChevronUp, Users } from "lucide-react";
 import UsageStats from "@/components/UsageStats";
 import TopNavBar from "@/components/layout/TopNavBar";
 
@@ -112,15 +113,6 @@ const Dashboard = () => {
         <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
           <div className="flex-1 overflow-y-auto">
             <div className="p-4">
-              <div className="relative mb-4">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <input
-                  type="search"
-                  placeholder="Search team..."
-                  className="w-full border border-gray-200 py-2 pl-8 pr-4 rounded-md focus:outline-none"
-                />
-              </div>
-              
               {/* Teams dropdown section */}
               <div className="mb-4">
                 <button 
@@ -148,11 +140,18 @@ const Dashboard = () => {
                     >
                       <div className="flex items-center">
                         <Users size={16} className="mr-2 text-gray-500" />
-                        <span>{team.name}</span>
+                        <span className="text-[0.875rem]">{team.name}</span>
                       </div>
                       {team.isActive && <span>✓</span>}
                     </div>
                   ))}
+                </div>
+
+                <div className="mt-2">
+                  <Button variant="outline" className="w-full flex items-center gap-2 justify-center text-sm">
+                    <Plus className="h-4 w-4" />
+                    <span>Create team</span>
+                  </Button>
                 </div>
               </div>
 
@@ -175,7 +174,7 @@ const Dashboard = () => {
                     <Link 
                       to={`/agent/${agent.id}`}
                       key={agent.id}
-                      className="px-3 py-2 rounded-md flex items-center text-sm hover:bg-gray-50 transition-colors duration-200"
+                      className="px-3 py-2 rounded-md flex items-center text-[0.875rem] hover:bg-gray-50 transition-colors duration-200"
                     >
                       <div 
                         className={`w-4 h-4 ${agent.color} rounded-sm mr-2 flex-shrink-0`}
@@ -184,12 +183,14 @@ const Dashboard = () => {
                     </Link>
                   ))}
                 </div>
-              </div>
 
-              <Button variant="outline" className="w-full flex items-center gap-2 justify-center">
-                <Plus className="h-4 w-4" />
-                <span>Create team</span>
-              </Button>
+                <div className="mt-2">
+                  <Button variant="outline" className="w-full flex items-center gap-2 justify-center text-sm">
+                    <Plus className="h-4 w-4" />
+                    <span>Create agent</span>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
           
