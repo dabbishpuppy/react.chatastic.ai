@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface Agent {
-  id: number;
+  id: string; // Changed from number to string to match Supabase UUID format
   name: string;
   image: string;
   color: string;

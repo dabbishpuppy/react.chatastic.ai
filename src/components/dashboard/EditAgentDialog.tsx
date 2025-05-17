@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: number;
+  id: string; // Changed from number to string to match Supabase UUID
   name: string;
   image: string;
   color: string;

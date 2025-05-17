@@ -1,38 +1,19 @@
 
 import React, { useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: number;
+  id: string; // Changed from number to string to match Supabase UUID
   name: string;
-  image: string;
-  color: string;
-  status?: string;
-  teamId?: string;
-  metrics?: {
-    conversations: number;
-    responseTime: string;
-    satisfaction: number;
-  };
 }
 
 interface DeleteAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: Agent;
-  onAgentDeleted: (agentId: number) => void;
+  onAgentDeleted: (agentId: string) => void; // Changed from number to string
 }
 
 const DeleteAgentDialog = ({
@@ -41,69 +22,55 @@ const DeleteAgentDialog = ({
   agent,
   onAgentDeleted
 }: DeleteAgentDialogProps) => {
-  const [confirmName, setConfirmName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const handleDelete = () => {
-    if (confirmName !== agent.name) return;
-    
     setIsSubmitting(true);
-    
+
     // In a real application, you would call an API here
     // For now we'll just simulate a delay and update locally
     setTimeout(() => {
       onAgentDeleted(agent.id);
       toast({
         title: "Agent deleted",
-        description: `${agent.name} has been deleted.`,
-        variant: "destructive"
+        description: `${agent.name} has been deleted successfully.`,
       });
       
       setIsSubmitting(false);
       onOpenChange(false);
-      setConfirmName("");
     }, 500);
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the
-            <span className="font-medium"> {agent.name} </span>
-            agent and remove its data from our servers.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="space-y-2 py-4">
-          <Label htmlFor="confirmName">
-            Type <span className="font-semibold">{agent.name}</span> to confirm
-          </Label>
-          <Input
-            id="confirmName"
-            value={confirmName}
-            onChange={(e) => setConfirmName(e.target.value)}
-            placeholder={`Type "${agent.name}" to confirm`}
-            className="w-full"
-            autoFocus
-          />
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setConfirmName("")} disabled={isSubmitting}>
-            Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            disabled={confirmName !== agent.name || isSubmitting}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Delete Agent</DialogTitle>
+          <DialogDescription>
+            Are you sure you want to delete {agent.name}? This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => onOpenChange(false)}
+            disabled={isSubmitting}
           >
-            {isSubmitting ? "Deleting..." : "Delete Agent"}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            Cancel
+          </Button>
+          <Button 
+            type="button" 
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
