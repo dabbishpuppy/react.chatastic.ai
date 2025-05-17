@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { 
   Activity, 
@@ -215,19 +216,25 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
                 {item.label}
               </div>
               {item.hasSubmenu && (
-                <span className="text-gray-500">
+                <span className="text-gray-500 transition-transform duration-200">
                   {expandedMenus[item.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </span>
               )}
             </button>
             
-            {/* Submenu */}
-            {item.hasSubmenu && expandedMenus[item.id] && (
-              <div className="ml-10 mt-1 mb-2">
+            {/* Submenu with transition effect */}
+            {item.hasSubmenu && (
+              <div 
+                className={`ml-10 overflow-hidden transition-all duration-300 ease-in-out ${
+                  expandedMenus[item.id] 
+                    ? "max-h-64 opacity-100 mt-1 mb-2" 
+                    : "max-h-0 opacity-0"
+                }`}
+              >
                 {item.submenu?.map((subItem) => (
                   <button
                     key={subItem.id}
-                    className={`w-full text-left py-2 px-3 text-sm rounded-md flex items-center ${
+                    className={`w-full text-left py-2 px-3 text-sm rounded-md flex items-center transition-colors duration-200 ${
                       isSubmenuActive(item.id, subItem.id)
                         ? "bg-gray-100 font-medium"
                         : "text-gray-600 hover:bg-gray-50"
