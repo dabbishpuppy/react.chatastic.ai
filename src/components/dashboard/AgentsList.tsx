@@ -80,10 +80,14 @@ const AgentsList = ({
     );
   };
 
-  // Navigate to agent's playground page - using straightforward navigation
-  const handleAgentClick = (agentId: string) => {
+  // Navigate to agent's playground page with event prevention
+  const handleAgentClick = (agentId: string, event: React.MouseEvent) => {
+    // Prevent any default behavior
+    event.preventDefault();
+    event.stopPropagation();
+    
     console.log(`Navigating to agent: ${agentId}`);
-    // Use direct navigation without any special options
+    // Navigate directly to agent page
     navigate(`/agent/${agentId}`);
   };
 
@@ -113,7 +117,7 @@ const AgentsList = ({
           <div 
             key={agent.id}
             className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
-            onClick={() => handleAgentClick(agent.id.toString())}
+            onClick={(e) => handleAgentClick(agent.id.toString(), e)}
           >
             <div className="flex items-center text-[0.875rem] flex-1">
               <div 

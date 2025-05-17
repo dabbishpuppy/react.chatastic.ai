@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Loader } from 'lucide-react';
@@ -18,17 +19,17 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
       setIsLoading(true);
       setPrevPathname(location.pathname);
       
-      // Update content immediately but keep loading state for a very brief moment
+      // Update content immediately but maintain loading state briefly
       setDisplayContent(children);
       
-      // Use minimal timeout to prevent flash but ensure state updates properly
+      // Very short timeout to ensure proper rendering
       const timeoutId = setTimeout(() => {
         setIsLoading(false);
-      }, 50); // Very short timeout
+      }, 10); // Extremely short timeout - just enough to let React process the state updates
       
       return () => clearTimeout(timeoutId);
     } else {
-      // For same route updates or search param changes, just update the content immediately
+      // For same route updates or search param changes, update content immediately
       setDisplayContent(children);
       setIsLoading(false);
     }

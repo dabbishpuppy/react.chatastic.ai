@@ -6,7 +6,7 @@ interface SidebarSubmenuItemProps {
   label: string;
   icon: React.ReactNode;
   isActive: boolean;
-  onClick: () => void;
+  onClick: (event?: React.MouseEvent) => void;
 }
 
 const SidebarSubmenuItem = ({
@@ -24,7 +24,7 @@ const SidebarSubmenuItem = ({
           ? "bg-gray-100 font-medium"
           : "text-gray-600 hover:bg-gray-50"
       }`}
-      onClick={onClick}
+      onClick={(e) => onClick(e)}
     >
       <span className="mr-2 text-gray-500">{icon}</span>
       {label}
