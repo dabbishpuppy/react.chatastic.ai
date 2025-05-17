@@ -1,10 +1,11 @@
 
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const RegistrationForm = () => {
   const [email, setEmail] = useState("");
@@ -12,9 +13,20 @@ const RegistrationForm = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const { signUp, networkAvailable } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!networkAvailable) {
+      toast({
+        title: "Network error",
+        description: "Please check your internet connection.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (password !== confirmPassword) {
       toast({
@@ -27,15 +39,22 @@ const RegistrationForm = () => {
     
     setIsSubmitting(true);
     
-    // Simulate form submission
-    setTimeout(() => {
-      console.log("Form submitted:", { email, password });
+    try {
+      await signUp(email, password);
       toast({
         title: "Registration successful!",
-        description: "Your account has been created.",
+        description: "Please check your email to verify your account.",
       });
+      navigate('/signin');
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -85,7 +104,7 @@ const RegistrationForm = () => {
         <Button
           type="submit"
           className="w-full bg-black hover:bg-gray-800 text-white"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !networkAvailable}
         >
           {isSubmitting ? "Signing up..." : "Sign up"}
         </Button>
@@ -115,6 +134,12 @@ const RegistrationForm = () => {
             type="button"
             variant="outline"
             className="w-full border-gray-300 flex items-center justify-center space-x-2"
+            onClick={() => {
+              toast({
+                title: "Google sign up",
+                description: "Google authentication is not yet implemented.",
+              });
+            }}
           >
             <svg className="w-5 h-5" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4ZM24 4C35.0457 4 44 12.9543 44 24C44 29.6325 42.0187 34.7927 38.6451 38.6451" stroke="#EA4335" strokeWidth="4" />
