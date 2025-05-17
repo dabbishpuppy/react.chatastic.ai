@@ -80,10 +80,10 @@ const AgentsList = ({
     );
   };
 
-  // Navigate to agent's playground page directly
+  // Navigate to agent's playground page - using straightforward navigation
   const handleAgentClick = (agentId: string) => {
     console.log(`Navigating to agent: ${agentId}`);
-    // Simple navigation without replace - fixes the issue with transitions
+    // Use direct navigation without any special options
     navigate(`/agent/${agentId}`);
   };
 

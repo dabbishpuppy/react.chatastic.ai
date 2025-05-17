@@ -17,16 +17,17 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const { teamsData } = useTeamsAndAgents();
   
-  // Find the current agent based on the URL parameter
+  // Find the current agent based on the URL parameter with proper cleanup
   useEffect(() => {
+    // Reset current agent when agentId changes
+    setCurrentAgent(null);
+    
     if (agentId && teamsData.length > 0) {
-      // Clear current agent first to avoid stale data
-      setCurrentAgent(null);
-      
       // Search through all teams to find the agent with matching ID
       for (const team of teamsData) {
         const foundAgent = team.agents.find(agent => agent.id.toString() === agentId);
         if (foundAgent) {
+          console.log("Found agent:", foundAgent.name);
           setCurrentAgent(foundAgent);
           break;
         }
@@ -37,12 +38,16 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   return (
     <div className="flex flex-col h-full">
       {/* Agent header section */}
-      {currentAgent && (
+      {currentAgent ? (
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-1">
             <div className={`w-4 h-4 ${currentAgent.color} rounded-sm flex-shrink-0`}></div>
             <span className="font-medium truncate">{currentAgent.name}</span>
           </div>
+        </div>
+      ) : (
+        <div className="p-4 border-b border-gray-200">
+          <div className="animate-pulse h-6 bg-gray-200 rounded w-3/4"></div>
         </div>
       )}
       
