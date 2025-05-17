@@ -1,12 +1,9 @@
 
 import React, { useState, ReactNode, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { Loader } from "lucide-react";
+import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Logo from "@/components/layout/Logo";
-import { supabase } from "@/lib/supabase";
-import { toast } from "@/hooks/use-toast";
 
 interface AgentPageLayoutProps {
   children: ReactNode;
@@ -25,53 +22,8 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
   const [pageTitle, setPageTitle] = useState(defaultPageTitle);
-  const [isLoading, setIsLoading] = useState(true);
-  const [agentExists, setAgentExists] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
   const { agentId } = useParams();
-  const navigate = useNavigate();
-
-  // Verify agent exists
-  useEffect(() => {
-    const checkAgent = async () => {
-      if (!agentId) {
-        navigate('/dashboard');
-        return;
-      }
-
-      setIsLoading(true);
-      
-      try {
-        const { data, error } = await supabase
-          .from('agents')
-          .select('id')
-          .eq('id', agentId)
-          .single();
-        
-        if (error || !data) {
-          console.error("Agent not found:", error);
-          setAgentExists(false);
-          toast({
-            title: "Agent not found",
-            description: "The agent you're looking for doesn't exist or you don't have access to it.",
-            variant: "destructive",
-          });
-          // Redirect with a short timeout to allow the toast to be seen
-          setTimeout(() => navigate('/dashboard'), 1500);
-          return;
-        }
-        
-        setAgentExists(true);
-      } catch (err) {
-        console.error("Error checking agent:", err);
-        setAgentExists(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    checkAgent();
-  }, [agentId, navigate]);
 
   useEffect(() => {
     // Reset active tab when agent changes
@@ -95,30 +47,6 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
       contentRef.current.scrollTop = 0;
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col h-screen items-center justify-center">
-        <Loader className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p>Loading agent environment...</p>
-      </div>
-    );
-  }
-
-  if (!agentExists) {
-    return (
-      <div className="flex flex-col h-screen items-center justify-center text-center p-4">
-        <h2 className="text-xl font-medium mb-2">Agent not found</h2>
-        <p className="text-muted-foreground mb-4">This agent doesn't exist or you don't have access to it.</p>
-        <button 
-          className="px-4 py-2 bg-primary text-white rounded-md"
-          onClick={() => navigate('/dashboard')}
-        >
-          Return to Dashboard
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-screen">
