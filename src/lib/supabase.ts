@@ -27,8 +27,8 @@ try {
         flowType: 'pkce'
       },
       global: {
-        fetch: (...args) => {
-          return fetch(...args).catch(err => {
+        fetch: (url, options) => {
+          return fetch(url, options).catch(err => {
             console.error('Supabase fetch error:', err);
             throw new Error('Network error. Please check your connection and try again.');
           });
