@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import TextTab from "@/components/sources/TextTab";
@@ -7,18 +6,21 @@ import WebsiteTab from "@/components/sources/WebsiteTab";
 import QATab from "@/components/sources/QATab";
 import SourcesWidget from "@/components/sources/SourcesWidget";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-
 const SourcesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { agentId } = useParams();
+  const {
+    agentId
+  } = useParams();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const tab = searchParams.get("tab") || "text";
-  
+
   // Set the URL parameter when the component mounts if it doesn't exist
   useEffect(() => {
     if (!searchParams.has("tab")) {
-      navigate(`/agent/${agentId}/sources?tab=text`, { replace: true });
+      navigate(`/agent/${agentId}/sources?tab=text`, {
+        replace: true
+      });
     }
   }, []);
 
@@ -28,8 +30,9 @@ const SourcesPage: React.FC = () => {
     textFiles: 1,
     links: 6,
     qa: 1,
-    totalSize: 4 * 1024, // 4 KB
-    maxSize: 400 * 1024, // 400 KB
+    totalSize: 4 * 1024,
+    // 4 KB
+    maxSize: 400 * 1024 // 400 KB
   };
 
   // Get the current tab title for display
@@ -63,13 +66,11 @@ const SourcesPage: React.FC = () => {
         return <TextTab />;
     }
   };
-
-  return (
-    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Sources" showPageTitle={false}>
+  return <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Sources" showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <h1 className="text-3xl font-bold mb-6">{getTabTitle()}</h1>
         <div className="flex gap-6">
-          <div className="bg-white rounded-lg p-6 flex-1">
+          <div className="bg-white rounded-lg p-6 flex-1 px-[23px]">
             {renderTabContent()}
           </div>
           <div className="w-80 flex-shrink-0">
@@ -77,8 +78,6 @@ const SourcesPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </AgentPageLayout>
-  );
+    </AgentPageLayout>;
 };
-
 export default SourcesPage;
