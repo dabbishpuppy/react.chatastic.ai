@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Link } from 'react-router-dom';
@@ -222,7 +223,7 @@ const Index = () => {
                   <div className="flex items-start gap-3 text-sm">
                     <div className="bg-blue-50 rounded-lg p-3 ml-auto">
                       <p className="font-medium">AI Assistant</p>
-                      <p>You can upgrade your subscription by going to Settings > Plans. There you'll see all available plans and can choose the one that best fits your needs. Would you like me to guide you through the process?</p>
+                      <p>You can upgrade your subscription by going to Settings &gt; Plans. There you&apos;ll see all available plans and can choose the one that best fits your needs. Would you like me to guide you through the process?</p>
                     </div>
                   </div>
                   
@@ -236,7 +237,7 @@ const Index = () => {
                   <div className="flex items-start gap-3 text-sm">
                     <div className="bg-blue-50 rounded-lg p-3 ml-auto">
                       <p className="font-medium">AI Assistant</p>
-                      <p>Great! First, click on your profile icon in the top right corner. Then select "Settings" from the dropdown menu. In the settings page, click on the "Plans" tab. You'll see a comparison of all available plans. Once you've selected a plan, click "Upgrade" and follow the payment instructions. Is there anything else you'd like to know?</p>
+                      <p>Great! First, click on your profile icon in the top right corner. Then select &quot;Settings&quot; from the dropdown menu. In the settings page, click on the &quot;Plans&quot; tab. You&apos;ll see a comparison of all available plans. Once you&apos;ve selected a plan, click &quot;Upgrade&quot; and follow the payment instructions. Is there anything else you&apos;d like to know?</p>
                     </div>
                   </div>
                 </div>
