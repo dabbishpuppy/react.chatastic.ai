@@ -11,7 +11,6 @@ interface Agent {
   image: string;
   color: string;
   status?: string;
-  teamId?: string;
   metrics?: {
     conversations: number;
     responseTime: string;
@@ -19,25 +18,16 @@ interface Agent {
   };
 }
 
-interface Team {
-  id: string;
-  name: string;
-}
-
 interface AgentsListProps {
   agents: Agent[];
   isExpanded: boolean;
   onToggleExpand: () => void;
-  teams: Team[];
-  currentTeamId?: string;
 }
 
 const AgentsList = ({
   agents,
   isExpanded,
-  onToggleExpand,
-  teams,
-  currentTeamId
+  onToggleExpand
 }: AgentsListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
@@ -94,7 +84,6 @@ const AgentsList = ({
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onAgentCreated={handleAgentCreated}
-        teams={teams}
       />
     </div>
   );
