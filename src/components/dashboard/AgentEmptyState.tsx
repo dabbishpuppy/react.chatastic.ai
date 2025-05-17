@@ -5,19 +5,22 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Bot, Plus } from 'lucide-react';
 import CreateAgentDialog from './CreateAgentDialog';
 import { Agent, Team } from '@/hooks/useTeamsAndAgents';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AgentEmptyStateProps {
   teamName?: string;
+  teamId?: string;
   onCreateAgent: (agent: Agent) => void;
 }
 
-const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAgent }) => {
+const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, teamId, onCreateAgent }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { user } = useAuth();
 
-  // Get the current team for the dialog
+  // Create a mock team for the dialog that includes a proper ID
   const mockTeam: Team = {
-    id: '',
-    name: teamName || '',
+    id: teamId || '', // Ensure we have a valid ID if provided
+    name: teamName || 'Default Team',
     isActive: true,
     agents: [],
     metrics: {
@@ -50,6 +53,7 @@ const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAge
           <Button 
             onClick={() => setIsCreateDialogOpen(true)}
             className="flex items-center gap-2"
+            disabled={!teamId} // Disable if no teamId is provided
           >
             <Plus className="h-4 w-4" />
             Create Your First Agent
@@ -60,7 +64,7 @@ const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAge
       <CreateAgentDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
-        teams={mockTeam ? [mockTeam] : []} 
+        teams={mockTeam.id ? [mockTeam] : []} 
         onAgentCreated={onCreateAgent}
       />
     </div>

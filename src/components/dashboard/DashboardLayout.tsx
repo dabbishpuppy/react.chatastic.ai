@@ -1,4 +1,3 @@
-
 import React from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
@@ -55,7 +54,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               teamsList={teamsData}
             />
           ) : (
-            <AgentEmptyState teamName={selectedTeam?.name} onCreateAgent={onAgentCreated} />
+            <AgentEmptyState 
+              teamName={selectedTeam?.name} 
+              teamId={selectedTeam?.id}
+              onCreateAgent={onAgentCreated} 
+            />
           )}
         </div>
       </div>

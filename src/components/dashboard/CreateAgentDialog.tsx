@@ -75,6 +75,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Make sure we always have a valid team selected
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
   
   const form = useForm<FormValues>({
@@ -85,7 +87,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   });
 
   const onSubmit = async (values: FormValues) => {
-    if (!selectedTeam) {
+    if (!selectedTeam || !selectedTeam.id) {
       toast({
         title: "Error",
         description: "No team selected. Please create or select a team first.",
@@ -110,6 +112,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     
     try {
       console.log("Creating agent with team_id:", selectedTeam.id);
+      
       // Insert the new agent - The RLS policies will handle permission checking
       const { data, error } = await supabase
         .from('agents')
@@ -209,8 +212,23 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
               )}
             />
 
+            {selectedTeam ? (
+              <div className="text-sm text-muted-foreground">
+                Creating in team: <span className="font-medium">{selectedTeam.name}</span>
+              </div>
+            ) : (
+              <div className="text-sm text-red-500">
+                No team selected. Please create a team first.
+              </div>
+            )}
+
             <DialogFooter>
-              <Button type="submit">Create Agent</Button>
+              <Button 
+                type="submit" 
+                disabled={!selectedTeam}
+              >
+                Create Agent
+              </Button>
             </DialogFooter>
           </form>
         </Form>

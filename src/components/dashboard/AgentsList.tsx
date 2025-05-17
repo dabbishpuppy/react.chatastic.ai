@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,11 @@ const AgentsList = ({
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
   const { toast } = useToast();
+
+  // Update local agents when props change
+  useEffect(() => {
+    setLocalAgents(agents);
+  }, [agents]);
 
   // Handle creating a new agent
   const handleAgentCreated = (newAgent: Agent) => {
@@ -72,6 +78,10 @@ const AgentsList = ({
       prevAgents.filter(agent => agent.id !== agentId)
     );
   };
+
+  // Make sure we have at least one valid team with an ID
+  const validTeams = teams.filter(team => team && team.id);
+  const canCreateAgent = validTeams.length > 0;
 
   // Use local agents if available, otherwise use the props agents
   const displayAgents = localAgents.length > 0 ? localAgents : agents;
@@ -142,6 +152,7 @@ const AgentsList = ({
           variant="outline" 
           className="w-full flex items-center gap-2 justify-center text-sm"
           onClick={() => setIsDialogOpen(true)}
+          disabled={!canCreateAgent}
         >
           <Plus className="h-4 w-4" />
           <span>Create agent</span>
@@ -151,7 +162,7 @@ const AgentsList = ({
       <CreateAgentDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        teams={teams}
+        teams={validTeams}
         onAgentCreated={handleAgentCreated}
       />
       
