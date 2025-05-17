@@ -76,27 +76,14 @@ const DeleteTeamDialog: React.FC<DeleteTeamDialogProps> = ({
         </AlertDialogHeader>
         
         <div className="py-4">
-          <div className="mb-4">
-            <label className="text-sm font-medium block mb-2">
-              Team Name
-            </label>
-            <Input 
-              value={team.name}
-              readOnly
-              className="bg-gray-50"
-            />
-          </div>
-          
-          <div>
-            <label className="text-sm font-medium block mb-2">
-              Please type your team name to confirm
-            </label>
-            <Input
-              value={confirmName}
-              onChange={(e) => setConfirmName(e.target.value)}
-              placeholder="Enter team name to confirm"
-            />
-          </div>
+          <label className="text-sm font-medium block mb-2">
+            Please type your team name to confirm
+          </label>
+          <Input
+            value={confirmName}
+            onChange={(e) => setConfirmName(e.target.value)}
+            placeholder="Enter team name to confirm"
+          />
         </div>
 
         <AlertDialogFooter>
