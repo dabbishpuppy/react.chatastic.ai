@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -13,9 +13,10 @@ import {
   FormItem,
   FormMessage,
 } from "@/components/ui/form";
-import { Eye, EyeOff, Mail } from "lucide-react";
+import { Eye, EyeOff, Mail, WifiOff, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Define form schema
 const formSchema = z.object({
@@ -26,10 +27,12 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 const SignIn = () => {
-  const { signIn } = useAuth();
+  const { signIn, networkAvailable } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -39,21 +42,63 @@ const SignIn = () => {
     }
   });
 
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      setNetworkError(null);
+    };
+    
+    const handleOffline = () => {
+      setIsOffline(true);
+      setNetworkError("You are currently offline. Please check your internet connection.");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Reset network error when the user makes changes to the form
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      if (networkError) {
+        setNetworkError(null);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form, networkError]);
+
   const onSubmit = async (values: FormValues) => {
+    // Clear previous network errors
+    setNetworkError(null);
+    
+    if (isOffline) {
+      setNetworkError("You are currently offline. Please check your internet connection.");
+      return;
+    }
+    
     try {
       setIsLoading(true);
       await signIn(values.email, values.password);
       toast({
         title: "Sign in successful",
-        description: "Welcome back to Wonderwave!"
+        description: "Welcome to Wonderwave!"
       });
-      navigate("/dashboard");
+      // The redirect is handled in the AuthContext
     } catch (error: any) {
-      toast({
-        title: "Sign in failed",
-        description: error.message,
-        variant: "destructive"
-      });
+      console.error("Login error:", error);
+      
+      // Check for network-related errors
+      if (!navigator.onLine || error.message?.includes("Network") || 
+          error.message?.includes("network") || error.message === "Failed to fetch") {
+        setNetworkError(error.message || "Network error. Please check your connection and try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -63,12 +108,31 @@ const SignIn = () => {
     setShowPassword(!showPassword);
   };
 
+  // Network status indicator component
+  const NetworkStatusIndicator = () => {
+    if (networkAvailable && !networkError) return null;
+    
+    return (
+      <Alert variant="destructive" className="mb-4 bg-red-50 border-red-200">
+        <AlertDescription className="flex items-center gap-2 text-red-800">
+          {isOffline ? <WifiOff size={16} /> : <AlertCircle size={16} />}
+          {networkError || "Network error. Please check your internet connection and try again."}
+        </AlertDescription>
+      </Alert>
+    );
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">Welcome Back</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Sign in to your account to continue
+          </p>
         </div>
+
+        <NetworkStatusIndicator />
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-6">
@@ -141,7 +205,7 @@ const SignIn = () => {
             <Button
               type="submit"
               className="w-full bg-black hover:bg-gray-800 text-white py-2 rounded-md"
-              disabled={isLoading}
+              disabled={isLoading || isOffline}
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </Button>
@@ -169,12 +233,17 @@ const SignIn = () => {
               variant="outline"
               className="w-full border border-gray-300 py-2 flex items-center justify-center space-x-2"
               onClick={() => {
-                // Google sign-in would be implemented here
+                if (isOffline) {
+                  setNetworkError("You are currently offline. Please check your internet connection.");
+                  return;
+                }
+                
                 toast({
                   title: "Google Sign in",
                   description: "Google authentication is not yet implemented."
                 });
               }}
+              disabled={isOffline}
             >
               <Mail size={18} />
               <span>Google</span>

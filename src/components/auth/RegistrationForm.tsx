@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const RegistrationForm = () => {
@@ -16,9 +16,9 @@ const RegistrationForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const { toast } = useToast();
   const { signUp, networkAvailable } = useAuth();
-  const navigate = useNavigate();
   
   // Monitor online/offline status
   useEffect(() => {
@@ -73,11 +73,7 @@ const RegistrationForm = () => {
     
     try {
       await signUp(email, password);
-      toast({
-        title: "Registration successful!",
-        description: "Please check your email to verify your account.",
-      });
-      navigate('/signin');
+      setRegistrationSuccess(true);
     } catch (error: any) {
       console.error("Registration error:", error);
       
@@ -86,16 +82,28 @@ const RegistrationForm = () => {
           error.message?.includes("network") || error.message === "Failed to fetch") {
         setNetworkError(error.message || "Network error. Please check your connection and try again.");
       }
-      
-      toast({
-        title: "Registration failed",
-        description: error.message || "An unexpected error occurred",
-        variant: "destructive",
-      });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // If registration is successful, show the success message
+  if (registrationSuccess) {
+    return (
+      <div className="text-center">
+        <div className="flex justify-center mb-4">
+          <CheckCircle className="h-16 w-16 text-green-500" />
+        </div>
+        <h2 className="text-2xl font-bold mb-4">Registration Successful!</h2>
+        <p className="mb-6 text-gray-600">
+          Please check your email to verify your account. Once verified, you'll be able to sign in and create your first team.
+        </p>
+        <Button asChild className="w-full">
+          <Link to="/signin">Go to Sign In</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md mx-auto">

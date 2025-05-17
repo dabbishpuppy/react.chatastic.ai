@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface AuthContextProps {
@@ -56,12 +56,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    // Initial session check
-    const checkSession = async () => {
+    // Set up auth state listener FIRST to prevent missing auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        // Only synchronous state updates here
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        
+        // Use setTimeout to avoid auth deadlocks
+        setTimeout(() => {
+          if (event === 'SIGNED_IN') {
+            // Check if the user already has a team
+            const checkForTeams = async () => {
+              try {
+                const { data: teams } = await supabase
+                  .from('teams')
+                  .select('id')
+                  .eq('user_id', newSession?.user.id)
+                  .limit(1);
+                
+                if (teams && teams.length > 0) {
+                  navigate('/dashboard');
+                } else {
+                  navigate('/create-team');
+                }
+              } catch (error) {
+                console.error('Error checking for teams:', error);
+                navigate('/dashboard');
+              }
+            };
+            
+            checkForTeams();
+          } else if (event === 'SIGNED_OUT') {
+            navigate('/signin');
+          } else if (event === 'USER_UPDATED') {
+            setUser(newSession?.user ?? null);
+          }
+        }, 0);
+      }
+    );
+
+    // THEN check for existing session
+    const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (currentSession?.user) {
+          // User is already logged in
+          const { data: teams } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('user_id', currentSession.user.id)
+            .limit(1);
+          
+          if (teams && teams.length > 0) {
+            navigate('/dashboard');
+          } else if (window.location.pathname !== '/create-team') {
+            navigate('/create-team');
+          }
+        }
       } catch (error) {
         console.error('Error checking authentication status:', error);
       } finally {
@@ -69,21 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    checkSession();
-
-    // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (event === 'SIGNED_IN') {
-          navigate('/dashboard');
-        } else if (event === 'SIGNED_OUT') {
-          navigate('/signin');
-        }
-      }
-    );
+    initializeAuth();
 
     return () => {
       subscription.unsubscribe();
