@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import PageTransition from "@/components/layout/PageTransition";
 import Index from "./pages/Index";
 import SignIn from "./pages/SignIn";
 import Register from "./pages/Register";
@@ -43,63 +44,85 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/create-team" element={
               <ProtectedRoute>
-                <CreateTeamPage />
+                <PageTransition>
+                  <CreateTeamPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             
             {/* Protected Routes */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <Dashboard />
+                <PageTransition>
+                  <Dashboard />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/usage" element={
               <ProtectedRoute>
-                <UsagePage />
+                <PageTransition>
+                  <UsagePage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/agent/:agentId" element={
               <ProtectedRoute>
-                <AgentEnvironment />
+                <PageTransition>
+                  <AgentEnvironment />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/agent/:agentId/activity" element={
               <ProtectedRoute>
-                <ActivityPage />
+                <PageTransition>
+                  <ActivityPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/agent/:agentId/analytics" element={
               <ProtectedRoute>
-                <AnalyticsPage />
+                <PageTransition>
+                  <AnalyticsPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/agent/:agentId/sources" element={
               <ProtectedRoute>
-                <SourcesPage />
+                <PageTransition>
+                  <SourcesPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/agent/:agentId/actions" element={
               <ProtectedRoute>
-                <ActionsPage />
+                <PageTransition>
+                  <ActionsPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             <Route path="/agent/:agentId/integrations" element={
               <ProtectedRoute>
-                <IntegrationsPage />
+                <PageTransition>
+                  <IntegrationsPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             
             {/* Agent Settings Routes - Using wildcard for nested routes */}
             <Route path="/agent/:agentId/settings/*" element={
               <ProtectedRoute>
-                <AgentSettingsPage />
+                <PageTransition>
+                  <AgentSettingsPage />
+                </PageTransition>
               </ProtectedRoute>
             } />
             
             {/* Admin Settings Routes */}
             <Route path="/settings" element={
               <ProtectedRoute>
-                <Settings />
+                <PageTransition>
+                  <Settings />
+                </PageTransition>
               </ProtectedRoute>
             }>
               <Route index element={<GeneralSettings />} />

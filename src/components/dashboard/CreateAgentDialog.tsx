@@ -77,6 +77,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Make sure we always have a valid team selected
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
@@ -170,16 +171,30 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         teamId: selectedTeam.id,
       };
 
-      onAgentCreated(newAgent);
-      toast({
-        title: "Agent created",
-        description: `${values.name} has been created successfully!`,
-      });
-      form.reset();
+      // Close dialog first
       onOpenChange(false);
       
-      // Redirect to the sources page for the new agent
-      navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+      // Show processing toast
+      setIsProcessing(true);
+      
+      // Add a small delay before calling onAgentCreated for a smoother transition
+      setTimeout(() => {
+        onAgentCreated(newAgent);
+        
+        toast({
+          title: "Agent created",
+          description: `${values.name} has been created successfully!`,
+        });
+        
+        form.reset();
+        
+        // Redirect to the sources page for the new agent after a short delay
+        setTimeout(() => {
+          navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+          setIsProcessing(false);
+        }, 500);
+      }, 500);
+      
     } catch (error: any) {
       console.error("Exception creating agent:", error);
       toast({
@@ -187,63 +202,73 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         description: error.message || "Failed to create agent. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Create New Agent</DialogTitle>
-          <DialogDescription>
-            Create a new AI agent for your team. Fill in the details below.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {isProcessing && (
+        <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+          <div className="bg-card p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <Loader className="h-10 w-10 animate-spin text-primary mb-4" />
+            <p className="text-lg font-medium">Creating your agent...</p>
+          </div>
+        </div>
+      )}
+      
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Agent</DialogTitle>
+            <DialogDescription>
+              Create a new AI agent for your team. Fill in the details below.
+            </DialogDescription>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Agent Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Enter agent name..." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {selectedTeam ? (
-              <div className="text-sm text-muted-foreground">
-                Creating in team: <span className="font-medium">{selectedTeam.name}</span>
-              </div>
-            ) : (
-              <div className="text-sm text-red-500">
-                No team selected. Please create a team first.
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button 
-                type="submit" 
-                disabled={!selectedTeam || isSubmitting}
-                className="relative"
-              >
-                {isSubmitting && (
-                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Agent Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter agent name..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-                {isSubmitting ? "Creating..." : "Create Agent"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              />
+
+              {selectedTeam ? (
+                <div className="text-sm text-muted-foreground">
+                  Creating in team: <span className="font-medium">{selectedTeam.name}</span>
+                </div>
+              ) : (
+                <div className="text-sm text-red-500">
+                  No team selected. Please create a team first.
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button 
+                  type="submit" 
+                  disabled={!selectedTeam || isSubmitting}
+                  className="relative"
+                >
+                  {isSubmitting && (
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {isSubmitting ? "Creating..." : "Create Agent"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
