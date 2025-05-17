@@ -22,6 +22,16 @@ const IntegrationsPage: React.FC = () => {
     }
   }, []);
 
+  // Get the current tab title
+  const getTabTitle = () => {
+    switch(tab) {
+      case "embed": return "Embed";
+      case "share": return "Share";
+      case "integrations": return "Integrations";
+      default: return "Embed";
+    }
+  };
+
   // Render the appropriate tab content based on the URL parameter
   const renderTabContent = () => {
     switch (tab) {
@@ -54,9 +64,9 @@ const IntegrationsPage: React.FC = () => {
   };
 
   return (
-    <AgentPageLayout defaultActiveTab="connect" defaultPageTitle="Integrations" showPageTitle={false}>
+    <AgentPageLayout defaultActiveTab="connect" defaultPageTitle={getTabTitle()} showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
-        <h1 className="text-3xl font-bold mb-6">Integrations</h1>
+        <h1 className="text-3xl font-bold mb-6">{getTabTitle()}</h1>
         <div className="bg-white rounded-lg p-6">
           {renderTabContent()}
         </div>
