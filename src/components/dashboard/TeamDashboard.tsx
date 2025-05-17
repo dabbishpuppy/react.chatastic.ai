@@ -5,8 +5,8 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import TeamPerformanceOverview from "./dashboard-cards/TeamPerformanceOverview";
 import AgentStatusSummary from "./dashboard-cards/AgentStatusSummary";
 import RecentActivityFeed from "./dashboard-cards/RecentActivityFeed";
-import ResourceAllocation from "./dashboard-cards/ResourceAllocation";
-import TeamComparisonChart from "./TeamComparisonChart";
+import TopPerformingAgents from "./dashboard-cards/TopPerformingAgents";
+import TeamGoalsProgress from "./dashboard-cards/TeamGoalsProgress";
 
 interface TeamDashboardProps {
   team: {
@@ -69,43 +69,29 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
       </div>
       
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Resource Allocation */}
+        {/* Top Performing Agents */}
         <Card>
           <CardHeader>
-            <CardTitle>Resource Allocation</CardTitle>
+            <CardTitle>Top Performing Agents</CardTitle>
             <CardDescription>
-              Current resource utilization
+              Leaderboard based on key metrics
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <ResourceAllocation metrics={team.metrics} />
+            <TopPerformingAgents agents={team.agents} />
           </CardContent>
         </Card>
         
-        {/* Team Comparison */}
+        {/* Team Goals Progress */}
         <Card>
           <CardHeader>
-            <CardTitle>Team Comparison</CardTitle>
+            <CardTitle>Team Goals Progress</CardTitle>
             <CardDescription>
-              How your team compares to others
+              Progress towards this month's targets
             </CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <div className="h-[300px]">
-              <ChartContainer
-                config={{
-                  conversations: { theme: { light: "#9b87f5", dark: "#9b87f5" }, label: "Conversations" },
-                  satisfaction: { theme: { light: "#10b981", dark: "#10b981" }, label: "Satisfaction" },
-                  apiCalls: { theme: { light: "#f97316", dark: "#f97316" }, label: "API Calls (hundreds)" }
-                }}
-              >
-                {/* Wrap the children in a React Fragment so it's treated as a single child */}
-                <>
-                  <TeamComparisonChart teams={teamsList} />
-                  <ChartTooltip />
-                </>
-              </ChartContainer>
-            </div>
+            <TeamGoalsProgress teamId={team.id} />
           </CardContent>
         </Card>
       </div>
@@ -114,4 +100,3 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
 };
 
 export default TeamDashboard;
-
