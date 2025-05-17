@@ -1,40 +1,12 @@
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User, LogOut } from "lucide-react";
+import { DollarSign, User, LogOut, Loader } from "lucide-react";
 import AgentSidebarMenu from "./sidebar/AgentSidebarMenu";
 import SidebarActions from "../dashboard/SidebarActions";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
-// Sample agent data structure - in a real implementation, this would come from a data store or API
-const agentsData = [
-  {
-    id: "1",
-    name: "Wonder AI",
-    color: "bg-violet-600",
-  },
-  {
-    id: "2",
-    name: "Agora AI",
-    color: "bg-amber-100",
-  },
-  {
-    id: "3",
-    name: "PristineBag AI",
-    color: "bg-rose-400",
-  },
-  {
-    id: "4",
-    name: "AI Kundeservice",
-    color: "bg-black",
-  },
-  {
-    id: "5",
-    name: "theballooncompany.com",
-    color: "bg-white",
-  }
-];
 
 interface AgentSidebarProps {
   activeTab: string;
@@ -51,20 +23,16 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   // Find the current agent based on the URL parameter
   useEffect(() => {
     const fetchAgent = async () => {
-      if (!agentId) return;
+      if (!agentId) {
+        setIsLoading(false);
+        return;
+      }
       
       setIsLoading(true);
+      console.log("Fetching agent with ID:", agentId);
       
       try {
-        // First check the sample data for quick development
-        const sampleAgent = agentsData.find(agent => agent.id === agentId);
-        if (sampleAgent) {
-          setCurrentAgent(sampleAgent);
-          setIsLoading(false);
-          return;
-        }
-        
-        // Otherwise fetch from Supabase
+        // Fetch from Supabase
         const { data, error } = await supabase
           .from('agents')
           .select('id, name, color')
@@ -73,15 +41,29 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
           
         if (error) {
           console.error('Error fetching agent:', error);
-          toast({
-            title: 'Error',
-            description: 'Could not load agent information',
-            variant: 'destructive'
-          });
-          return;
-        }
-        
-        if (data) {
+          
+          // Fallback to sample data for development
+          const sampleAgentsData = [
+            { id: "1", name: "Wonder AI", color: "bg-violet-600" },
+            { id: "2", name: "Agora AI", color: "bg-amber-100" },
+            { id: "3", name: "PristineBag AI", color: "bg-rose-400" },
+            { id: "4", name: "AI Kundeservice", color: "bg-black" },
+            { id: "5", name: "theballooncompany.com", color: "bg-white" }
+          ];
+          
+          const sampleAgent = sampleAgentsData.find(agent => agent.id === agentId);
+          if (sampleAgent) {
+            console.log("Found sample agent:", sampleAgent);
+            setCurrentAgent(sampleAgent);
+          } else {
+            toast({
+              title: 'Error',
+              description: 'Could not load agent information',
+              variant: 'destructive'
+            });
+          }
+        } else if (data) {
+          console.log("Fetched agent data:", data);
           setCurrentAgent(data);
         }
       } catch (err) {
@@ -94,13 +76,16 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     fetchAgent();
   }, [agentId, toast]);
 
+  console.log("Current agent:", currentAgent);
+  console.log("Is loading:", isLoading);
+
   return (
     <div className="flex flex-col h-full">
       {/* Agent header section */}
       {isLoading ? (
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-2 h-7">
-            <div className="w-4 h-4 bg-gray-200 rounded-sm animate-pulse"></div>
+            <Loader size={16} className="animate-spin" />
             <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
           </div>
         </div>

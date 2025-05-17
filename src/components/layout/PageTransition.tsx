@@ -13,17 +13,20 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
   const [displayContent, setDisplayContent] = useState(children);
 
   // Get state from location
-  const fromAgentAction = location.state?.fromAgentCreation || location.state?.fromAgentsList;
+  const fromAgentAction = location.state?.fromAgentCreation || 
+                          location.state?.fromAgentsList || 
+                          location.pathname.includes('/playground/');
   
   // Debug
   console.log("PageTransition - location:", location.pathname);
   console.log("PageTransition - state:", location.state);
 
   useEffect(() => {
-    // Skip loading state if coming from agent creation or agent list click
+    // Skip loading state if coming from agent actions or directly to playground
     if (fromAgentAction) {
-      console.log("Coming from agent action, skipping loading animation");
+      console.log("Coming from agent action or playground, skipping loading animation");
       setDisplayContent(children);
+      setIsLoading(false);
       return;
     }
 

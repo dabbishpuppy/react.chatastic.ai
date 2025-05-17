@@ -51,13 +51,13 @@ const AgentsList = ({
     });
   };
 
-  // Handle agent navigation - FIXED NAVIGATION ISSUE
+  // Handle agent navigation - Using fixed navigation method
   const handleAgentClick = (agentId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("Navigating to agent:", agentId);
+    console.log("Navigating to agent playground:", agentId);
     
-    // Direct navigation to the playground route
+    // Direct navigation to the playground route with state to prevent loading animation
     navigate(`/playground/${agentId}`, { 
       state: { fromAgentsList: true } 
     });
