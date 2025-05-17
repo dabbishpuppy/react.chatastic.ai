@@ -58,6 +58,7 @@ const DashboardSidebar = ({
           
           <AgentsList 
             agents={selectedTeam.agents}
+            teams={teams}
             isExpanded={expandedSections.agents}
             onToggleExpand={() => toggleSection('agents')}
           />

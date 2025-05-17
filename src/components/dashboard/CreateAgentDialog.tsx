@@ -22,34 +22,25 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 
 // Define the form schema
 const formSchema = z.object({
   name: z.string().min(1, { message: "Agent name is required" }),
-  color: z.string().default("bg-violet-600"),
+  teamId: z.string().min(1, { message: "Team is required" }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface CreateAgentDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onAgentCreated: (agent: {
-    id: number;
-    name: string;
-    image: string;
-    color: string;
-    status: "active";
-    metrics: {
-      conversations: number;
-      responseTime: string;
-      satisfaction: number;
-    };
-  }) => void;
-}
-
-const bgColorOptions = [
+// Color palette for automatic assignment
+const agentColorPalette = [
   "bg-violet-600",
   "bg-amber-100",
   "bg-rose-400",
@@ -62,9 +53,36 @@ const bgColorOptions = [
   "bg-purple-500",
 ];
 
+interface Team {
+  id: string;
+  name: string;
+  isActive?: boolean;
+  agents: any[];
+}
+
+interface CreateAgentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  teams: Team[];
+  onAgentCreated: (agent: {
+    id: number;
+    name: string;
+    image: string;
+    color: string;
+    status: "active";
+    metrics: {
+      conversations: number;
+      responseTime: string;
+      satisfaction: number;
+    };
+    teamId: string;
+  }) => void;
+}
+
 const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   open,
   onOpenChange,
+  teams,
   onAgentCreated,
 }) => {
   const navigate = useNavigate();
@@ -72,23 +90,30 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      color: "bg-violet-600",
+      teamId: teams.length > 0 ? teams[0].id : "",
     },
   });
 
   const onSubmit = (values: FormValues) => {
+    // Auto-assign a color from the palette (round robin based on team's existing agents)
+    const selectedTeam = teams.find(team => team.id === values.teamId);
+    const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
+    const colorIndex = teamAgentsCount % agentColorPalette.length;
+    const autoAssignedColor = agentColorPalette[colorIndex];
+    
     // Create a new agent with the form values
     const newAgent = {
       id: Date.now(), // Use timestamp as a simple ID for now
       name: values.name,
       image: "/placeholder.svg",
-      color: values.color,
+      color: autoAssignedColor,
       status: "active" as const,
       metrics: {
         conversations: 0,
         responseTime: "0.0s",
         satisfaction: 0,
       },
+      teamId: values.teamId,
     };
 
     onAgentCreated(newAgent);
@@ -131,25 +156,27 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
 
             <FormField
               control={form.control}
-              name="color"
+              name="teamId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Choose Color</FormLabel>
-                  <FormControl>
-                    <div className="flex flex-wrap gap-2">
-                      {bgColorOptions.map((color) => (
-                        <div
-                          key={color}
-                          className={`w-8 h-8 rounded-md cursor-pointer ${color} ${
-                            field.value === color 
-                              ? "ring-2 ring-offset-2 ring-primary" 
-                              : "ring-1 ring-offset-1 ring-gray-200"
-                          } border border-gray-200`}
-                          onClick={() => field.onChange(color)}
-                        />
+                  <FormLabel>Team</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a team" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
                       ))}
-                    </div>
-                  </FormControl>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
