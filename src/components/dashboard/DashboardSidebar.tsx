@@ -20,19 +20,19 @@ interface Agent {
 }
 
 interface DashboardSidebarProps {
-  teams: Team[];
-  selectedTeam: Team;
+  teams: any[];
+  selectedTeam: any;
   expandedSections: {
     teams: boolean;
     agents: boolean;
   };
-  onTeamSelect: (team: Team) => void;
+  onTeamSelect: (team: any) => void;
   toggleSection: (section: string) => void;
-  onTeamCreated?: (team: Team) => void;
-  onAgentCreated?: (agent: Agent) => void;
+  onTeamCreated: (team: any) => void;
+  onAgentCreated: (agent: any) => void;
 }
 
-const DashboardSidebar = ({
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   teams,
   selectedTeam,
   expandedSections,
@@ -40,28 +40,29 @@ const DashboardSidebar = ({
   toggleSection,
   onTeamCreated,
   onAgentCreated
-}: DashboardSidebarProps) => {
+}) => {
   return (
-    <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
-      <div className="p-4 border-b border-gray-200">
-        <Logo size="md" />
+    <div className="flex flex-col w-64 border-r border-gray-200 bg-white p-4 h-screen overflow-y-auto">
+      <div className="flex items-center h-12 mb-6">
+        <Logo />
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4">
-          <TeamsList 
-            teams={teams}
-            selectedTeam={selectedTeam}
-            isExpanded={expandedSections.teams}
-            onToggleExpand={() => toggleSection('teams')}
-            onTeamSelect={onTeamSelect}
-          />
-          
-          <AgentsList 
-            agents={selectedTeam.agents}
-            isExpanded={expandedSections.agents}
-            onToggleExpand={() => toggleSection('agents')}
-          />
-        </div>
+      
+      <div className="flex-1 space-y-1">
+        <TeamsList
+          teams={teams}
+          selectedTeam={selectedTeam}
+          isExpanded={expandedSections.teams}
+          onToggleExpand={() => toggleSection("teams")}
+          onTeamSelect={onTeamSelect}
+        />
+        
+        <AgentsList
+          agents={selectedTeam?.agents || []}
+          isExpanded={expandedSections.agents}
+          onToggleExpand={() => toggleSection("agents")}
+          teams={teams}
+          currentTeamId={selectedTeam?.id}
+        />
       </div>
       
       <SidebarActions />
