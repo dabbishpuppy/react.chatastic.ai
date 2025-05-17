@@ -1,11 +1,14 @@
 
 import React from "react";
-import { NavLink, Outlet } from "react-router-dom";
-import TopNavBar from "@/components/layout/TopNavBar";
-import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LineChart } from "lucide-react";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LineChart, LayoutDashboard } from "lucide-react";
+import Logo from "@/components/layout/Logo";
 
 const Settings = () => {
+  const navigate = useNavigate();
+  
   const menuItems = [
+    { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { to: "/settings/general", label: "General", icon: <SettingsIcon size={18} /> },
     { to: "/settings/usage", label: "Usage", icon: <LineChart size={18} /> },
     { to: "/settings/members", label: "Members", icon: <Users size={18} /> },
@@ -16,11 +19,14 @@ const Settings = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <TopNavBar />
+      {/* Removed the TopNavBar */}
       
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <div className="w-64 border-r border-gray-200 bg-white">
+          <div className="p-4 border-b border-gray-200">
+            <Logo size="md" />
+          </div>
           <nav className="p-4">
             {menuItems.map((item) => (
               <NavLink

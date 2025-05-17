@@ -3,6 +3,7 @@ import React from "react";
 import TeamsList from "./TeamsList";
 import AgentsList from "./AgentsList";
 import SidebarActions from "./SidebarActions";
+import Logo from "@/components/layout/Logo";
 
 interface Team {
   id: string;
@@ -38,6 +39,9 @@ const DashboardSidebar = ({
 }: DashboardSidebarProps) => {
   return (
     <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
+      <div className="p-4 border-b border-gray-200">
+        <Logo size="md" />
+      </div>
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
           <TeamsList 

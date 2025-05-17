@@ -1,8 +1,8 @@
 
 import React, { useState, ReactNode } from "react";
-import TopNavBar from "@/components/layout/TopNavBar";
 import AgentSidebar from "@/components/agent/AgentSidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Logo from "@/components/layout/Logo";
 
 interface AgentPageLayoutProps {
   children: ReactNode;
@@ -29,12 +29,15 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
   return (
     <div className="flex flex-col h-screen">
-      <TopNavBar />
+      {/* Removed TopNavBar */}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar with fixed height and internal scroll */}
         <div className="w-64 border-r bg-white">
-          <ScrollArea className="h-full">
+          <div className="p-4 border-b border-gray-200">
+            <Logo size="md" />
+          </div>
+          <ScrollArea className="h-[calc(100vh-68px)]">
             <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
           </ScrollArea>
         </div>

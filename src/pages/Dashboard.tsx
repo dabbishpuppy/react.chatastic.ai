@@ -1,9 +1,8 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import TopNavBar from "@/components/layout/TopNavBar";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
+import Logo from "@/components/layout/Logo";
 
 // Sample data structure for teams and their agents
 const teamsData = [
@@ -140,22 +139,39 @@ const Dashboard = () => {
     }));
   };
 
-  // Get all agents for the top navigation dropdown
+  // Get all agents for other components
   const allAgents = teamsData.flatMap(team => team.agents);
 
   return (
     <div className="flex flex-col min-h-screen">
-      <TopNavBar teams={teamsData} agents={allAgents} />
+      {/* Removed the TopNavBar */}
 
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar 
-          teams={teamsData}
-          selectedTeam={selectedTeam}
-          expandedSections={expandedSections}
-          onTeamSelect={handleTeamSelect}
-          toggleSection={toggleSection}
-        />
+        <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
+          <div className="p-4 border-b border-gray-200">
+            <Logo size="md" />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              <TeamsList 
+                teams={teamsData}
+                selectedTeam={selectedTeam}
+                isExpanded={expandedSections.teams}
+                onToggleExpand={() => toggleSection('teams')}
+                onTeamSelect={handleTeamSelect}
+              />
+              
+              <AgentsList 
+                agents={selectedTeam.agents}
+                isExpanded={expandedSections.agents}
+                onToggleExpand={() => toggleSection('agents')}
+              />
+            </div>
+          </div>
+          
+          <SidebarActions />
+        </div>
 
         {/* Main content - with bg-[#f5f5f5] */}
         <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">

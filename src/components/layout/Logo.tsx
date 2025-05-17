@@ -19,7 +19,7 @@ const Logo: React.FC<LogoProps> = ({ size = 'md', linkToHome = false }) => {
       <div className="bg-black text-white rounded p-1 mr-1">
         <span className={`${sizeClasses[size]}`}>C</span>
       </div>
-      <span className={`${sizeClasses[size]}`}>SaasBase</span>
+      <span className={`${sizeClasses[size]}`}>Wonderwave</span>
     </div>
   );
 
