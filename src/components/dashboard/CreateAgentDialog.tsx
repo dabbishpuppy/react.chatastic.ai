@@ -1,9 +1,10 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -75,6 +76,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Make sure we always have a valid team selected
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
@@ -104,6 +106,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       });
       return;
     }
+    
+    setIsSubmitting(true);
     
     // Auto-assign a color from the palette (round robin based on team's existing agents)
     const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
@@ -183,6 +187,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         description: error.message || "Failed to create agent. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -225,9 +231,13 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
             <DialogFooter>
               <Button 
                 type="submit" 
-                disabled={!selectedTeam}
+                disabled={!selectedTeam || isSubmitting}
+                className="relative"
               >
-                Create Agent
+                {isSubmitting && (
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {isSubmitting ? "Creating..." : "Create Agent"}
               </Button>
             </DialogFooter>
           </form>

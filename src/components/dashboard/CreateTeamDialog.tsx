@@ -3,6 +3,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -106,6 +107,7 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
       });
       
       form.reset();
+      onOpenChange(false);
     } catch (error: any) {
       console.error("Error creating team:", error);
       toast({
@@ -148,7 +150,11 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
+                className="relative"
               >
+                {isSubmitting && (
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 {isSubmitting ? "Creating..." : "Create Team"}
               </Button>
             </DialogFooter>
