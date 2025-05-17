@@ -59,7 +59,7 @@ interface CreateAgentDialogProps {
   onOpenChange: (open: boolean) => void;
   teams: Team[];
   onAgentCreated: (agent: {
-    id: string; // Changed from number to string to match Supabase UUID
+    id: string;
     name: string;
     image: string;
     color: string;
@@ -105,13 +105,13 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     const autoAssignedColor = agentColorPalette[colorIndex];
     
     try {
-      // Insert the new agent into Supabase
+      // Insert the new agent into Supabase - Fixed the issue with empty team_id
       const { data, error } = await supabase
         .from('agents')
         .insert([
           {
             name: values.name,
-            team_id: selectedTeam.id,
+            team_id: selectedTeam.id || null, // Ensure team_id is never empty
             color: autoAssignedColor,
             image: "/placeholder.svg",
             status: "active",
