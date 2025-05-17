@@ -44,6 +44,10 @@ const FilesTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold">Files</h2>
+      </div>
+
       <Card
         className={`border border-dashed ${
           isDragging ? "border-blue-500 bg-blue-50" : "border-gray-300"
