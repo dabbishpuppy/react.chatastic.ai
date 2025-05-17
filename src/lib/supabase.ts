@@ -14,6 +14,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 let supabase;
 
 try {
+  // Check network connection before creating client
+  if (!navigator.onLine) {
+    console.error("⚠️ Network connection unavailable. Supabase client initialization may fail.");
+  }
+  
   supabase = createClient(
     supabaseUrl || 'https://your-supabase-url.supabase.co',
     supabaseAnonKey || 'your-anon-key', 

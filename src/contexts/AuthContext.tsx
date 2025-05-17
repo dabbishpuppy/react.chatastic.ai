@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -56,9 +57,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [navigate]);
 
+  const isNetworkAvailable = () => {
+    return navigator.onLine;
+  };
+
+  const handleApiError = (error: any) => {
+    // Check if it's a network error
+    if (!isNetworkAvailable() || 
+        error.message === "Failed to fetch" || 
+        error.code === "network_error" ||
+        error.message?.includes("NetworkError") ||
+        error.message?.includes("Network Error")) {
+      return new Error("Network error. Please check your internet connection and try again.");
+    }
+    
+    // Return the original error if it's not a network error
+    return error;
+  };
+
   const signUp = async (email: string, password: string) => {
     try {
-      if (!navigator.onLine) {
+      if (!isNetworkAvailable()) {
         throw new Error("Network connection unavailable. Please check your internet connection.");
       }
       
@@ -79,48 +98,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error("Sign up error:", error);
       
-      // Check if it's a network error
-      if (error.message === "Failed to fetch" || error.code === "network_error") {
-        toast({
-          title: "Network error",
-          description: "Unable to connect to authentication service. Please check your internet connection.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Registration failed",
-          description: error.message || "An unexpected error occurred",
-          variant: "destructive",
-        });
-      }
-      throw error;
+      const processedError = handleApiError(error);
+      
+      toast({
+        title: "Registration failed",
+        description: processedError.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+      throw processedError;
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      if (!isNetworkAvailable()) {
+        throw new Error("Network connection unavailable. Please check your internet connection.");
+      }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } catch (error: any) {
+      const processedError = handleApiError(error);
+      
       toast({
         title: "Login failed",
-        description: error.message,
+        description: processedError.message,
         variant: "destructive",
       });
-      throw error;
+      throw processedError;
     }
   };
 
   const signOut = async () => {
     try {
+      if (!isNetworkAvailable()) {
+        throw new Error("Network connection unavailable. Please check your internet connection.");
+      }
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error: any) {
+      const processedError = handleApiError(error);
+      
       toast({
         title: "Sign out failed",
-        description: error.message,
+        description: processedError.message,
         variant: "destructive",
       });
+      throw processedError;
     }
   };
 

@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -13,9 +13,10 @@ import {
   FormItem,
   FormMessage,
 } from "@/components/ui/form";
-import { Eye, EyeOff, Mail } from "lucide-react";
+import { Eye, EyeOff, Mail, WifiOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Define form schema
 const formSchema = z.object({
@@ -34,6 +35,8 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -44,30 +47,45 @@ const Register = () => {
     }
   });
 
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      setNetworkError(null);
+    };
+    
+    const handleOffline = () => {
+      setIsOffline(true);
+      setNetworkError("You are currently offline. Please check your internet connection.");
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const onSubmit = async (values: FormValues) => {
+    // Clear previous network errors
+    setNetworkError(null);
+    
+    if (isOffline) {
+      setNetworkError("You are currently offline. Please check your internet connection.");
+      return;
+    }
+    
     try {
       setIsLoading(true);
       await signUp(values.email, values.password);
-      toast({
-        title: "Registration successful",
-        description: "Please check your email to verify your account."
-      });
     } catch (error: any) {
       console.error("Registration error:", error);
       
-      // Handle network errors specifically
-      if (error.message === "Failed to fetch" || !navigator.onLine) {
-        toast({
-          title: "Network error",
-          description: "Please check your internet connection and try again.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Registration failed",
-          description: error.message || "An unknown error occurred",
-          variant: "destructive"
-        });
+      // Check for network-related errors
+      if (error.message?.includes("Network") || error.message?.includes("network") || error.message === "Failed to fetch") {
+        setNetworkError(error.message || "Network error. Please check your connection and try again.");
       }
     } finally {
       setIsLoading(false);
@@ -88,6 +106,15 @@ const Register = () => {
         <div className="text-center">
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">Get started for free</h2>
         </div>
+
+        {(isOffline || networkError) && (
+          <Alert variant="destructive" className="bg-red-500 text-white">
+            <AlertDescription className="flex items-center gap-2">
+              <WifiOff size={16} />
+              {networkError || "Network error. Please check your internet connection and try again."}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-6">
@@ -188,7 +215,7 @@ const Register = () => {
             <Button
               type="submit"
               className="w-full bg-black hover:bg-gray-800 text-white py-2 rounded-md"
-              disabled={isLoading}
+              disabled={isLoading || isOffline}
             >
               {isLoading ? "Signing up..." : "Sign up"}
             </Button>
