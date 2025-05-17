@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,50 +5,63 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Bold, Italic, List, ListOrdered, Link2, Smile, MoreHorizontal, ChevronRight, Plus } from "lucide-react";
-
 const QATab: React.FC = () => {
   // Mock data for Q&A items
-  const qaItems = [
-    { id: "1", title: "Hva er nummeret?", questions: 1, size: "199 B" },
-    { id: "2", title: "Endre bordreservasjon?", questions: 1, size: "313 B" },
-    { id: "3", title: "kan jeg ta med hunden min?", questions: 1, size: "58 B" },
-    { id: "4", title: "Hei. Så at deres sted var på Quizforbund sik nettside...", questions: 1, size: "163 B" },
-    { id: "5", title: "hva er organisasjonsnummeret deres fra Brønnøysund-regist...", questions: 1, size: "92 B" },
-    { id: "6", title: "Hva koster billettene?", questions: 1, size: "238 B" },
-    { id: "7", title: "Hva med kulturkrasj?", questions: 1, size: "359 B" },
-  ];
-
-  return (
-    <div className="space-y-6">
+  const qaItems = [{
+    id: "1",
+    title: "Hva er nummeret?",
+    questions: 1,
+    size: "199 B"
+  }, {
+    id: "2",
+    title: "Endre bordreservasjon?",
+    questions: 1,
+    size: "313 B"
+  }, {
+    id: "3",
+    title: "kan jeg ta med hunden min?",
+    questions: 1,
+    size: "58 B"
+  }, {
+    id: "4",
+    title: "Hei. Så at deres sted var på Quizforbund sik nettside...",
+    questions: 1,
+    size: "163 B"
+  }, {
+    id: "5",
+    title: "hva er organisasjonsnummeret deres fra Brønnøysund-regist...",
+    questions: 1,
+    size: "92 B"
+  }, {
+    id: "6",
+    title: "Hva koster billettene?",
+    questions: 1,
+    size: "238 B"
+  }, {
+    id: "7",
+    title: "Hva med kulturkrasj?",
+    questions: 1,
+    size: "359 B"
+  }];
+  return <div className="space-y-6">
       <div>
-        <p className="mb-2 text-gray-600">
-          Craft responses for important questions, ensuring your AI Agent shares the most relevant info. Use
-          Custom Answers to add images and videos for enhanced engagement.
-        </p>
+        
       </div>
 
-      <Card className="border border-gray-200 p-4">
+      <Card className="border border-gray-200 p-4 px-[16px]">
         <div className="space-y-4">
           <div>
             <label htmlFor="qa-title" className="block text-sm font-medium text-gray-700 mb-1">
               Title
             </label>
-            <Input 
-              id="qa-title" 
-              placeholder="Ex: Refund requests" 
-              className="w-full"
-            />
+            <Input id="qa-title" placeholder="Ex: Refund requests" className="w-full" />
           </div>
 
           <div>
             <label htmlFor="qa-question" className="block text-sm font-medium text-gray-700 mb-1">
               Question
             </label>
-            <Input 
-              id="qa-question" 
-              placeholder="Ex: How do I request a refund?" 
-              className="w-full"
-            />
+            <Input id="qa-question" placeholder="Ex: How do I request a refund?" className="w-full" />
           </div>
 
           <div className="flex items-center text-indigo-600 mb-2">
@@ -84,11 +96,7 @@ const QATab: React.FC = () => {
                   </Button>
                   <div className="ml-auto text-xs text-gray-400">0 B</div>
                 </div>
-                <Textarea 
-                  id="qa-answer" 
-                  placeholder="Enter your answer..." 
-                  className="border-0 focus-visible:ring-0 min-h-[150px]"
-                />
+                <Textarea id="qa-answer" placeholder="Enter your answer..." className="border-0 focus-visible:ring-0 min-h-[150px]" />
               </CardContent>
             </Card>
           </div>
@@ -101,8 +109,7 @@ const QATab: React.FC = () => {
         </div>
       </Card>
 
-      {qaItems.length > 0 && (
-        <div>
+      {qaItems.length > 0 && <div>
           <h3 className="text-lg font-medium mb-3">Q&A sources</h3>
           <Table>
             <TableHeader>
@@ -114,8 +121,7 @@ const QATab: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {qaItems.map((item) => (
-                <TableRow key={item.id} className="cursor-pointer hover:bg-gray-50">
+              {qaItems.map(item => <TableRow key={item.id} className="cursor-pointer hover:bg-gray-50">
                   <TableCell className="font-medium">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 mr-3 bg-gray-200 text-gray-600 rounded-full p-1">
@@ -140,8 +146,7 @@ const QATab: React.FC = () => {
                       </Button>
                     </div>
                   </TableCell>
-                </TableRow>
-              ))}
+                </TableRow>)}
             </TableBody>
           </Table>
           <div className="flex items-center justify-between mt-4 text-sm">
@@ -179,10 +184,7 @@ const QATab: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        </div>}
+    </div>;
 };
-
 export default QATab;
