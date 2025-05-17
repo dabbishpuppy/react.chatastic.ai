@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, DollarSign, User, LogOut } from "lucide-react";
 import UsageStats from "@/components/UsageStats";
 import TopNavBar from "@/components/layout/TopNavBar";
 
@@ -51,6 +51,18 @@ const Dashboard = () => {
     }
   };
 
+  const handleUpgradeClick = () => {
+    navigate("/settings/plans");
+  };
+
+  const handleMyAccountClick = () => {
+    navigate("/settings/general");
+  };
+
+  const handleLogoutClick = () => {
+    navigate("/signout");
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <TopNavBar />
@@ -58,29 +70,77 @@ const Dashboard = () => {
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar - Removed the p-4 padding to fix white space */}
-        <div className="w-64 border-r border-gray-200 hidden md:block">
-          <div className="p-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <input
-                type="search"
-                placeholder="Search team..."
-                className="w-full border border-gray-200 py-2 pl-8 pr-4 rounded-md focus:outline-none"
-              />
+        <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
+          <div className="flex-1">
+            <div className="p-4">
+              <div className="relative mb-4">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  type="search"
+                  placeholder="Search team..."
+                  className="w-full border border-gray-200 py-2 pl-8 pr-4 rounded-md focus:outline-none"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">Teams</h3>
+                <div className="bg-gray-100 px-3 py-2 rounded-md flex items-center justify-between font-medium">
+                  <span>Wonderwave</span>
+                  <span>✓</span>
+                </div>
+              </div>
+
+              <Button variant="outline" className="w-full flex items-center gap-2 justify-center">
+                <Plus className="h-4 w-4" />
+                <span>Create team</span>
+              </Button>
+            </div>
+          </div>
+          
+          {/* New bottom section - same as in AgentSidebar */}
+          <div className="border-t p-4 space-y-4">
+            {/* Usage Credits */}
+            <div className="bg-gray-50 rounded-md p-3">
+              <div className="text-sm font-medium text-gray-800">Usage Credits</div>
+              <div className="flex justify-between items-center mt-1">
+                <div className="text-xs text-gray-500">Free Plan</div>
+                <div className="text-xs font-medium text-purple-600">5 left</div>
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">0 of 5 used</div>
             </div>
             
-            <div className="mb-4">
-              <h3 className="text-sm font-medium text-gray-500 mb-2">Teams</h3>
-              <div className="bg-gray-100 px-3 py-2 rounded-md flex items-center justify-between font-medium">
-                <span>Wonderwave</span>
-                <span>✓</span>
-              </div>
-            </div>
-
-            <Button variant="outline" className="w-full flex items-center gap-2 justify-center">
-              <Plus className="h-4 w-4" />
-              <span>Create team</span>
+            {/* Upgrade button */}
+            <Button 
+              onClick={handleUpgradeClick}
+              className="w-full flex items-center justify-center"
+              size="sm"
+            >
+              <DollarSign size={16} className="mr-1" />
+              Upgrade
             </Button>
+            
+            {/* My Account and Logout */}
+            <div className="space-y-2">
+              <Button 
+                variant="ghost" 
+                className="w-full flex items-center justify-start text-gray-700"
+                size="sm"
+                onClick={handleMyAccountClick}
+              >
+                <User size={16} className="mr-2" />
+                My Account
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                className="w-full flex items-center justify-start text-gray-700"
+                size="sm"
+                onClick={handleLogoutClick}
+              >
+                <LogOut size={16} className="mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
 
