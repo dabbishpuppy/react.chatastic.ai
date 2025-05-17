@@ -5,35 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, User, LogOut } from "lucide-react";
 import AgentSidebarMenu from "./sidebar/AgentSidebarMenu";
 import SidebarActions from "../dashboard/SidebarActions";
-
-// Sample agent data structure - in a real implementation, this would come from a data store or API
-const agentsData = [
-  {
-    id: "1",
-    name: "Wonder AI",
-    color: "bg-violet-600",
-  },
-  {
-    id: "2",
-    name: "Agora AI",
-    color: "bg-amber-100",
-  },
-  {
-    id: "3",
-    name: "PristineBag AI",
-    color: "bg-rose-400",
-  },
-  {
-    id: "4",
-    name: "AI Kundeservice",
-    color: "bg-black",
-  },
-  {
-    id: "5",
-    name: "theballooncompany.com",
-    color: "bg-white",
-  }
-];
+import { useTeamsAndAgents, Agent } from "@/hooks/useTeamsAndAgents";
 
 interface AgentSidebarProps {
   activeTab: string;
@@ -43,17 +15,22 @@ interface AgentSidebarProps {
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
   const navigate = useNavigate();
   const { agentId } = useParams();
-  const [currentAgent, setCurrentAgent] = useState<{id: string, name: string, color: string} | null>(null);
-
+  const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
+  const { teamsData } = useTeamsAndAgents();
+  
   // Find the current agent based on the URL parameter
   useEffect(() => {
-    if (agentId) {
-      const agent = agentsData.find(agent => agent.id === agentId);
-      if (agent) {
-        setCurrentAgent(agent);
+    if (agentId && teamsData.length > 0) {
+      // Search through all teams to find the agent with matching ID
+      for (const team of teamsData) {
+        const foundAgent = team.agents.find(agent => agent.id.toString() === agentId);
+        if (foundAgent) {
+          setCurrentAgent(foundAgent);
+          break;
+        }
       }
     }
-  }, [agentId]);
+  }, [agentId, teamsData]);
 
   return (
     <div className="flex flex-col h-full">

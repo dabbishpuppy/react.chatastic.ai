@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -79,10 +80,11 @@ const AgentsList = ({
     );
   };
 
-  // Navigate to agent page - ensure it goes to the Playground
+  // Navigate to agent's playground page
   const handleAgentClick = (agentId: string) => {
-    // Navigate directly to the agent's playground page
-    navigate(`/agent/${agentId}`);
+    console.log(`Navigating to agent: ${agentId}`);
+    // Force navigation to the agent's playground page
+    window.location.href = `/agent/${agentId}`;
   };
 
   // Make sure we have at least one valid team with an ID
