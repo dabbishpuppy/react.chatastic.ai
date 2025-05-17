@@ -9,7 +9,7 @@ interface Team {
   id: string;
   name: string;
   isActive: boolean;
-  agents?: any[];
+  agents: any[];
   metrics?: any;
 }
 
@@ -32,10 +32,15 @@ const TeamsList = ({
   const [localTeams, setLocalTeams] = useState<Team[]>(teams);
 
   // Handle creating a new team
-  const handleTeamCreated = (newTeam: Team) => {
-    setLocalTeams(prevTeams => [...prevTeams, newTeam]);
+  const handleTeamCreated = (newTeam: any) => {
+    const teamWithCorrectType = {
+      ...newTeam,
+      agents: newTeam.agents as any[]
+    };
+    
+    setLocalTeams(prevTeams => [...prevTeams, teamWithCorrectType]);
     // Auto-select the newly created team
-    onTeamSelect(newTeam);
+    onTeamSelect(teamWithCorrectType);
   };
 
   // Use local teams if available, otherwise use the props teams

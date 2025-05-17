@@ -37,7 +37,7 @@ interface CreateTeamDialogProps {
     id: string;
     name: string;
     isActive: boolean;
-    agents: [];
+    agents: never[]; // Changed from [] to never[] to match the expected type
     metrics: {
       totalConversations: number;
       avgResponseTime: string;
@@ -66,7 +66,7 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
       id: `team-${Date.now()}`, // Use timestamp as a simple ID for now
       name: values.name,
       isActive: false,
-      agents: [],
+      agents: [] as never[], // Explicitly cast empty array to never[] to fix type error
       metrics: {
         totalConversations: 0,
         avgResponseTime: "0.0s",

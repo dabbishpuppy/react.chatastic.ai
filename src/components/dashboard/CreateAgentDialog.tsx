@@ -22,7 +22,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
-import { CirclePicker } from 'react-color';
 
 // Define the form schema
 const formSchema = z.object({
