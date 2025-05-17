@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Users, CircleCheck } from "lucide-react";
+import { ChevronDown, Users, CircleCheck, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
@@ -74,7 +74,7 @@ const TeamsDropdown: React.FC = () => {
             <Link 
               to={`/team/${team.id}`}
               onClick={() => handleTeamSelect(team.name)}
-              className="flex items-center justify-between text-sm"
+              className="flex items-center justify-between text-[0.875rem]"
             >
               {team.name}
               {team.active && <CircleCheck size={16} className="text-green-500" />}
@@ -87,7 +87,8 @@ const TeamsDropdown: React.FC = () => {
             onClick={() => setSelectedTeam("Teams")}
             className="w-full"
           >
-            <Button variant="outline" className="w-full bg-white text-primary border border-input">
+            <Button variant="outline" className="w-full bg-white text-primary border border-input flex items-center gap-1">
+              <Plus size={14} />
               Create Team
             </Button>
           </Link>

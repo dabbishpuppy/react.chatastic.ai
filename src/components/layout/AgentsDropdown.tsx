@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Bot, CircleCheck } from "lucide-react";
+import { ChevronDown, Bot, CircleCheck, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface AgentsDropdownProps {
@@ -89,7 +89,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
             <Link 
               to={`/agent/${agent.id}`}
               onClick={() => handleAgentSelect(agent.name)}
-              className="flex items-center justify-between text-sm w-full"
+              className="flex items-center justify-between text-[0.875rem] w-full"
             >
               {agent.name}
               {currentAgentId === agent.id && (
@@ -104,7 +104,8 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
             onClick={() => handleAgentSelect("Agents")}
             className="w-full"
           >
-            <Button variant="outline" className="w-full bg-white text-primary border border-input">
+            <Button variant="outline" className="w-full bg-white text-primary border border-input flex items-center gap-1">
+              <Plus size={14} />
               Create Agent
             </Button>
           </Link>
