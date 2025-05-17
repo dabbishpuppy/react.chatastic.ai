@@ -1,5 +1,6 @@
 
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,6 +67,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   onOpenChange,
   onAgentCreated,
 }) => {
+  const navigate = useNavigate();
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -96,6 +98,9 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     });
     form.reset();
     onOpenChange(false);
+    
+    // Redirect to the sources page for the new agent
+    navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
   };
 
   return (
