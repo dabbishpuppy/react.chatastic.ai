@@ -1,4 +1,3 @@
-
 import React from "react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
@@ -32,37 +31,21 @@ export const useTeamManagement = ({
     );
   };
 
-  const handleTeamCreated = async (newTeam: {
-    name: string;
-  }) => {
-    if (!user?.id) return;
-
+  const handleTeamCreated = async (newTeam: any) => {
+    console.log("Team created received in TeamManagement:", newTeam);
+    
+    if (!newTeam || !newTeam.id) {
+      console.error("Invalid team data received:", newTeam);
+      return;
+    }
+    
     try {
-      // Insert the new team into Supabase
-      const { data, error } = await supabase
-        .from('teams')
-        .insert([
-          { 
-            name: newTeam.name, 
-            user_id: user.id,
-            total_conversations: 0,
-            avg_response_time: "0.0s",
-            usage_percent: 0,
-            api_calls: 0,
-            satisfaction: 0
-          }
-        ])
-        .select('*')
-        .single();
-      
-      if (error) throw error;
-      
       // Add the new team to the UI with needed properties
       const teamWithUI = {
-        ...data,
+        ...newTeam,
         isActive: true,
-        agents: [],
-        metrics: {
+        agents: newTeam.agents || [],
+        metrics: newTeam.metrics || {
           totalConversations: 0,
           avgResponseTime: "0.0s",
           usagePercent: 0,
@@ -77,17 +60,20 @@ export const useTeamManagement = ({
         isActive: false
       }));
       
+      // Add the new team to the beginning of the array
       setTeamsData([teamWithUI, ...updatedTeams]);
       setSelectedTeam(teamWithUI);
+      
+      console.log("Teams data updated with new team:", [teamWithUI, ...updatedTeams]);
       
       toast({
         title: "Team created",
         description: `${newTeam.name} team has been created successfully!`,
       });
     } catch (error: any) {
-      console.error("Error creating team:", error);
+      console.error("Error handling team creation:", error);
       toast({
-        title: "Failed to create team",
+        title: "Failed to update UI",
         description: error.message,
         variant: "destructive",
       });

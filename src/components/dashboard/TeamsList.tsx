@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,9 @@ interface TeamsListProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onTeamSelect: (team: Team) => void;
+  onTeamCreated?: (team: any) => void;
+  onTeamEdited?: (team: any) => void;
+  onTeamDeleted?: (teamId: string) => void;
 }
 
 const TeamsList = ({
@@ -25,7 +29,10 @@ const TeamsList = ({
   selectedTeam,
   isExpanded,
   onToggleExpand,
-  onTeamSelect
+  onTeamSelect,
+  onTeamCreated,
+  onTeamEdited,
+  onTeamDeleted
 }: TeamsListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -46,6 +53,27 @@ const TeamsList = ({
     e.preventDefault();
     setTeamToDelete(team);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleTeamCreated = (newTeam: any) => {
+    if (onTeamCreated) {
+      onTeamCreated(newTeam);
+    }
+    setIsDialogOpen(false);
+  };
+
+  const handleTeamEdited = (updatedTeam: any) => {
+    if (onTeamEdited) {
+      onTeamEdited(updatedTeam);
+    }
+    setIsEditDialogOpen(false);
+  };
+
+  const handleTeamDeleted = (teamId: string) => {
+    if (onTeamDeleted) {
+      onTeamDeleted(teamId);
+    }
+    setIsDeleteDialogOpen(false);
   };
 
   return (
@@ -117,9 +145,7 @@ const TeamsList = ({
       <CreateTeamDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onTeamCreated={(newTeam) => {
-          // Handle team creation event
-        }}
+        onTeamCreated={handleTeamCreated}
       />
 
       {teamToEdit && (
@@ -127,9 +153,7 @@ const TeamsList = ({
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           team={teamToEdit}
-          onTeamEdited={(updatedTeam) => {
-            // Handle team update event
-          }}
+          onTeamEdited={handleTeamEdited}
         />
       )}
 
@@ -138,9 +162,7 @@ const TeamsList = ({
           open={isDeleteDialogOpen}
           onOpenChange={setIsDeleteDialogOpen}
           team={teamToDelete}
-          onTeamDeleted={(teamId) => {
-            // Handle team deletion event
-          }}
+          onTeamDeleted={handleTeamDeleted}
         />
       )}
     </div>

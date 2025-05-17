@@ -15,10 +15,10 @@ interface DashboardSidebarProps {
   };
   onTeamSelect: (team: Team) => void;
   toggleSection: (section: string) => void;
-  onTeamCreated?: (team: any) => void;
+  onTeamCreated: (team: any) => void;
   onAgentCreated?: (agent: any) => void;
-  onTeamEdited?: (team: any) => void;
-  onTeamDeleted?: (teamId: string) => void;
+  onTeamEdited: (team: any) => void;
+  onTeamDeleted: (teamId: string) => void;
 }
 
 const DashboardSidebar = ({
@@ -45,6 +45,9 @@ const DashboardSidebar = ({
             isExpanded={expandedSections.teams}
             onToggleExpand={() => toggleSection('teams')}
             onTeamSelect={onTeamSelect}
+            onTeamCreated={onTeamCreated}
+            onTeamEdited={onTeamEdited}
+            onTeamDeleted={onTeamDeleted}
           />
           
           {selectedTeam && (
