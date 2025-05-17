@@ -67,7 +67,7 @@ const SourcesPage: React.FC = () => {
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Sources" showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
-        <h1 className="text-3xl font-bold mb-6">Sources</h1>
+        <h1 className="text-3xl font-bold mb-6">{getTabTitle()}</h1>
         <div className="flex gap-6">
           <div className="bg-white rounded-lg p-6 flex-1">
             {renderTabContent()}
