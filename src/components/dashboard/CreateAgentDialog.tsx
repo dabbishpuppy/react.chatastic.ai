@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define the form schema - removed teamId requirement
 const formSchema = z.object({
@@ -80,6 +81,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   onAgentCreated,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Add this to get the current user
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
   
   const form = useForm<FormValues>({
@@ -98,6 +100,15 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       });
       return;
     }
+
+    if (!user) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create an agent.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Auto-assign a color from the palette (round robin based on team's existing agents)
     const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
@@ -105,13 +116,30 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     const autoAssignedColor = agentColorPalette[colorIndex];
     
     try {
+      // Check if the team exists and belongs to the current user
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', selectedTeam.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (teamError || !teamData) {
+        toast({
+          title: "Team Access Error",
+          description: "You don't have permission to add agents to this team.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Insert the new agent into Supabase - Fixed the issue with empty team_id
       const { data, error } = await supabase
         .from('agents')
         .insert([
           {
             name: values.name,
-            team_id: selectedTeam.id || null, // Ensure team_id is never empty
+            team_id: selectedTeam.id, // Ensure team_id is never empty
             color: autoAssignedColor,
             image: "/placeholder.svg",
             status: "active",

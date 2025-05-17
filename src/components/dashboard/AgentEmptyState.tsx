@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bot, Plus } from 'lucide-react';
 import CreateAgentDialog from './CreateAgentDialog';
-import { Agent } from '@/hooks/useTeamsAndAgents';
+import { Agent, Team } from '@/hooks/useTeamsAndAgents';
 
 interface AgentEmptyStateProps {
   teamName?: string;
@@ -15,7 +15,7 @@ const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAge
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Get the current team for the dialog
-  const mockTeam = {
+  const mockTeam: Team = {
     id: '',
     name: teamName || '',
     isActive: true,

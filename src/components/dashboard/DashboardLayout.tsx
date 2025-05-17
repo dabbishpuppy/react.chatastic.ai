@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
 import AgentEmptyState from "@/components/dashboard/AgentEmptyState";
@@ -49,7 +49,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
         {/* Main content */}
         <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
-          {selectedTeam && selectedTeam.agents.length > 0 ? (
+          {selectedTeam && selectedTeam.agents && selectedTeam.agents.length > 0 ? (
             <TeamDashboard 
               team={selectedTeam}
               teamsList={teamsData}

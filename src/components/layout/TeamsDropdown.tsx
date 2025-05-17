@@ -19,7 +19,7 @@ interface TeamsDropdownProps {
 
 const TeamsDropdown: React.FC<TeamsDropdownProps> = ({ teams }) => {
   // Find active team, adjusting for either isActive or active property
-  const defaultTeam = teams.find(t => t.isActive) || teams[0];
+  const defaultTeam = teams.find(t => t.isActive === true) || teams[0];
   const [selectedTeam, setSelectedTeam] = useState<string>(defaultTeam?.name || "Teams");
   const location = useLocation();
   
