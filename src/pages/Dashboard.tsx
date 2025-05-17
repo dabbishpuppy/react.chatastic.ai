@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
 import Logo from "@/components/layout/Logo";
+import TeamsList from "@/components/dashboard/TeamsList";
+import AgentsList from "@/components/dashboard/AgentsList";
+import SidebarActions from "@/components/dashboard/SidebarActions";
 
 // Sample data structure for teams and their agents
 const teamsData = [
@@ -148,30 +151,13 @@ const Dashboard = () => {
 
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <Logo size="md" />
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4">
-              <TeamsList 
-                teams={teamsData}
-                selectedTeam={selectedTeam}
-                isExpanded={expandedSections.teams}
-                onToggleExpand={() => toggleSection('teams')}
-                onTeamSelect={handleTeamSelect}
-              />
-              
-              <AgentsList 
-                agents={selectedTeam.agents}
-                isExpanded={expandedSections.agents}
-                onToggleExpand={() => toggleSection('agents')}
-              />
-            </div>
-          </div>
-          
-          <SidebarActions />
-        </div>
+        <DashboardSidebar
+          teams={teamsData}
+          selectedTeam={selectedTeam}
+          expandedSections={expandedSections}
+          onTeamSelect={handleTeamSelect}
+          toggleSection={toggleSection}
+        />
 
         {/* Main content - with bg-[#f5f5f5] */}
         <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
