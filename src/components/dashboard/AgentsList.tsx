@@ -80,11 +80,11 @@ const AgentsList = ({
     );
   };
 
-  // Navigate to agent's playground page directly
+  // Navigate to agent page
   const handleAgentClick = (agentId: string) => {
     console.log(`Navigating to agent: ${agentId}`);
-    // Simple navigation without replace - fixes the issue with transitions
-    navigate(`/agent/${agentId}`);
+    // Navigate to the agent page with replace to avoid history build-up
+    navigate(`/agent/${agentId}`, { replace: true });
   };
 
   // Make sure we have at least one valid team with an ID

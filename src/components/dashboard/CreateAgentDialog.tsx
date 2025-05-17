@@ -24,7 +24,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Team } from "@/hooks/useTeamsAndAgents";
 
@@ -143,6 +143,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
           description: error.message,
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
       
@@ -153,6 +154,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
           description: "Failed to create agent. Please try again.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
       
@@ -177,22 +179,21 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       // Show processing toast
       setIsProcessing(true);
       
-      // Add a small delay before calling onAgentCreated for a smoother transition
+      // Call onAgentCreated callback
+      onAgentCreated(newAgent);
+      
+      toast({
+        title: "Agent created",
+        description: `${values.name} has been created successfully!`,
+      });
+      
+      form.reset();
+      
+      // Redirect to the agent page with a short delay
       setTimeout(() => {
-        onAgentCreated(newAgent);
-        
-        toast({
-          title: "Agent created",
-          description: `${values.name} has been created successfully!`,
-        });
-        
-        form.reset();
-        
-        // Redirect to the sources page for the new agent after a short delay
-        setTimeout(() => {
-          navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
-          setIsProcessing(false);
-        }, 500);
+        navigate(`/agent/${newAgent.id}`, { replace: true });
+        setIsProcessing(false);
+        setIsSubmitting(false);
       }, 500);
       
     } catch (error: any) {

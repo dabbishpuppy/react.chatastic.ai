@@ -24,7 +24,7 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
       const timeoutId = setTimeout(() => {
         setDisplayContent(children);
         setIsLoading(false);
-      }, 100); // Very short timeout to prevent perceived lag
+      }, 300); // Short timeout for smoother transitions
       
       return () => clearTimeout(timeoutId);
     } else {

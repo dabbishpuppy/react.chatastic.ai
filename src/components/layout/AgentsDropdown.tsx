@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,10 +25,11 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
   const [selectedAgent, setSelectedAgent] = useState<string>("Agents");
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   
   // Check if we're on an agent page and extract the ID
   React.useEffect(() => {
-    const match = location.pathname.match(/\/agent\/(\d+)/);
+    const match = location.pathname.match(/\/agent\/(\d+|[0-9a-f-]+)/);
     if (match) {
       const agentId = match[1];
       const agent = agents.find(a => a.id.toString() === agentId);
@@ -41,8 +42,9 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
     }
   }, [location.pathname, agents]);
 
-  const handleAgentSelect = (agentName: string) => {
-    setSelectedAgent(agentName);
+  const handleAgentSelect = (agent: { id: number | string; name: string }) => {
+    setSelectedAgent(agent.name);
+    navigate(`/agent/${agent.id}`, { replace: true });
   };
 
   return (
@@ -57,10 +59,9 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
       <DropdownMenuContent className="w-56 bg-white">
         {agents.map(agent => (
           <DropdownMenuItem key={agent.id} asChild>
-            <Link 
-              to={`/agent/${agent.id}`}
-              onClick={() => handleAgentSelect(agent.name)}
-              className="flex items-center justify-between text-[0.875rem] w-full"
+            <button
+              onClick={() => handleAgentSelect(agent)}
+              className="flex w-full items-center justify-between text-[0.875rem]"
             >
               <div className="flex items-center gap-2">
                 {agent.color && (
@@ -71,13 +72,13 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
               {currentAgentId === agent.id.toString() && (
                 <CircleCheck size={16} className="text-green-500" />
               )}
-            </Link>
+            </button>
           </DropdownMenuItem>
         ))}
         <DropdownMenuItem asChild className="border-t mt-1 pt-1">
           <Link 
             to="/dashboard" 
-            onClick={() => handleAgentSelect("Agents")}
+            onClick={() => setSelectedAgent("Agents")}
             className="w-full"
           >
             <Button variant="outline" className="w-full bg-white text-primary border border-input flex items-center gap-1">
