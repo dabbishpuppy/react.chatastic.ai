@@ -5,8 +5,6 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import TeamPerformanceOverview from "./dashboard-cards/TeamPerformanceOverview";
 import AgentStatusSummary from "./dashboard-cards/AgentStatusSummary";
 import RecentActivityFeed from "./dashboard-cards/RecentActivityFeed";
-import TopPerformingAgents from "./dashboard-cards/TopPerformingAgents";
-import TeamGoalsProgress from "./dashboard-cards/TeamGoalsProgress";
 
 interface TeamDashboardProps {
   team: {
@@ -64,34 +62,6 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
           </CardHeader>
           <CardContent>
             <RecentActivityFeed teamId={team.id} />
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Top Performing Agents */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Agents</CardTitle>
-            <CardDescription>
-              Leaderboard based on key metrics
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <TopPerformingAgents agents={team.agents} />
-          </CardContent>
-        </Card>
-        
-        {/* Team Goals Progress */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Team Goals Progress</CardTitle>
-            <CardDescription>
-              Progress towards this month's targets
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <TeamGoalsProgress teamId={team.id} />
           </CardContent>
         </Card>
       </div>
