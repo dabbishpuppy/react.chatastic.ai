@@ -2,9 +2,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TopNavBar from "@/components/layout/TopNavBar";
-import UsageStats from "@/components/UsageStats";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import AgentCards from "@/components/dashboard/AgentCards";
+import TeamDashboard from "@/components/dashboard/TeamDashboard";
 
 // Sample data structure for teams and their agents
 const teamsData = [
@@ -18,14 +17,33 @@ const teamsData = [
         name: "Wonder AI",
         image: "/placeholder.svg",
         color: "bg-violet-600",
+        status: "active",
+        metrics: {
+          conversations: 253,
+          responseTime: "1.2s",
+          satisfaction: 94,
+        }
       },
       {
         id: 2,
         name: "Agora AI",
         image: "/placeholder.svg", 
         color: "bg-amber-100",
+        status: "active",
+        metrics: {
+          conversations: 187,
+          responseTime: "0.9s",
+          satisfaction: 91,
+        }
       },
-    ]
+    ],
+    metrics: {
+      totalConversations: 440,
+      avgResponseTime: "1.1s",
+      usagePercent: 68,
+      apiCalls: 12450,
+      satisfaction: 92,
+    }
   },
   {
     id: "2",
@@ -37,14 +55,33 @@ const teamsData = [
         name: "PristineBag AI",
         image: "/placeholder.svg",
         color: "bg-rose-400",
+        status: "inactive",
+        metrics: {
+          conversations: 134,
+          responseTime: "1.5s",
+          satisfaction: 87,
+        }
       },
       {
         id: 4,
         name: "AI Kundeservice",
         image: "/placeholder.svg",
         color: "bg-black",
+        status: "active",
+        metrics: {
+          conversations: 219,
+          responseTime: "1.3s",
+          satisfaction: 89,
+        }
       },
-    ]
+    ],
+    metrics: {
+      totalConversations: 353,
+      avgResponseTime: "1.4s",
+      usagePercent: 54,
+      apiCalls: 8930,
+      satisfaction: 88,
+    }
   },
   {
     id: "3",
@@ -56,8 +93,21 @@ const teamsData = [
         name: "theballooncompany.com",
         image: "/placeholder.svg",
         color: "bg-white",
+        status: "active",
+        metrics: {
+          conversations: 178,
+          responseTime: "1.0s",
+          satisfaction: 95,
+        }
       }
-    ]
+    ],
+    metrics: {
+      totalConversations: 178,
+      avgResponseTime: "1.0s",
+      usagePercent: 32,
+      apiCalls: 4250,
+      satisfaction: 95,
+    }
   }
 ];
 
@@ -106,14 +156,10 @@ const Dashboard = () => {
 
         {/* Main content */}
         <div className="flex-1 overflow-auto p-6">
-          {activeTab === "agents" && (
-            <AgentCards
-              teamName={selectedTeam.name}
-              agents={selectedTeam.agents}
-            />
-          )}
-
-          {activeTab === "usage" && <UsageStats />}
+          <TeamDashboard 
+            team={selectedTeam}
+            teamsList={teamsData}
+          />
         </div>
       </div>
     </div>
