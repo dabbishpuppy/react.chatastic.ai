@@ -8,7 +8,7 @@ import AgentsList from "@/components/dashboard/AgentsList";
 import SidebarActions from "@/components/dashboard/SidebarActions";
 
 // Sample data structure for teams and their agents
-const teamsData = [
+const initialTeamsData = [
   {
     id: "1",
     name: "Wonderwave",
@@ -115,6 +115,7 @@ const teamsData = [
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("agents");
+  const [teamsData, setTeamsData] = useState(initialTeamsData);
   const [selectedTeam, setSelectedTeam] = useState(() => {
     return teamsData.find(team => team.isActive) || teamsData[0];
   });
@@ -142,6 +143,29 @@ const Dashboard = () => {
     }));
   };
 
+  const handleTeamCreated = (newTeam) => {
+    setTeamsData(prevTeams => [...prevTeams, newTeam]);
+    setSelectedTeam(newTeam);
+  };
+
+  const handleAgentCreated = (newAgent) => {
+    // Add the new agent to the currently selected team
+    setTeamsData(prevTeams => prevTeams.map(team => 
+      team.id === selectedTeam.id 
+        ? { 
+            ...team, 
+            agents: [...team.agents, newAgent] 
+          } 
+        : team
+    ));
+
+    // Update the selected team reference
+    setSelectedTeam(prevSelected => ({
+      ...prevSelected,
+      agents: [...prevSelected.agents, newAgent]
+    }));
+  };
+
   // Get all agents for other components
   const allAgents = teamsData.flatMap(team => team.agents);
 
@@ -157,6 +181,8 @@ const Dashboard = () => {
           expandedSections={expandedSections}
           onTeamSelect={handleTeamSelect}
           toggleSection={toggleSection}
+          onTeamCreated={handleTeamCreated}
+          onAgentCreated={handleAgentCreated}
         />
 
         {/* Main content - with bg-[#f5f5f5] */}

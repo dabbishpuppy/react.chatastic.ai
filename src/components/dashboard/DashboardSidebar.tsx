@@ -28,6 +28,8 @@ interface DashboardSidebarProps {
   };
   onTeamSelect: (team: Team) => void;
   toggleSection: (section: string) => void;
+  onTeamCreated?: (team: Team) => void;
+  onAgentCreated?: (agent: Agent) => void;
 }
 
 const DashboardSidebar = ({
@@ -35,7 +37,9 @@ const DashboardSidebar = ({
   selectedTeam,
   expandedSections,
   onTeamSelect,
-  toggleSection
+  toggleSection,
+  onTeamCreated,
+  onAgentCreated
 }: DashboardSidebarProps) => {
   return (
     <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">

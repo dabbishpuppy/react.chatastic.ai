@@ -1,13 +1,16 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, ChevronDown, ChevronUp, Plus, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import CreateTeamDialog from "./CreateTeamDialog";
 
 interface Team {
   id: string;
   name: string;
   isActive: boolean;
+  agents?: any[];
+  metrics?: any;
 }
 
 interface TeamsListProps {
@@ -25,6 +28,19 @@ const TeamsList = ({
   onToggleExpand,
   onTeamSelect
 }: TeamsListProps) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [localTeams, setLocalTeams] = useState<Team[]>(teams);
+
+  // Handle creating a new team
+  const handleTeamCreated = (newTeam: Team) => {
+    setLocalTeams(prevTeams => [...prevTeams, newTeam]);
+    // Auto-select the newly created team
+    onTeamSelect(newTeam);
+  };
+
+  // Use local teams if available, otherwise use the props teams
+  const displayTeams = localTeams.length > 0 ? localTeams : teams;
+
   return (
     <div className="mb-4">
       <button 
@@ -40,7 +56,7 @@ const TeamsList = ({
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
         isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
       }`}>
-        {teams.map(team => (
+        {displayTeams.map(team => (
           <div 
             key={team.id}
             className={`px-3 py-2 rounded-md flex items-center justify-between cursor-pointer transition-colors duration-200 ${
@@ -62,11 +78,21 @@ const TeamsList = ({
       </div>
 
       <div className="mt-2">
-        <Button variant="outline" className="w-full flex items-center gap-2 justify-center text-sm">
+        <Button 
+          variant="outline" 
+          className="w-full flex items-center gap-2 justify-center text-sm"
+          onClick={() => setIsDialogOpen(true)}
+        >
           <Plus className="h-4 w-4" />
           <span>Create team</span>
         </Button>
       </div>
+
+      <CreateTeamDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onTeamCreated={handleTeamCreated}
+      />
     </div>
   );
 };
