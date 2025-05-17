@@ -20,12 +20,11 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
       setIsLoading(true);
       setPrevPathname(location.pathname);
       
-      // Store the new children to show once loading finishes
-      // Use a shorter timeout for better UX
+      // Immediately update content and reset loading after a minimal delay
       const timeoutId = setTimeout(() => {
         setDisplayContent(children);
         setIsLoading(false);
-      }, 200);
+      }, 100); // Very short timeout to prevent perceived lag
       
       return () => clearTimeout(timeoutId);
     } else {

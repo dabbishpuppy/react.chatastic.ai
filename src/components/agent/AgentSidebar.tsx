@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User, LogOut } from "lucide-react";
 import AgentSidebarMenu from "./sidebar/AgentSidebarMenu";
 import SidebarActions from "../dashboard/SidebarActions";
 import { useTeamsAndAgents, Agent } from "@/hooks/useTeamsAndAgents";
@@ -21,6 +20,9 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   // Find the current agent based on the URL parameter
   useEffect(() => {
     if (agentId && teamsData.length > 0) {
+      // Clear current agent first to avoid stale data
+      setCurrentAgent(null);
+      
       // Search through all teams to find the agent with matching ID
       for (const team of teamsData) {
         const foundAgent = team.agents.find(agent => agent.id.toString() === agentId);

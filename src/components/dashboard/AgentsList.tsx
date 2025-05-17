@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -82,7 +83,7 @@ const AgentsList = ({
   // Navigate to agent's playground page directly
   const handleAgentClick = (agentId: string) => {
     console.log(`Navigating to agent: ${agentId}`);
-    // Use navigate without replace to make sure the transition works properly
+    // Simple navigation without replace - fixes the issue with transitions
     navigate(`/agent/${agentId}`);
   };
 
