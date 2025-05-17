@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Activity, 
   BarChart2, 
@@ -21,7 +20,7 @@ import {
   Users,
   LineChart
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 interface AgentSidebarProps {
@@ -32,7 +31,39 @@ interface AgentSidebarProps {
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
   const navigate = useNavigate();
   const { agentId } = useParams();
+  const location = useLocation();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  
+  // Get current submenu from URL
+  const getCurrentSubmenu = () => {
+    const searchParams = new URLSearchParams(location.search);
+    return searchParams.get("tab") || "";
+  };
+
+  // Initialize expanded menus based on active tab
+  useEffect(() => {
+    // Check if any submenu is active and expand its parent
+    const currentSubmenu = getCurrentSubmenu();
+    
+    const shouldExpandSources = 
+      activeTab === "sources" || 
+      ["text", "files", "website", "qa"].includes(currentSubmenu);
+      
+    const shouldExpandConnect = 
+      activeTab === "connect" || 
+      ["embed", "share", "integrations"].includes(currentSubmenu);
+      
+    const shouldExpandSettings = 
+      activeTab === "settings" ||
+      location.pathname.includes("/settings/");
+      
+    setExpandedMenus(prev => ({
+      ...prev,
+      sources: shouldExpandSources,
+      connect: shouldExpandConnect,
+      settings: shouldExpandSettings
+    }));
+  }, [activeTab, location]);
 
   // Main menu items
   const menuItems = [
@@ -45,10 +76,10 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       icon: <FileText size={18} />,
       hasSubmenu: true,
       submenu: [
-        { id: "text", label: "Text", path: "sources" },
-        { id: "files", label: "Files", path: "sources" },
-        { id: "website", label: "Website", path: "sources" },
-        { id: "qa", label: "Q&A", path: "sources" }
+        { id: "text", label: "Text", path: "sources", icon: <FileText size={14} /> },
+        { id: "files", label: "Files", path: "sources", icon: <FileText size={14} /> },
+        { id: "website", label: "Website", path: "sources", icon: <Globe size={14} /> },
+        { id: "qa", label: "Q&A", path: "sources", icon: <FileText size={14} /> }
       ]
     },
     { id: "actions", label: "Actions", icon: <Zap size={18} /> },
@@ -58,9 +89,9 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       icon: <Share size={18} />,
       hasSubmenu: true,
       submenu: [
-        { id: "embed", label: "Embed", path: "integrations" },
-        { id: "share", label: "Share", path: "integrations" },
-        { id: "integrations", label: "Integrations", path: "integrations" }
+        { id: "embed", label: "Embed", path: "integrations", icon: <LayoutTemplate size={14} /> },
+        { id: "share", label: "Share", path: "integrations", icon: <Share size={14} /> },
+        { id: "integrations", label: "Integrations", path: "integrations", icon: <Bot size={14} /> }
       ]
     },
     { 
@@ -69,14 +100,14 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
       icon: <Settings size={18} />,
       hasSubmenu: true,
       submenu: [
-        { id: "general", label: "General", path: "settings/general" },
-        { id: "ai", label: "AI", path: "settings/ai" },
-        { id: "chat-interface", label: "Interface", path: "settings/chat-interface" },
-        { id: "security", label: "Security", path: "settings/security" },
-        { id: "usage", label: "Usage", path: "settings/usage" },
-        { id: "leads", label: "Leads", path: "settings/leads" },
-        { id: "notifications", label: "Notifications", path: "settings/notifications" },
-        { id: "custom-domains", label: "Domains", path: "settings/custom-domains" }
+        { id: "general", label: "General", path: "settings/general", icon: <Settings size={14} /> },
+        { id: "ai", label: "AI", path: "settings/ai", icon: <Bot size={14} /> },
+        { id: "chat-interface", label: "Interface", path: "settings/chat-interface", icon: <LayoutTemplate size={14} /> },
+        { id: "security", label: "Security", path: "settings/security", icon: <Shield size={14} /> },
+        { id: "usage", label: "Usage", path: "settings/usage", icon: <LineChart size={14} /> },
+        { id: "leads", label: "Leads", path: "settings/leads", icon: <Users size={14} /> },
+        { id: "notifications", label: "Notifications", path: "settings/notifications", icon: <Bell size={14} /> },
+        { id: "custom-domains", label: "Domains", path: "settings/custom-domains", icon: <Globe size={14} /> }
       ]
     },
   ];
@@ -111,7 +142,17 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
 
   const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string) => {
     onTabChange(parentTabId, submenuId);
-    navigate(`/agent/${agentId}/${submenuPath}`);
+    
+    if (submenuPath === "sources") {
+      navigate(`/agent/${agentId}/sources?tab=${submenuId}`);
+    } else if (submenuPath === "integrations") {
+      navigate(`/agent/${agentId}/integrations?tab=${submenuId}`);
+    } else {
+      navigate(`/agent/${agentId}/${submenuPath}`);
+    }
+    
+    // Keep the dropdown open
+    setExpandedMenus(prev => ({...prev, [parentTabId]: true}));
     
     // Scroll to top after navigation
     window.scrollTo(0, 0);
@@ -131,6 +172,29 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
 
   const handleLogoutClick = () => {
     navigate("/signout");
+  };
+
+  // Check if a submenu item is active
+  const isSubmenuActive = (parentId: string, subId: string) => {
+    const currentSubmenu = getCurrentSubmenu();
+    
+    if (parentId === "sources" && activeTab === "sources") {
+      return currentSubmenu === subId;
+    }
+    
+    if (parentId === "connect" && activeTab === "connect") {
+      return currentSubmenu === subId;
+    }
+    
+    if (parentId === "settings" && activeTab === "settings") {
+      if (subId === "general") {
+        return location.pathname.includes("/settings/general");
+      } else if (location.pathname.includes(`/settings/${subId}`)) {
+        return true;
+      }
+    }
+    
+    return false;
   };
 
   return (
@@ -163,13 +227,14 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
                 {item.submenu?.map((subItem) => (
                   <button
                     key={subItem.id}
-                    className={`w-full text-left py-2 px-3 text-sm rounded-md ${
-                      activeTab === subItem.id
+                    className={`w-full text-left py-2 px-3 text-sm rounded-md flex items-center ${
+                      isSubmenuActive(item.id, subItem.id)
                         ? "bg-gray-100 font-medium"
                         : "text-gray-600 hover:bg-gray-50"
                     }`}
                     onClick={() => handleSubmenuClick(item.id, subItem.path, subItem.id)}
                   >
+                    <span className="mr-2 text-gray-500">{subItem.icon}</span>
                     {subItem.label}
                   </button>
                 ))}
