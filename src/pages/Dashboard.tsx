@@ -140,9 +140,12 @@ const Dashboard = () => {
     }));
   };
 
+  // Get all agents for the top navigation dropdown
+  const allAgents = teamsData.flatMap(team => team.agents);
+
   return (
     <div className="flex flex-col min-h-screen">
-      <TopNavBar />
+      <TopNavBar teams={teamsData} agents={allAgents} />
 
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
@@ -154,7 +157,7 @@ const Dashboard = () => {
           toggleSection={toggleSection}
         />
 
-        {/* Main content - Adding bg-[#f5f5f5] */}
+        {/* Main content - with bg-[#f5f5f5] */}
         <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
           <TeamDashboard 
             team={selectedTeam}

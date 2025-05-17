@@ -6,65 +6,23 @@ import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
 
-// Import the teams data to pass to the dropdowns
-const teams = [
-  {
-    id: "1",
-    name: "Wonderwave",
-    isActive: true,
-  },
-  {
-    id: "2",
-    name: "Analytics Team",
-    isActive: false,
-  },
-  {
-    id: "3",
-    name: "Support Team",
-    isActive: false,
-  }
-];
+interface TopNavBarProps {
+  teams?: Array<{
+    id: string;
+    name: string;
+    isActive?: boolean;
+    agents?: Array<any>;
+  }>;
+  agents?: Array<{
+    id: number | string;
+    name: string;
+    image?: string;
+    color?: string;
+    status?: string;
+  }>;
+}
 
-// Combine all agents for the dropdown
-const agents = [
-  {
-    id: 1,
-    name: "Wonder AI",
-    image: "/placeholder.svg",
-    color: "bg-violet-600",
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Agora AI",
-    image: "/placeholder.svg", 
-    color: "bg-amber-100",
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "PristineBag AI",
-    image: "/placeholder.svg",
-    color: "bg-rose-400",
-    status: "inactive",
-  },
-  {
-    id: 4,
-    name: "AI Kundeservice",
-    image: "/placeholder.svg",
-    color: "bg-black",
-    status: "active",
-  },
-  {
-    id: 5,
-    name: "theballooncompany.com",
-    image: "/placeholder.svg",
-    color: "bg-white",
-    status: "active",
-  }
-];
-
-const TopNavBar = () => {
+const TopNavBar: React.FC<TopNavBarProps> = ({ teams = [], agents = [] }) => {
   const location = useLocation();
   const path = location.pathname;
   
@@ -89,10 +47,10 @@ const TopNavBar = () => {
             </span>
           </Link>
           <div className="hidden md:flex ml-8 space-x-6">
-            {/* Teams Dropdown - now with props */}
+            {/* Teams Dropdown - with props */}
             <TeamsDropdown teams={teams} />
             
-            {/* Agents Dropdown - now with props */}
+            {/* Agents Dropdown - with props */}
             <AgentsDropdown isActive={isActive('/dashboard')} agents={agents} />
           </div>
         </div>

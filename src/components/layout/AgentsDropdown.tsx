@@ -62,7 +62,12 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
               onClick={() => handleAgentSelect(agent.name)}
               className="flex items-center justify-between text-[0.875rem] w-full"
             >
-              {agent.name}
+              <div className="flex items-center gap-2">
+                {agent.color && (
+                  <div className={`w-4 h-4 ${agent.color} rounded-sm flex-shrink-0`}></div>
+                )}
+                <span>{agent.name}</span>
+              </div>
               {currentAgentId === agent.id.toString() && (
                 <CircleCheck size={16} className="text-green-500" />
               )}
