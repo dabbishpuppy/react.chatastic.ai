@@ -1,5 +1,6 @@
 
 import React, { useState, ReactNode, useEffect, useRef } from "react";
+import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Logo from "@/components/layout/Logo";
