@@ -9,6 +9,7 @@ interface AuthContextProps {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  networkAvailable: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -20,7 +21,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [networkAvailable, setNetworkAvailable] = useState(navigator.onLine);
   const navigate = useNavigate();
+
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = () => {
+      setNetworkAvailable(true);
+      toast({
+        title: "Connection restored",
+        description: "You are now online.",
+      });
+    };
+    
+    const handleOffline = () => {
+      setNetworkAvailable(false);
+      toast({
+        title: "No internet connection",
+        description: "You are offline. Please check your connection.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check
+    setNetworkAvailable(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     // Initial session check
@@ -153,6 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     session,
     loading,
+    networkAvailable,
     signUp,
     signIn,
     signOut,

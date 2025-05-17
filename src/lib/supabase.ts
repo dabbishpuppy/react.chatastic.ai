@@ -5,27 +5,34 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Initialize supabase client outside the try block
+let supabase;
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('⚠️ Supabase environment variables are missing. Using default values for development.');
   // This warning will help developers understand what's happening
 }
 
-// Create Supabase client with available credentials
-let supabase;
-
 try {
-  // Check network connection before creating client
-  if (!navigator.onLine) {
-    console.error("⚠️ Network connection unavailable. Supabase client initialization may fail.");
-  }
-  
+  // Create Supabase client with available credentials
   supabase = createClient(
-    supabaseUrl || 'https://your-supabase-url.supabase.co',
-    supabaseAnonKey || 'your-anon-key', 
+    supabaseUrl || 'https://xyzcompany.supabase.co',
+    supabaseAnonKey || 'public-anon-key-for-testing-only', 
     {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        storageKey: 'wonderwave-auth-storage',
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      },
+      global: {
+        fetch: (...args) => {
+          return fetch(...args).catch(err => {
+            console.error('Supabase fetch error:', err);
+            throw new Error('Network error. Please check your connection and try again.');
+          });
+        }
       }
     }
   );
@@ -33,7 +40,17 @@ try {
   console.log("✅ Supabase client initialized successfully");
 } catch (error) {
   console.error("❌ Failed to initialize Supabase client:", error);
-  throw new Error("Failed to initialize Supabase client. Please check your configuration.");
+  // Create a fallback client that will show appropriate errors
+  supabase = createClient(
+    'https://fallback-url.supabase.co',
+    'fallback-anon-key',
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
 }
 
 // Export the client
