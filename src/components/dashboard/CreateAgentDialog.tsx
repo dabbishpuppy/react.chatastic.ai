@@ -22,19 +22,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 
-// Define the form schema
+// Define the form schema - removed teamId requirement
 const formSchema = z.object({
   name: z.string().min(1, { message: "Agent name is required" }),
-  teamId: z.string().min(1, { message: "Team is required" }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -86,17 +78,17 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   onAgentCreated,
 }) => {
   const navigate = useNavigate();
+  const selectedTeam = teams.find(team => team.isActive) || teams[0];
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      teamId: teams.length > 0 ? teams[0].id : "",
     },
   });
 
   const onSubmit = (values: FormValues) => {
     // Auto-assign a color from the palette (round robin based on team's existing agents)
-    const selectedTeam = teams.find(team => team.id === values.teamId);
     const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
     const colorIndex = teamAgentsCount % agentColorPalette.length;
     const autoAssignedColor = agentColorPalette[colorIndex];
@@ -113,7 +105,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         responseTime: "0.0s",
         satisfaction: 0,
       },
-      teamId: values.teamId,
+      teamId: selectedTeam.id,
     };
 
     onAgentCreated(newAgent);
@@ -149,34 +141,6 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
                   <FormControl>
                     <Input placeholder="Enter agent name..." {...field} />
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="teamId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Team</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a team" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {teams.map((team) => (
-                        <SelectItem key={team.id} value={team.id}>
-                          {team.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
