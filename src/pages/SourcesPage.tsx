@@ -32,6 +32,22 @@ const SourcesPage: React.FC = () => {
     maxSize: 400 * 1024, // 400 KB
   };
 
+  // Get the current tab title for display
+  const getTabTitle = () => {
+    switch (tab) {
+      case "text":
+        return "Text";
+      case "files":
+        return "Files";
+      case "website":
+        return "Website";
+      case "qa":
+        return "Q&A";
+      default:
+        return "Text";
+    }
+  };
+
   // Render the appropriate tab content based on the URL parameter
   const renderTabContent = () => {
     switch (tab) {

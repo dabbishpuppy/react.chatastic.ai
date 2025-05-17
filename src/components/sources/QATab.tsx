@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,14 +20,8 @@ const QATab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div>
         <h2 className="text-2xl font-semibold">Q&A</h2>
-        <div className="text-right">
-          <div className="text-sm text-gray-500 mb-1">Total size: 65 KB / 33 MB</div>
-          <Button className="bg-black hover:bg-gray-800">
-            Retrain agent
-          </Button>
-        </div>
       </div>
 
       <div className="space-y-4">
