@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface Agent {
-  id: string; // Changed from number to string to match Supabase UUID format
+  id: string; // Using string type for ID to match Supabase UUID
   name: string;
   image: string;
   color: string;
@@ -86,7 +86,7 @@ const AgentsList = ({
     );
   };
 
-  const handleAgentDeleted = (agentId: number) => {
+  const handleAgentDeleted = (agentId: string) => {
     setLocalAgents(prevAgents => 
       prevAgents.filter(agent => agent.id !== agentId)
     );
