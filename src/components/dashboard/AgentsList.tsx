@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateAgentDialog from "./CreateAgentDialog";
@@ -80,11 +79,11 @@ const AgentsList = ({
     );
   };
 
-  // Navigate to agent's playground page
+  // Navigate to agent's playground page directly
   const handleAgentClick = (agentId: string) => {
     console.log(`Navigating to agent: ${agentId}`);
-    // Use React Router's navigate function with {replace: true} to avoid adding to history
-    navigate(`/agent/${agentId}`, { replace: true });
+    // Use navigate without replace to make sure the transition works properly
+    navigate(`/agent/${agentId}`);
   };
 
   // Make sure we have at least one valid team with an ID

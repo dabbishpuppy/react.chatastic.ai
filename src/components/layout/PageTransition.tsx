@@ -16,18 +16,20 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
   useEffect(() => {
     // Only start loading for actual route path changes
     if (location.pathname !== prevPathname) {
+      // Set loading state
       setIsLoading(true);
       setPrevPathname(location.pathname);
       
       // Store the new children to show once loading finishes
+      // Use a shorter timeout for better UX
       const timeoutId = setTimeout(() => {
         setDisplayContent(children);
         setIsLoading(false);
-      }, 300); // Adjust timing as needed
+      }, 200);
       
       return () => clearTimeout(timeoutId);
     } else {
-      // For same route updates or search param changes, just update the content
+      // For same route updates or search param changes, just update the content immediately
       setDisplayContent(children);
     }
   }, [location.pathname, children, prevPathname]);
