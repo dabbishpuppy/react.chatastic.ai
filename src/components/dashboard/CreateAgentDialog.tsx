@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -191,7 +190,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       
       // Navigate directly without setTimeout
       // This prevents multiple page loads
-      navigate(`/agent/${newAgent.id}/sources?tab=text`, { 
+      navigate(`/playground/${newAgent.id}/sources?tab=text`, { 
         replace: true,
         state: { fromAgentCreation: true } 
       });

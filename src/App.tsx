@@ -65,42 +65,44 @@ const App = () => (
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/agent/:agentId" element={
+            
+            {/* Playground Routes - Change from /agent/ to /playground/ */}
+            <Route path="/playground/:agentId" element={
               <ProtectedRoute>
                 <PageTransition>
                   <AgentEnvironment />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/agent/:agentId/activity" element={
+            <Route path="/playground/:agentId/activity" element={
               <ProtectedRoute>
                 <PageTransition>
                   <ActivityPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/agent/:agentId/analytics" element={
+            <Route path="/playground/:agentId/analytics" element={
               <ProtectedRoute>
                 <PageTransition>
                   <AnalyticsPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/agent/:agentId/sources" element={
+            <Route path="/playground/:agentId/sources" element={
               <ProtectedRoute>
                 <PageTransition>
                   <SourcesPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/agent/:agentId/actions" element={
+            <Route path="/playground/:agentId/actions" element={
               <ProtectedRoute>
                 <PageTransition>
                   <ActionsPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/agent/:agentId/integrations" element={
+            <Route path="/playground/:agentId/integrations" element={
               <ProtectedRoute>
                 <PageTransition>
                   <IntegrationsPage />
@@ -108,8 +110,17 @@ const App = () => (
               </ProtectedRoute>
             } />
             
+            {/* Maintain backward compatibility with old routes */}
+            <Route path="/agent/:agentId" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Navigate to={location => `/playground/${location.pathname.split('/')[2]}`} replace />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            
             {/* Agent Settings Routes - Using wildcard for nested routes */}
-            <Route path="/agent/:agentId/settings/*" element={
+            <Route path="/playground/:agentId/settings/*" element={
               <ProtectedRoute>
                 <PageTransition>
                   <AgentSettingsPage />

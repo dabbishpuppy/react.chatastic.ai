@@ -26,9 +26,10 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const location = useLocation();
   
-  // Check if we're on an agent page and extract the ID
+  // Check if we're on a playground page and extract the ID
   React.useEffect(() => {
-    const match = location.pathname.match(/\/agent\/(\d+)/);
+    // Match both /agent/:id and /playground/:id paths for backward compatibility
+    const match = location.pathname.match(/\/(?:agent|playground)\/([^\/]+)/);
     if (match) {
       const agentId = match[1];
       const agent = agents.find(a => a.id.toString() === agentId);
@@ -58,7 +59,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
         {agents.map(agent => (
           <DropdownMenuItem key={agent.id} asChild>
             <Link 
-              to={`/agent/${agent.id}`}
+              to={`/playground/${agent.id}`}
               onClick={() => handleAgentSelect(agent.name)}
               className="flex items-center justify-between text-[0.875rem] w-full"
             >

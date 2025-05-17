@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateAgentDialog from "./CreateAgentDialog";
@@ -28,6 +28,7 @@ const AgentsList = ({
   isExpanded,
   onToggleExpand
 }: AgentsListProps) => {
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -47,6 +48,15 @@ const AgentsList = ({
     toast({
       title: "Agent created",
       description: `${newAgent.name} has been created successfully.`
+    });
+  };
+
+  // Handle agent navigation
+  const handleAgentClick = (agentId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    navigate(`/playground/${agentId}`, { 
+      replace: true,
+      state: { fromAgentsList: true } 
     });
   };
 
@@ -104,17 +114,15 @@ const AgentsList = ({
         {displayAgents.map(agent => (
           <div 
             key={agent.id}
-            className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
+            className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+            onClick={(e) => handleAgentClick(agent.id, e)}
           >
-            <Link 
-              to={`/agent/${agent.id}`}
-              className="flex items-center text-[0.875rem] flex-1"
-            >
+            <div className="flex items-center text-[0.875rem] flex-1">
               <div 
                 className={`w-4 h-4 ${agent.color} rounded-sm mr-2 flex-shrink-0`}
               ></div>
               <span className="truncate">{agent.name}</span>
-            </Link>
+            </div>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
