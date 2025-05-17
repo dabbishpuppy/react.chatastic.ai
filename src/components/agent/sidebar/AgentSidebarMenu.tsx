@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -15,7 +16,8 @@ import {
   Users,
   LineChart,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  LayoutDashboard
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
 import SidebarSubmenuItem from "./SidebarSubmenuItem";
@@ -64,6 +66,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
 
   // Main menu items
   const menuItems = [
+    { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "playground", label: "Playground", icon: <FileText size={18} /> },
     { id: "activity", label: "Activity", icon: <Activity size={18} /> },
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
@@ -112,6 +115,11 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
   const handleClick = (tabId: string, tabLabel: string, hasSubmenu?: boolean) => {
     if (hasSubmenu) {
       setExpandedMenus(prev => ({...prev, [tabId]: !prev[tabId]}));
+      return;
+    }
+    
+    if (tabId === "dashboard") {
+      navigate(`/dashboard`);
       return;
     }
     
