@@ -4,7 +4,7 @@ import { Trophy, MessageSquare, User } from "lucide-react";
 
 interface TopPerformingAgentsProps {
   agents: Array<{
-    id: number;
+    id: string; // Changed from number to string to match Supabase UUID
     name: string;
     image: string;
     color: string;

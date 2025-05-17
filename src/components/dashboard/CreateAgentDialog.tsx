@@ -53,12 +53,13 @@ interface Team {
   agents: any[];
 }
 
+// Updated to use string for id to match Supabase's UUID
 interface CreateAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teams: Team[];
   onAgentCreated: (agent: {
-    id: number;
+    id: string; // Changed from number to string to match Supabase UUID
     name: string;
     image: string;
     color: string;

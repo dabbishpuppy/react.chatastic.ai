@@ -7,7 +7,19 @@ import CreateAgentDialog from './CreateAgentDialog';
 
 interface AgentEmptyStateProps {
   teamName?: string;
-  onCreateAgent: (agent: any) => void;
+  onCreateAgent: (agent: {
+    id: string; // Changed from number to string to match Supabase UUID
+    name: string;
+    image: string;
+    color: string;
+    status: string;
+    metrics: {
+      conversations: number;
+      responseTime: string;
+      satisfaction: number;
+    };
+    teamId: string;
+  }) => void;
 }
 
 const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAgent }) => {
