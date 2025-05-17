@@ -41,6 +41,7 @@ interface AgentSidebarProps {
 }
 
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
+  const navigate = useNavigate();
   const { agentId } = useParams();
   const [currentAgent, setCurrentAgent] = useState<{id: string, name: string, color: string} | null>(null);
 

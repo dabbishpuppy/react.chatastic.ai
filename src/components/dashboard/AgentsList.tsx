@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateAgentDialog from "./CreateAgentDialog";
@@ -35,6 +35,7 @@ const AgentsList = ({
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Update local agents when props change
   useEffect(() => {
@@ -79,6 +80,11 @@ const AgentsList = ({
     );
   };
 
+  // Navigate to agent page
+  const handleAgentClick = (agentId: string) => {
+    navigate(`/agent/${agentId}`);
+  };
+
   // Make sure we have at least one valid team with an ID
   const validTeams = teams.filter(team => team && team.id);
   const canCreateAgent = validTeams.length > 0;
@@ -104,17 +110,15 @@ const AgentsList = ({
         {displayAgents.map(agent => (
           <div 
             key={agent.id}
-            className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
+            className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+            onClick={() => handleAgentClick(agent.id.toString())}
           >
-            <Link 
-              to={`/agent/${agent.id}`}
-              className="flex items-center text-[0.875rem] flex-1"
-            >
+            <div className="flex items-center text-[0.875rem] flex-1">
               <div 
                 className={`w-4 h-4 ${agent.color} rounded-sm mr-2 flex-shrink-0`}
               ></div>
               <span className="truncate">{agent.name}</span>
-            </Link>
+            </div>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
