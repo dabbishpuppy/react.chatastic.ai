@@ -33,29 +33,16 @@ export const useAgentManagement = ({
     if (!selectedTeam) return;
     
     try {
-      // Insert the new agent into Supabase
-      const { data, error } = await supabase
-        .from('agents')
-        .insert([
-          { 
-            name: newAgent.name,
-            team_id: selectedTeam.id,
-            color: newAgent.color,
-            image: newAgent.image || "/placeholder.svg",
-            status: newAgent.status || "active",
-            conversations: 0,
-            response_time: "0.0s",
-            satisfaction: 0
-          }
-        ])
-        .select('*')
-        .single();
+      // We don't need to insert the agent here because CreateAgentDialog already does it
+      // Just update the local state with the new agent data
       
-      if (error) throw error;
-      
-      // Add the new agent to the UI with needed properties
+      // Format the agent to match our expected structure
       const agentWithUI = {
-        ...data,
+        id: newAgent.id,
+        name: newAgent.name,
+        image: newAgent.image || "/placeholder.svg",
+        color: newAgent.color,
+        status: newAgent.status || "active",
         metrics: {
           conversations: 0,
           responseTime: "0.0s",
@@ -83,9 +70,9 @@ export const useAgentManagement = ({
         description: `${newAgent.name} agent has been created successfully!`,
       });
     } catch (error: any) {
-      console.error("Error creating agent:", error);
+      console.error("Error updating agent state:", error);
       toast({
-        title: "Failed to create agent",
+        title: "Failed to update agent state",
         description: error.message,
         variant: "destructive",
       });

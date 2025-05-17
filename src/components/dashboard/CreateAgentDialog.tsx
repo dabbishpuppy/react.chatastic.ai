@@ -109,7 +109,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     const autoAssignedColor = agentColorPalette[colorIndex];
     
     try {
-      // Insert the new agent directly without checking team ownership - the RLS policies will handle this
+      console.log("Creating agent with team_id:", selectedTeam.id);
+      // Insert the new agent - The RLS policies will handle permission checking
       const { data, error } = await supabase
         .from('agents')
         .insert([
@@ -129,14 +130,29 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       
       if (error) {
         console.error("Error creating agent:", error);
-        throw error;
+        toast({
+          title: "Error creating agent",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!data) {
+        console.error("No data returned from agent creation");
+        toast({
+          title: "Error creating agent",
+          description: "Failed to create agent. Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
       
       // Create a new agent with the form values and returned data
       const newAgent = {
         id: data.id,
         name: data.name,
-        image: data.image,
+        image: data.image || "/placeholder.svg",
         color: data.color,
         status: "active" as const,
         metrics: {
@@ -158,6 +174,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       // Redirect to the sources page for the new agent
       navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
     } catch (error: any) {
+      console.error("Exception creating agent:", error);
       toast({
         title: "Error creating agent",
         description: error.message || "Failed to create agent. Please try again.",

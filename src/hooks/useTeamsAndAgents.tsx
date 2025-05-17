@@ -51,7 +51,10 @@ export const useTeamsAndAgents = () => {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (teamsError) throw teamsError;
+        if (teamsError) {
+          console.error("Teams fetch error:", teamsError);
+          throw teamsError;
+        }
         
         if (teams && teams.length > 0) {
           // For each team, fetch its agents
@@ -63,7 +66,10 @@ export const useTeamsAndAgents = () => {
                 .eq('team_id', team.id)
                 .order('created_at', { ascending: false });
               
-              if (agentsError) throw agentsError;
+              if (agentsError) {
+                console.error("Agents fetch error for team", team.id, ":", agentsError);
+                throw agentsError;
+              }
               
               // Add additional properties needed by the UI
               return {
