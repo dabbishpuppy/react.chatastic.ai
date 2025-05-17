@@ -112,11 +112,7 @@ const App = () => (
             
             {/* Maintain backward compatibility with old routes */}
             <Route path="/agent/:agentId" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Navigate to={location => `/playground/${location.pathname.split('/')[2]}`} replace />
-                </PageTransition>
-              </ProtectedRoute>
+              <Navigate to={`/playground/${location.pathname.split('/')[2]}`} replace />
             } />
             
             {/* Agent Settings Routes - Using wildcard for nested routes */}
@@ -158,3 +154,4 @@ const App = () => (
 );
 
 export default App;
+
