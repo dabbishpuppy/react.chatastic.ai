@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -118,49 +117,48 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
       return;
     }
     
+    // Call onTabChange first to ensure state is updated
+    onTabChange(tabId, tabLabel);
+    
+    // Then handle navigation with preventDefault to avoid auto-scrolling
     if (tabId === "dashboard") {
-      navigate(`/dashboard`);
+      navigate(`/dashboard`, { replace: true });
       return;
     }
     
-    onTabChange(tabId, tabLabel);
-    
+    // Use replace: true to prevent scroll restoration
     if (tabId === "activity") {
-      navigate(`/agent/${agentId}/activity`);
+      navigate(`/agent/${agentId}/activity`, { replace: true });
     } else if (tabId === "playground") {
-      navigate(`/agent/${agentId}`);
+      navigate(`/agent/${agentId}`, { replace: true });
     } else if (tabId === "analytics") {
-      navigate(`/agent/${agentId}/analytics`);
+      navigate(`/agent/${agentId}/analytics`, { replace: true });
     } else if (tabId === "sources") {
-      navigate(`/agent/${agentId}/sources`);
+      navigate(`/agent/${agentId}/sources`, { replace: true });
     } else if (tabId === "actions") {
-      navigate(`/agent/${agentId}/actions`);
+      navigate(`/agent/${agentId}/actions`, { replace: true });
     } else if (tabId === "connect") {
-      navigate(`/agent/${agentId}/integrations`);
+      navigate(`/agent/${agentId}/integrations`, { replace: true });
     } else if (tabId === "settings") {
-      navigate(`/agent/${agentId}/settings`);
+      navigate(`/agent/${agentId}/settings`, { replace: true });
     }
     
-    // Scroll to top after navigation
-    window.scrollTo(0, 0);
+    // Manual scroll reset handled in AgentPageLayout component
   };
 
   const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string) => {
     onTabChange(parentTabId, submenuId);
     
     if (submenuPath === "sources") {
-      navigate(`/agent/${agentId}/sources?tab=${submenuId}`);
+      navigate(`/agent/${agentId}/sources?tab=${submenuId}`, { replace: true });
     } else if (submenuPath === "integrations") {
-      navigate(`/agent/${agentId}/integrations?tab=${submenuId}`);
+      navigate(`/agent/${agentId}/integrations?tab=${submenuId}`, { replace: true });
     } else {
-      navigate(`/agent/${agentId}/${submenuPath}`);
+      navigate(`/agent/${agentId}/${submenuPath}`, { replace: true });
     }
     
     // Keep the dropdown open
     setExpandedMenus(prev => ({...prev, [parentTabId]: true}));
-    
-    // Scroll to top after navigation
-    window.scrollTo(0, 0);
   };
 
   // Check if a submenu item is active

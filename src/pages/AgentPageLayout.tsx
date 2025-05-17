@@ -1,5 +1,5 @@
 
-import React, { useState, ReactNode } from "react";
+import React, { useState, ReactNode, useEffect, useRef } from "react";
 import AgentSidebar from "@/components/agent/AgentSidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Logo from "@/components/layout/Logo";
@@ -21,16 +21,27 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
   const [pageTitle, setPageTitle] = useState(defaultPageTitle);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Prevent auto-scrolling when component mounts
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [activeTab]); // Reset scroll position when tab changes
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
     setPageTitle(tabLabel);
+    
+    // Ensure scroll position is reset to top when tab changes
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
   };
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Removed TopNavBar */}
-
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar with fixed height and internal scroll */}
         <div className="w-64 border-r bg-white">
@@ -43,10 +54,21 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
         </div>
 
         {/* Main content with its own scroll */}
-        <div className="flex-1 overflow-auto">
+        <div 
+          ref={contentRef} 
+          className="flex-1 overflow-auto"
+        >
           {showPageTitle && (
-            <div className="p-6 pb-0 flex justify-between items-center">
-              <h1 className="text-3xl font-bold">{pageTitle}</h1>
+            <div 
+              className="p-6 pb-0 flex justify-between items-center"
+              style={{ 
+                backgroundImage: 'radial-gradient(#e0e0e0 1px, transparent 1px)', 
+                backgroundSize: '16px 16px',
+                backgroundPosition: '0 0',
+                backgroundColor: '#f9f9f9'
+              }}
+            >
+              <h1 className="text-3xl font-bold text-[#221F26]">{pageTitle}</h1>
               {headerActions && (
                 <div className="flex items-center space-x-2">
                   {headerActions}

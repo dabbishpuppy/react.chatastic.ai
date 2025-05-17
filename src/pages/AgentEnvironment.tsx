@@ -14,7 +14,11 @@ const AgentEnvironment: React.FC = () => {
   };
 
   const headerActions = (
-    <Button variant="outline" onClick={toggleSettings} className="flex items-center">
+    <Button 
+      variant="outline" 
+      onClick={toggleSettings} 
+      className="flex items-center bg-white"
+    >
       <Settings size={18} className="mr-2" />
       Agent Settings
     </Button>
