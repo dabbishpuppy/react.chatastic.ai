@@ -1,9 +1,8 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import PageTransition from "@/components/layout/PageTransition";
@@ -30,12 +29,6 @@ import AgentSettingsPage from "./pages/AgentSettingsPage";
 import CreateTeamPage from "./pages/CreateTeamPage";
 
 const queryClient = new QueryClient();
-
-// Redirect component that extracts the agentId from the URL
-const AgentRedirect = () => {
-  const { agentId } = useParams();
-  return <Navigate to={`/playground/${agentId}`} replace />;
-};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -71,44 +64,42 @@ const App = () => (
                 </PageTransition>
               </ProtectedRoute>
             } />
-            
-            {/* Playground Routes - Change from /agent/ to /playground/ */}
-            <Route path="/playground/:agentId" element={
+            <Route path="/agent/:agentId" element={
               <ProtectedRoute>
                 <PageTransition>
                   <AgentEnvironment />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/playground/:agentId/activity" element={
+            <Route path="/agent/:agentId/activity" element={
               <ProtectedRoute>
                 <PageTransition>
                   <ActivityPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/playground/:agentId/analytics" element={
+            <Route path="/agent/:agentId/analytics" element={
               <ProtectedRoute>
                 <PageTransition>
                   <AnalyticsPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/playground/:agentId/sources" element={
+            <Route path="/agent/:agentId/sources" element={
               <ProtectedRoute>
                 <PageTransition>
                   <SourcesPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/playground/:agentId/actions" element={
+            <Route path="/agent/:agentId/actions" element={
               <ProtectedRoute>
                 <PageTransition>
                   <ActionsPage />
                 </PageTransition>
               </ProtectedRoute>
             } />
-            <Route path="/playground/:agentId/integrations" element={
+            <Route path="/agent/:agentId/integrations" element={
               <ProtectedRoute>
                 <PageTransition>
                   <IntegrationsPage />
@@ -116,11 +107,8 @@ const App = () => (
               </ProtectedRoute>
             } />
             
-            {/* Maintain backward compatibility with old routes */}
-            <Route path="/agent/:agentId" element={<AgentRedirect />} />
-            
             {/* Agent Settings Routes - Using wildcard for nested routes */}
-            <Route path="/playground/:agentId/settings/*" element={
+            <Route path="/agent/:agentId/settings/*" element={
               <ProtectedRoute>
                 <PageTransition>
                   <AgentSettingsPage />

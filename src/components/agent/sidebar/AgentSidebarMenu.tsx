@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -14,6 +15,8 @@ import {
   Bell,
   Users,
   LineChart,
+  ChevronDown,
+  ChevronUp,
   LayoutDashboard
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
@@ -118,41 +121,40 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     // Call onTabChange first to ensure state is updated
     onTabChange(tabId, tabLabel);
     
-    // Then handle navigation with preventDefault to avoid auto-scrolling
+    // Then handle navigation
     if (tabId === "dashboard") {
       navigate(`/dashboard`, { replace: true });
       return;
     }
     
-    // Use the new /playground route pattern
+    // Use replace: true to prevent scroll restoration and history build-up
     if (tabId === "activity") {
-      navigate(`/playground/${agentId}/activity`, { replace: true });
+      navigate(`/agent/${agentId}/activity`, { replace: true });
     } else if (tabId === "playground") {
-      navigate(`/playground/${agentId}`, { replace: true });
+      navigate(`/agent/${agentId}`, { replace: true });
     } else if (tabId === "analytics") {
-      navigate(`/playground/${agentId}/analytics`, { replace: true });
+      navigate(`/agent/${agentId}/analytics`, { replace: true });
     } else if (tabId === "sources") {
-      navigate(`/playground/${agentId}/sources`, { replace: true });
+      navigate(`/agent/${agentId}/sources`, { replace: true });
     } else if (tabId === "actions") {
-      navigate(`/playground/${agentId}/actions`, { replace: true });
+      navigate(`/agent/${agentId}/actions`, { replace: true });
     } else if (tabId === "connect") {
-      navigate(`/playground/${agentId}/integrations`, { replace: true });
+      navigate(`/agent/${agentId}/integrations`, { replace: true });
     } else if (tabId === "settings") {
-      navigate(`/playground/${agentId}/settings`, { replace: true });
+      navigate(`/agent/${agentId}/settings`, { replace: true });
     }
-    
-    // Manual scroll reset handled in AgentPageLayout component
   };
 
   const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string) => {
     onTabChange(parentTabId, submenuId);
     
+    // Use replace: true to prevent history stack build-up
     if (submenuPath === "sources") {
-      navigate(`/playground/${agentId}/sources?tab=${submenuId}`, { replace: true });
+      navigate(`/agent/${agentId}/sources?tab=${submenuId}`, { replace: true });
     } else if (submenuPath === "integrations") {
-      navigate(`/playground/${agentId}/integrations?tab=${submenuId}`, { replace: true });
+      navigate(`/agent/${agentId}/integrations?tab=${submenuId}`, { replace: true });
     } else {
-      navigate(`/playground/${agentId}/${submenuPath}`, { replace: true });
+      navigate(`/agent/${agentId}/${submenuPath}`, { replace: true });
     }
     
     // Keep the dropdown open

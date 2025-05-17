@@ -16,13 +16,6 @@ const SidebarSubmenuItem = ({
   isActive,
   onClick
 }: SidebarSubmenuItemProps) => {
-  const handleClick = (e: React.MouseEvent) => {
-    // Stop propagation to prevent bubbling up to parent menu items
-    e.stopPropagation();
-    e.preventDefault();
-    onClick();
-  };
-  
   return (
     <button
       key={id}
@@ -31,7 +24,7 @@ const SidebarSubmenuItem = ({
           ? "bg-gray-100 font-medium"
           : "text-gray-600 hover:bg-gray-50"
       }`}
-      onClick={handleClick}
+      onClick={onClick}
     >
       <span className="mr-2 text-gray-500">{icon}</span>
       {label}

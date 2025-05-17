@@ -11,36 +11,27 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [displayContent, setDisplayContent] = useState(children);
-
-  // Get state from location
-  const fromAgentAction = location.state?.fromAgentCreation || 
-                          location.state?.fromAgentsList || 
-                          location.pathname.includes('/playground/');
+  const [prevPathname, setPrevPathname] = useState(location.pathname);
   
-  // Debug
-  console.log("PageTransition - location:", location.pathname);
-  console.log("PageTransition - state:", location.state);
-
   useEffect(() => {
-    // Skip loading state if coming from agent actions or directly to playground
-    if (fromAgentAction) {
-      console.log("Coming from agent action or playground, skipping loading animation");
+    // Only start loading for actual route path changes
+    if (location.pathname !== prevPathname) {
+      // Set loading state
+      setIsLoading(true);
+      setPrevPathname(location.pathname);
+      
+      // Immediately update content and reset loading after a minimal delay
+      const timeoutId = setTimeout(() => {
+        setDisplayContent(children);
+        setIsLoading(false);
+      }, 100); // Very short timeout to prevent perceived lag
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      // For same route updates or search param changes, just update the content immediately
       setDisplayContent(children);
-      setIsLoading(false);
-      return;
     }
-
-    // Only start loading when the location changes (genuine navigation)
-    setIsLoading(true);
-    
-    // Use a very short timeout to make transitions feel snappy
-    const timeoutId = setTimeout(() => {
-      setDisplayContent(children);
-      setIsLoading(false);
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, [location.key, children, fromAgentAction]);
+  }, [location.pathname, children, prevPathname]);
 
   // Show loading state when transitioning between pages
   if (isLoading) {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateAgentDialog from "./CreateAgentDialog";
@@ -28,7 +28,6 @@ const AgentsList = ({
   isExpanded,
   onToggleExpand
 }: AgentsListProps) => {
-  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -36,6 +35,7 @@ const AgentsList = ({
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Update local agents when props change
   useEffect(() => {
@@ -48,18 +48,6 @@ const AgentsList = ({
     toast({
       title: "Agent created",
       description: `${newAgent.name} has been created successfully.`
-    });
-  };
-
-  // Handle agent navigation - Using fixed navigation method
-  const handleAgentClick = (agentId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("Navigating to agent playground:", agentId);
-    
-    // Direct navigation to the playground route with state to prevent loading animation
-    navigate(`/playground/${agentId}`, { 
-      state: { fromAgentsList: true } 
     });
   };
 
@@ -92,6 +80,13 @@ const AgentsList = ({
     );
   };
 
+  // Navigate to agent's playground page directly
+  const handleAgentClick = (agentId: string) => {
+    console.log(`Navigating to agent: ${agentId}`);
+    // Simple navigation without replace - fixes the issue with transitions
+    navigate(`/agent/${agentId}`);
+  };
+
   // Make sure we have at least one valid team with an ID
   const validTeams = teams.filter(team => team && team.id);
   const canCreateAgent = validTeams.length > 0;
@@ -118,7 +113,7 @@ const AgentsList = ({
           <div 
             key={agent.id}
             className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
-            onClick={(e) => handleAgentClick(agent.id, e)}
+            onClick={() => handleAgentClick(agent.id.toString())}
           >
             <div className="flex items-center text-[0.875rem] flex-1">
               <div 

@@ -23,13 +23,6 @@ const SidebarMenuItem = ({
   onClick,
   children
 }: SidebarMenuItemProps) => {
-  const handleClick = (e: React.MouseEvent) => {
-    // Stop propagation to prevent multiple navigation events
-    e.stopPropagation();
-    e.preventDefault();
-    onClick();
-  };
-
   return (
     <div key={id} className="mb-1">
       <button
@@ -38,7 +31,7 @@ const SidebarMenuItem = ({
             ? "bg-gray-100 font-medium"
             : "text-gray-700 hover:bg-gray-50"
         }`}
-        onClick={handleClick}
+        onClick={onClick}
       >
         <div className="flex items-center">
           <span className="mr-3 text-gray-500">{icon}</span>

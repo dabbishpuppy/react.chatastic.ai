@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,12 +25,10 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
   const [selectedAgent, setSelectedAgent] = useState<string>("Agents");
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const location = useLocation();
-  const navigate = useNavigate();
   
-  // Check if we're on a playground page and extract the ID
+  // Check if we're on an agent page and extract the ID
   React.useEffect(() => {
-    // Match both /agent/:id and /playground/:id paths for backward compatibility
-    const match = location.pathname.match(/\/(?:agent|playground)\/([^\/]+)/);
+    const match = location.pathname.match(/\/agent\/(\d+)/);
     if (match) {
       const agentId = match[1];
       const agent = agents.find(a => a.id.toString() === agentId);
@@ -43,14 +41,8 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
     }
   }, [location.pathname, agents]);
 
-  const handleAgentSelect = (agent: { id: string | number, name: string }) => {
-    setSelectedAgent(agent.name);
-    setCurrentAgentId(agent.id.toString());
-    
-    // Navigate directly to the playground route
-    navigate(`/playground/${agent.id}`, { 
-      state: { fromAgentsList: true } 
-    });
+  const handleAgentSelect = (agentName: string) => {
+    setSelectedAgent(agentName);
   };
 
   return (
@@ -64,21 +56,28 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive, agents = [] }
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 bg-white">
         {agents.map(agent => (
-          <DropdownMenuItem key={agent.id} onClick={() => handleAgentSelect(agent)} className="flex items-center justify-between text-[0.875rem] w-full">
-            <div className="flex items-center gap-2">
-              {agent.color && (
-                <div className={`w-4 h-4 ${agent.color} rounded-sm flex-shrink-0`}></div>
+          <DropdownMenuItem key={agent.id} asChild>
+            <Link 
+              to={`/agent/${agent.id}`}
+              onClick={() => handleAgentSelect(agent.name)}
+              className="flex items-center justify-between text-[0.875rem] w-full"
+            >
+              <div className="flex items-center gap-2">
+                {agent.color && (
+                  <div className={`w-4 h-4 ${agent.color} rounded-sm flex-shrink-0`}></div>
+                )}
+                <span>{agent.name}</span>
+              </div>
+              {currentAgentId === agent.id.toString() && (
+                <CircleCheck size={16} className="text-green-500" />
               )}
-              <span>{agent.name}</span>
-            </div>
-            {currentAgentId === agent.id.toString() && (
-              <CircleCheck size={16} className="text-green-500" />
-            )}
+            </Link>
           </DropdownMenuItem>
         ))}
         <DropdownMenuItem asChild className="border-t mt-1 pt-1">
           <Link 
             to="/dashboard" 
+            onClick={() => handleAgentSelect("Agents")}
             className="w-full"
           >
             <Button variant="outline" className="w-full bg-white text-primary border border-input flex items-center gap-1">

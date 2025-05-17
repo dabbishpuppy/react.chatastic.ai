@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -142,7 +143,6 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
           description: error.message,
           variant: "destructive",
         });
-        setIsSubmitting(false);
         return;
       }
       
@@ -153,7 +153,6 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
           description: "Failed to create agent. Please try again.",
           variant: "destructive",
         });
-        setIsSubmitting(false);
         return;
       }
       
@@ -172,32 +171,30 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         teamId: selectedTeam.id,
       };
 
-      // Close dialog first to prevent unnecessary re-renders
+      // Close dialog first
       onOpenChange(false);
       
       // Show processing toast
       setIsProcessing(true);
       
-      // Call onAgentCreated immediately to update UI
-      onAgentCreated(newAgent);
+      // Add a small delay before calling onAgentCreated for a smoother transition
+      setTimeout(() => {
+        onAgentCreated(newAgent);
+        
+        toast({
+          title: "Agent created",
+          description: `${values.name} has been created successfully!`,
+        });
+        
+        form.reset();
+        
+        // Redirect to the sources page for the new agent after a short delay
+        setTimeout(() => {
+          navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+          setIsProcessing(false);
+        }, 500);
+      }, 500);
       
-      toast({
-        title: "Agent created",
-        description: `${values.name} has been created successfully!`,
-      });
-      
-      form.reset();
-      
-      // Navigate directly without setTimeout
-      // This prevents multiple page loads
-      navigate(`/playground/${newAgent.id}/sources?tab=text`, { 
-        replace: true,
-        state: { fromAgentCreation: true } 
-      });
-      
-      // Reset processing state after navigation
-      setIsSubmitting(false);
-      setIsProcessing(false);
     } catch (error: any) {
       console.error("Exception creating agent:", error);
       toast({
@@ -206,7 +203,6 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
         variant: "destructive",
       });
       setIsSubmitting(false);
-      setIsProcessing(false);
     }
   };
 
