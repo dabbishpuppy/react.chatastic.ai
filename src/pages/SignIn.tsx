@@ -13,7 +13,7 @@ import {
   FormItem,
   FormMessage,
 } from "@/components/ui/form";
-import { Eye, EyeOff, Google } from "lucide-react";
+import { Eye, EyeOff, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
@@ -176,7 +176,7 @@ const SignIn = () => {
                 });
               }}
             >
-              <Google size={18} />
+              <Mail size={18} />
               <span>Google</span>
             </Button>
             
