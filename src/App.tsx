@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,7 +21,7 @@ import ApiKeys from "./pages/settings/ApiKeys";
 import UsageSettings from "./pages/settings/Usage";
 import AgentEnvironment from "./pages/AgentEnvironment";
 import UsagePage from "./pages/Usage";
-import ActivityPage from "./pages/ActivityPage";
+import ActivityPage from "./pages/Activity";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
@@ -57,6 +58,16 @@ const App = () => (
                 </PageTransition>
               </ProtectedRoute>
             } />
+            
+            {/* Team-specific dashboard route */}
+            <Route path="/dashboard/:teamName" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Dashboard />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            
             <Route path="/usage" element={
               <ProtectedRoute>
                 <PageTransition>

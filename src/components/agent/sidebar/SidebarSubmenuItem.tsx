@@ -24,7 +24,10 @@ const SidebarSubmenuItem = ({
           ? "bg-gray-100 font-medium"
           : "text-gray-600 hover:bg-gray-50"
       }`}
-      onClick={(e) => onClick(e)}
+      onClick={(e) => {
+        e.stopPropagation(); // Stop event bubbling to parent
+        onClick(e);
+      }}
     >
       <span className="mr-2 text-gray-500">{icon}</span>
       {label}
