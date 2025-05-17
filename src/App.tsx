@@ -21,7 +21,7 @@ import ApiKeys from "./pages/settings/ApiKeys";
 import UsageSettings from "./pages/settings/Usage";
 import AgentEnvironment from "./pages/AgentEnvironment";
 import UsagePage from "./pages/Usage";
-import ActivityPage from "./pages/Activity";
+import ActivityPage from "./pages/ActivityPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
