@@ -58,16 +58,6 @@ const App = () => (
                 </PageTransition>
               </ProtectedRoute>
             } />
-            
-            {/* Team-specific dashboard route */}
-            <Route path="/dashboard/:teamName" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Dashboard />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            
             <Route path="/usage" element={
               <ProtectedRoute>
                 <PageTransition>

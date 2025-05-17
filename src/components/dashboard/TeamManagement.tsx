@@ -1,6 +1,4 @@
-
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { Team } from "@/hooks/useTeamsAndAgents";
@@ -20,7 +18,6 @@ export const useTeamManagement = ({
   setSelectedTeam
 }: TeamManagementProps) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const handleTeamSelect = (team: Team) => {
     setSelectedTeam(team);
@@ -32,10 +29,6 @@ export const useTeamManagement = ({
         isActive: t.id === team.id
       }))
     );
-    
-    // Navigate to the team-specific URL
-    const teamNameForUrl = encodeURIComponent(team.name.toLowerCase().replace(/\s+/g, '-'));
-    navigate(`/dashboard/${teamNameForUrl}`);
   };
 
   const handleTeamCreated = async (newTeam: any) => {
@@ -77,10 +70,6 @@ export const useTeamManagement = ({
         title: "Team created",
         description: `${newTeam.name} team has been created successfully!`,
       });
-      
-      // Navigate to the team-specific URL
-      const teamNameForUrl = encodeURIComponent(newTeam.name.toLowerCase().replace(/\s+/g, '-'));
-      navigate(`/dashboard/${teamNameForUrl}`);
     } catch (error: any) {
       console.error("Error handling team creation:", error);
       toast({
@@ -111,10 +100,6 @@ export const useTeamManagement = ({
       
       if (selectedTeam?.id === updatedTeam.id) {
         setSelectedTeam(prev => prev ? { ...prev, name: updatedTeam.name } : null);
-        
-        // Navigate to updated team URL if this is the selected team
-        const teamNameForUrl = encodeURIComponent(updatedTeam.name.toLowerCase().replace(/\s+/g, '-'));
-        navigate(`/dashboard/${teamNameForUrl}`);
       }
       
       toast({
@@ -156,13 +141,8 @@ export const useTeamManagement = ({
               isActive: index === 0
             }))
           );
-          
-          // Navigate to the new selected team's URL
-          const teamNameForUrl = encodeURIComponent(updatedTeams[0].name.toLowerCase().replace(/\s+/g, '-'));
-          navigate(`/dashboard/${teamNameForUrl}`);
         } else {
           setSelectedTeam(null);
-          navigate('/dashboard');
         }
       }
       

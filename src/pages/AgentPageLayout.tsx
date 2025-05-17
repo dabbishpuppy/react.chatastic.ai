@@ -23,20 +23,14 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
   const [pageTitle, setPageTitle] = useState(defaultPageTitle);
   const contentRef = useRef<HTMLDivElement>(null);
-  const { agentId } = useParams();
 
-  // Reset active tab and page title when agent changes
+  // Prevent auto-scrolling when component mounts
   useEffect(() => {
-    setActiveTab(defaultActiveTab);
-    setPageTitle(defaultPageTitle);
-    
-    // Reset scroll position
     if (contentRef.current) {
       contentRef.current.scrollTop = 0;
     }
-  }, [agentId, defaultActiveTab, defaultPageTitle]);
+  }, [activeTab]); // Reset scroll position when tab changes
 
-  // Handle tab changes
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
     setPageTitle(tabLabel);

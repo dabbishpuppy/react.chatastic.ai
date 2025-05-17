@@ -9,7 +9,7 @@ interface SidebarMenuItemProps {
   isActive: boolean;
   hasSubmenu?: boolean;
   isExpanded?: boolean;
-  onClick: (event?: React.MouseEvent) => void;
+  onClick: () => void;
   children?: React.ReactNode;
 }
 
@@ -31,7 +31,7 @@ const SidebarMenuItem = ({
             ? "bg-gray-100 font-medium"
             : "text-gray-700 hover:bg-gray-50"
         }`}
-        onClick={(e) => onClick(e)}
+        onClick={onClick}
       >
         <div className="flex items-center">
           <span className="mr-3 text-gray-500">{icon}</span>
