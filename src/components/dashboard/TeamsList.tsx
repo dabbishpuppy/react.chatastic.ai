@@ -136,11 +136,14 @@ const TeamsList = ({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => openEditDialog(team, e as React.MouseEvent)}>
+                <DropdownMenuItem 
+                  className="text-[0.875rem]" 
+                  onClick={(e) => openEditDialog(team, e as React.MouseEvent)}
+                >
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  className="text-destructive focus:text-destructive" 
+                  className="text-destructive focus:text-destructive text-[0.875rem]" 
                   onClick={(e) => openDeleteDialog(team, e as React.MouseEvent)}
                 >
                   Delete
