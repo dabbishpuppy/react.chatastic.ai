@@ -28,7 +28,7 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">{team.name} Dashboard</h2>
+          <h1 className="text-[1.875rem] font-bold tracking-tight">{team.name} Dashboard</h1>
           <p className="text-muted-foreground">
             Overview and performance metrics for your team.
           </p>
