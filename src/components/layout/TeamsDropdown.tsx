@@ -11,26 +11,26 @@ import { ChevronDown, Users, CircleCheck } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
-const TeamsDropdown: React.FC = () => {
-  // Sample teams data
-  const teams = [
-    {
-      id: "1",
-      name: "Wonderwave",
-      active: true,
-    },
-    {
-      id: "2",
-      name: "Analytics Team",
-      active: false,
-    },
-    {
-      id: "3",
-      name: "Support Team",
-      active: false,
-    }
-  ];
+// Same teams data as in Dashboard
+const teams = [
+  {
+    id: "1",
+    name: "Wonderwave",
+    active: true,
+  },
+  {
+    id: "2",
+    name: "Analytics Team",
+    active: false,
+  },
+  {
+    id: "3",
+    name: "Support Team",
+    active: false,
+  }
+];
 
+const TeamsDropdown: React.FC = () => {
   const defaultTeam = teams.find(t => t.active) || teams[0];
   const [selectedTeam, setSelectedTeam] = useState<string>(defaultTeam.name);
   const location = useLocation();

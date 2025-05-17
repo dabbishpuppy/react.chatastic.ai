@@ -14,9 +14,9 @@ interface AgentsDropdownProps {
   isActive: boolean;
 }
 
-const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
-  // Sample agents data to match the sidebar
-  const agents = [
+// This should match the structure in Dashboard.tsx for consistency
+const agentsByTeam = {
+  "1": [  // Wonderwave team
     {
       id: "1",
       name: "Wonder AI",
@@ -25,6 +25,8 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
       id: "2",
       name: "Agora AI",
     },
+  ],
+  "2": [  // Analytics team
     {
       id: "3",
       name: "PristineBag AI",
@@ -33,12 +35,22 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
       id: "4",
       name: "AI Kundeservice",
     },
+  ],
+  "3": [  // Support team
     {
       id: "5",
       name: "theballooncompany.com",
     }
-  ];
+  ]
+};
 
+// Default team is Wonderwave (id: 1)
+const defaultTeamId = "1";
+
+const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
+  // Combine all agents for the dropdown
+  const allAgents = Object.values(agentsByTeam).flat();
+  
   const [selectedAgent, setSelectedAgent] = useState<string>("Agents");
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const location = useLocation();
@@ -48,7 +60,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
     const match = location.pathname.match(/\/agent\/(\d+)/);
     if (match) {
       const agentId = match[1];
-      const agent = agents.find(a => a.id === agentId);
+      const agent = allAgents.find(a => a.id === agentId);
       if (agent) {
         setSelectedAgent(agent.name);
         setCurrentAgentId(agentId);
@@ -72,7 +84,7 @@ const AgentsDropdown: React.FC<AgentsDropdownProps> = ({ isActive }) => {
         <ChevronDown size={14} />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
-        {agents.map(agent => (
+        {allAgents.map(agent => (
           <DropdownMenuItem key={agent.id} asChild>
             <Link 
               to={`/agent/${agent.id}`}
