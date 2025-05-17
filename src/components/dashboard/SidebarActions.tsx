@@ -1,78 +1,52 @@
 
 import React from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Cog, HelpCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
 const SidebarActions = () => {
+  const { signOut } = useAuth();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
   
-  const handleUpgradeClick = () => {
-    navigate("/settings/plans");
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out from your account."
+      });
+      navigate('/signin');
+    } catch (error: any) {
+      toast({
+        title: "Sign out failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleMyAccountClick = () => {
-    navigate("/settings/general");
-  };
-
-  const handleLogoutClick = async () => {
-    await signOut();
-    // Navigation is handled by the auth context
-  };
-  
   return (
-    <div className="border-t p-4 space-y-4">
-      {/* User info */}
-      {user && (
-        <div className="bg-gray-50 rounded-md p-3">
-          <div className="text-sm font-medium text-gray-800">
-            {user.email}
-          </div>
-        </div>
-      )}
-      
-      {/* Usage Credits */}
-      <div className="bg-gray-50 rounded-md p-3">
-        <div className="text-sm font-medium text-gray-800">Usage Credits</div>
-        <div className="flex justify-between items-center mt-1">
-          <div className="text-xs text-gray-500">Free Plan</div>
-          <div className="text-xs font-medium text-purple-600">5 left</div>
-        </div>
-        <div className="text-xs text-gray-500 mt-0.5">0 of 5 used</div>
-      </div>
-      
-      {/* Upgrade button */}
-      <Button 
-        onClick={handleUpgradeClick}
-        className="w-full flex items-center justify-center"
-        size="sm"
-      >
-        <DollarSign size={16} className="mr-1" />
-        Upgrade
-      </Button>
-      
-      {/* My Account and Logout */}
-      <div className="space-y-2">
+    <div className="p-4 border-t border-gray-200">
+      <div className="flex items-center justify-between mb-4">
+        <Link to="/settings">
+          <Button variant="ghost" className="h-8 w-8 p-0" title="Settings">
+            <Cog size={20} />
+          </Button>
+        </Link>
+        <Link to="/help">
+          <Button variant="ghost" className="h-8 w-8 p-0" title="Help & Support">
+            <HelpCircle size={20} />
+          </Button>
+        </Link>
         <Button 
           variant="ghost" 
-          className="w-full flex items-center justify-start text-gray-700"
-          size="sm"
-          onClick={handleMyAccountClick}
+          className="h-8 w-8 p-0" 
+          title="Sign Out"
+          onClick={handleSignOut}
         >
-          <User size={16} className="mr-2" />
-          My Account
-        </Button>
-        
-        <Button 
-          variant="ghost" 
-          className="w-full flex items-center justify-start text-gray-700"
-          size="sm"
-          onClick={handleLogoutClick}
-        >
-          <LogOut size={16} className="mr-2" />
-          Logout
+          <LogOut size={20} />
         </Button>
       </div>
     </div>

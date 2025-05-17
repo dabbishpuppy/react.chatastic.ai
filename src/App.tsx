@@ -110,6 +110,10 @@ const App = () => (
               <Route path="api-keys" element={<ApiKeys />} />
               <Route path="usage" element={<UsageSettings />} />
             </Route>
+
+            {/* Redirect /signout to /signin and handle the logout logic in the component */}
+            <Route path="/signout" element={<Navigate to="/signin" replace />} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

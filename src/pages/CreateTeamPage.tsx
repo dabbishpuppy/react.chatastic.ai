@@ -1,119 +1,97 @@
 
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-
-const teamSchema = z.object({
-  name: z.string().min(1, { message: "Team name is required" }),
-});
-
-type TeamFormValues = z.infer<typeof teamSchema>;
+import { useAuth } from "@/contexts/AuthContext";
+import CreateTeamDialog from "@/components/dashboard/CreateTeamDialog";
+import { toast } from "@/hooks/use-toast";
+import Logo from "@/components/layout/Logo";
 
 const CreateTeamPage = () => {
+  const [isDialogOpen, setIsDialogOpen] = useState(true);
   const { user } = useAuth();
   const navigate = useNavigate();
-  
-  const form = useForm<TeamFormValues>({
-    resolver: zodResolver(teamSchema),
-    defaultValues: {
-      name: "",
-    },
-  });
-  
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const onSubmit = async (values: TeamFormValues) => {
-    if (!user) {
-      toast({
-        title: "Authentication error",
-        description: "Please sign in to create a team",
-        variant: "destructive",
-      });
-      navigate("/signin");
-      return;
-    }
-    
+  // Check if user already has teams, if yes redirect to dashboard
+  useEffect(() => {
+    const checkForTeams = async () => {
+      if (!user) return;
+
+      try {
+        const { data: teams } = await supabase
+          .from('teams')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+
+        if (teams && teams.length > 0) {
+          // User already has teams, redirect to dashboard
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        console.error("Error checking for existing teams:", error);
+      }
+    };
+
+    checkForTeams();
+  }, [user, navigate]);
+
+  const handleTeamCreated = async (team: any) => {
+    if (!user) return;
+
     try {
-      setIsSubmitting(true);
-      
-      // Insert the new team into the database
+      // Insert the team in Supabase
       const { data, error } = await supabase
         .from('teams')
-        .insert([
-          { 
-            name: values.name, 
-            user_id: user.id 
-          }
-        ])
-        .select('id')
+        .insert([{
+          name: team.name,
+          user_id: user.id,
+          total_conversations: 0,
+          avg_response_time: "0.0s",
+          usage_percent: 0,
+          api_calls: 0,
+          satisfaction: 0
+        }])
+        .select('*')
         .single();
-      
+
       if (error) throw error;
-      
+
       toast({
         title: "Team created successfully",
-        description: "Now let's create your first AI agent",
+        description: `${team.name} team has been created!`
       });
-      
-      navigate("/dashboard");
+
+      // Redirect to dashboard after team creation
+      navigate('/dashboard');
     } catch (error: any) {
-      console.error("Error creating team:", error);
       toast({
         title: "Failed to create team",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
-  
+
+  const handleCloseDialog = () => {
+    // If user closes dialog without creating a team, redirect to dashboard
+    setIsDialogOpen(false);
+    navigate('/dashboard');
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold">Create Your Team</CardTitle>
-          <CardDescription>
-            Set up your first team to organize your AI agents
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Team Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter team name..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Creating team..." : "Create Team"}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+      <div className="text-center mb-8">
+        <Logo size="lg" />
+        <h1 className="mt-6 text-3xl font-bold">Welcome to Wonderwave!</h1>
+        <p className="mt-2 text-gray-600">Let's get started by creating your first team.</p>
+      </div>
+
+      <CreateTeamDialog
+        open={isDialogOpen}
+        onOpenChange={handleCloseDialog}
+        onTeamCreated={handleTeamCreated}
+      />
     </div>
   );
 };
