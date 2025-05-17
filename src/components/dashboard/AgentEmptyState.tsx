@@ -13,6 +13,14 @@ interface AgentEmptyStateProps {
 const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAgent }) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
+  // Get the current team for the dialog
+  const mockTeam = {
+    id: '',
+    name: teamName || '',
+    isActive: true,
+    agents: []
+  };
+
   return (
     <div className="flex items-center justify-center min-h-[80vh]">
       <Card className="max-w-md w-full">
@@ -44,7 +52,7 @@ const AgentEmptyState: React.FC<AgentEmptyStateProps> = ({ teamName, onCreateAge
       <CreateAgentDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
-        teams={[]} // This will be populated by the parent component
+        teams={mockTeam ? [mockTeam] : []} 
         onAgentCreated={onCreateAgent}
       />
     </div>

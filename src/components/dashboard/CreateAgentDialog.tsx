@@ -23,6 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 // Define the form schema - removed teamId requirement
 const formSchema = z.object({
@@ -87,37 +88,74 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     },
   });
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
+    if (!selectedTeam) {
+      toast({
+        title: "Error",
+        description: "No team selected. Please create or select a team first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Auto-assign a color from the palette (round robin based on team's existing agents)
     const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
     const colorIndex = teamAgentsCount % agentColorPalette.length;
     const autoAssignedColor = agentColorPalette[colorIndex];
     
-    // Create a new agent with the form values
-    const newAgent = {
-      id: Date.now(), // Use timestamp as a simple ID for now
-      name: values.name,
-      image: "/placeholder.svg",
-      color: autoAssignedColor,
-      status: "active" as const,
-      metrics: {
-        conversations: 0,
-        responseTime: "0.0s",
-        satisfaction: 0,
-      },
-      teamId: selectedTeam.id,
-    };
+    try {
+      // Insert the new agent into Supabase
+      const { data, error } = await supabase
+        .from('agents')
+        .insert([
+          {
+            name: values.name,
+            team_id: selectedTeam.id,
+            color: autoAssignedColor,
+            image: "/placeholder.svg",
+            status: "active",
+            conversations: 0,
+            response_time: "0.0s",
+            satisfaction: 0
+          }
+        ])
+        .select('*')
+        .single();
+      
+      if (error) throw error;
+      
+      // Create a new agent with the form values and returned data
+      const newAgent = {
+        id: data.id,
+        name: data.name,
+        image: data.image,
+        color: data.color,
+        status: "active" as const,
+        metrics: {
+          conversations: 0,
+          responseTime: "0.0s",
+          satisfaction: 0,
+        },
+        teamId: selectedTeam.id,
+      };
 
-    onAgentCreated(newAgent);
-    toast({
-      title: "Agent created",
-      description: `${values.name} has been created successfully!`,
-    });
-    form.reset();
-    onOpenChange(false);
-    
-    // Redirect to the sources page for the new agent
-    navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+      onAgentCreated(newAgent);
+      toast({
+        title: "Agent created",
+        description: `${values.name} has been created successfully!`,
+      });
+      form.reset();
+      onOpenChange(false);
+      
+      // Redirect to the sources page for the new agent
+      navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+    } catch (error: any) {
+      toast({
+        title: "Error creating agent",
+        description: error.message || "Failed to create agent. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
