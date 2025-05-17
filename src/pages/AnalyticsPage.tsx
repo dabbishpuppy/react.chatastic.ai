@@ -5,7 +5,7 @@ import AnalyticsTab from "@/components/analytics/AnalyticsTab";
 
 const AnalyticsPage: React.FC = () => {
   return (
-    <AgentPageLayout defaultActiveTab="analytics" defaultPageTitle="Analytics">
+    <AgentPageLayout defaultActiveTab="analytics" defaultPageTitle="Analytics" showPageTitle={false}>
       <div className="overflow-hidden">
         <AnalyticsTab />
       </div>

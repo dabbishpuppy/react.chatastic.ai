@@ -58,7 +58,7 @@ const AgentSettingsPage: React.FC = () => {
   };
 
   return (
-    <AgentPageLayout defaultActiveTab="" defaultPageTitle="Settings">
+    <AgentPageLayout defaultActiveTab="" defaultPageTitle="Settings" showPageTitle={false}>
       <div className="flex flex-col p-8 bg-[#f5f5f5] overflow-hidden w-full min-h-screen">
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
         {/* Horizontal Tabs */}

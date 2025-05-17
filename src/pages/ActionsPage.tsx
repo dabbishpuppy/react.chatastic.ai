@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 
 const ActionsPage: React.FC = () => {
   return (
-    <AgentPageLayout defaultActiveTab="actions" defaultPageTitle="Actions">
+    <AgentPageLayout defaultActiveTab="actions" defaultPageTitle="Actions" showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <h1 className="text-3xl font-bold mb-6">Actions</h1>
         <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-lg">

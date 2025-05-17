@@ -12,7 +12,7 @@ const IntegrationsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState("embed");
 
   return (
-    <AgentPageLayout defaultActiveTab="integrations" defaultPageTitle="Integrations">
+    <AgentPageLayout defaultActiveTab="integrations" defaultPageTitle="Integrations" showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <h1 className="text-3xl font-bold mb-6">Integrations</h1>
         <div className="bg-white rounded-lg p-6">
