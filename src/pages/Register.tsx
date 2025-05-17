@@ -19,33 +19,39 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-const loginSchema = z.object({
+const registerSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
-  password: z.string().min(1, { message: "Password is required" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+  confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters" }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const SignIn = () => {
-  const { signIn } = useAuth();
+const Register = () => {
+  const { signUp } = useAuth();
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: "",
     },
   });
-
-  const onSubmit = async (values: LoginFormValues) => {
+  
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  
+  const onSubmit = async (values: RegisterFormValues) => {
     try {
       setIsSubmitting(true);
-      await signIn(values.email, values.password);
-      // Navigation handled by AuthContext
+      await signUp(values.email, values.password);
+      // Instead of redirecting, we'll show a message to check email
+      // Navigation happens after email verification in AuthContext
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Registration error:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -55,9 +61,9 @@ const SignIn = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold">Sign In</CardTitle>
+          <CardTitle className="text-3xl font-bold">Create an account</CardTitle>
           <CardDescription>
-            Enter your email and password to sign in to your account
+            Enter your email to create your account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -91,8 +97,26 @@ const SignIn = () => {
                 )}
               />
               
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Signing in..." : "Sign In"}
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      <PasswordInput id="confirmPassword" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Creating account..." : "Create account"}
               </Button>
             </form>
           </Form>
@@ -125,9 +149,9 @@ const SignIn = () => {
         </CardContent>
         <CardFooter className="text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link to="/register" className="text-blue-500 hover:underline">
-              Sign Up
+            Already have an account?{" "}
+            <Link to="/signin" className="text-blue-500 hover:underline">
+              Sign In
             </Link>
           </p>
         </CardFooter>
@@ -136,4 +160,4 @@ const SignIn = () => {
   );
 };
 
-export default SignIn;
+export default Register;

@@ -3,9 +3,11 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { DollarSign, User, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SidebarActions = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   
   const handleUpgradeClick = () => {
     navigate("/settings/plans");
@@ -15,12 +17,22 @@ const SidebarActions = () => {
     navigate("/settings/general");
   };
 
-  const handleLogoutClick = () => {
-    navigate("/signout");
+  const handleLogoutClick = async () => {
+    await signOut();
+    // Navigation is handled by the auth context
   };
   
   return (
     <div className="border-t p-4 space-y-4">
+      {/* User info */}
+      {user && (
+        <div className="bg-gray-50 rounded-md p-3">
+          <div className="text-sm font-medium text-gray-800">
+            {user.email}
+          </div>
+        </div>
+      )}
+      
       {/* Usage Credits */}
       <div className="bg-gray-50 rounded-md p-3">
         <div className="text-sm font-medium text-gray-800">Usage Credits</div>
