@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, ChevronDown, ChevronUp, Plus, MoreHorizontal } from "lucide-react";
+import { Users, ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateTeamDialog from "./CreateTeamDialog";
 import EditTeamDialog from "./EditTeamDialog";
@@ -140,12 +140,14 @@ const TeamsList = ({
                   className="text-[0.875rem]" 
                   onClick={(e) => openEditDialog(team, e as React.MouseEvent)}
                 >
+                  <Edit size={16} className="mr-2" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className="text-destructive focus:text-destructive text-[0.875rem]" 
                   onClick={(e) => openDeleteDialog(team, e as React.MouseEvent)}
                 >
+                  <Trash2 size={16} className="mr-2" />
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
