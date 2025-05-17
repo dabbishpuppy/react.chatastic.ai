@@ -11,28 +11,20 @@ import { ChevronDown, Users, CircleCheck, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
-// Same teams data as in Dashboard
-const teams = [
-  {
-    id: "1",
-    name: "Wonderwave",
-    active: true,
-  },
-  {
-    id: "2",
-    name: "Analytics Team",
-    active: false,
-  },
-  {
-    id: "3",
-    name: "Support Team",
-    active: false,
-  }
-];
+// Remove the static teams data and make the component accept teams as props
+interface TeamsDropdownProps {
+  teams: Array<{
+    id: string;
+    name: string;
+    active?: boolean;
+    isActive?: boolean;
+  }>;
+}
 
-const TeamsDropdown: React.FC = () => {
-  const defaultTeam = teams.find(t => t.active) || teams[0];
-  const [selectedTeam, setSelectedTeam] = useState<string>(defaultTeam.name);
+const TeamsDropdown: React.FC<TeamsDropdownProps> = ({ teams }) => {
+  // Find active team, adjusting for either isActive or active property
+  const defaultTeam = teams.find(t => t.active || t.isActive) || teams[0];
+  const [selectedTeam, setSelectedTeam] = useState<string>(defaultTeam?.name || "Teams");
   const location = useLocation();
   
   // Check if we're on a team page and extract the ID
@@ -47,9 +39,9 @@ const TeamsDropdown: React.FC = () => {
     } else if (location.pathname.includes('/agent/')) {
       // If we're on an agent page and no team is explicitly selected,
       // default to the active team or first team
-      setSelectedTeam(defaultTeam.name);
+      setSelectedTeam(defaultTeam?.name || "Teams");
     }
-  }, [location.pathname]);
+  }, [location.pathname, teams, defaultTeam]);
 
   const handleTeamSelect = (teamName: string) => {
     setSelectedTeam(teamName);
@@ -68,7 +60,7 @@ const TeamsDropdown: React.FC = () => {
         {selectedTeam}
         <ChevronDown size={14} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
+      <DropdownMenuContent className="w-56 bg-white">
         {teams.map(team => (
           <DropdownMenuItem key={team.id} asChild>
             <Link 
@@ -77,7 +69,7 @@ const TeamsDropdown: React.FC = () => {
               className="flex items-center justify-between text-[0.875rem]"
             >
               {team.name}
-              {team.active && <CircleCheck size={16} className="text-green-500" />}
+              {(team.active || team.isActive) && <CircleCheck size={16} className="text-green-500" />}
             </Link>
           </DropdownMenuItem>
         ))}

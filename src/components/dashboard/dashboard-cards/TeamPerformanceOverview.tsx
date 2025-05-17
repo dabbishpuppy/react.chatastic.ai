@@ -1,7 +1,7 @@
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Clock, BarChart2, Activity } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { BadgeCheck, MessageSquare, Clock, ZapIcon, ThumbsUp } from "lucide-react";
 
 interface TeamPerformanceOverviewProps {
   metrics: {
@@ -14,59 +14,54 @@ interface TeamPerformanceOverviewProps {
 }
 
 const TeamPerformanceOverview: React.FC<TeamPerformanceOverviewProps> = ({ metrics }) => {
-  const cards = [
+  const items = [
     {
-      title: "Total Conversations",
-      value: metrics.totalConversations.toLocaleString(),
-      description: "Conversations this month",
-      icon: <Users className="h-4 w-4 text-muted-foreground" />,
-      change: "+12%",
-      trend: "up"
+      title: "Conversations",
+      value: metrics.totalConversations,
+      icon: <MessageSquare className="h-4 w-4 text-muted-foreground" />,
+      description: "Total handled"
     },
     {
-      title: "Avg Response Time",
+      title: "Avg. Response",
       value: metrics.avgResponseTime,
-      description: "Response latency",
       icon: <Clock className="h-4 w-4 text-muted-foreground" />,
-      change: "-0.2s",
-      trend: "down"
+      description: "Response time"
+    },
+    {
+      title: "Usage",
+      value: `${metrics.usagePercent}%`,
+      icon: <ZapIcon className="h-4 w-4 text-muted-foreground" />,
+      description: "Of quota used"
     },
     {
       title: "Satisfaction",
       value: `${metrics.satisfaction}%`,
-      description: "User satisfaction",
-      icon: <Activity className="h-4 w-4 text-muted-foreground" />,
-      change: "+2%",
-      trend: "up"
+      icon: <ThumbsUp className="h-4 w-4 text-muted-foreground" />,
+      description: "User rating"
     },
-    {
-      title: "API Calls",
-      value: metrics.apiCalls.toLocaleString(),
-      description: "This month",
-      icon: <BarChart2 className="h-4 w-4 text-muted-foreground" />,
-      change: "+8%",
-      trend: "up"
-    }
   ];
 
   return (
     <>
-      {cards.map((card, i) => (
-        <Card key={i}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {card.title}
-            </CardTitle>
-            {card.icon}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{card.value}</div>
-            <p className="text-xs text-muted-foreground">{card.description}</p>
-            <div className="mt-2 flex items-center text-xs">
-              <span className={`mr-1 ${card.trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
-                {card.change}
-              </span>
-              <span className="text-muted-foreground">from last month</span>
+      {items.map((item) => (
+        <Card key={item.title} className="bg-white">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center space-x-2">
+                {item.icon}
+                <span className="text-sm font-medium">{item.title}</span>
+              </div>
+              {item.value === `${metrics.satisfaction}%` && metrics.satisfaction >= 90 && (
+                <BadgeCheck className="h-4 w-4 text-green-500" />
+              )}
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl font-bold">
+                {item.value}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {item.description}
+              </p>
             </div>
           </CardContent>
         </Card>

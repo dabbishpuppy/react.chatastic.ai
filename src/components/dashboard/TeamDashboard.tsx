@@ -41,8 +41,8 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Agent Status Summary */}
-        <Card className="col-span-2">
+        {/* Agent Status Summary - with white background */}
+        <Card className="col-span-2 bg-white">
           <CardHeader>
             <CardTitle>Agent Status</CardTitle>
             <CardDescription>
@@ -54,8 +54,8 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
           </CardContent>
         </Card>
         
-        {/* Recent Activity Feed */}
-        <Card>
+        {/* Recent Activity Feed - with white background */}
+        <Card className="bg-white">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>Latest activity from your agents</CardDescription>

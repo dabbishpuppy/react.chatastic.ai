@@ -6,6 +6,64 @@ import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
 
+// Import the teams data to pass to the dropdowns
+const teams = [
+  {
+    id: "1",
+    name: "Wonderwave",
+    isActive: true,
+  },
+  {
+    id: "2",
+    name: "Analytics Team",
+    isActive: false,
+  },
+  {
+    id: "3",
+    name: "Support Team",
+    isActive: false,
+  }
+];
+
+// Combine all agents for the dropdown
+const agents = [
+  {
+    id: 1,
+    name: "Wonder AI",
+    image: "/placeholder.svg",
+    color: "bg-violet-600",
+    status: "active",
+  },
+  {
+    id: 2,
+    name: "Agora AI",
+    image: "/placeholder.svg", 
+    color: "bg-amber-100",
+    status: "active",
+  },
+  {
+    id: 3,
+    name: "PristineBag AI",
+    image: "/placeholder.svg",
+    color: "bg-rose-400",
+    status: "inactive",
+  },
+  {
+    id: 4,
+    name: "AI Kundeservice",
+    image: "/placeholder.svg",
+    color: "bg-black",
+    status: "active",
+  },
+  {
+    id: 5,
+    name: "theballooncompany.com",
+    image: "/placeholder.svg",
+    color: "bg-white",
+    status: "active",
+  }
+];
+
 const TopNavBar = () => {
   const location = useLocation();
   const path = location.pathname;
@@ -21,7 +79,7 @@ const TopNavBar = () => {
   };
 
   return (
-    <header className="border-b border-gray-200">
+    <header className="border-b border-gray-200 bg-white">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-6">
           <Link to="/dashboard" className="text-2xl font-bold">
@@ -31,11 +89,11 @@ const TopNavBar = () => {
             </span>
           </Link>
           <div className="hidden md:flex ml-8 space-x-6">
-            {/* Teams Dropdown */}
-            <TeamsDropdown />
+            {/* Teams Dropdown - now with props */}
+            <TeamsDropdown teams={teams} />
             
-            {/* Agents Dropdown */}
-            <AgentsDropdown isActive={isActive('/dashboard')} />
+            {/* Agents Dropdown - now with props */}
+            <AgentsDropdown isActive={isActive('/dashboard')} agents={agents} />
           </div>
         </div>
         <div className="flex items-center space-x-4">
