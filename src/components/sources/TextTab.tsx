@@ -1,23 +1,18 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Bold, Italic, List, ListOrdered, Link2, Smile } from "lucide-react";
-
 const TextTab: React.FC = () => {
-  return (
-    <div className="space-y-6 mt-4">
+  return <div className="space-y-6 mt-4">
       <div>
-        <h2 className="text-2xl font-semibold">Text</h2>
+        <h2 className="text-2xl font-semibold">Add Text Snippet</h2>
       </div>
 
       <div className="space-y-4">
         <div>
-          <p className="mb-2 text-gray-600">
-            Add and process plain text-based sources to train your AI Agent with precise information.
-          </p>
+          
         </div>
 
         <div className="space-y-4">
@@ -25,11 +20,7 @@ const TextTab: React.FC = () => {
             <label htmlFor="text-title" className="block text-sm font-medium text-gray-700 mb-1">
               Title
             </label>
-            <Input 
-              id="text-title" 
-              placeholder="Ex: Refund requests" 
-              className="w-full"
-            />
+            <Input id="text-title" placeholder="Ex: Refund requests" className="w-full" />
           </div>
 
           <div>
@@ -59,11 +50,7 @@ const TextTab: React.FC = () => {
                   </Button>
                   <div className="ml-auto text-xs text-gray-400">0 B</div>
                 </div>
-                <Textarea 
-                  id="text-content" 
-                  placeholder="Enter your text" 
-                  className="border-0 focus-visible:ring-0 min-h-[200px]"
-                />
+                <Textarea id="text-content" placeholder="Enter your text" className="border-0 focus-visible:ring-0 min-h-[200px]" />
               </CardContent>
             </Card>
           </div>
@@ -75,8 +62,6 @@ const TextTab: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default TextTab;
