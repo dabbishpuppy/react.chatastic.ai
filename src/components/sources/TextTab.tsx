@@ -10,16 +10,12 @@ const TextTab: React.FC = () => {
   return (
     <div className="space-y-6 mt-4">
       <div>
-        <h2 className="text-2xl font-semibold">Text</h2>
+        <p className="mb-2 text-gray-600">
+          Add and process plain text-based sources to train your AI Agent with precise information.
+        </p>
       </div>
 
       <div className="space-y-4">
-        <div>
-          <p className="mb-2 text-gray-600">
-            Add and process plain text-based sources to train your AI Agent with precise information.
-          </p>
-        </div>
-
         <div className="space-y-4">
           <div>
             <label htmlFor="text-title" className="block text-sm font-medium text-gray-700 mb-1">
