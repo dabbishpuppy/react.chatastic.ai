@@ -5,18 +5,29 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Handle case when running in development without environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables are missing. Using default values for development.');
-  // This will allow the app to continue running in development
-  // In production, these variables should be properly set
+  console.warn('⚠️ Supabase environment variables are missing. Using default values for development.');
+  // This warning will help developers understand what's happening
 }
 
-// Create Supabase client with available credentials
-export const supabase = createClient(
-  supabaseUrl || 'https://your-supabase-url.supabase.co',
-  supabaseAnonKey || 'your-anon-key'
-);
+try {
+  // Create Supabase client with available credentials
+  export const supabase = createClient(
+    supabaseUrl || 'https://your-supabase-url.supabase.co',
+    supabaseAnonKey || 'your-anon-key', 
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      }
+    }
+  );
+  
+  console.log("✅ Supabase client initialized successfully");
+} catch (error) {
+  console.error("❌ Failed to initialize Supabase client:", error);
+  throw new Error("Failed to initialize Supabase client. Please check your configuration.");
+}
 
 // Types for our Supabase database tables
 export type Team = {

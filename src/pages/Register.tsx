@@ -53,11 +53,22 @@ const Register = () => {
         description: "Please check your email to verify your account."
       });
     } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive"
-      });
+      console.error("Registration error:", error);
+      
+      // Handle network errors specifically
+      if (error.message === "Failed to fetch" || !navigator.onLine) {
+        toast({
+          title: "Network error",
+          description: "Please check your internet connection and try again.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Registration failed",
+          description: error.message || "An unknown error occurred",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }

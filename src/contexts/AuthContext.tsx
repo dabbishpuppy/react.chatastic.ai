@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -59,6 +58,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string) => {
     try {
+      if (!navigator.onLine) {
+        throw new Error("Network connection unavailable. Please check your internet connection.");
+      }
+      
       const { error } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -74,11 +77,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "Please check your email to verify your account.",
       });
     } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.error("Sign up error:", error);
+      
+      // Check if it's a network error
+      if (error.message === "Failed to fetch" || error.code === "network_error") {
+        toast({
+          title: "Network error",
+          description: "Unable to connect to authentication service. Please check your internet connection.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Registration failed",
+          description: error.message || "An unexpected error occurred",
+          variant: "destructive",
+        });
+      }
       throw error;
     }
   };
