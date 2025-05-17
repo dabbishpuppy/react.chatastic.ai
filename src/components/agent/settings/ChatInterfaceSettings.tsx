@@ -56,10 +56,10 @@ const ChatInterfaceSettings: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-12rem)] flex flex-col md:flex-row">
+    <div className="flex flex-col md:flex-row border-t">
       {/* Left panel - Settings */}
-      <div className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-4">
-        <div className="space-y-6">
+      <div className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-0">
+        <div className="space-y-6 p-6">
           <Card>
             <CardHeader>
               <CardTitle>Chat Interface</CardTitle>
@@ -262,9 +262,9 @@ const ChatInterfaceSettings: React.FC = () => {
         </div>
       </div>
       
-      {/* Right panel - Chat Preview */}
-      <div className="w-full md:w-2/5 bg-gray-50 mt-6 md:mt-0">
-        <div className="h-full p-4 sticky top-0">
+      {/* Right panel - Chat Preview - with border instead of background color */}
+      <div className="w-full md:w-2/5 border-l">
+        <div className="p-6 sticky top-0">
           <div className="w-full max-w-md mx-auto h-[700px] bg-white rounded-lg shadow overflow-hidden flex flex-col">
             <div className="text-center py-2 text-sm text-gray-500 border-b">
               Chat Preview

@@ -8,12 +8,16 @@ interface AgentPageLayoutProps {
   children: ReactNode;
   defaultActiveTab: string;
   defaultPageTitle: string;
+  headerActions?: ReactNode;
+  showPageTitle?: boolean;
 }
 
 const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   children,
   defaultActiveTab,
   defaultPageTitle,
+  headerActions,
+  showPageTitle = true,
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
   const [pageTitle, setPageTitle] = useState(defaultPageTitle);
@@ -37,7 +41,16 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
         {/* Main content with its own scroll */}
         <div className="flex-1 overflow-auto">
-          {/* Removed the title element from here to avoid duplication */}
+          {showPageTitle && (
+            <div className="p-6 pb-0 flex justify-between items-center">
+              <h1 className="text-3xl font-bold">{pageTitle}</h1>
+              {headerActions && (
+                <div className="flex items-center space-x-2">
+                  {headerActions}
+                </div>
+              )}
+            </div>
+          )}
           {children}
         </div>
       </div>

@@ -2,26 +2,30 @@
 import React, { useState } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatSection from "@/components/agent/ChatSection";
-import ConversationView from "@/components/agent/ConversationView";
 import LLMSettingsPanel from "@/components/agent/LLMSettingsPanel";
-import { Conversation } from "@/components/activity/ConversationData";
-import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Settings } from "lucide-react";
 
 const AgentEnvironment: React.FC = () => {
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-
-  const handleCloseConversation = () => {
-    setActiveConversation(null);
-  };
 
   const toggleSettings = () => {
     setShowSettings(!showSettings);
   };
 
+  const headerActions = (
+    <Button variant="outline" onClick={toggleSettings} className="flex items-center">
+      <Settings size={18} className="mr-2" />
+      Agent Settings
+    </Button>
+  );
+
   return (
-    <AgentPageLayout defaultActiveTab="playground" defaultPageTitle="Playground">
+    <AgentPageLayout 
+      defaultActiveTab="playground" 
+      defaultPageTitle="Playground"
+      headerActions={headerActions}
+    >
       <div className="w-full h-full flex overflow-hidden">
         {/* Main content area with dotted background pattern that fills the entire section */}
         <div 
