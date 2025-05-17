@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Link } from 'react-router-dom';
@@ -124,7 +123,7 @@ const Index = () => {
                 </div>
                 <h3 className="text-xl font-bold mb-4">Train & Customize</h3>
                 <p className="text-muted-foreground">
-                  Fine-tune your AI's knowledge, tone, and responses to match your brand and business needs.
+                  Fine-tune your AI&apos;s knowledge, tone, and responses to match your brand and business needs.
                 </p>
               </div>
               
@@ -339,7 +338,7 @@ const Index = () => {
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold tracking-tight mb-4">Simple, Transparent Pricing</h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                Choose the plan that's right for your business
+                Choose the plan that&apos;s right for your business
               </p>
               
               <div className="flex items-center justify-center mt-8">
