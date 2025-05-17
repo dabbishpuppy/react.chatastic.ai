@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
-import { Users, ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { Users, ChevronDown, ChevronUp, Plus, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Team {
@@ -54,7 +54,9 @@ const TeamsList = ({
               <Users size={16} className="mr-2 text-gray-500" />
               <span className="text-[0.875rem]">{team.name}</span>
             </div>
-            {team.isActive && <span>✓</span>}
+            {team.isActive && (
+              <CheckCircle size={16} className="text-green-500" />
+            )}
           </div>
         ))}
       </div>

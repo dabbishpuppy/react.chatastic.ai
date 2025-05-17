@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Users, CircleCheck, Plus } from "lucide-react";
+import { ChevronDown, Users, CheckCircle, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 
@@ -69,7 +69,7 @@ const TeamsDropdown: React.FC<TeamsDropdownProps> = ({ teams }) => {
               className="flex items-center justify-between text-[0.875rem]"
             >
               {team.name}
-              {(team.active || team.isActive) && <CircleCheck size={16} className="text-green-500" />}
+              {(team.active || team.isActive) && <CheckCircle size={16} className="text-green-500" />}
             </Link>
           </DropdownMenuItem>
         ))}
