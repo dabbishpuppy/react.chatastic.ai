@@ -34,20 +34,28 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
   const handleClick = (tabId: string, tabLabel: string) => {
     onTabChange(tabId, tabLabel);
     
+    // Prevent default scroll behavior
+    const navigateTo = (path: string) => {
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        navigate(path);
+      }, 0);
+    };
+
     if (tabId === "activity") {
-      navigate(`/agent/${agentId}/activity`);
+      navigateTo(`/agent/${agentId}/activity`);
     } else if (tabId === "playground") {
-      navigate(`/agent/${agentId}`);
+      navigateTo(`/agent/${agentId}`);
     } else if (tabId === "analytics") {
-      navigate(`/agent/${agentId}/analytics`);
+      navigateTo(`/agent/${agentId}/analytics`);
     } else if (tabId === "sources") {
-      navigate(`/agent/${agentId}/sources`);
+      navigateTo(`/agent/${agentId}/sources`);
     } else if (tabId === "actions") {
-      navigate(`/agent/${agentId}/actions`);
+      navigateTo(`/agent/${agentId}/actions`);
     } else if (tabId === "connect") {
-      navigate(`/agent/${agentId}/integrations`);
+      navigateTo(`/agent/${agentId}/integrations`);
     } else if (tabId === "settings") {
-      navigate(`/agent/${agentId}/settings`);
+      navigateTo(`/agent/${agentId}/settings`);
     }
   };
 
