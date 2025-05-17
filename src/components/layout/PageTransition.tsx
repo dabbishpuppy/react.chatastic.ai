@@ -12,31 +12,31 @@ const PageTransition: React.FC<PageTransitionProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [displayContent, setDisplayContent] = useState(children);
 
-  // Check if we're navigating from agent creation
+  // Get state from location
   const fromAgentAction = location.state?.fromAgentCreation || location.state?.fromAgentsList;
+  
+  // Debug
+  console.log("PageTransition - location:", location.pathname);
+  console.log("PageTransition - state:", location.state);
 
   useEffect(() => {
-    // Skip loading state if coming directly from agent creation or agent list click
+    // Skip loading state if coming from agent creation or agent list click
     if (fromAgentAction) {
+      console.log("Coming from agent action, skipping loading animation");
       setDisplayContent(children);
       return;
     }
 
-    // Only start loading when the key changes (genuine navigation)
-    if (location.key) {
-      setIsLoading(true);
-      
-      // Use a very short timeout to make transitions feel snappy
-      const timeoutId = setTimeout(() => {
-        setDisplayContent(children);
-        setIsLoading(false);
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    } else {
-      // If it's the initial render, just show content immediately
+    // Only start loading when the location changes (genuine navigation)
+    setIsLoading(true);
+    
+    // Use a very short timeout to make transitions feel snappy
+    const timeoutId = setTimeout(() => {
       setDisplayContent(children);
-    }
+      setIsLoading(false);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [location.key, children, fromAgentAction]);
 
   // Show loading state when transitioning between pages
