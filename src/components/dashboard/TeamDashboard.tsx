@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
@@ -98,8 +99,11 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
                   apiCalls: { theme: { light: "#f97316", dark: "#f97316" }, label: "API Calls (hundreds)" }
                 }}
               >
-                <TeamComparisonChart teams={teamsList} />
-                <ChartTooltip />
+                {/* Wrap the children in a React Fragment so it's treated as a single child */}
+                <>
+                  <TeamComparisonChart teams={teamsList} />
+                  <ChartTooltip />
+                </>
               </ChartContainer>
             </div>
           </CardContent>
@@ -110,3 +114,4 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
 };
 
 export default TeamDashboard;
+
