@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,7 @@ const CreateTeam = () => {
     
     try {
       console.log("Creating team with user ID:", user.id);
+      console.log("Using session access token:", session.access_token.substring(0, 10) + "...");
       
       // Get authenticated client using the session token
       const authClient = getAuthenticatedClient(session.access_token);
@@ -108,10 +110,12 @@ const CreateTeam = () => {
         .select();
       
       if (teamError || !teamData || teamData.length === 0) {
+        console.error("Team creation error:", teamError);
         throw teamError || new Error("Failed to create team");
       }
 
       const newTeam = teamData[0];
+      console.log("Team created successfully:", newTeam);
       
       // Add user as a team member
       const { error: memberError } = await authClient
@@ -124,14 +128,20 @@ const CreateTeam = () => {
           }
         ]);
       
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error("Team member creation error:", memberError);
+        throw memberError;
+      }
       
       // Create team metrics
       const { error: metricsError } = await authClient
         .from('team_metrics')
         .insert([{ team_id: newTeam.id }]);
       
-      if (metricsError) throw metricsError;
+      if (metricsError) {
+        console.error("Team metrics creation error:", metricsError);
+        throw metricsError;
+      }
       
       toast.success("Team created successfully!");
       
