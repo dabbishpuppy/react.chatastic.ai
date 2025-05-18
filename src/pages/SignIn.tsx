@@ -1,20 +1,49 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import PasswordInput from "@/components/ui/PasswordInput";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, we would authenticate the user here
-    // For now, we'll just navigate to the dashboard
-    navigate("/dashboard");
+    
+    // Validate that both fields are filled
+    if (!email.trim() || !password.trim()) {
+      toast.error("Please enter both email and password");
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast.success("Successfully signed in");
+      navigate("/dashboard");
+    } catch (error: any) {
+      console.error("Error signing in:", error);
+      toast.error(error.message || "Failed to sign in");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,13 +59,29 @@ const SignIn = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" placeholder="name@example.com" type="email" required />
+              <Input 
+                id="email" 
+                placeholder="name@example.com" 
+                type="email" 
+                required 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <PasswordInput id="password" required />
+              <PasswordInput 
+                id="password" 
+                required 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+              />
             </div>
-            <Button type="submit" className="w-full">Sign In</Button>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Signing in..." : "Sign In"}
+            </Button>
           </form>
 
           <div className="relative my-6">
