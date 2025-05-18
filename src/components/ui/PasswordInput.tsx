@@ -10,6 +10,7 @@ interface PasswordInputProps {
   value?: string;
   required?: boolean;
   className?: string;
+  disabled?: boolean;  // Added the disabled prop
 }
 
 const PasswordInput: React.FC<PasswordInputProps> = ({
@@ -19,6 +20,7 @@ const PasswordInput: React.FC<PasswordInputProps> = ({
   value,
   required = false,
   className = "",
+  disabled = false,  // Added default value
 }) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -35,6 +37,7 @@ const PasswordInput: React.FC<PasswordInputProps> = ({
         onChange={onChange}
         value={value}
         required={required}
+        disabled={disabled}  // Pass it to the Input component
         className={`pr-10 ${className}`}
       />
       <button
@@ -43,6 +46,7 @@ const PasswordInput: React.FC<PasswordInputProps> = ({
         className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-500"
         tabIndex={-1}
         aria-label={showPassword ? "Hide password" : "Show password"}
+        disabled={disabled}  // Also disable the toggle button when input is disabled
       >
         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
       </button>
