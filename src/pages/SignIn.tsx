@@ -8,12 +8,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import PasswordInput from "@/components/ui/PasswordInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Check, X } from "lucide-react";
 
 const SignIn = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [resetEmailLoading, setResetEmailLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +50,43 @@ const SignIn = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Validate email
+    if (!email.trim()) {
+      toast.error("Please enter your email address");
+      return;
+    }
+    
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+    
+    setResetEmailLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      setResetEmailSent(true);
+      toast.success("Password reset email sent");
+    } catch (error: any) {
+      console.error("Error sending reset email:", error);
+      toast.error(error.message || "Failed to send password reset email");
+    } finally {
+      setResetEmailLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
       <Card className="w-full max-w-md">
@@ -56,6 +97,15 @@ const SignIn = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {resetEmailSent && (
+            <Alert className="mb-6 bg-green-50">
+              <Check className="h-4 w-4 text-green-500" />
+              <AlertDescription className="text-green-700">
+                Password reset email sent. Please check your inbox and follow the instructions.
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -66,20 +116,31 @@ const SignIn = () => {
                 required 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || resetEmailLoading}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password">Password</Label>
+                <Button
+                  variant="link"
+                  className="p-0 h-auto text-xs text-blue-500"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading || resetEmailLoading}
+                  type="button"
+                >
+                  {resetEmailLoading ? "Sending..." : "Forgot Password?"}
+                </Button>
+              </div>
               <PasswordInput 
                 id="password" 
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading || resetEmailLoading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || resetEmailLoading}>
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
