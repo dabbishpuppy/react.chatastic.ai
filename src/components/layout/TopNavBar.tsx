@@ -5,10 +5,14 @@ import Logo from "./Logo";
 import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
-import { Team } from "@/hooks/useTeamsAndAgents";
 
 interface TopNavBarProps {
-  teams?: Team[];
+  teams?: Array<{
+    id: string;
+    name: string;
+    isActive?: boolean;
+    agents?: Array<any>;
+  }>;
   agents?: Array<{
     id: number | string;
     name: string;

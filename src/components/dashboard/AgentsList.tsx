@@ -1,19 +1,39 @@
 
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CreateAgentDialog from "./CreateAgentDialog";
 import EditAgentDialog from "./EditAgentDialog";
 import DeleteAgentDialog from "./DeleteAgentDialog";
 import { useToast } from "@/hooks/use-toast";
-import { Agent, Team } from "@/hooks/useTeamsAndAgents";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+
+interface Agent {
+  id: number;
+  name: string;
+  image: string;
+  color: string;
+  status?: string;
+  teamId?: string;
+  metrics?: {
+    conversations: number;
+    responseTime: string;
+    satisfaction: number;
+  };
+}
+
+interface Team {
+  id: string;
+  name: string;
+  isActive: boolean;
+  agents: Agent[];
+}
 
 interface AgentsListProps {
   agents: Agent[];
@@ -35,12 +55,6 @@ const AgentsList = ({
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
   const { toast } = useToast();
-  const navigate = useNavigate();
-
-  // Update local agents when props change
-  useEffect(() => {
-    setLocalAgents(agents);
-  }, [agents]);
 
   // Handle creating a new agent
   const handleAgentCreated = (newAgent: Agent) => {
@@ -66,30 +80,17 @@ const AgentsList = ({
     setIsDeleteDialogOpen(true);
   };
 
-  // Handle editing a agent
   const handleAgentEdited = (updatedAgent: Agent) => {
     setLocalAgents(prevAgents => 
       prevAgents.map(agent => agent.id === updatedAgent.id ? updatedAgent : agent)
     );
   };
 
-  // Handle deleting a agent
-  const handleAgentDeleted = (agentId: string) => {
+  const handleAgentDeleted = (agentId: number) => {
     setLocalAgents(prevAgents => 
       prevAgents.filter(agent => agent.id !== agentId)
     );
   };
-
-  // Navigate to agent's playground page directly
-  const handleAgentClick = (agentId: string) => {
-    console.log(`Navigating to agent: ${agentId}`);
-    // Simple navigation without replace - fixes the issue with transitions
-    navigate(`/agent/${agentId}`);
-  };
-
-  // Make sure we have at least one valid team with an ID
-  const validTeams = teams.filter(team => team && team.id);
-  const canCreateAgent = validTeams.length > 0;
 
   // Use local agents if available, otherwise use the props agents
   const displayAgents = localAgents.length > 0 ? localAgents : agents;
@@ -112,15 +113,17 @@ const AgentsList = ({
         {displayAgents.map(agent => (
           <div 
             key={agent.id}
-            className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
-            onClick={() => handleAgentClick(agent.id.toString())}
+            className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
           >
-            <div className="flex items-center text-[0.875rem] flex-1">
+            <Link 
+              to={`/agent/${agent.id}`}
+              className="flex items-center text-[0.875rem] flex-1"
+            >
               <div 
                 className={`w-4 h-4 ${agent.color} rounded-sm mr-2 flex-shrink-0`}
               ></div>
               <span className="truncate">{agent.name}</span>
-            </div>
+            </Link>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -158,7 +161,6 @@ const AgentsList = ({
           variant="outline" 
           className="w-full flex items-center gap-2 justify-center text-sm"
           onClick={() => setIsDialogOpen(true)}
-          disabled={!canCreateAgent}
         >
           <Plus className="h-4 w-4" />
           <span>Create agent</span>
@@ -168,7 +170,7 @@ const AgentsList = ({
       <CreateAgentDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        teams={validTeams}
+        teams={teams}
         onAgentCreated={handleAgentCreated}
       />
       

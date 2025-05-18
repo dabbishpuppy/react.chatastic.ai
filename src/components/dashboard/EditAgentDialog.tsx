@@ -1,6 +1,5 @@
 
 import React, { useState } from "react";
-import { Loader } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: string; // Changed from number to string to match Supabase UUID
+  id: number;
   name: string;
   image: string;
   color: string;
@@ -38,14 +37,13 @@ const EditAgentDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    try {
-      // Small delay to simulate network request
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+    // In a real application, you would call an API here
+    // For now we'll just simulate a delay and update locally
+    setTimeout(() => {
       const updatedAgent = {
         ...agent,
         name: name.trim()
@@ -57,16 +55,9 @@ const EditAgentDialog = ({
         description: `${agent.name} has been renamed to ${name.trim()}.`,
       });
       
-      onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: "Error updating agent",
-        description: "Failed to update agent. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
       setIsSubmitting(false);
-    }
+      onOpenChange(false);
+    }, 500);
   };
 
   return (
@@ -102,11 +93,7 @@ const EditAgentDialog = ({
             <Button 
               type="submit" 
               disabled={!name.trim() || isSubmitting || name.trim() === agent.name}
-              className="relative"
             >
-              {isSubmitting && (
-                <Loader className="mr-2 h-4 w-4 animate-spin" />
-              )}
               {isSubmitting ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>

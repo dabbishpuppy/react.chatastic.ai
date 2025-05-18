@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 interface Agent {
-  id: string; // Changed from number to string to match Supabase UUID
+  id: number;
   name: string;
   image: string;
   color: string;

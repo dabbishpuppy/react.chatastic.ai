@@ -10,16 +10,20 @@ import {
 import { ChevronDown, Users, CheckCircle, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Team } from "@/hooks/useTeamsAndAgents";
 
 // Remove the static teams data and make the component accept teams as props
 interface TeamsDropdownProps {
-  teams: Team[];
+  teams: Array<{
+    id: string;
+    name: string;
+    active?: boolean;
+    isActive?: boolean;
+  }>;
 }
 
 const TeamsDropdown: React.FC<TeamsDropdownProps> = ({ teams }) => {
   // Find active team, adjusting for either isActive or active property
-  const defaultTeam = teams.find(t => t.isActive === true) || teams[0];
+  const defaultTeam = teams.find(t => t.active || t.isActive) || teams[0];
   const [selectedTeam, setSelectedTeam] = useState<string>(defaultTeam?.name || "Teams");
   const location = useLocation();
   
@@ -65,7 +69,7 @@ const TeamsDropdown: React.FC<TeamsDropdownProps> = ({ teams }) => {
               className="flex items-center justify-between text-[0.875rem]"
             >
               {team.name}
-              {team.isActive && <CheckCircle size={16} className="text-green-500" />}
+              {(team.active || team.isActive) && <CheckCircle size={16} className="text-green-500" />}
             </Link>
           </DropdownMenuItem>
         ))}

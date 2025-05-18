@@ -1,21 +1,38 @@
 
 import React, { useState } from "react";
-import { AlertTriangle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: string;
+  id: number;
   name: string;
+  image: string;
+  color: string;
+  status?: string;
+  teamId?: string;
+  metrics?: {
+    conversations: number;
+    responseTime: string;
+    satisfaction: number;
+  };
 }
 
 interface DeleteAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: Agent;
-  onAgentDeleted: (agentId: string) => void;
+  onAgentDeleted: (agentId: number) => void;
 }
 
 const DeleteAgentDialog = ({
@@ -29,87 +46,64 @@ const DeleteAgentDialog = ({
   const { toast } = useToast();
 
   const handleDelete = () => {
-    if (confirmName !== agent.name) {
-      toast({
-        title: "Error",
-        description: "Agent names do not match",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (confirmName !== agent.name) return;
+    
     setIsSubmitting(true);
-
+    
     // In a real application, you would call an API here
     // For now we'll just simulate a delay and update locally
     setTimeout(() => {
       onAgentDeleted(agent.id);
       toast({
         title: "Agent deleted",
-        description: `${agent.name} has been deleted successfully.`,
+        description: `${agent.name} has been deleted.`,
+        variant: "destructive"
       });
       
       setIsSubmitting(false);
-      setConfirmName("");
       onOpenChange(false);
+      setConfirmName("");
     }, 500);
   };
 
-  const handleClose = () => {
-    setConfirmName("");
-    onOpenChange(false);
-  };
-
-  const isDeleteDisabled = confirmName !== agent.name || isSubmitting;
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader className="flex flex-col items-center sm:items-start">
-          <div className="flex items-center gap-2 text-red-500">
-            <AlertTriangle className="h-5 w-5" />
-            <DialogTitle>Delete Agent {agent.name}?</DialogTitle>
-          </div>
-          <DialogDescription className="pt-2">
-            Are you sure you want to delete your agent?
-            <br />
-            This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="py-4 space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Agent Name</label>
-            <Input 
-              placeholder={agent.name}
-              value={confirmName}
-              onChange={(e) => setConfirmName(e.target.value)}
-            />
-            <p className="text-sm text-gray-500">Please type your agent name to confirm</p>
-          </div>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the
+            <span className="font-medium"> {agent.name} </span>
+            agent and remove its data from our servers.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-2 py-4">
+          <Label htmlFor="confirmName">
+            Type <span className="font-semibold">{agent.name}</span> to confirm
+          </Label>
+          <Input
+            id="confirmName"
+            value={confirmName}
+            onChange={(e) => setConfirmName(e.target.value)}
+            placeholder={`Type "${agent.name}" to confirm`}
+            className="w-full"
+            autoFocus
+          />
         </div>
-
-        <DialogFooter className="flex justify-between sm:justify-end gap-2">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setConfirmName("")} disabled={isSubmitting}>
             Cancel
-          </Button>
-          <Button 
-            type="button" 
-            variant="destructive"
+          </AlertDialogCancel>
+          <AlertDialogAction
             onClick={handleDelete}
-            disabled={isDeleteDisabled}
-            className="bg-red-500 hover:bg-red-600"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            disabled={confirmName !== agent.name || isSubmitting}
           >
-            {isSubmitting ? "Deleting..." : "Delete"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {isSubmitting ? "Deleting..." : "Delete Agent"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };
 

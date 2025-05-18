@@ -1,31 +1,27 @@
 
-import React from 'react';
-import Navigation from '@/components/landing/Navigation';
-import HeroSection from '@/components/landing/HeroSection';
-import FeaturesSection from '@/components/landing/FeaturesSection';
-import UseCasesSection from '@/components/landing/UseCasesSection';
-import DemoSection from '@/components/landing/DemoSection';
-import TestimonialsSection from '@/components/landing/TestimonialsSection';
-import PricingSection from '@/components/landing/PricingSection';
-import CTASection from '@/components/landing/CTASection';
-import FooterSection from '@/components/landing/FooterSection';
+import { useIsMobile } from '@/hooks/use-mobile';
+import Logo from '@/components/layout/Logo';
+import RegistrationForm from '@/components/auth/RegistrationForm';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
+  const isMobile = useIsMobile();
+  
   return (
     <div className="min-h-screen bg-white">
-      <Navigation />
-      
-      <main className="flex flex-col">
-        <HeroSection />
-        <FeaturesSection />
-        <UseCasesSection />
-        <DemoSection />
-        <TestimonialsSection />
-        <PricingSection />
-        <CTASection />
-      </main>
-      
-      <FooterSection />
+      <div className="container mx-auto px-4 py-8">
+        <header className="mb-12">
+          <div className="flex justify-center md:justify-start">
+            <Link to="/">
+              <Logo size={isMobile ? 'sm' : 'md'} />
+            </Link>
+          </div>
+        </header>
+        
+        <main className="flex justify-center items-center py-8">
+          <RegistrationForm />
+        </main>
+      </div>
     </div>
   );
 };

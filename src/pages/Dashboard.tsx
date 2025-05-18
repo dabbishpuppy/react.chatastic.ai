@@ -1,80 +1,220 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTeamsAndAgents } from "@/hooks/useTeamsAndAgents";
-import { useTeamManagement } from "@/components/dashboard/TeamManagement";
-import { useAgentManagement } from "@/components/dashboard/AgentManagement";
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import TeamEmptyState from "@/components/dashboard/TeamEmptyState";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import TeamDashboard from "@/components/dashboard/TeamDashboard";
+import Logo from "@/components/layout/Logo";
+import TeamsList from "@/components/dashboard/TeamsList";
+import AgentsList from "@/components/dashboard/AgentsList";
+import SidebarActions from "@/components/dashboard/SidebarActions";
+
+// Sample data structure for teams and their agents
+const initialTeamsData = [
+  {
+    id: "1",
+    name: "Wonderwave",
+    isActive: true,
+    agents: [
+      {
+        id: 1,
+        name: "Wonder AI",
+        image: "/placeholder.svg",
+        color: "bg-violet-600",
+        status: "active",
+        metrics: {
+          conversations: 253,
+          responseTime: "1.2s",
+          satisfaction: 94,
+        }
+      },
+      {
+        id: 2,
+        name: "Agora AI",
+        image: "/placeholder.svg", 
+        color: "bg-amber-100",
+        status: "active",
+        metrics: {
+          conversations: 187,
+          responseTime: "0.9s",
+          satisfaction: 91,
+        }
+      },
+    ],
+    metrics: {
+      totalConversations: 440,
+      avgResponseTime: "1.1s",
+      usagePercent: 68,
+      apiCalls: 12450,
+      satisfaction: 92,
+    }
+  },
+  {
+    id: "2",
+    name: "Analytics Team",
+    isActive: false,
+    agents: [
+      {
+        id: 3,
+        name: "PristineBag AI",
+        image: "/placeholder.svg",
+        color: "bg-rose-400",
+        status: "inactive",
+        metrics: {
+          conversations: 134,
+          responseTime: "1.5s",
+          satisfaction: 87,
+        }
+      },
+      {
+        id: 4,
+        name: "AI Kundeservice",
+        image: "/placeholder.svg",
+        color: "bg-black",
+        status: "active",
+        metrics: {
+          conversations: 219,
+          responseTime: "1.3s",
+          satisfaction: 89,
+        }
+      },
+    ],
+    metrics: {
+      totalConversations: 353,
+      avgResponseTime: "1.4s",
+      usagePercent: 54,
+      apiCalls: 8930,
+      satisfaction: 88,
+    }
+  },
+  {
+    id: "3",
+    name: "Support Team",
+    isActive: false,
+    agents: [
+      {
+        id: 5,
+        name: "theballooncompany.com",
+        image: "/placeholder.svg",
+        color: "bg-white",
+        status: "active",
+        metrics: {
+          conversations: 178,
+          responseTime: "1.0s",
+          satisfaction: 95,
+        }
+      }
+    ],
+    metrics: {
+      totalConversations: 178,
+      avgResponseTime: "1.0s",
+      usagePercent: 32,
+      apiCalls: 4250,
+      satisfaction: 95,
+    }
+  }
+];
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-  
-  // State for expanded sidebar sections
+  const [activeTab, setActiveTab] = useState("agents");
+  const [teamsData, setTeamsData] = useState(initialTeamsData);
+  const [selectedTeam, setSelectedTeam] = useState(() => {
+    return teamsData.find(team => team.isActive) || teamsData[0];
+  });
   const [expandedSections, setExpandedSections] = useState({
     teams: true,
     agents: true
   });
-  
-  // Fetch teams and agents data
-  const { 
-    teamsData, 
-    setTeamsData, 
-    selectedTeam, 
-    setSelectedTeam, 
-    loading 
-  } = useTeamsAndAgents();
-  
-  // Team management functions
-  const { 
-    handleTeamSelect, 
-    handleTeamCreated, 
-    handleTeamEdited, 
-    handleTeamDeleted 
-  } = useTeamManagement({
-    teamsData,
-    setTeamsData,
-    selectedTeam,
-    setSelectedTeam
-  });
-  
-  // Agent management functions
-  const { handleAgentCreated } = useAgentManagement({
-    selectedTeam,
-    teamsData,
-    setTeamsData,
-    setSelectedTeam
-  });
-  
-  // Toggle sidebar sections
-  const toggleSection = (section: string) => {
+  const navigate = useNavigate();
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === "settings") {
+      navigate("/settings/general");
+    }
+  };
+
+  const handleTeamSelect = (team) => {
+    setSelectedTeam(team);
+  };
+
+  const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
   };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
-  }
+  const handleTeamCreated = (newTeam) => {
+    setTeamsData(prevTeams => [...prevTeams, newTeam]);
+    setSelectedTeam(newTeam);
+  };
 
-  // If there are no teams, show the empty state
-  if (teamsData.length === 0) {
-    return <TeamEmptyState onCreateTeam={handleTeamCreated} />;
-  }
+  const handleTeamEdited = (updatedTeam) => {
+    setTeamsData(prevTeams => prevTeams.map(team => 
+      team.id === updatedTeam.id ? updatedTeam : team
+    ));
+    
+    if (selectedTeam.id === updatedTeam.id) {
+      setSelectedTeam(updatedTeam);
+    }
+  };
+
+  const handleTeamDeleted = (teamId) => {
+    const updatedTeams = teamsData.filter(team => team.id !== teamId);
+    setTeamsData(updatedTeams);
+    
+    // If the currently selected team was deleted, select another one
+    if (selectedTeam.id === teamId && updatedTeams.length > 0) {
+      setSelectedTeam(updatedTeams[0]);
+    }
+  };
+
+  const handleAgentCreated = (newAgent) => {
+    // Add the new agent to the currently selected team
+    setTeamsData(prevTeams => prevTeams.map(team => 
+      team.id === selectedTeam.id 
+        ? { 
+            ...team, 
+            agents: [...team.agents, newAgent] 
+          } 
+        : team
+    ));
+
+    // Update the selected team reference
+    setSelectedTeam(prevSelected => ({
+      ...prevSelected,
+      agents: [...prevSelected.agents, newAgent]
+    }));
+  };
+
+  // Get all agents for other components
+  const allAgents = teamsData.flatMap(team => team.agents);
 
   return (
-    <DashboardLayout
-      teamsData={teamsData}
-      selectedTeam={selectedTeam}
-      expandedSections={expandedSections}
-      onTeamSelect={handleTeamSelect}
-      toggleSection={toggleSection}
-      onTeamCreated={handleTeamCreated}
-      onAgentCreated={handleAgentCreated}
-      onTeamEdited={handleTeamEdited}
-      onTeamDeleted={handleTeamDeleted}
-    />
+    <div className="flex flex-col min-h-screen">
+      {/* Sidebar + Main content */}
+      <div className="flex flex-1 overflow-hidden">
+        <DashboardSidebar
+          teams={teamsData}
+          selectedTeam={selectedTeam}
+          expandedSections={expandedSections}
+          onTeamSelect={handleTeamSelect}
+          toggleSection={toggleSection}
+          onTeamCreated={handleTeamCreated}
+          onAgentCreated={handleAgentCreated}
+          onTeamEdited={handleTeamEdited}
+          onTeamDeleted={handleTeamDeleted}
+        />
+
+        {/* Main content - with bg-[#f5f5f5] */}
+        <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
+          <TeamDashboard 
+            team={selectedTeam}
+            teamsList={teamsData}
+          />
+        </div>
+      </div>
+    </div>
   );
 };
 

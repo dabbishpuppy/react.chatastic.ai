@@ -1,9 +1,8 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -52,7 +51,6 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
   team,
   onTeamEdited,
 }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -60,35 +58,19 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
     },
   });
 
-  const onSubmit = async (values: FormValues) => {
-    setIsSubmitting(true);
-    
-    try {
-      // Update the team with the new values
-      const updatedTeam = {
-        ...team,
-        name: values.name,
-      };
+  const onSubmit = (values: FormValues) => {
+    // Update the team with the new values
+    const updatedTeam = {
+      ...team,
+      name: values.name,
+    };
 
-      onTeamEdited(updatedTeam);
-      toast({
-        title: "Team updated",
-        description: `Team has been renamed to "${values.name}"`,
-      });
-      
-      // Small delay to show the loading state
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: "Error updating team",
-        description: "Failed to update team. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    onTeamEdited(updatedTeam);
+    toast({
+      title: "Team updated",
+      description: `Team has been renamed to "${values.name}"`,
+    });
+    onOpenChange(false);
   };
 
   return (
@@ -122,20 +104,10 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
                 type="button" 
                 variant="outline" 
                 onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit"
-                disabled={isSubmitting}
-                className="relative"
-              >
-                {isSubmitting && (
-                  <Loader className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
+              <Button type="submit">Save Changes</Button>
             </DialogFooter>
           </form>
         </Form>
