@@ -22,6 +22,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/providers/AuthProvider";
 
 // Define the form schema
 const formSchema = z.object({
@@ -53,6 +55,8 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
   onOpenChange,
   onTeamCreated,
 }) => {
+  const { user } = useAuth(); // Get the current authenticated user
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -60,29 +64,85 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
     },
   });
 
-  const onSubmit = (values: FormValues) => {
-    // Create a new team with the form values
-    const newTeam = {
-      id: `team-${Date.now()}`, // Use timestamp as a simple ID for now
-      name: values.name,
-      isActive: false,
-      agents: [] as never[], // Explicitly cast empty array to never[] to fix type error
-      metrics: {
-        totalConversations: 0,
-        avgResponseTime: "0.0s",
-        usagePercent: 0,
-        apiCalls: 0,
-        satisfaction: 0,
-      },
-    };
+  const onSubmit = async (values: FormValues) => {
+    if (!user) {
+      toast({
+        title: "Authentication error",
+        description: "You must be logged in to create a team.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    onTeamCreated(newTeam);
-    toast({
-      title: "Team created",
-      description: `${values.name} team has been created successfully!`,
-    });
-    form.reset();
-    onOpenChange(false);
+    try {
+      // Create the team in Supabase with the user ID as created_by
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .insert([
+          { 
+            name: values.name,
+            is_active: true,
+            created_by: user.id // Set the authenticated user's ID
+          }
+        ])
+        .select();
+      
+      if (teamError) {
+        throw teamError;
+      }
+
+      if (!teamData || teamData.length === 0) {
+        throw new Error("Failed to create team");
+      }
+
+      const newTeam = teamData[0];
+      
+      // Create team metrics entry
+      await supabase
+        .from('team_metrics')
+        .insert([{ team_id: newTeam.id }]);
+      
+      // Add user as team member with owner role
+      await supabase
+        .from('team_members')
+        .insert([
+          {
+            team_id: newTeam.id,
+            user_id: user.id,
+            role: 'owner'
+          }
+        ]);
+
+      // Format the team object to match expected interface
+      const formattedTeam = {
+        id: newTeam.id,
+        name: newTeam.name,
+        isActive: newTeam.is_active || false,
+        agents: [] as never[],
+        metrics: {
+          totalConversations: 0,
+          avgResponseTime: "0.0s",
+          usagePercent: 0,
+          apiCalls: 0,
+          satisfaction: 0,
+        },
+      };
+
+      onTeamCreated(formattedTeam);
+      toast({
+        title: "Team created",
+        description: `${values.name} team has been created successfully!`,
+      });
+      form.reset();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Error creating team:", error);
+      toast({
+        title: "Error creating team",
+        description: error.message || "Failed to create team. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -112,7 +172,9 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
             />
 
             <DialogFooter>
-              <Button type="submit">Create Team</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? "Creating..." : "Create Team"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>
