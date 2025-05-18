@@ -1,194 +1,364 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
-import Logo from "@/components/layout/Logo";
-import TeamsList from "@/components/dashboard/TeamsList";
-import AgentsList from "@/components/dashboard/AgentsList";
-import SidebarActions from "@/components/dashboard/SidebarActions";
-
-// Sample data structure for teams and their agents
-const initialTeamsData = [
-  {
-    id: "1",
-    name: "Wonderwave",
-    isActive: true,
-    agents: [
-      {
-        id: 1,
-        name: "Wonder AI",
-        image: "/placeholder.svg",
-        color: "bg-violet-600",
-        status: "active",
-        metrics: {
-          conversations: 253,
-          responseTime: "1.2s",
-          satisfaction: 94,
-        }
-      },
-      {
-        id: 2,
-        name: "Agora AI",
-        image: "/placeholder.svg", 
-        color: "bg-amber-100",
-        status: "active",
-        metrics: {
-          conversations: 187,
-          responseTime: "0.9s",
-          satisfaction: 91,
-        }
-      },
-    ],
-    metrics: {
-      totalConversations: 440,
-      avgResponseTime: "1.1s",
-      usagePercent: 68,
-      apiCalls: 12450,
-      satisfaction: 92,
-    }
-  },
-  {
-    id: "2",
-    name: "Analytics Team",
-    isActive: false,
-    agents: [
-      {
-        id: 3,
-        name: "PristineBag AI",
-        image: "/placeholder.svg",
-        color: "bg-rose-400",
-        status: "inactive",
-        metrics: {
-          conversations: 134,
-          responseTime: "1.5s",
-          satisfaction: 87,
-        }
-      },
-      {
-        id: 4,
-        name: "AI Kundeservice",
-        image: "/placeholder.svg",
-        color: "bg-black",
-        status: "active",
-        metrics: {
-          conversations: 219,
-          responseTime: "1.3s",
-          satisfaction: 89,
-        }
-      },
-    ],
-    metrics: {
-      totalConversations: 353,
-      avgResponseTime: "1.4s",
-      usagePercent: 54,
-      apiCalls: 8930,
-      satisfaction: 88,
-    }
-  },
-  {
-    id: "3",
-    name: "Support Team",
-    isActive: false,
-    agents: [
-      {
-        id: 5,
-        name: "theballooncompany.com",
-        image: "/placeholder.svg",
-        color: "bg-white",
-        status: "active",
-        metrics: {
-          conversations: 178,
-          responseTime: "1.0s",
-          satisfaction: 95,
-        }
-      }
-    ],
-    metrics: {
-      totalConversations: 178,
-      avgResponseTime: "1.0s",
-      usagePercent: 32,
-      apiCalls: 4250,
-      satisfaction: 95,
-    }
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("agents");
-  const [teamsData, setTeamsData] = useState(initialTeamsData);
-  const [selectedTeam, setSelectedTeam] = useState(() => {
-    return teamsData.find(team => team.isActive) || teamsData[0];
-  });
+  const [teamsData, setTeamsData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedTeam, setSelectedTeam] = useState<any>(null);
   const [expandedSections, setExpandedSections] = useState({
     teams: true,
     agents: true
   });
   const navigate = useNavigate();
 
-  const handleTabChange = (tab) => {
+  // Auth check and data loading
+  useEffect(() => {
+    const checkAuthAndLoadData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Check authentication
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          toast.error("Please sign in to access the dashboard");
+          navigate("/signin");
+          return;
+        }
+
+        // Get user data to check email verification
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user && !userData.user.email_confirmed_at) {
+          toast.error("Please verify your email before accessing the dashboard");
+          await supabase.auth.signOut();
+          navigate("/signin");
+          return;
+        }
+        
+        // Load teams the user belongs to
+        const { data: teamMembers, error: teamMembersError } = await supabase
+          .from('team_members')
+          .select('team_id')
+          .eq('user_id', session.user.id);
+          
+        if (teamMembersError) throw teamMembersError;
+        
+        if (!teamMembers || teamMembers.length === 0) {
+          // User has no teams, redirect to onboarding
+          navigate("/onboarding/create-team");
+          return;
+        }
+        
+        const teamIds = teamMembers.map(member => member.team_id);
+        
+        // Fetch full team data with is_active status
+        const { data: teams, error: teamsError } = await supabase
+          .from('teams')
+          .select('*')
+          .in('id', teamIds);
+          
+        if (teamsError) throw teamsError;
+        
+        if (!teams || teams.length === 0) {
+          navigate("/onboarding/create-team");
+          return;
+        }
+        
+        // Load agents and metrics for each team
+        const teamsWithAgents = await Promise.all(teams.map(async (team) => {
+          // Fetch agents for this team
+          const { data: agents, error: agentsError } = await supabase
+            .from('agents')
+            .select('*')
+            .eq('team_id', team.id);
+            
+          if (agentsError) throw agentsError;
+          
+          // Fetch metrics for each agent
+          const agentsWithMetrics = await Promise.all((agents || []).map(async (agent) => {
+            const { data: metrics, error: metricsError } = await supabase
+              .from('agent_metrics')
+              .select('*')
+              .eq('agent_id', agent.id)
+              .single();
+              
+            if (metricsError && metricsError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+              console.error("Error fetching agent metrics:", metricsError);
+            }
+            
+            return {
+              ...agent,
+              metrics: metrics ? {
+                conversations: metrics.conversations,
+                responseTime: metrics.response_time,
+                satisfaction: metrics.satisfaction
+              } : {
+                conversations: 0,
+                responseTime: "0.0s",
+                satisfaction: 0
+              }
+            };
+          }));
+          
+          // Fetch team metrics
+          const { data: teamMetrics, error: teamMetricsError } = await supabase
+            .from('team_metrics')
+            .select('*')
+            .eq('team_id', team.id)
+            .single();
+            
+          if (teamMetricsError && teamMetricsError.code !== 'PGRST116') {
+            console.error("Error fetching team metrics:", teamMetricsError);
+          }
+          
+          return {
+            ...team,
+            agents: agentsWithMetrics || [],
+            metrics: teamMetrics ? {
+              totalConversations: teamMetrics.total_conversations,
+              avgResponseTime: teamMetrics.avg_response_time,
+              usagePercent: teamMetrics.usage_percent,
+              apiCalls: teamMetrics.api_calls,
+              satisfaction: teamMetrics.satisfaction
+            } : {
+              totalConversations: 0,
+              avgResponseTime: "0.0s",
+              usagePercent: 0,
+              apiCalls: 0,
+              satisfaction: 0
+            }
+          };
+        }));
+        
+        setTeamsData(teamsWithAgents);
+        
+        // Check if any team is marked as active, otherwise use the first one
+        const activeTeam = teamsWithAgents.find(team => team.is_active) || teamsWithAgents[0];
+        setSelectedTeam(activeTeam);
+        
+        // Check if the selected team has agents
+        if (activeTeam.agents.length === 0) {
+          // No agents, redirect to create agent page
+          navigate("/onboarding/create-agent");
+          return;
+        }
+        
+      } catch (error: any) {
+        console.error("Error loading dashboard data:", error);
+        toast.error(error.message || "Failed to load dashboard data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuthAndLoadData();
+    
+    // Set up real-time subscription for teams and agents
+    const teamsSubscription = supabase
+      .channel('public:teams')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
+        checkAuthAndLoadData();
+      })
+      .subscribe();
+      
+    const agentsSubscription = supabase
+      .channel('public:agents')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, () => {
+        checkAuthAndLoadData();
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(teamsSubscription);
+      supabase.removeChannel(agentsSubscription);
+    };
+  }, [navigate]);
+
+  const handleTabChange = (tab: any) => {
     setActiveTab(tab);
     if (tab === "settings") {
       navigate("/settings/general");
     }
   };
 
-  const handleTeamSelect = (team) => {
+  const handleTeamSelect = (team: any) => {
     setSelectedTeam(team);
+    
+    // Update the is_active status in the database
+    const updateTeamActive = async () => {
+      try {
+        // First, set all teams to inactive
+        await supabase
+          .from('teams')
+          .update({ is_active: false })
+          .in('id', teamsData.map(t => t.id));
+          
+        // Then set the selected team to active
+        await supabase
+          .from('teams')
+          .update({ is_active: true })
+          .eq('id', team.id);
+      } catch (error) {
+        console.error("Error updating team active status:", error);
+      }
+    };
+    
+    updateTeamActive();
   };
 
-  const toggleSection = (section) => {
+  const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
   };
 
-  const handleTeamCreated = (newTeam) => {
-    setTeamsData(prevTeams => [...prevTeams, newTeam]);
-    setSelectedTeam(newTeam);
-  };
-
-  const handleTeamEdited = (updatedTeam) => {
-    setTeamsData(prevTeams => prevTeams.map(team => 
-      team.id === updatedTeam.id ? updatedTeam : team
-    ));
-    
-    if (selectedTeam.id === updatedTeam.id) {
-      setSelectedTeam(updatedTeam);
+  const handleTeamCreated = async (newTeam: any) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // 1. Insert the new team
+      const { data, error } = await supabase
+        .from('teams')
+        .insert([
+          { name: newTeam.name, is_active: false }
+        ])
+        .select();
+        
+      if (error || !data) throw error || new Error("Failed to create team");
+      
+      const createdTeam = data[0];
+      
+      // 2. Add the current user as a team member
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          { user_id: user.id, team_id: createdTeam.id, role: 'owner' }
+        ]);
+        
+      if (memberError) throw memberError;
+      
+      // 3. Create empty team metrics
+      const { error: metricsError } = await supabase
+        .from('team_metrics')
+        .insert([{ team_id: createdTeam.id }]);
+        
+      if (metricsError) throw metricsError;
+      
+      toast.success(`Team "${newTeam.name}" has been created successfully.`);
+      
+      // No need to manually update state as we're using real-time subscription
+      
+    } catch (error: any) {
+      console.error("Error creating team:", error);
+      toast.error(error.message || "Failed to create team");
     }
   };
 
-  const handleTeamDeleted = (teamId) => {
-    const updatedTeams = teamsData.filter(team => team.id !== teamId);
-    setTeamsData(updatedTeams);
-    
-    // If the currently selected team was deleted, select another one
-    if (selectedTeam.id === teamId && updatedTeams.length > 0) {
-      setSelectedTeam(updatedTeams[0]);
+  const handleAgentCreated = async (newAgent: any) => {
+    try {
+      if (!selectedTeam) {
+        throw new Error("No team selected");
+      }
+      
+      // 1. Insert the new agent
+      const { data, error } = await supabase
+        .from('agents')
+        .insert([
+          { 
+            name: newAgent.name, 
+            team_id: selectedTeam.id, 
+            color: newAgent.color,
+            status: 'active',
+            image: '/placeholder.svg'
+          }
+        ])
+        .select();
+        
+      if (error || !data) throw error || new Error("Failed to create agent");
+      
+      const createdAgent = data[0];
+      
+      // 2. Create empty agent metrics
+      const { error: metricsError } = await supabase
+        .from('agent_metrics')
+        .insert([{ 
+          agent_id: createdAgent.id,
+          conversations: 0,
+          response_time: '0.0s',
+          satisfaction: 0
+        }]);
+        
+      if (metricsError) throw metricsError;
+      
+      toast.success(`Agent "${newAgent.name}" has been created successfully.`);
+      
+      // No need to manually update state as we're using real-time subscription
+      
+    } catch (error: any) {
+      console.error("Error creating agent:", error);
+      toast.error(error.message || "Failed to create agent");
     }
   };
 
-  const handleAgentCreated = (newAgent) => {
-    // Add the new agent to the currently selected team
-    setTeamsData(prevTeams => prevTeams.map(team => 
-      team.id === selectedTeam.id 
-        ? { 
-            ...team, 
-            agents: [...team.agents, newAgent] 
-          } 
-        : team
-    ));
-
-    // Update the selected team reference
-    setSelectedTeam(prevSelected => ({
-      ...prevSelected,
-      agents: [...prevSelected.agents, newAgent]
-    }));
+  const handleTeamEdited = async (updatedTeam: any) => {
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({ name: updatedTeam.name })
+        .eq('id', updatedTeam.id);
+        
+      if (error) throw error;
+      
+      toast.success(`Team "${updatedTeam.name}" has been updated successfully.`);
+      
+      // No need to manually update state as we're using real-time subscription
+      
+    } catch (error: any) {
+      console.error("Error updating team:", error);
+      toast.error(error.message || "Failed to update team");
+    }
   };
 
-  // Get all agents for other components
-  const allAgents = teamsData.flatMap(team => team.agents);
+  const handleTeamDeleted = async (teamId: string) => {
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', teamId);
+        
+      if (error) throw error;
+      
+      toast.success("Team has been deleted successfully.");
+      
+      // No need to manually update state as we're using real-time subscription
+      
+    } catch (error: any) {
+      console.error("Error deleting team:", error);
+      toast.error(error.message || "Failed to delete team");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-lg">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -208,10 +378,12 @@ const Dashboard = () => {
 
         {/* Main content - with bg-[#f5f5f5] */}
         <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
-          <TeamDashboard 
-            team={selectedTeam}
-            teamsList={teamsData}
-          />
+          {selectedTeam && (
+            <TeamDashboard 
+              team={selectedTeam}
+              teamsList={teamsData}
+            />
+          )}
         </div>
       </div>
     </div>

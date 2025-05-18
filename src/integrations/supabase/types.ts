@@ -9,7 +9,179 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      agent_metrics: {
+        Row: {
+          agent_id: string
+          conversations: number
+          id: string
+          response_time: string
+          satisfaction: number
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          conversations?: number
+          id?: string
+          response_time?: string
+          satisfaction?: number
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          conversations?: number
+          id?: string
+          response_time?: string
+          satisfaction?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_metrics_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          image: string | null
+          name: string
+          status: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          image?: string | null
+          name: string
+          status?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          image?: string | null
+          name?: string
+          status?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_metrics: {
+        Row: {
+          api_calls: number
+          avg_response_time: string
+          id: string
+          satisfaction: number
+          team_id: string
+          total_conversations: number
+          updated_at: string
+          usage_percent: number
+        }
+        Insert: {
+          api_calls?: number
+          avg_response_time?: string
+          id?: string
+          satisfaction?: number
+          team_id: string
+          total_conversations?: number
+          updated_at?: string
+          usage_percent?: number
+        }
+        Update: {
+          api_calls?: number
+          avg_response_time?: string
+          id?: string
+          satisfaction?: number
+          team_id?: string
+          total_conversations?: number
+          updated_at?: string
+          usage_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_metrics_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

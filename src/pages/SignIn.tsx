@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,62 @@ const SignIn = () => {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetEmailLoading, setResetEmailLoading] = useState(false);
 
+  // Check if the user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // User is signed in, check onboarding status
+        redirectBasedOnOnboardingStatus(session.user.id);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  // Function to determine where to redirect user based on onboarding status
+  const redirectBasedOnOnboardingStatus = async (userId: string) => {
+    try {
+      // 1. Check if user has any teams
+      const { data: teamMembers, error: teamError } = await supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', userId);
+      
+      if (teamError) throw teamError;
+      
+      if (!teamMembers || teamMembers.length === 0) {
+        // User has no teams, send to create team page
+        navigate('/onboarding/create-team');
+        return;
+      }
+      
+      // 2. Check if the team has any agents
+      const teamId = teamMembers[0].team_id;
+      const { data: agents, error: agentError } = await supabase
+        .from('agents')
+        .select('id')
+        .eq('team_id', teamId)
+        .limit(1);
+      
+      if (agentError) throw agentError;
+      
+      if (!agents || agents.length === 0) {
+        // User has a team but no agents, send to create agent page
+        navigate('/onboarding/create-agent');
+        return;
+      }
+      
+      // User has completed onboarding, go to dashboard
+      navigate('/dashboard');
+      
+    } catch (error) {
+      console.error("Error checking onboarding status:", error);
+      // If there's any error, default to dashboard
+      navigate('/dashboard');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -31,7 +87,7 @@ const SignIn = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -41,7 +97,14 @@ const SignIn = () => {
       }
       
       toast.success("Successfully signed in");
-      navigate("/dashboard");
+      
+      // Redirect based on onboarding status
+      if (data.user) {
+        redirectBasedOnOnboardingStatus(data.user.id);
+      } else {
+        // Fallback to dashboard if no user data
+        navigate("/dashboard");
+      }
     } catch (error: any) {
       console.error("Error signing in:", error);
       toast.error(error.message || "Failed to sign in");
@@ -154,7 +217,11 @@ const SignIn = () => {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full">
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={() => toast.error("Google sign in is not implemented yet")}
+          >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 48 48" fill="none">
               <g clipPath="url(#clip0_17_40)">
                 <path d="M47.532 24.5528C47.532 22.9214 47.3997 21.2811 47.1175 19.6761H24.48V28.9181H37.4434C36.9055 31.8988 35.177 34.5356 32.6461 36.2111V42.2078H40.3801C44.9217 38.0278 47.532 31.8547 47.532 24.5528Z" fill="#4285F4" />

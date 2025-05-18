@@ -23,45 +23,55 @@ import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
+import CreateTeam from "./pages/onboarding/CreateTeam";
+import CreateAgent from "./pages/onboarding/CreateAgent";
+import { AuthProvider } from "./providers/AuthProvider";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/usage" element={<UsagePage />} />
-          <Route path="/agent/:agentId" element={<AgentEnvironment />} />
-          <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
-          <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
-          <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
-          <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
-          <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
-          
-          {/* Agent Settings Routes - Using wildcard for nested routes */}
-          <Route path="/agent/:agentId/settings/*" element={<AgentSettingsPage />} />
-          
-          {/* Admin Settings Routes */}
-          <Route path="/settings" element={<Settings />}>
-            <Route index element={<GeneralSettings />} />
-            <Route path="general" element={<GeneralSettings />} />
-            <Route path="members" element={<MembersSettings />} />
-            <Route path="plans" element={<PlansSettings />} />
-            <Route path="billing" element={<BillingSettings />} />
-            <Route path="api-keys" element={<ApiKeys />} />
-            <Route path="usage" element={<UsageSettings />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/usage" element={<UsagePage />} />
+            
+            {/* Onboarding Routes */}
+            <Route path="/onboarding/create-team" element={<CreateTeam />} />
+            <Route path="/onboarding/create-agent" element={<CreateAgent />} />
+
+            <Route path="/agent/:agentId" element={<AgentEnvironment />} />
+            <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
+            <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
+            <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
+            <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
+            <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
+            
+            {/* Agent Settings Routes - Using wildcard for nested routes */}
+            <Route path="/agent/:agentId/settings/*" element={<AgentSettingsPage />} />
+            
+            {/* Admin Settings Routes */}
+            <Route path="/settings" element={<Settings />}>
+              <Route index element={<GeneralSettings />} />
+              <Route path="general" element={<GeneralSettings />} />
+              <Route path="members" element={<MembersSettings />} />
+              <Route path="plans" element={<PlansSettings />} />
+              <Route path="billing" element={<BillingSettings />} />
+              <Route path="api-keys" element={<ApiKeys />} />
+              <Route path="usage" element={<UsageSettings />} />
+            </Route>
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
