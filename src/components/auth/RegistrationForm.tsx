@@ -30,11 +30,14 @@ const RegistrationForm = () => {
     setIsSubmitting(true);
     
     try {
+      // Use current site URL for redirects instead of hardcoded URL
+      const redirectTo = `${window.location.origin}/signin`;
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/signin`,
+          emailRedirectTo: redirectTo,
         }
       });
       

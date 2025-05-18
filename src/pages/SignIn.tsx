@@ -132,8 +132,11 @@ const SignIn = () => {
     setResetEmailLoading(true);
     
     try {
+      // Use current site URL for redirects instead of hardcoded URL
+      const redirectTo = `${window.location.origin}/reset-password`;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: redirectTo,
       });
       
       if (error) {
