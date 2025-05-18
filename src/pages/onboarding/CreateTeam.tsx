@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getAuthenticatedClient } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -81,13 +81,23 @@ const CreateTeam = () => {
       return;
     }
     
+    if (!session || !session.access_token) {
+      toast.error("Session is not valid. Please sign in again.");
+      await supabase.auth.signOut();
+      navigate("/signin");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
       console.log("Creating team with user ID:", user.id);
       
+      // Get authenticated client using the session token
+      const authClient = getAuthenticatedClient(session.access_token);
+      
       // Create a new team - EXPLICITLY set created_by to the current user ID
-      const { data: teamData, error: teamError } = await supabase
+      const { data: teamData, error: teamError } = await authClient
         .from('teams')
         .insert([
           { 
@@ -105,7 +115,7 @@ const CreateTeam = () => {
       const newTeam = teamData[0];
       
       // Add user as a team member
-      const { error: memberError } = await supabase
+      const { error: memberError } = await authClient
         .from('team_members')
         .insert([
           { 
@@ -118,7 +128,7 @@ const CreateTeam = () => {
       if (memberError) throw memberError;
       
       // Create team metrics
-      const { error: metricsError } = await supabase
+      const { error: metricsError } = await authClient
         .from('team_metrics')
         .insert([{ team_id: newTeam.id }]);
       
