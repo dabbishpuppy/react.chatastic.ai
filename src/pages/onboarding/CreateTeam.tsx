@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,31 +6,26 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/providers/AuthProvider";
 
 const CreateTeam = () => {
   const navigate = useNavigate();
   const [teamName, setTeamName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const { user, session } = useAuth(); // Use the auth provider to get current user
 
   // Check authentication status and email verification
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session) {
         // No session, redirect to sign in
         toast.error("Please sign in to continue");
         navigate("/signin");
         return;
       }
-
-      // Get user data
-      const { data: userData } = await supabase.auth.getUser();
-      setUser(userData?.user);
       
       // If email is not confirmed, redirect to sign in
-      if (userData?.user && !userData.user.email_confirmed_at) {
+      if (user && !user.email_confirmed_at) {
         toast.error("Please verify your email before continuing");
         await supabase.auth.signOut();
         navigate("/signin");
@@ -39,11 +33,11 @@ const CreateTeam = () => {
       }
       
       // Check if user already has a team
-      if (userData?.user) {
+      if (user) {
         const { data: teamMembers } = await supabase
           .from('team_members')
           .select('team_id')
-          .eq('user_id', userData.user.id);
+          .eq('user_id', user.id);
         
         if (teamMembers && teamMembers.length > 0) {
           // User already has a team, check if they have agents
@@ -66,7 +60,7 @@ const CreateTeam = () => {
     };
     
     checkAuth();
-  }, [navigate]);
+  }, [navigate, user, session]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,11 +79,15 @@ const CreateTeam = () => {
     setIsSubmitting(true);
     
     try {
-      // 1. Create a new team
+      // 1. Create a new team - WITH user.id as reference to satisfy RLS
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .insert([
-          { name: teamName, is_active: true }
+          { 
+            name: teamName, 
+            is_active: true,
+            created_by: user.id // Add the user ID to satisfy RLS policy
+          }
         ])
         .select();
       
