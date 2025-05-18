@@ -3,6 +3,8 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { DollarSign, User, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const SidebarActions = () => {
   const navigate = useNavigate();
@@ -15,8 +17,15 @@ const SidebarActions = () => {
     navigate("/settings/general");
   };
 
-  const handleLogoutClick = () => {
-    navigate("/signout");
+  const handleLogoutClick = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success("Successfully signed out");
+      navigate("/signin");
+    } catch (error: any) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
+    }
   };
   
   return (

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -190,6 +189,18 @@ const CreateTeam = () => {
     }
   };
 
+  // Handle sign out 
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success("Successfully signed out");
+      navigate("/signin");
+    } catch (error: any) {
+      console.error("Error signing out:", error);
+      toast.error("Failed to sign out");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
       {!user ? (
@@ -283,7 +294,7 @@ const CreateTeam = () => {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => supabase.auth.signOut().then(() => navigate("/signin"))}
+              onClick={handleSignOut}
             >
               Sign Out
             </Button>
