@@ -84,14 +84,16 @@ const CreateTeam = () => {
     setIsSubmitting(true);
     
     try {
-      // 1. Create a new team - WITH user.id as reference to satisfy RLS
+      console.log("Creating team with user ID:", user.id);
+      
+      // Create a new team - EXPLICITLY set created_by to the current user ID
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .insert([
           { 
             name: teamName, 
             is_active: true,
-            created_by: user.id // Add the user ID to satisfy RLS policy
+            created_by: user.id  // Explicitly set created_by to user.id
           }
         ])
         .select();
@@ -102,7 +104,7 @@ const CreateTeam = () => {
 
       const newTeam = teamData[0];
       
-      // 2. Add user as a team member
+      // Add user as a team member
       const { error: memberError } = await supabase
         .from('team_members')
         .insert([
@@ -115,7 +117,7 @@ const CreateTeam = () => {
       
       if (memberError) throw memberError;
       
-      // 3. Create team metrics
+      // Create team metrics
       const { error: metricsError } = await supabase
         .from('team_metrics')
         .insert([{ team_id: newTeam.id }]);
