@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -54,23 +53,26 @@ interface Team {
   agents: any[];
 }
 
+// Update the interface to match the expected type
+interface Agent {
+  id: number | string; // Accept both number and string for id
+  name: string;
+  image: string;
+  color: string;
+  status: "active";
+  metrics: {
+    conversations: number;
+    responseTime: string;
+    satisfaction: number;
+  };
+  teamId: string;
+}
+
 interface CreateAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teams: Team[];
-  onAgentCreated: (agent: {
-    id: number;
-    name: string;
-    image: string;
-    color: string;
-    status: "active";
-    metrics: {
-      conversations: number;
-      responseTime: string;
-      satisfaction: number;
-    };
-    teamId: string;
-  }) => void;
+  onAgentCreated: (agent: Agent) => void;
 }
 
 const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
@@ -118,7 +120,8 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
             team_id: selectedTeam.id,
             color: autoAssignedColor,
             status: 'active',
-            image: '/placeholder.svg'
+            image: '/placeholder.svg',
+            created_by: user.id // Add created_by field with user's ID
           }
         ])
         .select();
@@ -144,12 +147,13 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
       }
       
       // Format the agent object to match expected interface
-      const formattedAgent = {
-        id: newAgent.id,
+      // Convert the id to number using parseInt if needed or keep as is
+      const formattedAgent: Agent = {
+        id: newAgent.id, // No need to convert as we updated the interface
         name: newAgent.name,
         image: newAgent.image || "/placeholder.svg",
         color: newAgent.color,
-        status: "active" as const,
+        status: "active",
         metrics: {
           conversations: 0,
           responseTime: "0.0s",
