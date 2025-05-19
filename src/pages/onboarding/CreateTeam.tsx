@@ -87,7 +87,7 @@ const CreateTeam = () => {
     
     try {
       console.log("Creating team with user ID:", user.id);
-      console.log("Using session access token:", session.access_token.substring(0, 10) + "...");
+      console.log("Session token available:", !!session.access_token);
       
       // Get authenticated client using the session token
       const authClient = getAuthenticatedClient(session.access_token);

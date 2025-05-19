@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getAuthenticatedClient } from "@/integrations/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 
 // Define the form schema
@@ -55,7 +55,7 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
   onOpenChange,
   onTeamCreated,
 }) => {
-  const { user } = useAuth(); // Get the current authenticated user
+  const { user, session } = useAuth(); // Get the current authenticated user and session
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -65,7 +65,7 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
   });
 
   const onSubmit = async (values: FormValues) => {
-    if (!user) {
+    if (!user || !session?.access_token) {
       toast({
         title: "Authentication error",
         description: "You must be logged in to create a team.",
@@ -75,8 +75,11 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
     }
 
     try {
+      // Get authenticated client using the session token
+      const authClient = getAuthenticatedClient(session.access_token);
+      
       // Create the team in Supabase with the user ID as created_by
-      const { data: teamData, error: teamError } = await supabase
+      const { data: teamData, error: teamError } = await authClient
         .from('teams')
         .insert([
           { 
@@ -98,12 +101,12 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
       const newTeam = teamData[0];
       
       // Create team metrics entry
-      await supabase
+      await authClient
         .from('team_metrics')
         .insert([{ team_id: newTeam.id }]);
       
       // Add user as team member with owner role
-      await supabase
+      await authClient
         .from('team_members')
         .insert([
           {

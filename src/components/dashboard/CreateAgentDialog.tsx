@@ -23,6 +23,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
+import { supabase, getAuthenticatedClient } from "@/integrations/supabase/client";
+import { useAuth } from "@/providers/AuthProvider";
 
 // Define the form schema - removed teamId requirement
 const formSchema = z.object({
@@ -78,6 +80,7 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   onAgentCreated,
 }) => {
   const navigate = useNavigate();
+  const { user, session } = useAuth(); // Get authentication info
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
   
   const form = useForm<FormValues>({
@@ -87,37 +90,92 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     },
   });
 
-  const onSubmit = (values: FormValues) => {
-    // Auto-assign a color from the palette (round robin based on team's existing agents)
-    const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
-    const colorIndex = teamAgentsCount % agentColorPalette.length;
-    const autoAssignedColor = agentColorPalette[colorIndex];
-    
-    // Create a new agent with the form values
-    const newAgent = {
-      id: Date.now(), // Use timestamp as a simple ID for now
-      name: values.name,
-      image: "/placeholder.svg",
-      color: autoAssignedColor,
-      status: "active" as const,
-      metrics: {
-        conversations: 0,
-        responseTime: "0.0s",
-        satisfaction: 0,
-      },
-      teamId: selectedTeam.id,
-    };
+  const onSubmit = async (values: FormValues) => {
+    if (!user || !session?.access_token) {
+      toast({
+        title: "Authentication error",
+        description: "You must be logged in to create an agent.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    onAgentCreated(newAgent);
-    toast({
-      title: "Agent created",
-      description: `${values.name} has been created successfully!`,
-    });
-    form.reset();
-    onOpenChange(false);
-    
-    // Redirect to the sources page for the new agent
-    navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+    try {
+      // Get authenticated client using the session token
+      const authClient = getAuthenticatedClient(session.access_token);
+      
+      // Auto-assign a color from the palette (round robin based on team's existing agents)
+      const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
+      const colorIndex = teamAgentsCount % agentColorPalette.length;
+      const autoAssignedColor = agentColorPalette[colorIndex];
+      
+      // Create a new agent in Supabase
+      const { data: agentData, error: agentError } = await authClient
+        .from('agents')
+        .insert([
+          { 
+            name: values.name,
+            team_id: selectedTeam.id,
+            color: autoAssignedColor,
+            status: 'active',
+            image: '/placeholder.svg'
+          }
+        ])
+        .select();
+        
+      if (agentError || !agentData || agentData.length === 0) {
+        throw agentError || new Error("Failed to create agent");
+      }
+      
+      const newAgent = agentData[0];
+      
+      // Create agent metrics
+      const { error: metricsError } = await authClient
+        .from('agent_metrics')
+        .insert([{ 
+          agent_id: newAgent.id,
+          conversations: 0,
+          response_time: '0.0s',
+          satisfaction: 0
+        }]);
+        
+      if (metricsError) {
+        throw metricsError;
+      }
+      
+      // Format the agent object to match expected interface
+      const formattedAgent = {
+        id: newAgent.id,
+        name: newAgent.name,
+        image: newAgent.image || "/placeholder.svg",
+        color: newAgent.color,
+        status: "active" as const,
+        metrics: {
+          conversations: 0,
+          responseTime: "0.0s",
+          satisfaction: 0,
+        },
+        teamId: selectedTeam.id,
+      };
+
+      onAgentCreated(formattedAgent);
+      toast({
+        title: "Agent created",
+        description: `${values.name} has been created successfully!`,
+      });
+      form.reset();
+      onOpenChange(false);
+      
+      // Redirect to the sources page for the new agent
+      navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
+    } catch (error: any) {
+      console.error("Error creating agent:", error);
+      toast({
+        title: "Error creating agent",
+        description: error.message || "Failed to create agent. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -147,7 +205,9 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
             />
 
             <DialogFooter>
-              <Button type="submit">Create Agent</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? "Creating..." : "Create Agent"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

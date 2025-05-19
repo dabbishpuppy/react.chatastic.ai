@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, getAuthenticatedClient } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/providers/AuthProvider";
 
 // Color palette for automatic assignment
 const agentColorPalette = [
@@ -28,89 +29,89 @@ const CreateAgent = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teams, setTeams] = useState<any[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const { user, session } = useAuth();
 
   // Check authentication status and fetch teams
   useEffect(() => {
     const checkAuthAndFetchTeams = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session) {
         toast.error("Please sign in to continue");
         navigate("/signin");
         return;
       }
 
-      // Get user data
-      const { data: userData } = await supabase.auth.getUser();
-      setUser(userData?.user);
-      
-      if (userData?.user && !userData.user.email_confirmed_at) {
+      // Check if email is verified
+      if (user && !user.email_confirmed_at) {
         toast.error("Please verify your email before continuing");
         await supabase.auth.signOut();
         navigate("/signin");
         return;
       }
       
-      // Fetch user's teams
-      if (userData?.user) {
-        const { data: teamMembers, error: teamMembersError } = await supabase
-          .from('team_members')
-          .select('team_id')
-          .eq('user_id', userData.user.id);
+      // Get authenticated client
+      if (session && session.access_token) {
+        const authClient = getAuthenticatedClient(session.access_token);
         
-        if (teamMembersError) {
-          console.error("Error fetching team members:", teamMembersError);
-          toast.error("Failed to load your teams");
-          return;
-        }
-        
-        if (!teamMembers || teamMembers.length === 0) {
-          // User doesn't have any teams, redirect to create team
-          navigate('/onboarding/create-team');
-          return;
-        }
-        
-        // Fetch team details
-        const teamIds = teamMembers.map(member => member.team_id);
-        const { data: teamsData, error: teamsError } = await supabase
-          .from('teams')
-          .select('*')
-          .in('id', teamIds);
-        
-        if (teamsError) {
-          console.error("Error fetching teams:", teamsError);
-          toast.error("Failed to load your teams");
-          return;
-        }
-        
-        if (teamsData) {
-          setTeams(teamsData);
-          // Select the first team by default
-          if (teamsData.length > 0) {
-            setSelectedTeamId(teamsData[0].id);
-          }
-        }
-        
-        // Check if user already has agents in any team
-        if (teamIds.length > 0) {
-          const { data: agents, error: agentsError } = await supabase
-            .from('agents')
-            .select('id, team_id')
-            .in('team_id', teamIds);
+        // Fetch user's teams
+        if (user) {
+          const { data: teamMembers, error: teamMembersError } = await authClient
+            .from('team_members')
+            .select('team_id')
+            .eq('user_id', user.id);
           
-          if (agentsError) {
-            console.error("Error checking agents:", agentsError);
-          } else if (agents && agents.length > 0) {
-            // User already has completed onboarding, redirect to dashboard
-            navigate('/dashboard');
+          if (teamMembersError) {
+            console.error("Error fetching team members:", teamMembersError);
+            toast.error("Failed to load your teams");
+            return;
+          }
+          
+          if (!teamMembers || teamMembers.length === 0) {
+            // User doesn't have any teams, redirect to create team
+            navigate('/onboarding/create-team');
+            return;
+          }
+          
+          // Fetch team details
+          const teamIds = teamMembers.map(member => member.team_id);
+          const { data: teamsData, error: teamsError } = await authClient
+            .from('teams')
+            .select('*')
+            .in('id', teamIds);
+          
+          if (teamsError) {
+            console.error("Error fetching teams:", teamsError);
+            toast.error("Failed to load your teams");
+            return;
+          }
+          
+          if (teamsData) {
+            setTeams(teamsData);
+            // Select the first team by default
+            if (teamsData.length > 0) {
+              setSelectedTeamId(teamsData[0].id);
+            }
+          }
+          
+          // Check if user already has agents in any team
+          if (teamIds.length > 0) {
+            const { data: agents, error: agentsError } = await authClient
+              .from('agents')
+              .select('id, team_id')
+              .in('team_id', teamIds);
+            
+            if (agentsError) {
+              console.error("Error checking agents:", agentsError);
+            } else if (agents && agents.length > 0) {
+              // User already has completed onboarding, redirect to dashboard
+              navigate('/dashboard');
+            }
           }
         }
       }
     };
     
     checkAuthAndFetchTeams();
-  }, [navigate]);
+  }, [navigate, user, session]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,11 +126,23 @@ const CreateAgent = () => {
       return;
     }
     
+    if (!session || !session.access_token || !user) {
+      toast.error("Authentication required. Please sign in again.");
+      navigate("/signin");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
+      // Get authenticated client
+      const authClient = getAuthenticatedClient(session.access_token);
+      
+      console.log("Creating agent with user ID:", user.id);
+      console.log("For team ID:", selectedTeamId);
+      
       // 1. Create a new agent
-      const { data: agentData, error: agentError } = await supabase
+      const { data: agentData, error: agentError } = await authClient
         .from('agents')
         .insert([
           { 
@@ -149,7 +162,7 @@ const CreateAgent = () => {
       const newAgent = agentData[0];
       
       // 2. Create agent metrics
-      const { error: metricsError } = await supabase
+      const { error: metricsError } = await authClient
         .from('agent_metrics')
         .insert([{ 
           agent_id: newAgent.id,
