@@ -1,86 +1,42 @@
 
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 const RegistrationForm = () => {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password !== confirmPassword) {
-      toast.error("Passwords don't match", {
+      toast({
+        title: "Passwords don't match",
         description: "Please make sure your passwords match.",
+        variant: "destructive",
       });
       return;
     }
     
     setIsSubmitting(true);
     
-    try {
-      // Use current site URL for redirects instead of hardcoded URL
-      const redirectTo = `${window.location.origin}/signin`;
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectTo,
-        }
+    // Simulate form submission
+    setTimeout(() => {
+      console.log("Form submitted:", { email, password });
+      toast({
+        title: "Registration successful!",
+        description: "Your account has been created.",
       });
-      
-      if (error) throw error;
-      
-      // Registration successful - show confirmation message
-      setEmailSent(true);
-      
-      // Don't navigate away yet - show the user instructions to check email
-      toast.success("Registration successful!", {
-        description: "Please check your email to verify your account.",
-      });
-      
-    } catch (error: any) {
-      console.error("Registration error:", error);
-      toast.error(error.message || "Failed to register");
-    } finally {
       setIsSubmitting(false);
-    }
+    }, 1000);
   };
-
-  if (emailSent) {
-    return (
-      <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 text-center">
-        <div className="flex justify-center mb-4">
-          <CheckCircle className="h-12 w-12 text-green-500" />
-        </div>
-        <h2 className="text-2xl font-bold mb-3">Verify your email</h2>
-        <p className="text-gray-600 mb-6">
-          We've sent a verification link to <strong>{email}</strong>.<br />
-          Please check your inbox and click the link to verify your account.
-        </p>
-        <Alert className="mb-6 bg-blue-50">
-          <AlertDescription className="text-blue-700">
-            After verifying your email, you'll need to sign in again to continue setting up your account.
-          </AlertDescription>
-        </Alert>
-        <Button onClick={() => navigate("/signin")} variant="outline" className="w-full">
-          Go to Sign In
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -99,7 +55,6 @@ const RegistrationForm = () => {
             onChange={(e) => setEmail(e.target.value)}
             required
             className="w-full"
-            disabled={isSubmitting}
           />
         </div>
         
@@ -112,7 +67,6 @@ const RegistrationForm = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            disabled={isSubmitting}
           />
         </div>
         
@@ -125,7 +79,6 @@ const RegistrationForm = () => {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            disabled={isSubmitting}
           />
         </div>
         
@@ -162,7 +115,6 @@ const RegistrationForm = () => {
             type="button"
             variant="outline"
             className="w-full border-gray-300 flex items-center justify-center space-x-2"
-            onClick={() => toast.error("Google sign up is not implemented yet")}
           >
             <svg className="w-5 h-5" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4ZM24 4C35.0457 4 44 12.9543 44 24C44 29.6325 42.0187 34.7927 38.6451 38.6451" stroke="#EA4335" strokeWidth="4" />

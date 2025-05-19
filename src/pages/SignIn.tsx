@@ -1,178 +1,21 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Check, X } from "lucide-react";
-import { useAuth } from "@/providers/AuthProvider";
 
 const SignIn = () => {
   const navigate = useNavigate();
-  const { user, session, isLoading } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
-  const [resetEmailLoading, setResetEmailLoading] = useState(false);
 
-  // Check if the user is already logged in
-  useEffect(() => {
-    console.log("SignIn useEffect - session:", session ? "exists" : "none", "isLoading:", isLoading);
-    
-    if (!isLoading && session) {
-      // User is signed in, redirect to dashboard
-      console.log("User is already signed in, redirecting to dashboard");
-      redirectBasedOnOnboardingStatus(session.user.id);
-    }
-  }, [session, isLoading, navigate]);
-
-  // Function to determine where to redirect user based on onboarding status
-  const redirectBasedOnOnboardingStatus = async (userId: string) => {
-    try {
-      console.log("Checking onboarding status for user:", userId);
-      // 1. Check if user has any teams
-      const { data: teamMembers, error: teamError } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', userId);
-      
-      if (teamError) throw teamError;
-      
-      console.log("Team members:", teamMembers);
-      
-      if (!teamMembers || teamMembers.length === 0) {
-        // User has no teams, send to create team page
-        console.log("User has no teams, redirecting to create team page");
-        navigate('/onboarding/create-team');
-        return;
-      }
-      
-      // 2. Check if the team has any agents
-      const teamId = teamMembers[0].team_id;
-      const { data: agents, error: agentError } = await supabase
-        .from('agents')
-        .select('id')
-        .eq('team_id', teamId)
-        .limit(1);
-      
-      if (agentError) throw agentError;
-      
-      console.log("Agents:", agents);
-      
-      if (!agents || agents.length === 0) {
-        // User has a team but no agents, send to create agent page
-        console.log("User has a team but no agents, redirecting to create agent page");
-        navigate('/onboarding/create-agent');
-        return;
-      }
-      
-      // User has completed onboarding, go to dashboard
-      console.log("User has completed onboarding, redirecting to dashboard");
-      navigate('/dashboard');
-      
-    } catch (error) {
-      console.error("Error checking onboarding status:", error);
-      // If there's any error, default to dashboard
-      navigate('/dashboard');
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate that both fields are filled
-    if (!email.trim() || !password.trim()) {
-      toast.error("Please enter both email and password");
-      return;
-    }
-    
-    setLoginLoading(true);
-    
-    try {
-      console.log("Attempting to sign in with:", email);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast.success("Successfully signed in");
-      
-      // Redirect based on onboarding status
-      if (data.user) {
-        redirectBasedOnOnboardingStatus(data.user.id);
-      } else {
-        // Fallback to dashboard if no user data
-        navigate("/dashboard");
-      }
-    } catch (error: any) {
-      console.error("Error signing in:", error);
-      toast.error(error.message || "Failed to sign in");
-    } finally {
-      setLoginLoading(false);
-    }
+    // In a real app, we would authenticate the user here
+    // For now, we'll just navigate to the dashboard
+    navigate("/dashboard");
   };
-
-  const handleForgotPassword = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    
-    // Validate email
-    if (!email.trim()) {
-      toast.error("Please enter your email address");
-      return;
-    }
-    
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error("Please enter a valid email address");
-      return;
-    }
-    
-    setResetEmailLoading(true);
-    
-    try {
-      // Use current site URL for redirects instead of hardcoded URL
-      const redirectTo = `${window.location.origin}/reset-password`;
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: redirectTo,
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      setResetEmailSent(true);
-      toast.success("Password reset email sent");
-    } catch (error: any) {
-      console.error("Error sending reset email:", error);
-      toast.error(error.message || "Failed to send password reset email");
-    } finally {
-      setResetEmailLoading(false);
-    }
-  };
-
-  // If already logged in, show loading state while we check onboarding status
-  if (!isLoading && session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-lg">Loading your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
@@ -184,52 +27,16 @@ const SignIn = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {resetEmailSent && (
-            <Alert className="mb-6 bg-green-50">
-              <Check className="h-4 w-4 text-green-500" />
-              <AlertDescription className="text-green-700">
-                Password reset email sent. Please check your inbox and follow the instructions.
-              </AlertDescription>
-            </Alert>
-          )}
-          
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                placeholder="name@example.com" 
-                type="email" 
-                required 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loginLoading || resetEmailLoading}
-              />
+              <Input id="email" placeholder="name@example.com" type="email" required />
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label htmlFor="password">Password</Label>
-                <Button
-                  variant="link"
-                  className="p-0 h-auto text-xs text-blue-500"
-                  onClick={handleForgotPassword}
-                  disabled={loginLoading || resetEmailLoading}
-                  type="button"
-                >
-                  {resetEmailLoading ? "Sending..." : "Forgot Password?"}
-                </Button>
-              </div>
-              <PasswordInput 
-                id="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={loginLoading || resetEmailLoading}
-              />
+              <Label htmlFor="password">Password</Label>
+              <PasswordInput id="password" required />
             </div>
-            <Button type="submit" className="w-full" disabled={loginLoading || resetEmailLoading}>
-              {loginLoading ? "Signing in..." : "Sign In"}
-            </Button>
+            <Button type="submit" className="w-full">Sign In</Button>
           </form>
 
           <div className="relative my-6">
@@ -241,11 +48,7 @@ const SignIn = () => {
             </div>
           </div>
 
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={() => toast.error("Google sign in is not implemented yet")}
-          >
+          <Button variant="outline" className="w-full">
             <svg className="mr-2 h-4 w-4" viewBox="0 0 48 48" fill="none">
               <g clipPath="url(#clip0_17_40)">
                 <path d="M47.532 24.5528C47.532 22.9214 47.3997 21.2811 47.1175 19.6761H24.48V28.9181H37.4434C36.9055 31.8988 35.177 34.5356 32.6461 36.2111V42.2078H40.3801C44.9217 38.0278 47.532 31.8547 47.532 24.5528Z" fill="#4285F4" />

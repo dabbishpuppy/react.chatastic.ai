@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface Agent {
-  id: number | string; // Updated to accept both number and string
+  id: number;
   name: string;
   image: string;
   color: string;
@@ -85,7 +86,7 @@ const AgentsList = ({
     );
   };
 
-  const handleAgentDeleted = (agentId: number | string) => {
+  const handleAgentDeleted = (agentId: number) => {
     setLocalAgents(prevAgents => 
       prevAgents.filter(agent => agent.id !== agentId)
     );

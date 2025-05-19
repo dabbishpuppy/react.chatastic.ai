@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: number | string; // Updated to accept both number and string
+  id: number;
   name: string;
   image: string;
   color: string;

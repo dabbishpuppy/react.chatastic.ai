@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: number | string; // Updated to accept both number and string
+  id: number;
   name: string;
   image: string;
   color: string;
@@ -32,7 +32,7 @@ interface DeleteAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: Agent;
-  onAgentDeleted: (agentId: number | string) => void;
+  onAgentDeleted: (agentId: number) => void;
 }
 
 const DeleteAgentDialog = ({

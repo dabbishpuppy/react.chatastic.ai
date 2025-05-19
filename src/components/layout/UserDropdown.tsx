@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,17 +9,8 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, LayoutDashboard, User, LogOut, UserRound, Book, HelpCircle, GitPullRequest } from "lucide-react";
-import { useAuth } from "@/providers/AuthProvider";
 
 const UserDropdown: React.FC = () => {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-  
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/signin');
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-1">
@@ -31,7 +22,7 @@ const UserDropdown: React.FC = () => {
       <DropdownMenuContent align="end" className="w-64 p-2 bg-white">
         <div className="px-3 py-2">
           <div className="font-medium">Wonderwave</div>
-          <div className="text-sm text-gray-500">{user?.email || 'User'}</div>
+          <div className="text-sm text-gray-500">nohman@wonderwave.no</div>
         </div>
         
         <DropdownMenuSeparator />
@@ -73,11 +64,11 @@ const UserDropdown: React.FC = () => {
         
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem onClick={handleSignOut}>
-          <div className="w-full text-sm flex items-center gap-2">
+        <DropdownMenuItem>
+          <Link to="/signout" className="w-full text-sm flex items-center gap-2">
             <LogOut size={16} />
             Sign out
-          </div>
+          </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
