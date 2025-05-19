@@ -10,31 +10,32 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Check, X } from "lucide-react";
+import { useAuth } from "@/providers/AuthProvider";
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const { user, session, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [resetEmailLoading, setResetEmailLoading] = useState(false);
 
   // Check if the user is already logged in
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // User is signed in, check onboarding status
-        redirectBasedOnOnboardingStatus(session.user.id);
-      }
-    };
-
-    checkSession();
-  }, []);
+    console.log("SignIn useEffect - session:", session ? "exists" : "none", "isLoading:", isLoading);
+    
+    if (!isLoading && session) {
+      // User is signed in, redirect to dashboard
+      console.log("User is already signed in, redirecting to dashboard");
+      redirectBasedOnOnboardingStatus(session.user.id);
+    }
+  }, [session, isLoading, navigate]);
 
   // Function to determine where to redirect user based on onboarding status
   const redirectBasedOnOnboardingStatus = async (userId: string) => {
     try {
+      console.log("Checking onboarding status for user:", userId);
       // 1. Check if user has any teams
       const { data: teamMembers, error: teamError } = await supabase
         .from('team_members')
@@ -43,8 +44,11 @@ const SignIn = () => {
       
       if (teamError) throw teamError;
       
+      console.log("Team members:", teamMembers);
+      
       if (!teamMembers || teamMembers.length === 0) {
         // User has no teams, send to create team page
+        console.log("User has no teams, redirecting to create team page");
         navigate('/onboarding/create-team');
         return;
       }
@@ -59,13 +63,17 @@ const SignIn = () => {
       
       if (agentError) throw agentError;
       
+      console.log("Agents:", agents);
+      
       if (!agents || agents.length === 0) {
         // User has a team but no agents, send to create agent page
+        console.log("User has a team but no agents, redirecting to create agent page");
         navigate('/onboarding/create-agent');
         return;
       }
       
       // User has completed onboarding, go to dashboard
+      console.log("User has completed onboarding, redirecting to dashboard");
       navigate('/dashboard');
       
     } catch (error) {
@@ -84,9 +92,10 @@ const SignIn = () => {
       return;
     }
     
-    setIsLoading(true);
+    setLoginLoading(true);
     
     try {
+      console.log("Attempting to sign in with:", email);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -109,7 +118,7 @@ const SignIn = () => {
       console.error("Error signing in:", error);
       toast.error(error.message || "Failed to sign in");
     } finally {
-      setIsLoading(false);
+      setLoginLoading(false);
     }
   };
 
@@ -153,6 +162,18 @@ const SignIn = () => {
     }
   };
 
+  // If already logged in, show loading state while we check onboarding status
+  if (!isLoading && session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-lg">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-100 p-4">
       <Card className="w-full max-w-md">
@@ -182,7 +203,7 @@ const SignIn = () => {
                 required 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading || resetEmailLoading}
+                disabled={loginLoading || resetEmailLoading}
               />
             </div>
             <div className="space-y-2">
@@ -192,7 +213,7 @@ const SignIn = () => {
                   variant="link"
                   className="p-0 h-auto text-xs text-blue-500"
                   onClick={handleForgotPassword}
-                  disabled={isLoading || resetEmailLoading}
+                  disabled={loginLoading || resetEmailLoading}
                   type="button"
                 >
                   {resetEmailLoading ? "Sending..." : "Forgot Password?"}
@@ -203,11 +224,11 @@ const SignIn = () => {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading || resetEmailLoading}
+                disabled={loginLoading || resetEmailLoading}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading || resetEmailLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
+            <Button type="submit" className="w-full" disabled={loginLoading || resetEmailLoading}>
+              {loginLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
 

@@ -1,12 +1,13 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/providers/AuthProvider";
 
 const Dashboard = () => {
+  const { user, session, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("agents");
   const [teamsData, setTeamsData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,26 +20,39 @@ const Dashboard = () => {
 
   // Auth check and data loading
   useEffect(() => {
+    console.log("Dashboard useEffect - session:", session ? "exists" : "none", "authLoading:", authLoading);
+    
     const checkAuthAndLoadData = async () => {
       try {
+        // If auth is still loading, wait
+        if (authLoading) {
+          console.log("Auth is still loading...");
+          return;
+        }
+        
         setIsLoading(true);
         
         // Check authentication
-        const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
+          console.log("No session found, redirecting to sign in");
           toast.error("Please sign in to access the dashboard");
           navigate("/signin");
           return;
         }
 
+        console.log("User authenticated:", session.user.id);
+        
         // Get user data to check email verification
         const { data: userData } = await supabase.auth.getUser();
         if (userData?.user && !userData.user.email_confirmed_at) {
+          console.log("Email not verified");
           toast.error("Please verify your email before accessing the dashboard");
           await supabase.auth.signOut();
           navigate("/signin");
           return;
         }
+        
+        console.log("Loading teams data...");
         
         // Load teams the user belongs to
         const { data: teamMembers, error: teamMembersError } = await supabase
@@ -46,10 +60,16 @@ const Dashboard = () => {
           .select('team_id')
           .eq('user_id', session.user.id);
           
-        if (teamMembersError) throw teamMembersError;
+        if (teamMembersError) {
+          console.error("Error fetching team members:", teamMembersError);
+          throw teamMembersError;
+        }
+        
+        console.log("Team members data:", teamMembers);
         
         if (!teamMembers || teamMembers.length === 0) {
           // User has no teams, redirect to onboarding
+          console.log("User has no teams, redirecting to create team page");
           navigate("/onboarding/create-team");
           return;
         }
@@ -62,9 +82,15 @@ const Dashboard = () => {
           .select('*')
           .in('id', teamIds);
           
-        if (teamsError) throw teamsError;
+        if (teamsError) {
+          console.error("Error fetching teams:", teamsError);
+          throw teamsError;
+        }
+        
+        console.log("Teams data:", teams);
         
         if (!teams || teams.length === 0) {
+          console.log("No teams found, redirecting to create team page");
           navigate("/onboarding/create-team");
           return;
         }
@@ -77,7 +103,12 @@ const Dashboard = () => {
             .select('*')
             .eq('team_id', team.id);
             
-          if (agentsError) throw agentsError;
+          if (agentsError) {
+            console.error("Error fetching agents:", agentsError);
+            throw agentsError;
+          }
+          
+          console.log(`Agents for team ${team.id}:`, agents);
           
           // Fetch metrics for each agent
           const agentsWithMetrics = await Promise.all((agents || []).map(async (agent) => {
@@ -135,15 +166,19 @@ const Dashboard = () => {
           };
         }));
         
+        console.log("Teams with agents:", teamsWithAgents);
+        
         setTeamsData(teamsWithAgents);
         
         // Check if any team is marked as active, otherwise use the first one
         const activeTeam = teamsWithAgents.find(team => team.is_active) || teamsWithAgents[0];
+        console.log("Selected team:", activeTeam);
         setSelectedTeam(activeTeam);
         
         // Check if the selected team has agents
         if (activeTeam.agents.length === 0) {
           // No agents, redirect to create agent page
+          console.log("Selected team has no agents, redirecting to create agent page");
           navigate("/onboarding/create-agent");
           return;
         }
@@ -162,6 +197,7 @@ const Dashboard = () => {
     const teamsSubscription = supabase
       .channel('public:teams')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
+        console.log("Teams data changed, reloading...");
         checkAuthAndLoadData();
       })
       .subscribe();
@@ -169,15 +205,17 @@ const Dashboard = () => {
     const agentsSubscription = supabase
       .channel('public:agents')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agents' }, () => {
+        console.log("Agents data changed, reloading...");
         checkAuthAndLoadData();
       })
       .subscribe();
     
     return () => {
+      console.log("Cleaning up dashboard subscriptions");
       supabase.removeChannel(teamsSubscription);
       supabase.removeChannel(agentsSubscription);
     };
-  }, [navigate]);
+  }, [session, authLoading, navigate]);
 
   const handleTabChange = (tab: any) => {
     setActiveTab(tab);
@@ -349,7 +387,7 @@ const Dashboard = () => {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -358,6 +396,12 @@ const Dashboard = () => {
         </div>
       </div>
     );
+  }
+
+  if (!session || !user) {
+    // This should not happen since we redirect in useEffect, but just in case
+    navigate("/signin");
+    return null;
   }
 
   return (
