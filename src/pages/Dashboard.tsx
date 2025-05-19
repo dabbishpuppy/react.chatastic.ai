@@ -225,28 +225,31 @@ const Dashboard = () => {
   };
 
   const handleTeamSelect = (team: any) => {
-    setSelectedTeam(team);
-    
-    // Update the is_active status in the database
-    const updateTeamActive = async () => {
-      try {
-        // First, set all teams to inactive
-        await supabase
-          .from('teams')
-          .update({ is_active: false })
-          .in('id', teamsData.map(t => t.id));
-          
-        // Then set the selected team to active
-        await supabase
-          .from('teams')
-          .update({ is_active: true })
-          .eq('id', team.id);
-      } catch (error) {
-        console.error("Error updating team active status:", error);
-      }
-    };
-    
-    updateTeamActive();
+    // Only set the selected team if it's a valid object
+    if (team && team.id) {
+      setSelectedTeam(team);
+      
+      // Update the is_active status in the database
+      const updateTeamActive = async () => {
+        try {
+          // First, set all teams to inactive
+          await supabase
+            .from('teams')
+            .update({ is_active: false })
+            .in('id', teamsData.map(t => t.id));
+            
+          // Then set the selected team to active
+          await supabase
+            .from('teams')
+            .update({ is_active: true })
+            .eq('id', team.id);
+        } catch (error) {
+          console.error("Error updating team active status:", error);
+        }
+      };
+      
+      updateTeamActive();
+    }
   };
 
   const toggleSection = (section: string) => {
@@ -409,7 +412,7 @@ const Dashboard = () => {
       {/* Sidebar + Main content */}
       <div className="flex flex-1 overflow-hidden">
         <DashboardSidebar
-          teams={teamsData}
+          teams={teamsData || []}
           selectedTeam={selectedTeam}
           expandedSections={expandedSections}
           onTeamSelect={handleTeamSelect}
