@@ -14,10 +14,9 @@ import MembersSettings from "./pages/settings/Members";
 import PlansSettings from "./pages/settings/Plans";
 import BillingSettings from "./pages/settings/Billing";
 import ApiKeys from "./pages/settings/ApiKeys";
-import UsageSettings from "./pages/settings/Usage";
 import AgentEnvironment from "./pages/AgentEnvironment";
-import UsagePage from "./pages/Usage";
 import ActivityPage from "./pages/ActivityPage";
+import LeadsPage from "./pages/LeadsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
@@ -36,9 +35,9 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/usage" element={<UsagePage />} />
           <Route path="/agent/:agentId" element={<AgentEnvironment />} />
           <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
+          <Route path="/agent/:agentId/activity/leads" element={<LeadsPage />} />
           <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
           <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
           <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
@@ -55,7 +54,6 @@ const App = () => (
             <Route path="plans" element={<PlansSettings />} />
             <Route path="billing" element={<BillingSettings />} />
             <Route path="api-keys" element={<ApiKeys />} />
-            <Route path="usage" element={<UsageSettings />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

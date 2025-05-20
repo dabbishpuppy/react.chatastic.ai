@@ -1,7 +1,7 @@
 
 import React from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LineChart, LayoutDashboard } from "lucide-react";
+import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard } from "lucide-react";
 import Logo from "@/components/layout/Logo";
 
 const Settings = () => {
@@ -10,7 +10,6 @@ const Settings = () => {
   const menuItems = [
     { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { to: "/settings/general", label: "General", icon: <SettingsIcon size={18} /> },
-    { to: "/settings/usage", label: "Usage", icon: <LineChart size={18} /> },
     { to: "/settings/members", label: "Members", icon: <Users size={18} /> },
     { to: "/settings/plans", label: "Plans", icon: <Package size={18} /> },
     { to: "/settings/billing", label: "Billing", icon: <CreditCard size={18} /> },

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -13,10 +14,11 @@ import {
   Bot,
   Bell,
   Users,
-  LineChart,
   ChevronDown,
   ChevronUp,
-  LayoutDashboard
+  LayoutDashboard,
+  MessageSquare,
+  UserRound
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
 import SidebarSubmenuItem from "./SidebarSubmenuItem";
@@ -55,11 +57,16 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
       activeTab === "settings" ||
       location.pathname.includes("/settings/");
       
+    const shouldExpandActivity =
+      activeTab === "activity" ||
+      location.pathname.includes("/activity");
+      
     setExpandedMenus(prev => ({
       ...prev,
       sources: shouldExpandSources,
       connect: shouldExpandConnect,
-      settings: shouldExpandSettings
+      settings: shouldExpandSettings,
+      activity: shouldExpandActivity
     }));
   }, [activeTab, location]);
 
@@ -67,7 +74,16 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "playground", label: "Playground", icon: <FileText size={18} /> },
-    { id: "activity", label: "Activity", icon: <Activity size={18} /> },
+    { 
+      id: "activity", 
+      label: "Activity", 
+      icon: <Activity size={18} />,
+      hasSubmenu: true,
+      submenu: [
+        { id: "chat-log", label: "Chat Log", path: "activity", icon: <MessageSquare size={14} /> },
+        { id: "leads", label: "Leads", path: "activity/leads", icon: <UserRound size={14} /> }
+      ]
+    },
     { id: "analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
     { 
       id: "sources",
@@ -103,7 +119,6 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
         { id: "ai", label: "AI", path: "settings/ai", icon: <Bot size={14} /> },
         { id: "chat-interface", label: "Interface", path: "settings/chat-interface", icon: <LayoutTemplate size={14} /> },
         { id: "security", label: "Security", path: "settings/security", icon: <Shield size={14} /> },
-        { id: "usage", label: "Usage", path: "settings/usage", icon: <LineChart size={14} /> },
         { id: "leads", label: "Leads", path: "settings/leads", icon: <Users size={14} /> },
         { id: "notifications", label: "Notifications", path: "settings/notifications", icon: <Bell size={14} /> },
         { id: "custom-domains", label: "Domains", path: "settings/custom-domains", icon: <Globe size={14} /> }
@@ -149,7 +164,13 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
   const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string) => {
     onTabChange(parentTabId, submenuId);
     
-    if (submenuPath === "sources") {
+    if (parentTabId === "activity") {
+      if (submenuId === "chat-log") {
+        navigate(`/agent/${agentId}/activity`, { replace: true });
+      } else if (submenuId === "leads") {
+        navigate(`/agent/${agentId}/activity/leads`, { replace: true });
+      }
+    } else if (submenuPath === "sources") {
       navigate(`/agent/${agentId}/sources?tab=${submenuId}`, { replace: true });
     } else if (submenuPath === "integrations") {
       navigate(`/agent/${agentId}/integrations?tab=${submenuId}`, { replace: true });
@@ -164,6 +185,14 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
   // Check if a submenu item is active
   const isSubmenuActive = (parentId: string, subId: string) => {
     const currentSubmenu = getCurrentSubmenu();
+    
+    if (parentId === "activity") {
+      if (subId === "chat-log") {
+        return location.pathname.endsWith('/activity') && !location.pathname.includes('/leads');
+      } else if (subId === "leads") {
+        return location.pathname.includes('/activity/leads');
+      }
+    }
     
     if (parentId === "sources" && activeTab === "sources") {
       return currentSubmenu === subId;

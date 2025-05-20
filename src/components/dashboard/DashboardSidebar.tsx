@@ -21,7 +21,7 @@ interface Agent {
 
 interface DashboardSidebarProps {
   teams: Team[];
-  selectedTeam: Team;
+  selectedTeam: Team | null;
   expandedSections: {
     teams: boolean;
     agents: boolean;
@@ -45,6 +45,9 @@ const DashboardSidebar = ({
   onTeamEdited,
   onTeamDeleted
 }: DashboardSidebarProps) => {
+  const teamsArray = Array.isArray(teams) ? teams : [];
+  const activeTeam = selectedTeam || (teamsArray.length > 0 ? teamsArray[0] : null);
+  
   return (
     <div className="w-64 border-r border-gray-200 hidden md:flex md:flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -53,19 +56,21 @@ const DashboardSidebar = ({
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
           <TeamsList 
-            teams={teams}
-            selectedTeam={selectedTeam}
+            teams={teamsArray}
+            selectedTeam={activeTeam}
             isExpanded={expandedSections.teams}
             onToggleExpand={() => toggleSection('teams')}
             onTeamSelect={onTeamSelect}
           />
           
-          <AgentsList 
-            agents={selectedTeam.agents}
-            teams={teams}
-            isExpanded={expandedSections.agents}
-            onToggleExpand={() => toggleSection('agents')}
-          />
+          {activeTeam && (
+            <AgentsList 
+              agents={activeTeam.agents || []}
+              teams={teamsArray}
+              isExpanded={expandedSections.agents}
+              onToggleExpand={() => toggleSection('agents')}
+            />
+          )}
         </div>
       </div>
       
