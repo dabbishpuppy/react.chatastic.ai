@@ -44,14 +44,14 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   return (
     <div className="flex flex-col h-screen">
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar with fixed position and height */}
-        <div className="w-64 border-r bg-white flex-shrink-0 flex flex-col h-screen">
-          <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        {/* Left sidebar with fixed height and internal scroll */}
+        <div className="w-64 border-r bg-white">
+          <div className="p-4 border-b border-gray-200">
             <Logo size="md" />
           </div>
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <ScrollArea className="h-[calc(100vh-68px)]">
             <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
-          </div>
+          </ScrollArea>
         </div>
 
         {/* Main content with its own scroll */}

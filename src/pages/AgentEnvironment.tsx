@@ -49,19 +49,12 @@ const AgentEnvironment: React.FC = () => {
           </div>
         </div>
         
-        {/* Settings sidebar with improved transition */}
-        <div 
-          className={`w-80 border-l border-gray-200 bg-white transition-all duration-300 ease-in-out ${
-            showSettings ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
-          }`}
-          style={{
-            position: showSettings ? 'relative' : 'absolute',
-            right: 0,
-            height: '100%',
-          }}
-        >
-          {showSettings && <LLMSettingsPanel onClose={toggleSettings} />}
-        </div>
+        {/* Settings sidebar - only visible when showSettings is true */}
+        {showSettings && (
+          <div className="w-80 border-l border-gray-200 bg-white">
+            <LLMSettingsPanel onClose={toggleSettings} />
+          </div>
+        )}
       </div>
     </AgentPageLayout>
   );

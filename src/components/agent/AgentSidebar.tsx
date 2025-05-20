@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { DollarSign, User, LogOut } from "lucide-react";
 import AgentSidebarMenu from "./sidebar/AgentSidebarMenu";
 import SidebarActions from "../dashboard/SidebarActions";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Sample agent data structure - in a real implementation, this would come from a data store or API
 const agentsData = [
@@ -59,7 +58,7 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     <div className="flex flex-col h-full">
       {/* Agent header section */}
       {currentAgent && (
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-2 mb-1">
             <div className={`w-4 h-4 ${currentAgent.color} rounded-sm flex-shrink-0`}></div>
             <span className="font-medium truncate">{currentAgent.name}</span>
@@ -67,13 +66,8 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
         </div>
       )}
       
-      <ScrollArea className="flex-1 overflow-y-auto">
-        <AgentSidebarMenu activeTab={activeTab} onTabChange={onTabChange} />
-      </ScrollArea>
-      
-      <div className="flex-shrink-0">
-        <SidebarActions />
-      </div>
+      <AgentSidebarMenu activeTab={activeTab} onTabChange={onTabChange} />
+      <SidebarActions />
     </div>
   );
 };
