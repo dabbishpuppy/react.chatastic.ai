@@ -9,7 +9,7 @@ interface SidebarMenuItemProps {
   isActive: boolean;
   hasSubmenu?: boolean;
   isExpanded?: boolean;
-  onClick: () => void;
+  onClick: (e?: React.MouseEvent) => void;
   children?: React.ReactNode;
 }
 

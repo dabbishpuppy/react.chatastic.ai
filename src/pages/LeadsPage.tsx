@@ -37,9 +37,21 @@ const LeadsPage: React.FC = () => {
       showPageTitle={false}
     >
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Leads</h1>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex gap-1">
+              <RefreshCcw size={18} />
+              Refresh
+            </Button>
+            <Button variant="outline" className="flex gap-1">
+              <Filter size={18} />
+              Filter
+            </Button>
+          </div>
+        </div>
+        
         <div className="bg-white rounded-lg border p-6">
-          <h1 className="text-2xl font-bold mb-6">Leads</h1>
-          
           {/* Filters section */}
           <div className="mb-6">
             <h2 className="text-lg font-medium mb-2">Filters</h2>

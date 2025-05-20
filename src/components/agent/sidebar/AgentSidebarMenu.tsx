@@ -126,7 +126,10 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     },
   ];
 
-  const handleClick = (tabId: string, tabLabel: string, hasSubmenu?: boolean) => {
+  const handleClick = (tabId: string, tabLabel: string, hasSubmenu?: boolean, e?: React.MouseEvent) => {
+    // Prevent default behavior to avoid page jumps
+    if (e) e.preventDefault();
+    
     if (hasSubmenu) {
       setExpandedMenus(prev => ({...prev, [tabId]: !prev[tabId]}));
       return;
@@ -135,7 +138,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     // Call onTabChange first to ensure state is updated
     onTabChange(tabId, tabLabel);
     
-    // Then handle navigation with preventDefault to avoid auto-scrolling
+    // Then handle navigation with replace: true to avoid page jumps
     if (tabId === "dashboard") {
       navigate(`/dashboard`, { replace: true });
       return;
@@ -157,11 +160,12 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     } else if (tabId === "settings") {
       navigate(`/agent/${agentId}/settings`, { replace: true });
     }
-    
-    // Manual scroll reset handled in AgentPageLayout component
   };
 
-  const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string) => {
+  const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string, e?: React.MouseEvent) => {
+    // Prevent default behavior to avoid page jumps
+    if (e) e.preventDefault();
+    
     onTabChange(parentTabId, submenuId);
     
     if (parentTabId === "activity") {
@@ -224,7 +228,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
           isActive={activeTab === item.id}
           hasSubmenu={item.hasSubmenu}
           isExpanded={expandedMenus[item.id]}
-          onClick={() => handleClick(item.id, item.label, item.hasSubmenu)}
+          onClick={(e) => handleClick(item.id, item.label, item.hasSubmenu, e)}
         >
           {item.submenu?.map((subItem) => (
             <SidebarSubmenuItem
@@ -233,7 +237,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
               label={subItem.label}
               icon={subItem.icon}
               isActive={isSubmenuActive(item.id, subItem.id)}
-              onClick={() => handleSubmenuClick(item.id, subItem.path, subItem.id)}
+              onClick={(e) => handleSubmenuClick(item.id, subItem.path, subItem.id, e)}
             />
           ))}
         </SidebarMenuItem>
