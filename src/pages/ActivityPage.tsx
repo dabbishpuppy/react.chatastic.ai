@@ -20,12 +20,12 @@ const ActivityPage: React.FC = () => {
   return (
     <AgentPageLayout 
       defaultActiveTab="activity" 
-      defaultPageTitle="Activity"
+      defaultPageTitle="Chat Log"
       showPageTitle={false}
     >
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Activity</h1>
+          <h1 className="text-3xl font-bold">Chat Log</h1>
           <div className="flex gap-2">
             <ChatLogsTab.ActionButtons />
           </div>
