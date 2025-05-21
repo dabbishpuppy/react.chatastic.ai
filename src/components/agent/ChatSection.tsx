@@ -2,8 +2,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, SendIcon, Settings, Copy, ThumbsUp, ThumbsDown } from "lucide-react";
+import { RefreshCw, SendIcon, Settings, Copy, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ChatMessage {
   isAgent: boolean;
@@ -18,6 +19,9 @@ interface ChatSectionProps {
   agentName?: string;
   placeholder?: string;
 }
+
+// Emoji list for the emoji picker
+const emojis = ["😊", "👍", "👋", "🙏", "❤️", "🎉", "🔥", "✨", "🤔", "😂", "🚀", "👏", "🌟", "💡", "👀", "💪", "🙌", "👌", "💯", "🎯"];
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
   initialMessages = [], 
@@ -118,6 +122,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }, 1500);
   };
 
+  const insertEmoji = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+  };
+
   // Loading animation dots
   const LoadingDots = () => (
     <div className="flex space-x-1 items-center">
@@ -166,7 +174,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               </Avatar>
             )}
             <div className="flex flex-col max-w-[80%]">
-              <div className={`rounded-lg p-3 ${
+              <div className={`rounded-lg p-3 text-[0.875rem] ${
                 msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
               }`}>
                 {msg.content}
@@ -249,12 +257,37 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       {/* Chat Input */}
       <form onSubmit={handleSubmit} className="border-t p-4">
         <div className="flex items-center w-full relative">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8"
+              >
+                <Smile size={18} className="text-gray-500" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2">
+              <div className="grid grid-cols-5 gap-2">
+                {emojis.map((emoji, index) => (
+                  <Button
+                    key={index}
+                    variant="ghost"
+                    className="h-8 w-8 p-0 hover:bg-gray-100"
+                    onClick={() => insertEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           <input
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder={placeholder}
-            className="w-full border rounded-full px-4 py-3 pr-12 focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <Button 
             type="submit" 

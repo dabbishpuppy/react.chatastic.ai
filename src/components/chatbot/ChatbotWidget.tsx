@@ -1,9 +1,10 @@
 
 import React, { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
+import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Types for our chat messages
 interface ChatMessage {
@@ -23,6 +24,9 @@ interface ChatbotWidgetProps {
   userAvatar?: string;
   primaryColor?: string;
 }
+
+// Emoji list for the emoji picker
+const emojis = ["😊", "👍", "👋", "🙏", "❤️", "🎉", "🔥", "✨", "🤔", "😂", "🚀", "👏", "🌟", "💡", "👀", "💪", "🙌", "👌", "💯", "🎯"];
 
 const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   productName = "Chatbase",
@@ -134,6 +138,10 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     // In a real implementation, you would send this feedback to your backend
   };
 
+  const insertEmoji = (emoji: string) => {
+    setMessage(prev => prev + emoji);
+  };
+
   // Loading animation dots
   const LoadingDots = () => (
     <div className="flex space-x-1 mt-2 ml-1">
@@ -188,7 +196,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 
                 <div className="flex flex-col max-w-[80%]">
                   <div
-                    className={`rounded-lg p-3 ${
+                    className={`rounded-lg p-3 text-[0.875rem] ${
                       msg.sender === "bot"
                         ? "bg-white border border-gray-200"
                         : "bg-primary text-primary-foreground"
@@ -297,12 +305,37 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           {/* Input area */}
           <form onSubmit={handleSendMessage} className="border-t p-3 bg-white">
             <div className="flex relative">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  >
+                    <Smile size={18} className="text-gray-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2">
+                  <div className="grid grid-cols-5 gap-2">
+                    {emojis.map((emoji, index) => (
+                      <Button
+                        key={index}
+                        variant="ghost"
+                        className="h-8 w-8 p-0 hover:bg-gray-100"
+                        onClick={() => insertEmoji(emoji)}
+                      >
+                        {emoji}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
               <input
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Message..."
-                className="flex-1 border rounded-lg pr-10 pl-4 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                className="flex-1 border rounded-lg pr-10 pl-10 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <Button
                 type="submit"

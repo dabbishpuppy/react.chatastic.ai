@@ -20,8 +20,8 @@ const ChatbotDemo: React.FC = () => {
             <li>Primary color</li>
           </ul>
           <p className="mb-4">
-            The widget is designed to be easily integrated with different LLM backends
-            like ChatGPT or Claude. Currently, it's using static demo responses.
+            The widget is designed to be easily integrated with different LLM backends.
+            Currently, it's using static demo responses.
           </p>
           <p className="mb-4">
             Features:
@@ -32,6 +32,7 @@ const ChatbotDemo: React.FC = () => {
             <li>Like/Dislike buttons for feedback</li>
             <li>Copy message functionality</li>
             <li>Regenerate response option</li>
+            <li>Emoji picker</li>
           </ul>
         </div>
       </div>
