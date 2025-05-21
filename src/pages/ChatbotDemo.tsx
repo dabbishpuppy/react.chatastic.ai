@@ -19,10 +19,20 @@ const ChatbotDemo: React.FC = () => {
             <li>Avatar images</li>
             <li>Primary color</li>
           </ul>
-          <p>
+          <p className="mb-4">
             The widget is designed to be easily integrated with different LLM backends
             like ChatGPT or Claude. Currently, it's using static demo responses.
           </p>
+          <p className="mb-4">
+            Features:
+          </p>
+          <ul className="list-disc pl-6 mb-4 space-y-2">
+            <li>Full-height chat interface</li>
+            <li>Loading animation while waiting for responses</li>
+            <li>Like/Dislike buttons for feedback</li>
+            <li>Copy message functionality</li>
+            <li>Regenerate response option</li>
+          </ul>
         </div>
       </div>
       

@@ -2,12 +2,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, SendIcon, Settings } from "lucide-react";
+import { RefreshCw, SendIcon, Settings, Copy, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ChatMessage {
   isAgent: boolean;
   content: string;
   timestamp: string;
+  feedback?: "like" | "dislike" | null;
 }
 
 interface ChatSectionProps {
@@ -31,6 +33,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       timestamp: new Date().toISOString()
     }
   ]);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -39,7 +42,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory]);
+  }, [chatHistory, isTyping]);
 
   // Update chat when initialMessages prop changes
   useEffect(() => {
@@ -62,15 +65,67 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     // Clear message input
     setMessage("");
     
+    // Show typing animation
+    setIsTyping(true);
+    
     // Simulate agent response (would be replaced with actual API call)
     setTimeout(() => {
+      setIsTyping(false);
       setChatHistory(prev => [...prev, {
         isAgent: true,
         content: "I'm here to help you with any questions or tasks!",
         timestamp: new Date().toISOString()
       }]);
-    }, 1000);
+    }, 1500);
   };
+
+  const copyMessageToClipboard = (content: string) => {
+    navigator.clipboard.writeText(content);
+    // You could add a toast notification here
+  };
+
+  const handleFeedback = (timestamp: string, type: "like" | "dislike") => {
+    setChatHistory(prev => 
+      prev.map(msg => 
+        msg.timestamp === timestamp 
+          ? { ...msg, feedback: type } 
+          : msg
+      )
+    );
+    // In a real implementation, you would send this feedback to your backend
+  };
+
+  const regenerateResponse = () => {
+    // Find the last user message
+    const lastUserMessageIndex = [...chatHistory].reverse().findIndex(msg => !msg.isAgent);
+    if (lastUserMessageIndex === -1) return;
+    
+    // Remove messages after the last user message
+    const messagesToKeep = chatHistory.slice(0, chatHistory.length - lastUserMessageIndex);
+    setChatHistory(messagesToKeep);
+    
+    // Show typing indicator
+    setIsTyping(true);
+    
+    // Simulate agent response
+    setTimeout(() => {
+      setIsTyping(false);
+      setChatHistory(prev => [...prev, {
+        isAgent: true,
+        content: "Here's an alternative response to your question.",
+        timestamp: new Date().toISOString()
+      }]);
+    }, 1500);
+  };
+
+  // Loading animation dots
+  const LoadingDots = () => (
+    <div className="flex space-x-1 items-center">
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "0ms"}}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "300ms"}}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "600ms"}}></div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full max-w-[800px] mx-auto">
@@ -84,7 +139,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           <span className="font-medium">{agentName}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-9 w-9">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={regenerateResponse}>
             <RefreshCw className="h-5 w-5" />
           </Button>
           {toggleSettings && (
@@ -110,13 +165,84 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
             )}
-            <div className={`rounded-lg p-3 max-w-[80%] text-sm ${
-              msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
-            }`}>
-              {msg.content}
+            <div className="flex flex-col max-w-[80%]">
+              <div className={`rounded-lg p-3 ${
+                msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
+              }`}>
+                {msg.content}
+              </div>
+              
+              {/* Message actions for agent messages */}
+              {msg.isAgent && (
+                <div className="flex mt-1 space-x-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => handleFeedback(msg.timestamp, "like")}
+                          variant="ghost"
+                          size="icon"
+                          className={`h-6 w-6 rounded-full ${msg.feedback === "like" ? "bg-green-100" : ""}`}
+                        >
+                          <ThumbsUp size={14} className={msg.feedback === "like" ? "text-green-600" : "text-gray-500"} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Like</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => handleFeedback(msg.timestamp, "dislike")}
+                          variant="ghost"
+                          size="icon"
+                          className={`h-6 w-6 rounded-full ${msg.feedback === "dislike" ? "bg-red-100" : ""}`}
+                        >
+                          <ThumbsDown size={14} className={msg.feedback === "dislike" ? "text-red-600" : "text-gray-500"} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Dislike</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => copyMessageToClipboard(msg.content)}
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 rounded-full"
+                        >
+                          <Copy size={14} className="text-gray-500" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Copy</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              )}
             </div>
           </div>
         ))}
+        
+        {/* Loading indicator */}
+        {isTyping && (
+          <div className="flex mb-4">
+            <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+              <AvatarImage src="/placeholder.svg" alt="Agent" />
+              <AvatarFallback>AI</AvatarFallback>
+            </Avatar>
+            <div className="rounded-lg p-3 bg-gray-100 max-w-[80%]">
+              <LoadingDots />
+            </div>
+          </div>
+        )}
+        
         <div ref={messagesEndRef} />
       </div>
 
@@ -135,6 +261,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             size="sm" 
             variant="ghost"
             className="absolute right-1 rounded-full h-8 w-8"
+            disabled={!message.trim()}
           >
             <SendIcon size={16} />
           </Button>

@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Types for our chat messages
 interface ChatMessage {
@@ -10,6 +11,8 @@ interface ChatMessage {
   content: string;
   sender: "bot" | "user";
   timestamp: Date;
+  isLoading?: boolean;
+  feedback?: "like" | "dislike" | null;
 }
 
 // Props for the ChatbotWidget component
@@ -44,6 +47,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
       timestamp: new Date(Date.now() + 1000),
     },
   ]);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom when messages change
@@ -69,9 +73,14 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
     setMessages([...messages, userMessage]);
     setMessage("");
+    
+    // Show typing indicator
+    setIsTyping(true);
 
     // Simulate bot response after a delay
     setTimeout(() => {
+      setIsTyping(false);
+      
       const botResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: "I'm a demo chatbot. This is a static reply to your message. In a real implementation, this would be connected to an LLM API.",
@@ -79,14 +88,66 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botResponse]);
-    }, 1000);
+    }, 2000);
   };
 
+  const copyMessageToClipboard = (content: string) => {
+    navigator.clipboard.writeText(content);
+    // You could add a toast notification here
+  };
+
+  const retryLastMessage = () => {
+    // Find the last user message
+    const lastUserMessageIndex = [...messages].reverse().findIndex(msg => msg.sender === "user");
+    if (lastUserMessageIndex === -1) return;
+    
+    const lastUserMessage = [...messages].reverse()[lastUserMessageIndex];
+    
+    // Remove messages after the last user message
+    const messagesToKeep = messages.slice(0, messages.length - lastUserMessageIndex);
+    setMessages(messagesToKeep);
+    
+    // Show typing indicator
+    setIsTyping(true);
+    
+    // Simulate bot response
+    setTimeout(() => {
+      setIsTyping(false);
+      const botResponse: ChatMessage = {
+        id: Date.now().toString(),
+        content: "This is a new response after retrying your question. In a real implementation, this would be a new generation from the LLM.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botResponse]);
+    }, 2000);
+  };
+
+  const handleFeedback = (messageId: string, type: "like" | "dislike") => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, feedback: type } 
+          : msg
+      )
+    );
+    // In a real implementation, you would send this feedback to your backend
+  };
+
+  // Loading animation dots
+  const LoadingDots = () => (
+    <div className="flex space-x-1 mt-2 ml-1">
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "0ms"}}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "300ms"}}></div>
+      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "600ms"}}></div>
+    </div>
+  );
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-0 right-6 z-50 flex flex-col items-end">
       {/* Chat window */}
       {isOpen && (
-        <div className="mb-4 w-[350px] sm:w-[400px] flex flex-col rounded-lg shadow-lg bg-white overflow-hidden border border-gray-200">
+        <div className="mb-4 w-[350px] sm:w-[400px] flex flex-col rounded-lg shadow-lg bg-white border border-gray-200 h-[calc(100vh-120px)]">
           {/* Chat header */}
           <div 
             className="p-4 flex items-center justify-between border-b" 
@@ -110,7 +171,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           </div>
 
           {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto p-4 h-[350px] bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -125,14 +186,87 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                   </Avatar>
                 )}
                 
-                <div
-                  className={`rounded-lg p-3 max-w-[80%] ${
-                    msg.sender === "bot"
-                      ? "bg-white border border-gray-200"
-                      : "bg-primary text-primary-foreground"
-                  }`}
-                >
-                  {msg.content}
+                <div className="flex flex-col max-w-[80%]">
+                  <div
+                    className={`rounded-lg p-3 ${
+                      msg.sender === "bot"
+                        ? "bg-white border border-gray-200"
+                        : "bg-primary text-primary-foreground"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                  
+                  {/* Message actions for bot messages */}
+                  {msg.sender === "bot" && (
+                    <div className="flex mt-1 space-x-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => handleFeedback(msg.id, "like")}
+                              variant="ghost"
+                              size="icon"
+                              className={`h-6 w-6 rounded-full ${msg.feedback === "like" ? "bg-green-100" : ""}`}
+                            >
+                              <ThumbsUp size={14} className={msg.feedback === "like" ? "text-green-600" : "text-gray-500"} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Like</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => handleFeedback(msg.id, "dislike")}
+                              variant="ghost"
+                              size="icon"
+                              className={`h-6 w-6 rounded-full ${msg.feedback === "dislike" ? "bg-red-100" : ""}`}
+                            >
+                              <ThumbsDown size={14} className={msg.feedback === "dislike" ? "text-red-600" : "text-gray-500"} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Dislike</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => copyMessageToClipboard(msg.content)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 rounded-full"
+                            >
+                              <Copy size={14} className="text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Copy</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={retryLastMessage}
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 rounded-full"
+                            >
+                              <RefreshCw size={14} className="text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Regenerate</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
                 </div>
                 
                 {msg.sender === "user" && (
@@ -143,6 +277,20 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 )}
               </div>
             ))}
+            
+            {/* Loading indicator */}
+            {isTyping && (
+              <div className="flex mb-4">
+                <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
+                  <AvatarImage src={botAvatar} alt={botName} />
+                  <AvatarFallback>CB</AvatarFallback>
+                </Avatar>
+                <div className="rounded-lg p-3 bg-white border border-gray-200 max-w-[80%]">
+                  <LoadingDots />
+                </div>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </div>
 
@@ -176,7 +324,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
       {/* Floating button */}
       <Button
         onClick={toggleChat}
-        className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0"
+        className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6"
         style={{ backgroundColor: primaryColor }}
       >
         {isOpen ? (
