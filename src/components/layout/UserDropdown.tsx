@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +9,31 @@ import {
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, LayoutDashboard, User, LogOut, UserRound, Book, HelpCircle, GitPullRequest } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 const UserDropdown: React.FC = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of your account",
+      });
+      navigate("/signin");
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "There was an error signing out",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-1">
@@ -22,7 +45,7 @@ const UserDropdown: React.FC = () => {
       <DropdownMenuContent align="end" className="w-64 p-2 bg-white">
         <div className="px-3 py-2">
           <div className="font-medium">Wonderwave</div>
-          <div className="text-sm text-gray-500">nohman@wonderwave.no</div>
+          <div className="text-sm text-gray-500">{user?.email || "not signed in"}</div>
         </div>
         
         <DropdownMenuSeparator />
@@ -64,11 +87,11 @@ const UserDropdown: React.FC = () => {
         
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem>
-          <Link to="/signout" className="w-full text-sm flex items-center gap-2">
+        <DropdownMenuItem onClick={handleSignOut}>
+          <div className="w-full text-sm flex items-center gap-2 cursor-pointer">
             <LogOut size={16} />
             Sign out
-          </Link>
+          </div>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

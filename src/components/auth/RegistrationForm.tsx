@@ -1,19 +1,44 @@
 
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const RegistrationForm = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  
+  // Check if user is already signed in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        navigate("/dashboard");
+      }
+    };
+    
+    checkSession();
+    
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session) {
+          navigate("/dashboard");
+        }
+      }
+    );
+    
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (password !== confirmPassword) {
@@ -27,15 +52,63 @@ const RegistrationForm = () => {
     
     setIsSubmitting(true);
     
-    // Simulate form submission
-    setTimeout(() => {
-      console.log("Form submitted:", { email, password });
-      toast({
-        title: "Registration successful!",
-        description: "Your account has been created.",
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
       });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.user) {
+        toast({
+          title: "Registration successful!",
+          description: "Your account has been created.",
+        });
+        
+        // Check if email confirmation is enabled
+        if (data.session) {
+          navigate("/dashboard");
+        } else {
+          toast({
+            title: "Email verification required",
+            description: "Please check your email to verify your account before signing in.",
+          });
+          navigate("/signin");
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "Registration failed",
+        description: error.message || "An error occurred during registration",
+        variant: "destructive",
+      });
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error with Google sign up",
+        description: error.message || "Could not sign up with Google",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -115,6 +188,7 @@ const RegistrationForm = () => {
             type="button"
             variant="outline"
             className="w-full border-gray-300 flex items-center justify-center space-x-2"
+            onClick={handleGoogleSignUp}
           >
             <svg className="w-5 h-5" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4ZM24 4C35.0457 4 44 12.9543 44 24C44 29.6325 42.0187 34.7927 38.6451 38.6451" stroke="#EA4335" strokeWidth="4" />

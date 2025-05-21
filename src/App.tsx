@@ -1,8 +1,11 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
@@ -27,36 +30,84 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/signin" element={<SignIn />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/agent/:agentId" element={<AgentEnvironment />} />
-        <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
-        <Route path="/agent/:agentId/activity/leads" element={<LeadsPage />} />
-        <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
-        <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
-        <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
-        <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
-        
-        {/* Agent Settings Routes - Using wildcard for nested routes */}
-        <Route path="/agent/:agentId/settings/*" element={<AgentSettingsPage />} />
-        
-        {/* Admin Settings Routes */}
-        <Route path="/settings" element={<Settings />}>
-          <Route index element={<GeneralSettings />} />
-          <Route path="general" element={<GeneralSettings />} />
-          <Route path="members" element={<MembersSettings />} />
-          <Route path="plans" element={<PlansSettings />} />
-          <Route path="billing" element={<BillingSettings />} />
-          <Route path="api-keys" element={<ApiKeys />} />
-        </Route>
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="/chatbot" element={<ChatbotDemo />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId" element={
+                <ProtectedRoute>
+                  <AgentEnvironment />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId/activity" element={
+                <ProtectedRoute>
+                  <ActivityPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId/activity/leads" element={
+                <ProtectedRoute>
+                  <LeadsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId/analytics" element={
+                <ProtectedRoute>
+                  <AnalyticsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId/sources" element={
+                <ProtectedRoute>
+                  <SourcesPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId/actions" element={
+                <ProtectedRoute>
+                  <ActionsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/agent/:agentId/integrations" element={
+                <ProtectedRoute>
+                  <IntegrationsPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Agent Settings Routes - Using wildcard for nested routes */}
+              <Route path="/agent/:agentId/settings/*" element={
+                <ProtectedRoute>
+                  <AgentSettingsPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Admin Settings Routes */}
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }>
+                <Route index element={<GeneralSettings />} />
+                <Route path="general" element={<GeneralSettings />} />
+                <Route path="members" element={<MembersSettings />} />
+                <Route path="plans" element={<PlansSettings />} />
+                <Route path="billing" element={<BillingSettings />} />
+                <Route path="api-keys" element={<ApiKeys />} />
+              </Route>
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="/chatbot" element={<ChatbotDemo />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          <Toaster />
+          <Sonner />
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
