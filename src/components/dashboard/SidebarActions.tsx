@@ -3,9 +3,13 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { DollarSign, User, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
 
 const SidebarActions = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+  const { toast } = useToast();
   
   const handleUpgradeClick = () => {
     navigate("/settings/plans");
@@ -15,8 +19,21 @@ const SidebarActions = () => {
     navigate("/settings/general");
   };
 
-  const handleLogoutClick = () => {
-    navigate("/signout");
+  const handleLogoutClick = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of your account",
+      });
+      navigate("/signin");
+    } catch (error) {
+      toast({
+        title: "Error signing out",
+        description: "There was an error signing out",
+        variant: "destructive",
+      });
+    }
   };
   
   return (

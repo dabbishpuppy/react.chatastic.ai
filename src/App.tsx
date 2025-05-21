@@ -37,11 +37,15 @@ function App() {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/signin" element={<SignIn />} />
+              
+              {/* All dashboard routes are now protected */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
               } />
+              
+              {/* All agent routes */}
               <Route path="/agent/:agentId" element={
                 <ProtectedRoute>
                   <AgentEnvironment />
@@ -98,7 +102,8 @@ function App() {
                 <Route path="billing" element={<BillingSettings />} />
                 <Route path="api-keys" element={<ApiKeys />} />
               </Route>
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              
+              {/* Public demo route */}
               <Route path="/chatbot" element={<ChatbotDemo />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
