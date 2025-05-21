@@ -1,10 +1,14 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "./Logo";
 import AgentsDropdown from "./AgentsDropdown";
 import TeamsDropdown from "./TeamsDropdown";
 import UserDropdown from "./UserDropdown";
+import { Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TopNavBarProps {
   teams?: Array<{
@@ -25,6 +29,8 @@ interface TopNavBarProps {
 const TopNavBar: React.FC<TopNavBarProps> = ({ teams = [], agents = [] }) => {
   const location = useLocation();
   const path = location.pathname;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
   
   const isActive = (route: string) => {
     if (route === '/settings' && path.startsWith('/settings')) {
@@ -36,6 +42,13 @@ const TopNavBar: React.FC<TopNavBarProps> = ({ teams = [], agents = [] }) => {
     return path === route;
   };
 
+  const navigationItems = (
+    <>
+      <TeamsDropdown teams={teams} />
+      <AgentsDropdown isActive={isActive('/dashboard')} agents={agents} />
+    </>
+  );
+
   return (
     <header className="border-b border-gray-200 bg-white">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -46,18 +59,48 @@ const TopNavBar: React.FC<TopNavBarProps> = ({ teams = [], agents = [] }) => {
               Wonderwave
             </span>
           </Link>
+          
+          {/* Desktop navigation */}
           <div className="hidden md:flex ml-8 space-x-6">
-            {/* Teams Dropdown - with props */}
-            <TeamsDropdown teams={teams} />
-            
-            {/* Agents Dropdown - with props */}
-            <AgentsDropdown isActive={isActive('/dashboard')} agents={agents} />
+            {navigationItems}
           </div>
         </div>
+        
         <div className="flex items-center space-x-4">
+          {isMobile && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden"
+            >
+              <Menu size={24} />
+              <span className="sr-only">Open menu</span>
+            </Button>
+          )}
           <UserDropdown />
         </div>
       </div>
+
+      {/* Mobile navigation menu */}
+      {isMobile && (
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetContent side="right" className="w-[280px] pt-12">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute top-4 right-4"
+            >
+              <X size={24} />
+              <span className="sr-only">Close</span>
+            </Button>
+            <div className="flex flex-col space-y-6 p-4">
+              {navigationItems}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </header>
   );
 };

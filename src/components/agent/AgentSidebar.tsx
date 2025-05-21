@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User, LogOut } from "lucide-react";
+import { DollarSign, User, LogOut, Menu } from "lucide-react";
 import AgentSidebarMenu from "./sidebar/AgentSidebarMenu";
 import SidebarActions from "../dashboard/SidebarActions";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Sample agent data structure - in a real implementation, this would come from a data store or API
 const agentsData = [
@@ -43,6 +45,8 @@ interface AgentSidebarProps {
 const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) => {
   const { agentId } = useParams();
   const [currentAgent, setCurrentAgent] = useState<{id: string, name: string, color: string} | null>(null);
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   // Find the current agent based on the URL parameter
   useEffect(() => {
@@ -54,7 +58,16 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
     }
   }, [agentId]);
 
-  return (
+  // Close the sidebar when tab changes on mobile
+  const handleTabChangeWrapper = (tab: string, tabLabel: string) => {
+    onTabChange(tab, tabLabel);
+    if (isMobile) {
+      setOpen(false);
+    }
+  };
+
+  // For desktop: render the normal sidebar
+  const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Agent header section */}
       {currentAgent && (
@@ -66,8 +79,35 @@ const AgentSidebar: React.FC<AgentSidebarProps> = ({ activeTab, onTabChange }) =
         </div>
       )}
       
-      <AgentSidebarMenu activeTab={activeTab} onTabChange={onTabChange} />
+      <AgentSidebarMenu activeTab={activeTab} onTabChange={handleTabChangeWrapper} />
       <SidebarActions />
+    </div>
+  );
+
+  // For mobile: render the sidebar in a drawer
+  if (isMobile) {
+    return (
+      <>
+        <SheetTrigger asChild onClick={() => setOpen(true)}>
+          <Button variant="ghost" size="icon" className="md:hidden">
+            <Menu size={24} />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+        </SheetTrigger>
+        
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent side="left" className="p-0 w-[280px]">
+            {sidebarContent}
+          </SheetContent>
+        </Sheet>
+      </>
+    );
+  }
+
+  // For desktop: render the sidebar directly
+  return (
+    <div className="hidden md:flex w-64 flex-col h-full">
+      {sidebarContent}
     </div>
   );
 };

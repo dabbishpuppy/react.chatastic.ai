@@ -9,10 +9,12 @@ import SecuritySettings from "@/components/agent/settings/SecuritySettings";
 import LeadsSettings from "@/components/agent/settings/LeadsSettings";
 import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
 import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
   const location = useLocation();
+  const isMobile = useIsMobile();
   
   // Extract the active tab from the URL
   const getActiveTab = () => {
@@ -44,8 +46,7 @@ const AgentSettingsPage: React.FC = () => {
   };
 
   return (
-    <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
-      {/* Removed the overflow-hidden class to prevent auto-scrolling behavior */}
+    <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={!isMobile}>
       <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
