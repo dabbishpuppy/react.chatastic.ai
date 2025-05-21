@@ -237,7 +237,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
               label={subItem.label}
               icon={subItem.icon}
               isActive={isSubmenuActive(item.id, subItem.id)}
-              onClick={(e) => handleSubmenuClick(item.id, subItem.path, subItem.id, e)}
+              onClick={() => handleSubmenuClick(item.id, subItem.path, subItem.id)}
             />
           ))}
         </SidebarMenuItem>
@@ -247,3 +247,4 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
 };
 
 export default AgentSidebarMenu;
+
