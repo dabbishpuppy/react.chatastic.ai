@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -555,11 +554,9 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           <>
             {chatIcon ? (
               <div className="h-full w-full flex items-center justify-center">
-                <img 
-                  src={chatIcon} 
-                  alt="Chat Icon" 
-                  className="h-full w-full object-cover" 
-                />
+                <span className="text-white">
+                  <MessageCircle size={24} />
+                </span>
               </div>
             ) : (
               <MessageCircle size={24} className="text-white" />
