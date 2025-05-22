@@ -85,6 +85,33 @@ export const ShareTab: React.FC = () => {
           <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
             <p><strong>Automatic updates:</strong> When you modify your chat interface settings, all shared links and embeds will automatically update without requiring any changes to the embed code.</p>
           </div>
+
+          <div className="mt-6">
+            <h3 className="text-lg font-medium mb-3">Chat bubble preview</h3>
+            <div className="flex justify-end mb-2">
+              <div className="flex flex-col items-center">
+                {settings.chat_icon ? (
+                  <div className="h-16 w-16 rounded-full shadow-lg overflow-hidden">
+                    <img 
+                      src={settings.chat_icon} 
+                      alt="Chat Icon"
+                      className="h-full w-full object-cover" 
+                    />
+                  </div>
+                ) : (
+                  <div 
+                    className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center"
+                    style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
+                  >
+                    <span className="text-white text-xl">💬</span>
+                  </div>
+                )}
+                <p className="text-sm text-gray-500 mt-2">
+                  {settings.chat_icon ? "Using custom chat icon" : "Using default bubble color"}
+                </p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

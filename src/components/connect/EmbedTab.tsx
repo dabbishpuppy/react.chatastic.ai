@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 
 export const EmbedTab: React.FC = () => {
@@ -11,7 +11,7 @@ export const EmbedTab: React.FC = () => {
   const [embedType, setEmbedType] = useState<"bubble" | "iframe">("bubble");
   const [showIdentityVerification, setShowIdentityVerification] = useState(false);
   const { settings } = useChatSettings();
-  const { agentId } = settings;
+  const { agentId } = useParams(); // Get agentId from URL params
   
   const handleCopy = () => {
     const embedCode = getEmbedCode();
