@@ -25,26 +25,27 @@ serve(async (req) => {
 
   try {
     // Get the agent ID from the URL
-    // There are multiple ways to extract path parameters:
     const url = new URL(req.url);
-    console.log('URL pathname:', url.pathname);
-    
-    // Method 1: Extract from path segments
     const pathParts = url.pathname.split('/');
-    console.log('Path parts:', pathParts);
-    const agentId = pathParts[pathParts.length - 1];
+    const agentIdFromPath = pathParts[pathParts.length - 1];
     
-    // Alternative Method 2: Check for query parameters (in case clients use that)
+    // Also check query parameters as fallback
     const queryAgentId = url.searchParams.get('agentId');
     
     // Use path parameter first, fall back to query parameter
-    const finalAgentId = agentId || queryAgentId;
+    const agentId = agentIdFromPath || queryAgentId;
     
-    console.log('Extracted agentId:', finalAgentId);
+    console.log('Extracted agentId:', agentId);
     
-    if (!finalAgentId) {
+    if (!agentId || agentId.length < 10) {
       return new Response(
-        JSON.stringify({ error: 'Agent ID is required', visibility: 'private' }),
+        JSON.stringify({ 
+          error: 'Agent ID is missing or invalid', 
+          visibility: 'private',
+          bubble_color: '#3B82F6',
+          user_message_color: '#3B82F6',
+          sync_colors: false
+        }),
         { status: 400, headers: corsHeaders }
       );
     }
@@ -58,7 +59,7 @@ serve(async (req) => {
     const { data: agentData, error: agentError } = await supabase
       .from('agents')
       .select('visibility')
-      .eq('id', finalAgentId)
+      .eq('id', agentId)
       .maybeSingle();
 
     // If agent doesn't exist or there's an error fetching it
@@ -67,7 +68,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
-          error: 'Error fetching agent'
+          error: 'Error fetching agent',
+          bubble_color: '#3B82F6',
+          user_message_color: '#3B82F6',
+          sync_colors: false
         }),
         { status: 500, headers: corsHeaders }
       );
@@ -78,7 +82,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
-          error: 'Agent not found'
+          error: 'Agent not found',
+          bubble_color: '#3B82F6',
+          user_message_color: '#3B82F6',
+          sync_colors: false
         }),
         { status: 404, headers: corsHeaders }
       );
@@ -86,7 +93,7 @@ serve(async (req) => {
 
     // If the agent is private, return an appropriate response
     if (agentData.visibility === 'private') {
-      console.log(`Agent ${finalAgentId} is PRIVATE`);
+      console.log(`Agent ${agentId} is PRIVATE`);
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
@@ -96,13 +103,13 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Agent ${finalAgentId} is PUBLIC, fetching settings`);
+    console.log(`Agent ${agentId} is PUBLIC, fetching settings`);
 
     // Fetch the chat interface settings for the agent
     const { data: settings, error: settingsError } = await supabase
       .from('chat_interface_settings')
       .select('*')
-      .eq('agent_id', finalAgentId)
+      .eq('agent_id', agentId)
       .maybeSingle();
 
     if (settingsError) {
