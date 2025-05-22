@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,8 +100,7 @@ const ChatInterfaceSettings: React.FC = () => {
       imageUrl: url
     });
     
-    // This function doesn't need to return a Promise<string> since we're not using the return value
-    // and we're handling the cropping separately
+    // Return a Promise<string> to match the expected function signature
     return Promise.resolve(url);
   };
 
@@ -143,6 +143,9 @@ const ChatInterfaceSettings: React.FC = () => {
 
   // Should we show the chat icon in preview?
   const showChatIconInPreview = !settings.chat_icon;
+
+  // Determine the header color based on sync settings
+  const headerColor = syncColorWithHeader ? settings.user_message_color : null;
 
   return (
     <div className="flex flex-col md:flex-row border-t">
@@ -364,7 +367,6 @@ const ChatInterfaceSettings: React.FC = () => {
                   onRemove={() => updateSetting("chat_icon", null)}
                   shape="circle"
                   size="md"
-                  placeholder="💬"
                 />
                 <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB.</p>
               </div>
@@ -437,13 +439,13 @@ const ChatInterfaceSettings: React.FC = () => {
                 profilePicture={settings.profile_picture || undefined}
                 footer={settings.footer || undefined}
                 userMessageColor={settings.user_message_color}
-                headerColor={settings.bubble_color}
+                headerColor={headerColor}
                 hideUserAvatar={true}
               />
             </div>
           </div>
           
-          {/* Chat icon preview - aligned to the right */}
+          {/* Only show the chat bubble button color preview when there's no chat icon */}
           {showChatIconInPreview && (
             <div className="mt-4 flex justify-end">
               <div 
@@ -455,6 +457,7 @@ const ChatInterfaceSettings: React.FC = () => {
             </div>
           )}
 
+          {/* Show the chat icon when available */}
           {settings.chat_icon && (
             <div className="mt-4 flex justify-end">
               <div className="h-20 w-20 rounded-full shadow-lg overflow-hidden">
