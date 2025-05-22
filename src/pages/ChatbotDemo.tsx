@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import { Input } from "@/components/ui/input";
@@ -13,9 +12,6 @@ import { ChatInterfaceSettings, defaultChatSettings } from "@/types/chatInterfac
 import { getChatSettings } from "@/services/chatSettingsService";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useChatSettings } from "@/hooks/useChatSettings";
-import AgentSidebar from "@/components/agent/AgentSidebar";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu } from "lucide-react";
 
 const ChatbotDemo: React.FC = () => {
   const { agentId } = useParams();
@@ -36,9 +32,6 @@ const ChatbotDemo: React.FC = () => {
   const [chatIcon, setChatIcon] = useState<string | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("chatbot-demo");
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const isMobile = useIsMobile();
   
   // Use the shared chat settings hook to ensure we have the latest settings
   const { settings: latestSettings } = useChatSettings();
@@ -95,10 +88,6 @@ const ChatbotDemo: React.FC = () => {
     }
   }, [latestSettings]);
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-  };
-
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -107,8 +96,7 @@ const ChatbotDemo: React.FC = () => {
     );
   }
 
-  // The main content of the page
-  const pageContent = (
+  return (
     <div className="min-h-screen p-8 bg-gray-50">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-4">Chatbot Preview</h1>
@@ -364,35 +352,6 @@ const ChatbotDemo: React.FC = () => {
         chatIcon={chatIcon}
         profilePicture={profilePicture}
       />
-    </div>
-  );
-
-  return (
-    <div className="flex flex-col h-screen">
-      {/* Mobile header with menu button */}
-      {isMobile && (
-        <div className="p-4 border-b border-gray-200 flex items-center">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mr-2"
-            onClick={() => setMobileSidebarOpen(true)}
-          >
-            <Menu size={24} />
-          </Button>
-          <span className="font-medium">Chatbot Demo</span>
-        </div>
-      )}
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar component */}
-        <AgentSidebar activeTab={activeTab} onTabChange={handleTabChange} />
-
-        {/* Main content with scroll */}
-        <div className="flex-1 overflow-auto">
-          {pageContent}
-        </div>
-      </div>
     </div>
   );
 };
