@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +33,7 @@ interface ChatbotWidgetProps {
   showSuggestions?: boolean;
   messagePlaceholder?: string;
   footer?: string | null;
+  chatIcon?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -56,6 +56,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   showSuggestions = true,
   messagePlaceholder = "Message...",
   footer,
+  chatIcon,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -518,13 +519,20 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
       {/* Floating button */}
       <Button
         onClick={toggleChat}
-        className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6"
+        className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
         style={{ backgroundColor: primaryColor }}
       >
         {isOpen ? (
           <ChevronDown size={24} />
         ) : (
-          <MessageCircle size={24} />
+          <>
+            {/* Use custom chat icon if provided, otherwise use default MessageCircle icon */}
+            {chatIcon ? (
+              <img src={chatIcon} alt="Chat" className="h-8 w-8 object-cover" />
+            ) : (
+              <MessageCircle size={24} />
+            )}
+          </>
         )}
       </Button>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ interface ChatSectionProps {
   allowRegenerate?: boolean;
   theme?: 'light' | 'dark' | 'system';
   profilePicture?: string;
+  footer?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -34,6 +34,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   allowRegenerate = true,
   theme = 'light',
   profilePicture,
+  footer,
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
@@ -155,6 +156,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     inputBg: theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
     inputText: theme === 'dark' ? 'text-gray-100' : 'text-gray-800',
     iconButton: theme === 'dark' ? 'text-gray-400 hover:text-gray-100' : 'text-gray-500 hover:text-gray-800',
+    footerBg: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-white border-t text-gray-500',
   };
 
   // Loading animation dots
@@ -323,8 +325,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       )}
 
       {/* Chat Input */}
-      <form onSubmit={handleSubmit} className={`border-t p-4 ${themeClasses.background}`}>
-        <div className="flex items-center w-full relative">
+      <div className={`border-t p-4 ${themeClasses.background}`}>
+        <form onSubmit={handleSubmit} className="flex items-center w-full relative">
           <Popover>
             <PopoverTrigger asChild>
               <Button 
@@ -366,8 +368,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           >
             <SendIcon size={16} />
           </Button>
-        </div>
-      </form>
+        </form>
+        
+        {/* Footer */}
+        {footer && (
+          <div className={`mt-3 text-xs text-center ${themeClasses.text}`}>
+            {footer}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

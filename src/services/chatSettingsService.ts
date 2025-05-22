@@ -22,14 +22,23 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
           show_suggestions_after_chat: settings.show_suggestions_after_chat,
           auto_show_delay: settings.auto_show_delay,
           footer: settings.footer,
-          updated_at: new Date(),
+          updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      
+      // Transform to expected type
+      const result: ChatInterfaceSettings = {
+        ...data,
+        suggested_messages: typeof data.suggested_messages === 'string' 
+          ? JSON.parse(data.suggested_messages)
+          : (data.suggested_messages || []),
+      };
+      
+      return result;
     } else {
       // Create new settings
       const { data, error } = await supabase
@@ -37,7 +46,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .insert({
           agent_id: settings.agent_id,
           initial_message: settings.initial_message,
-          suggested_messages: settings.suggested_messages,
+          suggested_messages: JSON.stringify(settings.suggested_messages),
           message_placeholder: settings.message_placeholder,
           show_feedback: settings.show_feedback,
           allow_regenerate: settings.allow_regenerate,
@@ -54,7 +63,16 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .single();
 
       if (error) throw error;
-      return data;
+      
+      // Transform to expected type
+      const result: ChatInterfaceSettings = {
+        ...data,
+        suggested_messages: typeof data.suggested_messages === 'string' 
+          ? JSON.parse(data.suggested_messages)
+          : (data.suggested_messages || []),
+      };
+      
+      return result;
     }
   } catch (error) {
     console.error('Error saving chat settings:', error);
@@ -76,7 +94,7 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
     if (!data) return null;
     
     // Parse the suggested_messages JSON if it's a string
-    const parsedData = {
+    const parsedData: ChatInterfaceSettings = {
       ...data,
       suggested_messages: typeof data.suggested_messages === 'string' 
         ? JSON.parse(data.suggested_messages)

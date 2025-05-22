@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import { Input } from "@/components/ui/input";
@@ -284,6 +283,7 @@ const ChatbotDemo: React.FC = () => {
         showSuggestions={showSuggestions}
         messagePlaceholder={messagePlaceholder}
         footer={footer}
+        chatIcon={settings?.chat_icon}
       />
     </div>
   );
