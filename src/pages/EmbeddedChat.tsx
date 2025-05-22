@@ -82,7 +82,7 @@ const EmbeddedChat: React.FC = () => {
     
     // Create a ResizeObserver to detect content changes
     if (window.ResizeObserver) {
-      const resizeObserver = new ResizeObserver((entries) => {
+      const resizeObserver = new ResizeObserver(() => {
         sendHeightToParent();
       });
       
@@ -108,7 +108,7 @@ const EmbeddedChat: React.FC = () => {
     // Send initial height after render
     setTimeout(sendHeightToParent, 100);
     
-    // Send height on chat updates
+    // Listen for chat events that might change height
     window.addEventListener('message', (event) => {
       if (event.data?.type === 'message-sent') {
         setTimeout(sendHeightToParent, 100);
