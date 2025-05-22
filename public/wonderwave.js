@@ -1,5 +1,6 @@
+
 /**
- * WonderWave Chat Widget v1.2
+ * WonderWave Chat Widget v1.3
  * A lightweight embeddable chat widget for any website
  */
 (function() {
@@ -165,6 +166,12 @@
         
         if (settings.chat_icon) {
           config.chatIcon = settings.chat_icon;
+        }
+        
+        // Apply bubble position from settings if available
+        if (settings.bubble_position) {
+          config.position = settings.bubble_position;
+          log('Applied bubble position from settings:', settings.bubble_position);
         }
       }
       

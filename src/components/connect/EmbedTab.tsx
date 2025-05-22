@@ -1,8 +1,9 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Link, useParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 
@@ -41,8 +42,8 @@ export const EmbedTab: React.FC = () => {
     if (embedType === "bubble") {
       // Create an array of config options that will be joined properly with commas
       const configOptions = [
-        `agentId: "${agentId}"`, 
-        `position: "${settings.bubble_position || 'right'}"`,
+        `agentId: "${agentId}"`,
+        // Position is now loaded from backend settings
       ];
       
       // Add debug option
@@ -147,7 +148,7 @@ export const EmbedTab: React.FC = () => {
                     </p>
                     
                     <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
-                      <strong>Automatic Updates:</strong> Changes to colors, chat icon, profile picture, and other settings in your chat interface will automatically apply to all embedded widgets without needing to update the embed code.
+                      <strong>Automatic Updates:</strong> Changes to bubble position, colors, chat icon, profile picture, and other settings in your chat interface will automatically apply to all embedded widgets without needing to update the embed code.
                     </div>
 
                     <div className="mt-4">
@@ -194,7 +195,6 @@ const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
 <script>
   window.wonderwaveConfig = {
     agentId: "${agentId}",
-    position: "${settings.bubble_position || 'right'}",
     identityHash: "YOUR_GENERATED_HASH", // Add the hash here
     userId: "USER_UUID" // The same user ID used to generate the hash
   };

@@ -51,38 +51,11 @@ const IntegrationsPage: React.FC = () => {
     }
   };
 
-  // Generate embed code based on the current agent ID and settings
-  const getEmbedCode = () => {
-    if (!agentId) return '';
-    
-    return `<script>
-(function(){
-  if(!window.wonderwaveConfig) {
-    window.wonderwaveConfig = {
-      agentId: "${agentId}",
-    };
-  }
-  
-  if(!window.wonderwave||window.wonderwave("getState")!=="initialized"){
-    window.wonderwave=(...args)=>{
-      if(!window.wonderwave.q){window.wonderwave.q=[];}
-      window.wonderwave.q.push(args);
-    };
-    
-    const script = document.createElement("script");
-    script.src = "https://query-spark-start.lovable.app/wonderwave.js";
-    script.async = true;
-    document.head.appendChild(script);
-  }
-})();
-</script>`;
-  };
-
   // Render the appropriate tab content based on the URL parameter
   const renderTabContent = () => {
     switch (tab) {
       case "embed":
-        return <EmbedTab embedCode={getEmbedCode()} agentId={agentId} />;
+        return <EmbedTab />;
       case "share":
         return <ShareTab />;
       case "integrations":
@@ -105,7 +78,7 @@ const IntegrationsPage: React.FC = () => {
           </div>
         );
       default:
-        return <EmbedTab embedCode={getEmbedCode()} agentId={agentId} />;
+        return <EmbedTab />;
     }
   };
 
