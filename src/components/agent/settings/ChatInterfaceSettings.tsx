@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -294,7 +293,7 @@ const ChatInterfaceSettings: React.FC = () => {
         </div>
       </div>
       
-      {/* Right panel - Chat Preview with preview for both Chat icon and Profile picture */}
+      {/* Right panel - Chat Preview */}
       <div className="w-full md:w-2/5 border-l">
         <div className="p-6 sticky top-0">
           <div className="w-full max-w-md mx-auto h-[700px] bg-white rounded-lg shadow overflow-hidden flex flex-col">

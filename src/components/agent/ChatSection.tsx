@@ -39,16 +39,35 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   footer,
 }) => {
   const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
-    {
-      isAgent: true,
-      content: "Hi! I'm Wonder AI. How can I help you today?",
-      timestamp: new Date().toISOString()
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
+    if (initialMessages.length) {
+      // Add a user message "Hello, World!" after the initial message
+      return [
+        ...initialMessages,
+        {
+          isAgent: false,
+          content: "Hello, World!",
+          timestamp: new Date(Date.now() + 1000).toISOString()
+        }
+      ];
     }
-  ]);
+    
+    return [
+      {
+        isAgent: true,
+        content: "Hi! I'm Wonder AI. How can I help you today?",
+        timestamp: new Date().toISOString()
+      },
+      {
+        isAgent: false,
+        content: "Hello, World!",
+        timestamp: new Date(Date.now() + 1000).toISOString()
+      }
+    ];
+  });
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [userHasMessaged, setUserHasMessaged] = useState(false);
+  const [userHasMessaged, setUserHasMessaged] = useState(true); // Set to true since we already added a user message
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -171,7 +190,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   );
 
   // Should we show suggested messages?
-  // Show if we have suggestions AND either user hasn't messaged yet OR showSuggestions is true
   const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
 
   return (
@@ -183,9 +201,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             {profilePicture ? (
               <AvatarImage src={profilePicture} alt={agentName} />
             ) : (
-              <AvatarImage src="/placeholder.svg" alt="Agent" />
+              <AvatarFallback className="bg-gray-200 text-gray-600">
+                {agentName.charAt(0)}
+              </AvatarFallback>
             )}
-            <AvatarFallback>AI</AvatarFallback>
           </Avatar>
           <span className={`font-medium ${themeClasses.text}`}>{agentName}</span>
         </div>
@@ -217,9 +236,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 {profilePicture ? (
                   <AvatarImage src={profilePicture} alt={agentName} />
                 ) : (
-                  <AvatarImage src="/placeholder.svg" alt="Agent" />
+                  <AvatarFallback className="bg-gray-200 text-gray-600">
+                    {agentName.charAt(0)}
+                  </AvatarFallback>
                 )}
-                <AvatarFallback>AI</AvatarFallback>
               </Avatar>
             )}
             <div className="flex flex-col max-w-[80%]">
@@ -284,6 +304,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 </div>
               )}
             </div>
+            
+            {!msg.isAgent && (
+              <Avatar className="h-8 w-8 ml-2 mt-1 border-0">
+                <AvatarFallback className="bg-gray-200 text-gray-600">U</AvatarFallback>
+              </Avatar>
+            )}
           </div>
         ))}
         
@@ -294,9 +320,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               {profilePicture ? (
                 <AvatarImage src={profilePicture} alt={agentName} />
               ) : (
-                <AvatarImage src="/placeholder.svg" alt="Agent" />
+                <AvatarFallback className="bg-gray-200 text-gray-600">
+                  {agentName.charAt(0)}
+                </AvatarFallback>
               )}
-              <AvatarFallback>AI</AvatarFallback>
             </Avatar>
             <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.agentBubble}`}>
               <LoadingDots />

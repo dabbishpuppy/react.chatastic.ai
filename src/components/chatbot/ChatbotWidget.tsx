@@ -81,7 +81,16 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         sender: "bot" as const,
         timestamp: new Date(Date.now() + index * 1000),
       }));
-      setMessages(initialMessages);
+      
+      // Add a user message "Hello, World!"
+      const userMessage = {
+        id: `user-hello`,
+        content: "Hello, World!",
+        sender: "user" as const,
+        timestamp: new Date(Date.now() + (initialMessages.length + 1) * 1000),
+      };
+      
+      setMessages([...initialMessages, userMessage]);
     }
   }, [initialMessage]);
   
@@ -287,8 +296,11 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
               >
                 <div className="flex">
                   <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
-                    <AvatarImage src={displayBotAvatar} alt={botName} />
-                    <AvatarFallback>AI</AvatarFallback>
+                    {displayBotAvatar ? (
+                      <AvatarImage src={displayBotAvatar} alt={botName} />
+                    ) : (
+                      <AvatarFallback className="bg-gray-200 text-gray-600">{botName.charAt(0)}</AvatarFallback>
+                    )}
                   </Avatar>
                   <p>{popupMessages[index]}</p>
                 </div>
@@ -308,8 +320,11 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           >
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8 bg-white">
-                <AvatarImage src={displayBotAvatar} alt={botName} />
-                <AvatarFallback>CB</AvatarFallback>
+                {displayBotAvatar ? (
+                  <AvatarImage src={displayBotAvatar} alt={botName} />
+                ) : (
+                  <AvatarFallback className="bg-gray-200 text-gray-600">{botName.charAt(0)}</AvatarFallback>
+                )}
               </Avatar>
               <span className="font-medium">{botName}</span>
             </div>
@@ -334,8 +349,11 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
               >
                 {msg.sender === "bot" && (
                   <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-                    <AvatarImage src={displayBotAvatar} alt={botName} />
-                    <AvatarFallback>CB</AvatarFallback>
+                    {displayBotAvatar ? (
+                      <AvatarImage src={displayBotAvatar} alt={botName} />
+                    ) : (
+                      <AvatarFallback className="bg-gray-200 text-gray-600">{botName.charAt(0)}</AvatarFallback>
+                    )}
                   </Avatar>
                 )}
                 
@@ -426,8 +444,11 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 
                 {msg.sender === "user" && (
                   <Avatar className="h-8 w-8 ml-2 mt-1 flex-shrink-0">
-                    <AvatarFallback>U</AvatarFallback>
-                    {userAvatar && <AvatarImage src={userAvatar} alt="User" />}
+                    {userAvatar ? (
+                      <AvatarImage src={userAvatar} alt="User" />
+                    ) : (
+                      <AvatarFallback className="bg-gray-200 text-gray-600">U</AvatarFallback>
+                    )}
                   </Avatar>
                 )}
               </div>
