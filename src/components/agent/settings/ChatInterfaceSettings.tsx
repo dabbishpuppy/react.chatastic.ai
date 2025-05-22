@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,7 +25,6 @@ const ChatInterfaceSettings: React.FC = () => {
   } = useChatSettings();
   
   const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
-  const componentMounted = useRef(false);
   
   // Initial preview messages based on settings
   const [previewMessages, setPreviewMessages] = React.useState([
@@ -36,13 +35,8 @@ const ChatInterfaceSettings: React.FC = () => {
     }
   ]);
 
-  // Update preview when settings change, but don't cause scrolling
+  // Update preview when settings change
   useEffect(() => {
-    if (!componentMounted.current) {
-      componentMounted.current = true;
-      return;
-    }
-    
     setPreviewMessages([
       {
         isAgent: true,
@@ -61,17 +55,9 @@ const ChatInterfaceSettings: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row border-t" style={{ scrollBehavior: 'auto' }}>
+    <div className="flex flex-col md:flex-row border-t">
       {/* Left panel - Settings */}
-      <div 
-        className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-0"
-        style={{ 
-          maxHeight: '100vh', 
-          overscrollBehavior: 'contain',
-          scrollMargin: 0,
-          scrollPadding: 0
-        }}
-      >
+      <div className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-0">
         <div className="space-y-6 p-6">
           <Card>
             <CardHeader>
@@ -80,17 +66,14 @@ const ChatInterfaceSettings: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <label htmlFor="initialMessageField" className="block text-sm font-medium">
+                <label htmlFor="initialMessage" className="block text-sm font-medium">
                   Initial messages
                 </label>
                 <Textarea
-                  id="initialMessageField"
+                  id="initialMessage"
                   value={settings.initial_message}
                   onChange={(e) => updateSetting("initial_message", e.target.value)}
-                  className="h-24 resize-none"
-                  autoFocus={false}
-                  tabIndex={1}
-                  style={{ scrollMargin: 0, scrollPadding: 0 }}
+                  className="h-24"
                 />
                 <p className="text-xs text-gray-500">Enter each message in a new line.</p>
               </div>
@@ -197,8 +180,7 @@ const ChatInterfaceSettings: React.FC = () => {
                   value={settings.footer || ""}
                   onChange={(e) => updateSetting("footer", e.target.value)}
                   placeholder="You can use this to add a disclaimer or a link to your privacy policy."
-                  className="h-24 resize-none"
-                  style={{ scrollMargin: 0, scrollPadding: 0 }}
+                  className="h-24"
                 />
                 <p className="text-xs text-gray-500">{(settings.footer || "").length}/200 characters</p>
               </div>

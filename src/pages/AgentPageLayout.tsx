@@ -1,4 +1,3 @@
-
 import React, { useState, ReactNode, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
@@ -30,50 +29,14 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // Prevent automatic scrolling when component mounts
+  // Modified effect to prevent auto-scrolling - removed scroll reset
   useEffect(() => {
-    if (window.history && 'scrollRestoration' in window.history) {
-      window.history.scrollRestoration = 'manual';
-    }
-    
-    // Force scroll to top
-    window.scrollTo(0, 0);
-    
-    // Remove focus from any element
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    
-    // Setup input event listeners to prevent scroll jumps
-    const preventInputScrollJump = (e: Event) => {
-      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || 
-          (e.target as HTMLElement).tagName === 'INPUT') {
-        e.stopPropagation();
-      }
-    };
-    
-    document.addEventListener('focus', preventInputScrollJump, true);
-    document.addEventListener('input', preventInputScrollJump, true);
-    
-    return () => {
-      document.removeEventListener('focus', preventInputScrollJump, true);
-      document.removeEventListener('input', preventInputScrollJump, true);
-    };
-  }, []);
-
-  // Prevent scroll on tab change
-  useEffect(() => {
-    // Don't manipulate scroll position on tab change
-    // Force top position
-    window.scrollTo(0, 0);
+    // Keep tab state but don't manipulate scroll position
   }, [activeTab]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
     setPageTitle(tabLabel);
-    
-    // Force scroll to top
-    window.scrollTo(0, 0);
     
     // Close mobile sidebar when navigation happens
     if (isMobile) {
@@ -127,20 +90,7 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
         {/* Main content with its own scroll */}
         <div 
           ref={contentRef} 
-          className="flex-1 overflow-auto no-auto-scroll"
-          style={{ 
-            scrollBehavior: 'auto',
-            overflowAnchor: 'none',
-            overscrollBehavior: 'contain',
-            scrollMargin: 0,
-            scrollPadding: 0
-          }}
-          onFocus={(e) => {
-            // Prevent any element from scrolling into view on focus
-            if (e.target !== contentRef.current) {
-              e.stopPropagation();
-            }
-          }}
+          className="flex-1 overflow-auto"
         >
           {children}
         </div>

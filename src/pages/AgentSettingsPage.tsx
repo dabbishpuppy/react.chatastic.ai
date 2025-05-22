@@ -1,5 +1,5 @@
 
-import React, { useEffect, useLayoutEffect } from "react";
+import React from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
@@ -10,7 +10,6 @@ import LeadsSettings from "@/components/agent/settings/LeadsSettings";
 import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
 import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
-import "../styles/scroll-reset.css";
 
 const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
@@ -28,52 +27,6 @@ const AgentSettingsPage: React.FC = () => {
     }
     return "general";
   };
-
-  // Use both useLayoutEffect (runs before DOM painting) and useEffect for redundancy
-  useLayoutEffect(() => {
-    // Disable browser's automatic scroll restoration
-    if (window.history && 'scrollRestoration' in window.history) {
-      window.history.scrollRestoration = 'manual';
-    }
-    
-    // Force scroll to top immediately before paint
-    window.scrollTo(0, 0);
-    
-    // Add settings-page class to html element
-    document.documentElement.classList.add('settings-page');
-    
-    return () => {
-      document.documentElement.classList.remove('settings-page');
-    };
-  }, [location.pathname]);
-  
-  // Prevent automatic scrolling when navigating to settings pages
-  // Use a more aggressive approach to ensure scroll position is always at the top
-  useEffect(() => {
-    // Force scroll to top
-    window.scrollTo(0, 0);
-    
-    // Also try to prevent any automatic focus
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    
-    // Add a small delay to counter any browser-specific scroll restoration
-    const timer = setTimeout(() => {
-      window.scrollTo(0, 0);
-      
-      // Add an additional timer for extra safety
-      const secondTimer = setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 100);
-      
-      return () => clearTimeout(secondTimer);
-    }, 50);
-    
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [location.pathname]);
 
   const activeTab = getActiveTab();
 
@@ -94,11 +47,11 @@ const AgentSettingsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
-      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen no-auto-scroll">
+      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
         {/* Settings content */}
-        <div className="bg-white rounded-lg p-6 no-auto-scroll">
+        <div className="bg-white rounded-lg p-6">
           <Routes>
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="general" element={<GeneralSettings />} />
