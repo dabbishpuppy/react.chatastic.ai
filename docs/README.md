@@ -42,11 +42,23 @@ Authentication is implemented using Supabase Auth with email/password login.
 
 Teams represent organizational units within the application. Each team can have multiple agents and users.
 
-- **Schema**: `teams` table with columns for `id`, `name`, `created_at`, and `updated_at`
+- **Schema**: `teams` table with columns for `id`, `name`, `created_at`, `updated_at`, and `created_by`
+- **Ownership**: Teams are tied to users via the `created_by` field which stores the user's ID
 - **Access Control**: 
   - Users can only see teams they're members of
   - Only authenticated users can create teams
   - Only team owners can update or delete teams
+  - RLS policies use `created_by` field to ensure only the creator can insert or view teams
+
+**Example Insert Code for Teams**:
+```typescript
+const { data, error } = await supabase
+  .from('teams')
+  .insert({
+    name: 'New Team Name',
+    created_by: user.id // Set the created_by field to current user's ID
+  });
+```
 
 ### Team Members
 
@@ -67,6 +79,41 @@ Agents are resources that belong to teams.
   - Team members can view agents
   - Team owners and admins can create, update, and delete agents
 
+## 🔐 Security
+
+Wonderwave implements a comprehensive security model to protect user data and enforce proper access controls:
+
+### Row Level Security (RLS)
+
+The application uses Supabase Row Level Security (RLS) policies to restrict data access at the database level:
+
+- **User-Specific Data**: Each record is associated with a specific user through direct ownership (`created_by`) or team membership
+- **Policy Enforcement**: Database queries automatically filter results based on the current user's permissions
+- **Zero Trust Model**: By default, tables deny access unless explicitly allowed via policies
+
+### Role-based Access Control
+
+Access is managed through the `team_members` table using three role levels:
+
+- **Owner**: Full control over team resources (create, read, update, delete)
+- **Admin**: Elevated privileges for managing team resources but cannot delete teams
+- **Member**: Basic access to view and use team resources
+
+### Security Implementation
+
+- **Authentication Token**: `auth.uid()` function is used in policies to identify the current user
+- **Ownership Verification**: `created_by` field is used to verify record ownership
+- **Function-Based Policies**: Database functions (`is_team_member`, `is_team_owner`, `get_team_role`) simplify complex permission checks
+- **Security Definer Functions**: Functions execute with elevated privileges but verify user permissions
+
+**Example RLS Policy**:
+```sql
+-- Users can only view their own teams
+CREATE POLICY "Users can view their own teams"
+ON teams FOR SELECT
+USING (auth.uid() = created_by OR public.is_team_member(id));
+```
+
 ## 🛠 Implemented Features
 
 ### Database Functions
@@ -79,7 +126,7 @@ Agents are resources that belong to teams.
 
 - Teams:
   - "Authenticated users can create teams"
-  - "Users can view their teams"
+  - "Users can view their own teams" (scoped by `created_by` and team membership)
   - "Team owners can update teams"
   - "Team owners can delete teams"
 
