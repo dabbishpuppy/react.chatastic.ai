@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -546,14 +547,13 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         </div>
       )}
       
-      {/* Floating button - styled to match wonderwave.js */}
+      {/* Floating button */}
       <Button
         onClick={toggleChat}
-        className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
-        style={{ backgroundColor: bubbleBackgroundColor }}
+        className="rounded-full h-16 w-16 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
       >
         {isOpen ? (
-          <ChevronDown size={24} className="text-white" />
+          <ChevronDown size={24} className="text-white" style={{ backgroundColor: bubbleBackgroundColor }} />
         ) : (
           <>
             {chatIcon ? (
@@ -565,7 +565,9 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 />
               </div>
             ) : (
-              <MessageCircle size={24} className="text-white" />
+              <div className="h-full w-full flex items-center justify-center" style={{ backgroundColor: bubbleBackgroundColor }}>
+                <MessageCircle size={24} className="text-white" />
+              </div>
             )}
           </>
         )}

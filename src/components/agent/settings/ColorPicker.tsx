@@ -35,12 +35,32 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
           />
         </PopoverTrigger>
         <PopoverContent className="p-2 w-auto">
-          <input 
-            type="color"
-            value={currentColor}
-            onChange={handleColorChange}
-            className="w-32 h-8 cursor-pointer"
-          />
+          <div className="flex flex-col gap-2">
+            <div className="w-32 h-32 relative">
+              <input 
+                type="color"
+                value={currentColor}
+                onChange={handleColorChange}
+                className="w-full h-full cursor-pointer absolute top-0 left-0"
+              />
+            </div>
+            <div className="flex justify-between">
+              <div>
+                <label className="block text-xs mb-1">HEX</label>
+                <input 
+                  type="text"
+                  value={currentColor}
+                  onChange={(e) => {
+                    if (/^#([0-9A-F]{3}){1,2}$/i.test(e.target.value) || /^#([0-9A-F]{6})$/i.test(e.target.value)) {
+                      setCurrentColor(e.target.value);
+                      onChange(e.target.value);
+                    }
+                  }}
+                  className="w-20 px-1 py-0.5 border rounded text-sm"
+                />
+              </div>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
       

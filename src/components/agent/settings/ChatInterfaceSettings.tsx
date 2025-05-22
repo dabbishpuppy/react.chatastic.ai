@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,6 @@ import ChatSection from "@/components/agent/ChatSection";
 import EditableSuggestedMessage from "./EditableSuggestedMessage";
 import ImageUpload from "./ImageUpload";
 import { useChatSettings } from "@/hooks/useChatSettings";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ColorPicker from "./ColorPicker";
 
 const ChatInterfaceSettings: React.FC = () => {
@@ -27,6 +27,11 @@ const ChatInterfaceSettings: React.FC = () => {
   
   const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
   const [syncColorWithHeader, setSyncColorWithHeader] = React.useState(false);
+  const [showCropDialog, setShowCropDialog] = React.useState<{
+    visible: boolean;
+    type: 'profile' | 'icon';
+    imageUrl: string;
+  }>({ visible: false, type: 'profile', imageUrl: '' });
   
   // Initial preview messages based on settings
   const [previewMessages, setPreviewMessages] = React.useState([
@@ -58,7 +63,7 @@ const ChatInterfaceSettings: React.FC = () => {
     ]);
   }, [settings.initial_message]);
 
-  // Handle color sync with header
+  // Handle color sync with header only when explicitly requested
   useEffect(() => {
     if (syncColorWithHeader && settings.bubble_color) {
       updateSetting("user_message_color", settings.bubble_color);
@@ -82,6 +87,39 @@ const ChatInterfaceSettings: React.FC = () => {
       updateSetting("user_message_color", settings.bubble_color);
     }
   };
+
+  // Handle file selection for image upload with cropping
+  const handleFileSelect = async (file: File, type: 'profile' | 'icon') => {
+    // Create a URL for the file
+    const url = URL.createObjectURL(file);
+    // Show crop dialog with the image URL
+    setShowCropDialog({
+      visible: true,
+      type,
+      imageUrl: url
+    });
+  };
+
+  // Handle crop completion and upload
+  const handleCropComplete = async (croppedImage: File) => {
+    try {
+      if (showCropDialog.type === 'profile') {
+        await uploadImage(croppedImage, 'profile');
+      } else {
+        await uploadImage(croppedImage, 'icon');
+      }
+    } catch (error) {
+      console.error("Error uploading cropped image:", error);
+    } finally {
+      // Close the crop dialog
+      setShowCropDialog({ visible: false, type: 'profile', imageUrl: '' });
+    }
+  };
+
+  // Close crop dialog without saving
+  const handleCropCancel = () => {
+    setShowCropDialog({ visible: false, type: 'profile', imageUrl: '' });
+  };
   
   if (isLoading) {
     return (
@@ -90,6 +128,9 @@ const ChatInterfaceSettings: React.FC = () => {
       </div>
     );
   }
+
+  // Should we show the chat icon in preview?
+  const showChatIconInPreview = !settings.chat_icon;
 
   return (
     <div className="flex flex-col md:flex-row border-t">
@@ -293,7 +334,7 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 <ImageUpload
                   currentImage={settings.profile_picture || undefined}
-                  onUpload={(file) => uploadImage(file, "profile")}
+                  onUpload={(file) => handleFileSelect(file, "profile")}
                   onRemove={() => updateSetting("profile_picture", null)}
                   shape="circle"
                   size="md"
@@ -307,7 +348,7 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 <ImageUpload
                   currentImage={settings.chat_icon || undefined}
-                  onUpload={(file) => uploadImage(file, "icon")}
+                  onUpload={(file) => handleFileSelect(file, "icon")}
                   onRemove={() => updateSetting("chat_icon", null)}
                   shape="circle"
                   size="md"
@@ -391,24 +432,74 @@ const ChatInterfaceSettings: React.FC = () => {
           </div>
           
           {/* Chat icon preview - aligned to the right */}
-          <div className="mt-4 flex justify-end">
-            <div 
-              className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
-              style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
-            >
-              {settings.chat_icon ? (
+          {showChatIconInPreview && (
+            <div className="mt-4 flex justify-end">
+              <div 
+                className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
+                style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
+              >
+                <span className="text-white text-xl">💬</span>
+              </div>
+            </div>
+          )}
+
+          {settings.chat_icon && (
+            <div className="mt-4 flex justify-end">
+              <div className="h-16 w-16 rounded-full shadow-lg overflow-hidden">
                 <img 
                   src={settings.chat_icon} 
-                  alt="Chat Icon" 
+                  alt="Chat Icon"
                   className="h-full w-full object-cover" 
                 />
-              ) : (
-                <span className="text-white text-xl">💬</span>
-              )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Image Crop Dialog */}
+      {showCropDialog.visible && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">
+                Add a {showCropDialog.type === 'profile' ? 'Profile picture' : 'Chat icon'}
+              </h3>
+              <Button variant="ghost" size="icon" onClick={handleCropCancel}>
+                <span className="sr-only">Close</span>
+                ✕
+              </Button>
+            </div>
+            <div className="bg-gray-900 aspect-square relative rounded-lg overflow-hidden">
+              <img 
+                src={showCropDialog.imageUrl} 
+                alt="Preview" 
+                className="w-full h-full object-contain"
+              />
+              <div className="absolute inset-0 pointer-events-none border-2 border-white rounded-full m-auto w-[90%] h-[90%] flex items-center justify-center">
+                <div className="border-[1px] border-white/30 w-full h-full rounded-full"></div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={handleCropCancel}>
+                Change image
+              </Button>
+              <Button onClick={() => {
+                // In a real implementation we would apply cropping. 
+                // For now, we'll just convert the URL back to a file
+                fetch(showCropDialog.imageUrl)
+                  .then(res => res.blob())
+                  .then(blob => {
+                    const file = new File([blob], "cropped-image.png", { type: "image/png" });
+                    handleCropComplete(file);
+                  });
+              }}>
+                Attach image
+              </Button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
