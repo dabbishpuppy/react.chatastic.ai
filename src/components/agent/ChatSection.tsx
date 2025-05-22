@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -73,9 +72,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [userHasMessaged, setUserHasMessaged] = useState(true); // Set to true since we already added a user message
+  const inputRef = useRef<HTMLInputElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Use a smoother scroll for embedded content to prevent parent page scrolling
+    if (isEmbedded && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   useEffect(() => {
@@ -89,11 +95,36 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
   }, [initialMessages]);
 
+  // Prevent scrolling outside iframe when focusing input
+  useEffect(() => {
+    if (isEmbedded && inputRef.current) {
+      const handleFocus = (e: FocusEvent) => {
+        e.preventDefault();
+        // Ensure the page doesn't scroll when input is focused
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTo(0, chatContainerRef.current.scrollHeight);
+        }
+      };
+
+      const input = inputRef.current;
+      input.addEventListener('focus', handleFocus);
+      
+      return () => {
+        input.removeEventListener('focus', handleFocus);
+      };
+    }
+  }, [isEmbedded]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
 
     submitMessage(message);
+    
+    // Prevent any potential scrolling of the parent page
+    if (isEmbedded) {
+      e.stopPropagation();
+    }
   };
 
   const submitMessage = (text: string) => {
@@ -126,6 +157,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   const handleSuggestedMessageClick = (text: string) => {
     submitMessage(text);
+    
+    // Prevent scrolling of parent page when clicking suggestions
+    if (isEmbedded) {
+      // Keep focus within the iframe
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
   };
 
   const copyMessageToClipboard = (content: string) => {
@@ -199,11 +236,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   // Determine container classes based on whether this is embedded or not
   const containerClasses = isEmbedded 
-    ? `flex flex-col h-full w-full ${themeClasses.background}`
+    ? `flex flex-col h-full w-full ${themeClasses.background} overflow-hidden`
     : `flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background}`;
 
   return (
-    <div className={containerClasses}>
+    <div className={containerClasses} ref={chatContainerRef}>
       {/* Chat Header */}
       <div className={`p-4 border-b flex items-center justify-between ${themeClasses.background}`}>
         <div className="flex items-center gap-2">
@@ -238,7 +275,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       </div>
 
       {/* Chat Messages */}
-      <div className={`flex-1 overflow-y-auto p-6 ${themeClasses.background}`}>
+      <div className={`flex-1 overflow-y-auto p-6 ${themeClasses.background} scroll-container`}>
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
             {msg.isAgent && (
@@ -392,11 +429,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             </PopoverContent>
           </Popover>
           <input
+            ref={inputRef}
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder={placeholder}
             className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.inputText}`}
+            onFocus={(e) => isEmbedded && e.currentTarget.scrollIntoView(false)}
           />
           <Button 
             type="submit" 
