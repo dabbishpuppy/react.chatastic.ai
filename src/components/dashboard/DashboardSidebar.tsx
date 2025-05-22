@@ -1,4 +1,3 @@
-
 import React from "react";
 import TeamsList from "./TeamsList";
 import AgentsList from "./AgentsList";
@@ -6,23 +5,7 @@ import SidebarActions from "./SidebarActions";
 import Logo from "@/components/layout/Logo";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-interface Agent {
-  id: string;
-  name: string;
-  image: string;
-  color: string;
-  status?: string;
-  team_id?: string;
-}
-
-interface Team {
-  id: string;
-  name: string;
-  isActive: boolean;
-  agents: Agent[];
-  metrics?: any;
-}
+import { Agent, Team } from "@/types/dashboard";
 
 interface DashboardSidebarProps {
   teams: Team[];
@@ -34,7 +17,7 @@ interface DashboardSidebarProps {
   onTeamSelect: (team: Team) => void;
   toggleSection: (section: string) => void;
   onTeamCreated?: (team: Team) => void;
-  onAgentCreated?: (agent: Agent) => void;
+  onAgentCreated?: (agent: Omit<Agent, "id">) => void;
   onTeamEdited?: (team: Team) => void;
   onTeamDeleted?: (teamId: string) => void;
   onAgentEdited?: (agent: Agent) => void;

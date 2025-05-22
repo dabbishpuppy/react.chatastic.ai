@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -13,20 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-
-interface Agent {
-  id: string;
-  name: string;
-  image: string;
-  color: string;
-  status?: string;
-  team_id?: string;
-  metrics?: {
-    conversations: number;
-    responseTime: string;
-    satisfaction: number;
-  };
-}
+import { Agent } from "@/types/dashboard";
 
 interface Team {
   id: string;
@@ -40,7 +26,7 @@ interface AgentsListProps {
   teams: Team[];
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onAgentCreated?: (agent: Agent) => void;
+  onAgentCreated?: (agent: Omit<Agent, "id">) => void;
   onAgentEdited?: (agent: Agent) => void;
   onAgentDeleted?: (agentId: string) => void;
 }
@@ -62,7 +48,7 @@ const AgentsList = ({
   const { toast } = useToast();
 
   // Handle creating a new agent
-  const handleAgentCreated = (newAgent: Agent) => {
+  const handleAgentCreated = (newAgent: Omit<Agent, "id">) => {
     if (onAgentCreated) {
       onAgentCreated(newAgent);
     }
