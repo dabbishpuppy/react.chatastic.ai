@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -267,6 +268,9 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     </div>
   );
 
+  // Display the proper avatar based on availability
+  const displayBotAvatar = profilePicture || botAvatar;
+
   return (
     <div className={`fixed bottom-0 ${positionClasses.container} z-50 flex flex-col`}>
       {/* Initial message popups - only show when chat is closed */}
@@ -283,7 +287,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
               >
                 <div className="flex">
                   <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
-                    <AvatarImage src={botAvatar} alt={botName} />
+                    <AvatarImage src={displayBotAvatar} alt={botName} />
                     <AvatarFallback>AI</AvatarFallback>
                   </Avatar>
                   <p>{popupMessages[index]}</p>
@@ -304,7 +308,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           >
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8 bg-white">
-                <AvatarImage src={botAvatar} alt={botName} />
+                <AvatarImage src={displayBotAvatar} alt={botName} />
                 <AvatarFallback>CB</AvatarFallback>
               </Avatar>
               <span className="font-medium">{botName}</span>
@@ -330,7 +334,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
               >
                 {msg.sender === "bot" && (
                   <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-                    <AvatarImage src={botAvatar} alt={botName} />
+                    <AvatarImage src={displayBotAvatar} alt={botName} />
                     <AvatarFallback>CB</AvatarFallback>
                   </Avatar>
                 )}
@@ -433,7 +437,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
             {isTyping && (
               <div className="flex mb-4">
                 <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-                  <AvatarImage src={botAvatar} alt={botName} />
+                  <AvatarImage src={displayBotAvatar} alt={botName} />
                   <AvatarFallback>CB</AvatarFallback>
                 </Avatar>
                 <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.botBubble}`}>
@@ -465,8 +469,8 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           )}
 
           {/* Input area */}
-          <form onSubmit={handleSendMessage} className={`border-t p-3 ${themeClasses.background}`}>
-            <div className="flex relative">
+          <div className={`border-t p-3 ${themeClasses.background}`}>
+            <form onSubmit={handleSendMessage} className="flex relative">
               <Popover>
                 <PopoverTrigger asChild>
                   <Button 
@@ -497,7 +501,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder={messagePlaceholder}
-                className={`flex-1 border rounded-lg pr-10 pl-10 py-2 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.text}`}
+                className={`w-full border rounded-lg pr-10 pl-10 py-2 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.text}`}
               />
               <Button
                 type="submit"
@@ -508,13 +512,13 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
               >
                 <Send size={18} className="text-gray-500" />
               </Button>
-            </div>
+            </form>
             {footer && (
               <div className="text-xs text-center mt-2 text-gray-500">
                 {footer}
               </div>
             )}
-          </form>
+          </div>
         </div>
       )}
       
@@ -528,7 +532,6 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           <ChevronDown size={24} />
         ) : (
           <>
-            {/* Use custom chat icon if provided, otherwise use default MessageCircle icon */}
             {chatIcon ? (
               <img src={chatIcon} alt="Chat" className="h-8 w-8 object-cover" />
             ) : (

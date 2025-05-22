@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import ChatSection from "@/components/agent/ChatSection";
 import EditableSuggestedMessage from "./EditableSuggestedMessage";
 import ImageUpload from "./ImageUpload";
 import { useChatSettings } from "@/hooks/useChatSettings";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ChatInterfaceSettings: React.FC = () => {
   const {
@@ -292,7 +294,7 @@ const ChatInterfaceSettings: React.FC = () => {
         </div>
       </div>
       
-      {/* Right panel - Chat Preview - with border instead of background color */}
+      {/* Right panel - Chat Preview with preview for both Chat icon and Profile picture */}
       <div className="w-full md:w-2/5 border-l">
         <div className="p-6 sticky top-0">
           <div className="w-full max-w-md mx-auto h-[700px] bg-white rounded-lg shadow overflow-hidden flex flex-col">
@@ -310,9 +312,26 @@ const ChatInterfaceSettings: React.FC = () => {
                 allowRegenerate={settings.allow_regenerate}
                 theme={settings.theme}
                 profilePicture={settings.profile_picture || undefined}
-                chatIcon={settings.chat_icon || undefined}
                 footer={settings.footer || undefined}
               />
+            </div>
+          </div>
+          
+          {/* Chat icon preview outside the chat window */}
+          <div className="mt-4 flex justify-center">
+            <div className="text-center">
+              <p className="mb-2 text-sm font-medium text-gray-500">Chat Icon Preview</p>
+              <div className="h-12 w-12 rounded-full bg-black shadow-lg flex items-center justify-center mx-auto overflow-hidden">
+                {settings.chat_icon ? (
+                  <img 
+                    src={settings.chat_icon} 
+                    alt="Chat Icon" 
+                    className="h-full w-full object-cover" 
+                  />
+                ) : (
+                  <span className="text-white text-xl">💬</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
