@@ -43,9 +43,9 @@ export async function fetchColorSettingsAndVisibility(agentId) {
               isPrivate = true;
               
               // If private, hide the chat bubble if it exists
-              const bubbleButton = document.getElementById('wonderwave-bubble');
-              if (bubbleButton) {
-                bubbleButton.style.display = 'none';
+              const existingBubble = document.getElementById('wonderwave-bubble');
+              if (existingBubble) {
+                existingBubble.style.display = 'none';
               }
               
               // If the chat is already open, close it
@@ -63,9 +63,9 @@ export async function fetchColorSettingsAndVisibility(agentId) {
               isPrivate = false;
               
               // If agent is now public (was private before), show the bubble
-              const bubbleButton = document.getElementById('wonderwave-bubble');
-              if (bubbleButton) {
-                bubbleButton.style.display = 'flex';
+              const existingBubble = document.getElementById('wonderwave-bubble');
+              if (existingBubble) {
+                existingBubble.style.display = 'flex';
               }
               
               // Since we already have the settings from the visibility check,
@@ -73,8 +73,8 @@ export async function fetchColorSettingsAndVisibility(agentId) {
               colorSettings = visibilityData;
               
               // Update existing bubble if it exists
-              const bubbleButton = document.getElementById('wonderwave-bubble');
-              if (bubbleButton) {
+              const bubbleElement = document.getElementById('wonderwave-bubble');
+              if (bubbleElement) {
                 updateBubbleAppearance();
               }
               
@@ -127,8 +127,8 @@ export async function fetchColorSettingsAndVisibility(agentId) {
         colorSettings = data;
         
         // Update existing bubble if it exists
-        const bubbleButton = document.getElementById('wonderwave-bubble');
-        if (bubbleButton) {
+        const bubbleElement = document.getElementById('wonderwave-bubble');
+        if (bubbleElement) {
           updateBubbleAppearance();
         }
         
