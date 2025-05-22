@@ -43,11 +43,29 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
+    
+    // Setup input event listeners to prevent scroll jumps
+    const preventInputScrollJump = (e: Event) => {
+      if ((e.target as HTMLElement).tagName === 'TEXTAREA' || 
+          (e.target as HTMLElement).tagName === 'INPUT') {
+        e.stopPropagation();
+      }
+    };
+    
+    document.addEventListener('focus', preventInputScrollJump, true);
+    document.addEventListener('input', preventInputScrollJump, true);
+    
+    return () => {
+      document.removeEventListener('focus', preventInputScrollJump, true);
+      document.removeEventListener('input', preventInputScrollJump, true);
+    };
   }, []);
 
   // Prevent scroll on tab change
   useEffect(() => {
     // Don't manipulate scroll position on tab change
+    // Force top position
+    window.scrollTo(0, 0);
   }, [activeTab]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
@@ -113,6 +131,15 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
           style={{ 
             scrollBehavior: 'auto',
             overflowAnchor: 'none',
+            overscrollBehavior: 'contain',
+            scrollMargin: 0,
+            scrollPadding: 0
+          }}
+          onFocus={(e) => {
+            // Prevent any element from scrolling into view on focus
+            if (e.target !== contentRef.current) {
+              e.stopPropagation();
+            }
           }}
         >
           {children}

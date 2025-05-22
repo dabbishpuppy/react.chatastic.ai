@@ -26,6 +26,17 @@ const ScrollToTop = () => {
     // Add a small delay to ensure scroll position is reset after any potential focus events
     const timer = setTimeout(() => {
       window.scrollTo(0, 0);
+      
+      // Add an additional event listener to prevent scroll on input focus
+      const preventScrollOnFocus = (e: Event) => {
+        setTimeout(() => window.scrollTo(0, 0), 0);
+      };
+      
+      document.addEventListener('focus', preventScrollOnFocus, true);
+      
+      return () => {
+        document.removeEventListener('focus', preventScrollOnFocus, true);
+      };
     }, 50);
     
     return () => {

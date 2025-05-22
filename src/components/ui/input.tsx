@@ -7,7 +7,17 @@ export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, autoFocus, ...props }, ref) => {
+  ({ className, type, autoFocus, onFocus, ...props }, ref) => {
+    const handleFocus = React.useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+      // Prevent scrolling into view on focus
+      e.preventDefault();
+      
+      // Call the original onFocus handler if provided
+      if (onFocus) {
+        onFocus(e);
+      }
+    }, [onFocus]);
+    
     return (
       <input
         type={type}
@@ -17,6 +27,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         ref={ref}
         autoFocus={false} // Always prevent autofocus
+        onFocus={handleFocus}
         {...props}
       />
     )
