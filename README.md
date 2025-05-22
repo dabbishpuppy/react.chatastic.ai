@@ -1,4 +1,3 @@
-
 # Welcome to your Lovable project
 
 ## Project info
@@ -61,22 +60,6 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## Project Features
-
-### Chat Interface
-
-The project includes a customizable chat interface with the following features:
-
-- Customizable appearance (theme, colors, position)
-- Suggested messages
-- Feedback collection
-- Message regeneration
-- Profile pictures and chat icons
-- Customizable initial messages and placeholders
-- Automatic chat display with configurable delay
-
-You can access the chatbot demo from the sidebar menu, and configure the chat interface in the settings section.
-
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/457a2427-6b8c-4723-9fd8-547ebd4354d9) and click on Share -> Publish.
@@ -88,4 +71,3 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
-
