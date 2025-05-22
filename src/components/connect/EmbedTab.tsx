@@ -7,6 +7,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import { AlertTriangle } from "lucide-react";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
 
 interface EmbedTabProps {
   embedCode?: string;
@@ -16,6 +17,7 @@ interface EmbedTabProps {
 export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) => {
   const [copyText, setCopyText] = useState("Copy");
   const [embedType, setEmbedType] = useState<"bubble" | "iframe">("bubble");
+  const [showIdentityVerification, setShowIdentityVerification] = useState(false);
   const { settings } = useChatSettings();
   
   const handleCopy = () => {
@@ -30,32 +32,55 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
       setTimeout(() => setCopyText("Copy"), 2000);
     }
   };
+
+  const handleCopyVerification = () => {
+    const verificationCode = document.querySelector(".verification-code code")?.textContent;
+    if (verificationCode) {
+      navigator.clipboard.writeText(verificationCode);
+      toast({
+        title: "Code copied",
+        description: "The verification code has been copied to your clipboard."
+      });
+    }
+  };
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
-      // Chat bubble embed code using wonderwave with settings from the chat interface
+      // Improved script with Proxy pattern
       return `<script>
-  (function(){
-    if(!window.wonderwaveConfig) {
-      window.wonderwaveConfig = {
-        agentId: "${agentId}",
-        position: "${settings.bubble_position || 'right'}" // Use the position from settings
-      };
-    }
+(function(){
+  if(!window.wonderwaveConfig) {
+    window.wonderwaveConfig = {
+      agentId: "${agentId}",
+      position: "${settings.bubble_position || 'right'}" // Use the position from settings
+    };
+  }
+  
+  if(!window.wonderwave || window.wonderwave("getState") !== "initialized") {
+    window.wonderwave = (...args) => {
+      window.wonderwave.q = window.wonderwave.q || [];
+      window.wonderwave.q.push(args);
+    };
     
-    if(!window.wonderwave || window.wonderwave("getState") == "initialized"){
-      window.wonderwave = (...arguments) => {
-        if(!window.wonderwave.q) { window.wonderwave.q = []; }
-        window.wonderwave.q.push(arguments);
-      };
-      window.wonderwave.d = {};
-      
+    // Add Proxy for better method handling
+    window.wonderwave = new Proxy(window.wonderwave, {
+      get(target, prop) {
+        if (prop === "q") return target.q;
+        return (...args) => target(prop, ...args);
+      }
+    });
+
+    const onLoad = function() {
       const script = document.createElement("script");
       script.src = "https://query-spark-start.lovable.app/wonderwave.js";
       script.async = true;
       document.head.appendChild(script);
-    }
-  })();
+    };
+
+    if (document.readyState === "complete") onLoad();
+    else window.addEventListener("load", onLoad);
+  }
+})();
 </script>`;
     } else {
       // Simplified iframe embedding code
@@ -64,15 +89,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   width="100%"
   style="height: 100%; min-height: 700px"
   frameborder="0"
-></iframe>
-
-<script>
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'resize-iframe' && e.data.agentId === '${agentId}') {
-      document.querySelector('iframe[src*="${agentId}"]').style.height = e.data.height + 'px';
-    }
-  });
-</script>`;
+></iframe>`;
     }
   };
   
@@ -121,6 +138,64 @@ Access-Control-Allow-Origin: *
                         </p>
                       </div>
                     </div>
+
+                    <div className="mt-4">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setShowIdentityVerification(!showIdentityVerification)}
+                      >
+                        {showIdentityVerification ? "Hide" : "Show"} Identity Verification
+                      </Button>
+                    </div>
+
+                    {showIdentityVerification && (
+                      <div className="mt-4 border p-4 rounded-md">
+                        <h4 className="font-medium mb-2">For Identity Verification</h4>
+                        <p className="text-sm text-gray-600 mb-2">
+                          On the server side, generate an HMAC hash using your secret key and the user ID:
+                        </p>
+                        
+                        <div className="verification-code bg-gray-50 p-3 rounded-md text-xs overflow-x-auto mb-3">
+                          <code>{`
+const crypto = require('crypto');
+const secret = '********'; // Your verification secret key
+const userId = current_user.id // A string UUID to identify your user
+const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
+                          `}</code>
+                          
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="mt-2"
+                            onClick={handleCopyVerification}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                        
+                        <p className="text-sm text-gray-600 mb-2">
+                          Then, include this hash in your chat bubble configuration:
+                        </p>
+                        
+                        <div className="bg-gray-50 p-3 rounded-md text-xs overflow-x-auto">
+                          <code>{`
+<script>
+  window.wonderwaveConfig = {
+    agentId: "${agentId}",
+    position: "${settings.bubble_position || 'right'}",
+    identityHash: "YOUR_GENERATED_HASH", // Add the hash here
+    userId: "USER_UUID" // The same user ID used to generate the hash
+  };
+</script>
+                          `}</code>
+                        </div>
+                        
+                        <div className="mt-3 text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
+                          <strong>Important:</strong> Keep your secret key safe! Never commit it directly to your repository, client-side code, or anywhere a third party can find it.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
