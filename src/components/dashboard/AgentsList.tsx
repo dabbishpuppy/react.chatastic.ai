@@ -15,12 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface Agent {
-  id: number;
+  id: string;
   name: string;
   image: string;
   color: string;
   status?: string;
-  teamId?: string;
+  team_id?: string;
   metrics?: {
     conversations: number;
     responseTime: string;
@@ -40,29 +40,32 @@ interface AgentsListProps {
   teams: Team[];
   isExpanded: boolean;
   onToggleExpand: () => void;
+  onAgentCreated?: (agent: Agent) => void;
+  onAgentEdited?: (agent: Agent) => void;
+  onAgentDeleted?: (agentId: string) => void;
 }
 
 const AgentsList = ({
   agents,
   teams,
   isExpanded,
-  onToggleExpand
+  onToggleExpand,
+  onAgentCreated,
+  onAgentEdited,
+  onAgentDeleted
 }: AgentsListProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [agentToEdit, setAgentToEdit] = useState<Agent | null>(null);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
-  const [localAgents, setLocalAgents] = useState<Agent[]>(agents);
   const { toast } = useToast();
 
   // Handle creating a new agent
   const handleAgentCreated = (newAgent: Agent) => {
-    setLocalAgents(prevAgents => [...prevAgents, newAgent]);
-    toast({
-      title: "Agent created",
-      description: `${newAgent.name} has been created successfully.`
-    });
+    if (onAgentCreated) {
+      onAgentCreated(newAgent);
+    }
   };
 
   // Functions to handle editing and deleting agents
@@ -81,19 +84,18 @@ const AgentsList = ({
   };
 
   const handleAgentEdited = (updatedAgent: Agent) => {
-    setLocalAgents(prevAgents => 
-      prevAgents.map(agent => agent.id === updatedAgent.id ? updatedAgent : agent)
-    );
+    if (onAgentEdited) {
+      onAgentEdited(updatedAgent);
+    }
   };
 
-  const handleAgentDeleted = (agentId: number) => {
-    setLocalAgents(prevAgents => 
-      prevAgents.filter(agent => agent.id !== agentId)
-    );
+  const handleAgentDeleted = (agentId: string) => {
+    if (onAgentDeleted) {
+      onAgentDeleted(agentId);
+    }
   };
 
-  // Use local agents if available, otherwise use the props agents
-  const displayAgents = localAgents.length > 0 ? localAgents : agents;
+  const activeTeam = teams.find(team => team.isActive);
 
   return (
     <div className="mb-4">
@@ -110,7 +112,7 @@ const AgentsList = ({
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
         isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
       }`}>
-        {displayAgents.map(agent => (
+        {agents.map(agent => (
           <div 
             key={agent.id}
             className="px-3 py-2 rounded-md flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
@@ -160,7 +162,17 @@ const AgentsList = ({
         <Button 
           variant="outline" 
           className="w-full flex items-center gap-2 justify-center text-sm"
-          onClick={() => setIsDialogOpen(true)}
+          onClick={() => {
+            if (!activeTeam) {
+              toast({
+                title: "No team selected",
+                description: "Please select or create a team first",
+                variant: "destructive",
+              });
+              return;
+            }
+            setIsDialogOpen(true);
+          }}
         >
           <Plus className="h-4 w-4" />
           <span>Create agent</span>

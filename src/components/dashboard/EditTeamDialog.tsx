@@ -21,7 +21,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { toast } from "@/hooks/use-toast";
 
 // Define the form schema
 const formSchema = z.object({
@@ -58,6 +57,12 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
     },
   });
 
+  React.useEffect(() => {
+    if (open) {
+      form.reset({ name: team.name });
+    }
+  }, [open, team.name, form]);
+
   const onSubmit = (values: FormValues) => {
     // Update the team with the new values
     const updatedTeam = {
@@ -66,10 +71,6 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
     };
 
     onTeamEdited(updatedTeam);
-    toast({
-      title: "Team updated",
-      description: `Team has been renamed to "${values.name}"`,
-    });
     onOpenChange(false);
   };
 

@@ -23,10 +23,13 @@ interface Team {
 
 interface TeamsListProps {
   teams: Team[];
-  selectedTeam: Team;
+  selectedTeam: Team | null;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onTeamSelect: (team: Team) => void;
+  onTeamCreated?: (team: Team) => void;
+  onTeamEdited?: (team: Team) => void;
+  onTeamDeleted?: (teamId: string) => void;
 }
 
 const TeamsList = ({
@@ -34,49 +37,16 @@ const TeamsList = ({
   selectedTeam,
   isExpanded,
   onToggleExpand,
-  onTeamSelect
+  onTeamSelect,
+  onTeamCreated,
+  onTeamEdited,
+  onTeamDeleted
 }: TeamsListProps) => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [teamToEdit, setTeamToEdit] = useState<Team | null>(null);
   const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
-  const [localTeams, setLocalTeams] = useState<Team[]>(teams);
-
-  // Handle creating a new team
-  const handleTeamCreated = (newTeam: any) => {
-    const teamWithCorrectType = {
-      ...newTeam,
-      agents: newTeam.agents as any[]
-    };
-    
-    setLocalTeams(prevTeams => [...prevTeams, teamWithCorrectType]);
-    // Auto-select the newly created team
-    onTeamSelect(teamWithCorrectType);
-  };
-
-  // Handle editing a team
-  const handleTeamEdited = (updatedTeam: Team) => {
-    setLocalTeams(prevTeams => 
-      prevTeams.map(team => team.id === updatedTeam.id ? updatedTeam : team)
-    );
-    
-    // Update the selected team if it was edited
-    if (selectedTeam.id === updatedTeam.id) {
-      onTeamSelect(updatedTeam);
-    }
-  };
-
-  // Handle deleting a team
-  const handleTeamDeleted = (teamId: string) => {
-    const updatedTeams = localTeams.filter(team => team.id !== teamId);
-    setLocalTeams(updatedTeams);
-    
-    // Select another team if the currently selected team was deleted
-    if (selectedTeam.id === teamId && updatedTeams.length > 0) {
-      onTeamSelect(updatedTeams[0]);
-    }
-  };
 
   // Open the edit dialog
   const openEditDialog = (team: Team, e: React.MouseEvent) => {
@@ -92,8 +62,26 @@ const TeamsList = ({
     setIsDeleteDialogOpen(true);
   };
 
-  // Use local teams if available, otherwise use the props teams
-  const displayTeams = localTeams.length > 0 ? localTeams : teams;
+  // Handle creating a new team
+  const handleTeamCreated = (newTeam: Team) => {
+    if (onTeamCreated) {
+      onTeamCreated(newTeam);
+    }
+  };
+
+  // Handle editing a team
+  const handleTeamEdited = (updatedTeam: Team) => {
+    if (onTeamEdited) {
+      onTeamEdited(updatedTeam);
+    }
+  };
+
+  // Handle deleting a team
+  const handleTeamDeleted = (teamId: string) => {
+    if (onTeamDeleted) {
+      onTeamDeleted(teamId);
+    }
+  };
 
   return (
     <div className="mb-4">
@@ -110,11 +98,11 @@ const TeamsList = ({
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
         isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
       }`}>
-        {displayTeams.map(team => (
+        {teams.map(team => (
           <div 
             key={team.id}
             className={`px-3 py-2 rounded-md flex items-center justify-between cursor-pointer transition-colors duration-200 ${
-              selectedTeam.id === team.id 
+              selectedTeam?.id === team.id 
                 ? "bg-gray-100 font-medium" 
                 : "hover:bg-gray-50"
             }`}
@@ -161,6 +149,7 @@ const TeamsList = ({
           variant="outline" 
           className="w-full flex items-center gap-2 justify-center text-sm"
           onClick={() => setIsCreateDialogOpen(true)}
+          aria-label="Create team"
         >
           <Plus className="h-4 w-4" />
           <span>Create team</span>

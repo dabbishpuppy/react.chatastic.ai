@@ -7,17 +7,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: number;
+  id: string;
   name: string;
   image: string;
   color: string;
   status?: string;
-  teamId?: string;
-  metrics?: {
-    conversations: number;
-    responseTime: string;
-    satisfaction: number;
-  };
+  team_id?: string;
 }
 
 interface EditAgentDialogProps {
@@ -37,27 +32,35 @@ const EditAgentDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  React.useEffect(() => {
+    if (open) {
+      setName(agent.name);
+    }
+  }, [open, agent.name]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // In a real application, you would call an API here
-    // For now we'll just simulate a delay and update locally
-    setTimeout(() => {
-      const updatedAgent = {
-        ...agent,
-        name: name.trim()
-      };
-      
-      onAgentEdited(updatedAgent);
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       toast({
-        title: "Agent updated",
-        description: `${agent.name} has been renamed to ${name.trim()}.`,
+        title: "Error",
+        description: "Agent name cannot be empty",
+        variant: "destructive",
       });
-      
       setIsSubmitting(false);
-      onOpenChange(false);
-    }, 500);
+      return;
+    }
+
+    const updatedAgent = {
+      ...agent,
+      name: trimmedName
+    };
+    
+    onAgentEdited(updatedAgent);
+    setIsSubmitting(false);
+    onOpenChange(false);
   };
 
   return (

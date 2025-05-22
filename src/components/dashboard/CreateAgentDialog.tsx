@@ -1,6 +1,5 @@
 
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,9 +21,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { toast } from "@/hooks/use-toast";
 
-// Define the form schema - removed teamId requirement
+// Define the form schema
 const formSchema = z.object({
   name: z.string().min(1, { message: "Agent name is required" }),
 });
@@ -57,17 +55,10 @@ interface CreateAgentDialogProps {
   onOpenChange: (open: boolean) => void;
   teams: Team[];
   onAgentCreated: (agent: {
-    id: number;
     name: string;
-    image: string;
+    image?: string;
     color: string;
-    status: "active";
-    metrics: {
-      conversations: number;
-      responseTime: string;
-      satisfaction: number;
-    };
-    teamId: string;
+    status?: string;
   }) => void;
 }
 
@@ -77,7 +68,6 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   teams,
   onAgentCreated,
 }) => {
-  const navigate = useNavigate();
   const selectedTeam = teams.find(team => team.isActive) || teams[0];
   
   const form = useForm<FormValues>({
@@ -88,6 +78,10 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
   });
 
   const onSubmit = (values: FormValues) => {
+    if (!selectedTeam) {
+      return; // Cannot create agent without a team
+    }
+    
     // Auto-assign a color from the palette (round robin based on team's existing agents)
     const teamAgentsCount = selectedTeam ? selectedTeam.agents.length : 0;
     const colorIndex = teamAgentsCount % agentColorPalette.length;
@@ -95,29 +89,15 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     
     // Create a new agent with the form values
     const newAgent = {
-      id: Date.now(), // Use timestamp as a simple ID for now
       name: values.name,
       image: "/placeholder.svg",
       color: autoAssignedColor,
-      status: "active" as const,
-      metrics: {
-        conversations: 0,
-        responseTime: "0.0s",
-        satisfaction: 0,
-      },
-      teamId: selectedTeam.id,
+      status: "active"
     };
 
     onAgentCreated(newAgent);
-    toast({
-      title: "Agent created",
-      description: `${values.name} has been created successfully!`,
-    });
     form.reset();
     onOpenChange(false);
-    
-    // Redirect to the sources page for the new agent
-    navigate(`/agent/${newAgent.id}/sources?tab=text`, { replace: true });
   };
 
   return (

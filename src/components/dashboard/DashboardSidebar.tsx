@@ -7,18 +7,21 @@ import Logo from "@/components/layout/Logo";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+interface Agent {
+  id: string;
+  name: string;
+  image: string;
+  color: string;
+  status?: string;
+  team_id?: string;
+}
+
 interface Team {
   id: string;
   name: string;
   isActive: boolean;
   agents: Agent[];
-}
-
-interface Agent {
-  id: number;
-  name: string;
-  image: string;
-  color: string;
+  metrics?: any;
 }
 
 interface DashboardSidebarProps {
@@ -34,6 +37,8 @@ interface DashboardSidebarProps {
   onAgentCreated?: (agent: Agent) => void;
   onTeamEdited?: (team: Team) => void;
   onTeamDeleted?: (teamId: string) => void;
+  onAgentEdited?: (agent: Agent) => void;
+  onAgentDeleted?: (agentId: string) => void;
   isMobileOpen?: boolean;
   setMobileOpen?: (open: boolean) => void;
 }
@@ -48,6 +53,8 @@ const DashboardSidebar = ({
   onAgentCreated,
   onTeamEdited,
   onTeamDeleted,
+  onAgentEdited,
+  onAgentDeleted,
   isMobileOpen = false,
   setMobileOpen
 }: DashboardSidebarProps) => {
@@ -73,6 +80,9 @@ const DashboardSidebar = ({
                 setMobileOpen(false);
               }
             }}
+            onTeamCreated={onTeamCreated}
+            onTeamEdited={onTeamEdited}
+            onTeamDeleted={onTeamDeleted}
           />
           
           {activeTeam && (
@@ -81,6 +91,9 @@ const DashboardSidebar = ({
               teams={teamsArray}
               isExpanded={expandedSections.agents}
               onToggleExpand={() => toggleSection('agents')}
+              onAgentCreated={onAgentCreated}
+              onAgentEdited={onAgentEdited}
+              onAgentDeleted={onAgentDeleted}
             />
           )}
         </div>

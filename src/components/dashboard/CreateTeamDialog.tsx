@@ -21,7 +21,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { toast } from "@/hooks/use-toast";
 
 // Define the form schema
 const formSchema = z.object({
@@ -34,11 +33,11 @@ interface CreateTeamDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTeamCreated: (team: {
-    id: string;
+    id?: string;
     name: string;
-    isActive: boolean;
-    agents: never[]; // Changed from [] to never[] to match the expected type
-    metrics: {
+    isActive?: boolean;
+    agents?: any[];
+    metrics?: {
       totalConversations: number;
       avgResponseTime: string;
       usagePercent: number;
@@ -63,24 +62,10 @@ const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({
   const onSubmit = (values: FormValues) => {
     // Create a new team with the form values
     const newTeam = {
-      id: `team-${Date.now()}`, // Use timestamp as a simple ID for now
       name: values.name,
-      isActive: false,
-      agents: [] as never[], // Explicitly cast empty array to never[] to fix type error
-      metrics: {
-        totalConversations: 0,
-        avgResponseTime: "0.0s",
-        usagePercent: 0,
-        apiCalls: 0,
-        satisfaction: 0,
-      },
     };
 
     onTeamCreated(newTeam);
-    toast({
-      title: "Team created",
-      description: `${values.name} team has been created successfully!`,
-    });
     form.reset();
     onOpenChange(false);
   };

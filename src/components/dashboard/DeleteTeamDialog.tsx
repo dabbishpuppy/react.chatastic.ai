@@ -39,11 +39,6 @@ const DeleteTeamDialog: React.FC<DeleteTeamDialogProps> = ({
   const handleDelete = () => {
     if (confirmName === team.name) {
       onTeamDeleted(team.id);
-      toast({
-        title: "Team deleted",
-        description: `"${team.name}" has been deleted`,
-        variant: "destructive",
-      });
       onOpenChange(false);
       setConfirmName("");
     } else {

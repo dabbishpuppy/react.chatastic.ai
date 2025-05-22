@@ -15,24 +15,19 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
-  id: number;
+  id: string;
   name: string;
   image: string;
   color: string;
   status?: string;
-  teamId?: string;
-  metrics?: {
-    conversations: number;
-    responseTime: string;
-    satisfaction: number;
-  };
+  team_id?: string;
 }
 
 interface DeleteAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agent: Agent;
-  onAgentDeleted: (agentId: number) => void;
+  onAgentDeleted: (agentId: string) => void;
 }
 
 const DeleteAgentDialog = ({
@@ -50,20 +45,10 @@ const DeleteAgentDialog = ({
     
     setIsSubmitting(true);
     
-    // In a real application, you would call an API here
-    // For now we'll just simulate a delay and update locally
-    setTimeout(() => {
-      onAgentDeleted(agent.id);
-      toast({
-        title: "Agent deleted",
-        description: `${agent.name} has been deleted.`,
-        variant: "destructive"
-      });
-      
-      setIsSubmitting(false);
-      onOpenChange(false);
-      setConfirmName("");
-    }, 500);
+    onAgentDeleted(agent.id);
+    setIsSubmitting(false);
+    onOpenChange(false);
+    setConfirmName("");
   };
 
   return (
