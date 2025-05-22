@@ -559,9 +559,10 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                   alt="Chat" 
                   className="h-full w-full object-cover" 
                 />
-              ) : (
-                <MessageCircle size={24} className="text-white" />
-              )}
+              </div>
+            ) : (
+              <MessageCircle size={24} className="text-white" />
+            )}
           </>
         )}
       </Button>
