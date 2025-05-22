@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +24,16 @@ interface ChatbotWidgetProps {
   userAvatar?: string;
   primaryColor?: string;
   showPopups?: boolean;
+  theme?: 'light' | 'dark' | 'system';
+  bubblePosition?: 'left' | 'right';
+  autoShowDelay?: number;
+  showFeedback?: boolean;
+  allowRegenerate?: boolean;
+  initialMessage?: string;
+  suggestedMessages?: string[];
+  showSuggestions?: boolean;
+  messagePlaceholder?: string;
+  footer?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -35,6 +46,16 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   userAvatar,
   primaryColor = "#000000",
   showPopups = true,
+  theme = 'light',
+  bubblePosition = 'right',
+  autoShowDelay = 1,
+  showFeedback = true,
+  allowRegenerate = true,
+  initialMessage = "👋 Hi! I am an AI chatbot, ask me anything!",
+  suggestedMessages = [],
+  showSuggestions = true,
+  messagePlaceholder = "Message...",
+  footer,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -43,33 +64,22 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Initial message popups state
-  const [popupMessages] = useState<string[]>([
-    `👋 Hi! I am ${botName}, ask me anything about ${productName}!`,
-    `By the way, you can create an agent like me for your website! 😊`
-  ]);
+  const [popupMessages] = useState<string[]>(initialMessage.split('\n').filter(Boolean));
   const [visiblePopups, setVisiblePopups] = useState<number[]>([]);
   
   // Set initial welcome messages when component mounts
   useEffect(() => {
     // Only set initial messages once
     if (messages.length === 0) {
-      const initialMessages = [
-        {
-          id: "welcome",
-          content: `👋 Hi! I am ${botName}, ask me anything about ${productName}!`,
-          sender: "bot" as const,
-          timestamp: new Date(),
-        },
-        {
-          id: "intro",
-          content: `By the way, you can create a chatbot like me for your website! 🤩`,
-          sender: "bot" as const,
-          timestamp: new Date(Date.now() + 1000),
-        },
-      ];
+      const initialMessages = initialMessage.split('\n').filter(Boolean).map((content, index) => ({
+        id: `welcome-${index}`,
+        content,
+        sender: "bot" as const,
+        timestamp: new Date(Date.now() + index * 1000),
+      }));
       setMessages(initialMessages);
     }
-  }, [botName, productName]);
+  }, [initialMessage]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -79,27 +89,41 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   // Show popups when chat is closed
   useEffect(() => {
     if (!isOpen && showPopups) {
+      // Only show popups if autoShowDelay is positive
+      if (autoShowDelay <= 0) return;
+      
       // Reset visible popups when chat closes
       setVisiblePopups([]);
       
-      // Show first popup after a short delay
+      // Get message list for popups
+      const popupList = popupMessages.length > 0 ? popupMessages : ["👋 Hi! I am an AI assistant!"];
+      
+      // Show first popup after configured delay
       const firstPopupTimeout = setTimeout(() => {
         setVisiblePopups([0]);
         
-        // Show second popup after another delay
-        const secondPopupTimeout = setTimeout(() => {
-          setVisiblePopups([0, 1]);
-        }, 2000);
-        
-        return () => clearTimeout(secondPopupTimeout);
-      }, 1000);
+        // Show additional popups with sequential delays if available
+        if (popupList.length > 1) {
+          const subsequentTimeouts: NodeJS.Timeout[] = [];
+          
+          for (let i = 1; i < popupList.length; i++) {
+            const timeout = setTimeout(() => {
+              setVisiblePopups(prev => [...prev, i]);
+            }, i * 2000); // Show each subsequent popup after 2 seconds
+            
+            subsequentTimeouts.push(timeout);
+          }
+          
+          return () => subsequentTimeouts.forEach(timeout => clearTimeout(timeout));
+        }
+      }, autoShowDelay * 1000); // Convert to milliseconds
       
       return () => clearTimeout(firstPopupTimeout);
     } else {
       // Hide popups when chat is open
       setVisiblePopups([]);
     }
-  }, [isOpen, showPopups]);
+  }, [isOpen, showPopups, autoShowDelay, popupMessages]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -143,6 +167,8 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   };
 
   const retryLastMessage = () => {
+    if (!allowRegenerate) return;
+    
     // Find the last user message
     const lastUserMessageIndex = [...messages].reverse().findIndex(msg => msg.sender === "user");
     if (lastUserMessageIndex === -1) return;
@@ -184,6 +210,51 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     setMessage(prev => prev + emoji);
   };
 
+  const handleSuggestedMessageClick = (text: string) => {
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      content: text,
+      sender: "user",
+      timestamp: new Date(),
+    };
+
+    setMessages([...messages, userMessage]);
+    
+    // Show typing indicator
+    setIsTyping(true);
+
+    // Simulate bot response after a delay
+    setTimeout(() => {
+      setIsTyping(false);
+      
+      const botResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: "This is a response to your suggested message selection. In a real implementation, this would be connected to an LLM API.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botResponse]);
+    }, 2000);
+  };
+
+  // Apply theme based on settings
+  const themeClasses = {
+    background: theme === 'dark' ? 'bg-gray-900' : 'bg-white',
+    header: theme === 'dark' ? 'bg-gray-800 text-white' : '',
+    text: theme === 'dark' ? 'text-white' : 'text-gray-800',
+    inputBg: theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
+    botBubble: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border border-gray-200',
+    userBubble: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
+    popup: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border border-gray-200',
+  };
+
+  // Position of the chat widget
+  const positionClasses = {
+    container: bubblePosition === 'left' ? 'left-6 items-start' : 'right-6 items-end',
+    popup: bubblePosition === 'left' ? 'ml-16' : 'mr-16',
+  };
+
   // Loading animation dots
   const LoadingDots = () => (
     <div className="flex space-x-1 mt-2 ml-1">
@@ -194,48 +265,38 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   );
 
   return (
-    <div className="fixed bottom-0 right-6 z-50 flex flex-col items-end">
+    <div className={`fixed bottom-0 ${positionClasses.container} z-50 flex flex-col`}>
       {/* Initial message popups - only show when chat is closed */}
       {!isOpen && showPopups && visiblePopups.length > 0 && (
-        <div className="mb-4 mr-16 flex flex-col gap-2">
-          {visiblePopups.includes(0) && (
-            <div 
-              className="rounded-lg shadow-lg p-4 bg-white border border-gray-200 max-w-[280px] transition-opacity duration-500 opacity-100 animate-fade-in"
-              style={{ borderColor: primaryColor }}
-            >
-              <div className="flex">
-                <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
-                  <AvatarImage src={botAvatar} alt={botName} />
-                  <AvatarFallback>AI</AvatarFallback>
-                </Avatar>
-                <p>{popupMessages[0]}</p>
+        <div className={`mb-4 ${positionClasses.popup} flex flex-col gap-2`}>
+          {visiblePopups.map((index) => {
+            if (index >= popupMessages.length) return null;
+            
+            return (
+              <div 
+                key={index}
+                className={`rounded-lg shadow-lg p-4 max-w-[280px] transition-opacity duration-500 opacity-100 animate-fade-in ${themeClasses.popup}`}
+                style={{ borderColor: primaryColor }}
+              >
+                <div className="flex">
+                  <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
+                    <AvatarImage src={botAvatar} alt={botName} />
+                    <AvatarFallback>AI</AvatarFallback>
+                  </Avatar>
+                  <p>{popupMessages[index]}</p>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {visiblePopups.includes(1) && (
-            <div 
-              className="rounded-lg shadow-lg p-4 bg-white border border-gray-200 max-w-[280px] transition-opacity duration-500 opacity-100 animate-fade-in"
-              style={{ borderColor: primaryColor }}
-            >
-              <div className="flex">
-                <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
-                  <AvatarImage src={botAvatar} alt={botName} />
-                  <AvatarFallback>AI</AvatarFallback>
-                </Avatar>
-                <p>{popupMessages[1]}</p>
-              </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 
       {/* Chat window */}
       {isOpen && (
-        <div className="mb-4 w-[350px] sm:w-[400px] flex flex-col rounded-lg shadow-lg bg-white border border-gray-200 h-[calc(100vh-120px)]">
+        <div className={`mb-4 w-[350px] sm:w-[400px] flex flex-col rounded-lg shadow-lg h-[calc(100vh-120px)] ${themeClasses.background}`}>
           {/* Chat header */}
           <div 
-            className="p-4 flex items-center justify-between border-b" 
+            className={`p-4 flex items-center justify-between border-b ${themeClasses.header}`} 
             style={{ backgroundColor: primaryColor, color: 'white' }}
           >
             <div className="flex items-center gap-2">
@@ -256,7 +317,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           </div>
 
           {/* Chat messages */}
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          <div className={`flex-1 overflow-y-auto p-4 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -275,15 +336,15 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                   <div
                     className={`rounded-lg p-3 text-[0.875rem] ${
                       msg.sender === "bot"
-                        ? "bg-white border border-gray-200"
-                        : "bg-primary text-primary-foreground"
+                        ? themeClasses.botBubble
+                        : themeClasses.userBubble
                     }`}
                   >
                     {msg.content}
                   </div>
                   
                   {/* Message actions for bot messages */}
-                  {msg.sender === "bot" && (
+                  {msg.sender === "bot" && showFeedback && (
                     <div className="flex mt-1 space-x-1">
                       <TooltipProvider>
                         <Tooltip>
@@ -334,21 +395,23 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                           </TooltipContent>
                         </Tooltip>
 
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              onClick={retryLastMessage}
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 rounded-full"
-                            >
-                              <RefreshCw size={14} className="text-gray-500" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Regenerate</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        {allowRegenerate && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={retryLastMessage}
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded-full"
+                              >
+                                <RefreshCw size={14} className="text-gray-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Regenerate</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </TooltipProvider>
                     </div>
                   )}
@@ -370,7 +433,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                   <AvatarImage src={botAvatar} alt={botName} />
                   <AvatarFallback>CB</AvatarFallback>
                 </Avatar>
-                <div className="rounded-lg p-3 bg-white border border-gray-200 max-w-[80%]">
+                <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.botBubble}`}>
                   <LoadingDots />
                 </div>
               </div>
@@ -379,8 +442,27 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Suggested messages */}
+          {showSuggestions && suggestedMessages.length > 0 && (
+            <div className={`p-3 border-t ${themeClasses.background}`}>
+              <div className="flex flex-wrap gap-2">
+                {suggestedMessages.map((suggestion, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
+                    onClick={() => handleSuggestedMessageClick(suggestion)}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Input area */}
-          <form onSubmit={handleSendMessage} className="border-t p-3 bg-white">
+          <form onSubmit={handleSendMessage} className={`border-t p-3 ${themeClasses.background}`}>
             <div className="flex relative">
               <Popover>
                 <PopoverTrigger asChild>
@@ -392,13 +474,13 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                     <Smile size={18} className="text-gray-500" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 p-2">
+                <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
                   <div className="grid grid-cols-5 gap-2">
                     {emojis.map((emoji, index) => (
                       <Button
                         key={index}
                         variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-gray-100"
+                        className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                         onClick={() => insertEmoji(emoji)}
                       >
                         {emoji}
@@ -411,8 +493,8 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Message..."
-                className="flex-1 border rounded-lg pr-10 pl-10 py-2 focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder={messagePlaceholder}
+                className={`flex-1 border rounded-lg pr-10 pl-10 py-2 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.text}`}
               />
               <Button
                 type="submit"
@@ -424,9 +506,11 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                 <Send size={18} className="text-gray-500" />
               </Button>
             </div>
-            <div className="text-xs text-center mt-2 text-gray-500">
-              By chatting, you agree to our <a href="#" className="underline hover:text-gray-700">privacy policy</a>.
-            </div>
+            {footer && (
+              <div className="text-xs text-center mt-2 text-gray-500">
+                {footer}
+              </div>
+            )}
           </form>
         </div>
       )}
@@ -445,32 +529,6 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
       </Button>
     </div>
   );
-};
-
-// Helper components
-const LoadingDots = () => (
-  <div className="flex space-x-1 mt-2 ml-1">
-    <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "0ms"}}></div>
-    <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "300ms"}}></div>
-    <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "600ms"}}></div>
-  </div>
-);
-
-// Helper functions that were kept the same
-const copyMessageToClipboard = (content: string) => {
-  navigator.clipboard.writeText(content);
-};
-
-const handleFeedback = (messageId: string, type: "like" | "dislike") => {
-  // Implementation kept the same
-};
-
-const retryLastMessage = () => {
-  // Implementation kept the same
-};
-
-const insertEmoji = (emoji: string) => {
-  // Implementation kept the same
 };
 
 export default ChatbotWidget;

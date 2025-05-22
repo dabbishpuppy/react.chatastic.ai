@@ -1,46 +1,36 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/components/ui/use-toast";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 import ChatSection from "@/components/agent/ChatSection";
-import { Trash } from "lucide-react";
-
-interface SuggestedMessage {
-  id: string;
-  text: string;
-}
+import EditableSuggestedMessage from "./EditableSuggestedMessage";
+import ImageUpload from "./ImageUpload";
+import { useChatSettings } from "@/hooks/useChatSettings";
 
 const ChatInterfaceSettings: React.FC = () => {
-  const [initialMessage, setInitialMessage] = useState("👋 Hej! Jag är AI assistenten til Agora. Hva kan jeg hjelpe deg med i dag?");
-  const [messagePlaceholder, setMessagePlaceholder] = useState("Write message here...");
-  const [showSuggestions, setShowSuggestions] = useState(true);
-  const [collectFeedback, setCollectFeedback] = useState(true);
-  const [regenerateMessages, setRegenerateMessages] = useState(true);
-  const [displayName, setDisplayName] = useState("Agora AI");
-  const [theme, setTheme] = useState("light");
-  const [userBubbleAlign, setUserBubbleAlign] = useState("right");
-  const [autoShowDelay, setAutoShowDelay] = useState("1");
-  const [footer, setFooter] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  const {
+    settings,
+    isLoading,
+    isSaving,
+    updateSetting,
+    handleSave,
+    addSuggestedMessage,
+    updateSuggestedMessage,
+    deleteSuggestedMessage,
+    uploadImage
+  } = useChatSettings();
   
-  // Suggested messages state
-  const [suggestedMessages, setSuggestedMessages] = useState<SuggestedMessage[]>([
-    { id: "1", text: "Suggest 1" },
-    { id: "2", text: "Suggest 2" }
-  ]);
-  const [newSuggestedMessage, setNewSuggestedMessage] = useState("");
+  const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
   
-  // Initial preview message based on settings
-  const [previewMessages, setPreviewMessages] = useState([
+  // Initial preview messages based on settings
+  const [previewMessages, setPreviewMessages] = React.useState([
     {
       isAgent: true,
-      content: initialMessage,
+      content: settings.initial_message,
       timestamp: new Date().toISOString()
     }
   ]);
@@ -50,37 +40,19 @@ const ChatInterfaceSettings: React.FC = () => {
     setPreviewMessages([
       {
         isAgent: true,
-        content: initialMessage,
+        content: settings.initial_message,
         timestamp: new Date().toISOString()
       }
     ]);
-  }, [initialMessage]);
-
-  const handleSave = () => {
-    setIsSaving(true);
-    
-    setTimeout(() => {
-      setIsSaving(false);
-      toast({
-        title: "Settings saved",
-        description: "Your chat interface settings have been updated successfully."
-      });
-    }, 1000);
-  };
-
-  const addSuggestedMessage = () => {
-    if (newSuggestedMessage.trim()) {
-      setSuggestedMessages([
-        ...suggestedMessages, 
-        { id: Date.now().toString(), text: newSuggestedMessage.trim() }
-      ]);
-      setNewSuggestedMessage("");
-    }
-  };
-
-  const deleteSuggestedMessage = (id: string) => {
-    setSuggestedMessages(suggestedMessages.filter(msg => msg.id !== id));
-  };
+  }, [settings.initial_message]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col md:flex-row border-t">
@@ -99,8 +71,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 <Textarea
                   id="initialMessage"
-                  value={initialMessage}
-                  onChange={(e) => setInitialMessage(e.target.value)}
+                  value={settings.initial_message}
+                  onChange={(e) => updateSetting("initial_message", e.target.value)}
                   className="h-24"
                 />
                 <p className="text-xs text-gray-500">Enter each message in a new line.</p>
@@ -112,23 +84,15 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 
                 <div className="space-y-2 border rounded-md p-4 bg-gray-50">
-                  {suggestedMessages.map((msg) => (
-                    <div key={msg.id} className="flex items-center justify-between gap-2 p-2 bg-white border rounded">
-                      <div className="flex-1 overflow-hidden text-ellipsis">
-                        {msg.text}
-                        <span className="ml-2 text-xs text-gray-400">
-                          {msg.text.length}/40
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteSuggestedMessage(msg.id)}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  {settings.suggested_messages.map((msg) => (
+                    <EditableSuggestedMessage
+                      key={msg.id}
+                      id={msg.id}
+                      text={msg.text}
+                      onUpdate={updateSuggestedMessage}
+                      onDelete={deleteSuggestedMessage}
+                      maxLength={40}
+                    />
                   ))}
                   
                   <div className="flex gap-2 mt-2">
@@ -141,7 +105,12 @@ const ChatInterfaceSettings: React.FC = () => {
                     />
                     <Button 
                       variant="outline" 
-                      onClick={addSuggestedMessage}
+                      onClick={() => {
+                        if (newSuggestedMessage.trim()) {
+                          addSuggestedMessage(newSuggestedMessage.trim());
+                          setNewSuggestedMessage("");
+                        }
+                      }}
                       disabled={!newSuggestedMessage.trim()}
                     >
                       Add
@@ -157,8 +126,8 @@ const ChatInterfaceSettings: React.FC = () => {
                   </div>
                   <Switch
                     id="showSuggestions"
-                    checked={showSuggestions}
-                    onCheckedChange={setShowSuggestions}
+                    checked={settings.show_suggestions_after_chat}
+                    onCheckedChange={(value) => updateSetting("show_suggestions_after_chat", value)}
                   />
                 </div>
               </div>
@@ -170,8 +139,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 <Input
                   id="placeholder"
                   placeholder="Message..."
-                  value={messagePlaceholder}
-                  onChange={(e) => setMessagePlaceholder(e.target.value)}
+                  value={settings.message_placeholder}
+                  onChange={(e) => updateSetting("message_placeholder", e.target.value)}
                   className="max-w-md"
                 />
               </div>
@@ -184,8 +153,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 </div>
                 <Switch
                   id="collectFeedback"
-                  checked={collectFeedback}
-                  onCheckedChange={setCollectFeedback}
+                  checked={settings.show_feedback}
+                  onCheckedChange={(value) => updateSetting("show_feedback", value)}
                 />
               </div>
               
@@ -197,8 +166,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 </div>
                 <Switch
                   id="regenerateMessages"
-                  checked={regenerateMessages}
-                  onCheckedChange={setRegenerateMessages}
+                  checked={settings.allow_regenerate}
+                  onCheckedChange={(value) => updateSetting("allow_regenerate", value)}
                 />
               </div>
               
@@ -208,19 +177,22 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 <Textarea
                   id="footer"
-                  value={footer}
-                  onChange={(e) => setFooter(e.target.value)}
+                  value={settings.footer || ""}
+                  onChange={(e) => updateSetting("footer", e.target.value)}
                   placeholder="You can use this to add a disclaimer or a link to your privacy policy."
                   className="h-24"
                 />
-                <p className="text-xs text-gray-500">{footer.length}/200 characters</p>
+                <p className="text-xs text-gray-500">{(settings.footer || "").length}/200 characters</p>
               </div>
               
               <div className="space-y-2">
                 <label htmlFor="theme" className="block text-sm font-medium">
                   Theme
                 </label>
-                <Select value={theme} onValueChange={setTheme}>
+                <Select 
+                  value={settings.theme} 
+                  onValueChange={(value) => updateSetting("theme", value as 'light' | 'dark' | 'system')}
+                >
                   <SelectTrigger className="max-w-md">
                     <SelectValue />
                   </SelectTrigger>
@@ -238,8 +210,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 </label>
                 <Input
                   id="displayName"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
+                  value={settings.display_name}
+                  onChange={(e) => updateSetting("display_name", e.target.value)}
                   className="max-w-md"
                 />
               </div>
@@ -248,21 +220,13 @@ const ChatInterfaceSettings: React.FC = () => {
                 <label className="block text-sm font-medium">
                   Profile picture
                 </label>
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 border rounded-full overflow-hidden bg-gray-100">
-                    <AspectRatio ratio={1/1}>
-                      <div className="flex items-center justify-center h-full">
-                        <span className="text-2xl">👋</span>
-                      </div>
-                    </AspectRatio>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Upload Image
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-gray-500">
-                    Remove
-                  </Button>
-                </div>
+                <ImageUpload
+                  currentImage={settings.profile_picture || undefined}
+                  onUpload={(file) => uploadImage(file, "profile")}
+                  onRemove={() => updateSetting("profile_picture", null)}
+                  shape="circle"
+                  size="md"
+                />
                 <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB.</p>
               </div>
               
@@ -270,14 +234,14 @@ const ChatInterfaceSettings: React.FC = () => {
                 <label className="block text-sm font-medium">
                   Chat icon
                 </label>
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 border rounded-full overflow-hidden bg-gray-100">
-                    <AspectRatio ratio={1/1}></AspectRatio>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Upload Image
-                  </Button>
-                </div>
+                <ImageUpload
+                  currentImage={settings.chat_icon || undefined}
+                  onUpload={(file) => uploadImage(file, "icon")}
+                  onRemove={() => updateSetting("chat_icon", null)}
+                  shape="circle"
+                  size="md"
+                  placeholder="💬"
+                />
                 <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB.</p>
               </div>
               
@@ -285,7 +249,10 @@ const ChatInterfaceSettings: React.FC = () => {
                 <label htmlFor="bubbleAlign" className="block text-sm font-medium">
                   Align chat bubble button
                 </label>
-                <Select value={userBubbleAlign} onValueChange={setUserBubbleAlign}>
+                <Select 
+                  value={settings.bubble_position} 
+                  onValueChange={(value) => updateSetting("bubble_position", value as 'left' | 'right')}
+                >
                   <SelectTrigger className="max-w-md">
                     <SelectValue />
                   </SelectTrigger>
@@ -304,8 +271,13 @@ const ChatInterfaceSettings: React.FC = () => {
                   <Input
                     id="autoShowDelay"
                     type="number"
-                    value={autoShowDelay}
-                    onChange={(e) => setAutoShowDelay(e.target.value)}
+                    value={settings.auto_show_delay.toString()}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value);
+                      if (!isNaN(value)) {
+                        updateSetting("auto_show_delay", value);
+                      }
+                    }}
                   />
                   <span>seconds (negative to disable)</span>
                 </div>
@@ -331,10 +303,13 @@ const ChatInterfaceSettings: React.FC = () => {
             <div className="flex-1 overflow-hidden">
               <ChatSection 
                 initialMessages={previewMessages}
-                agentName={displayName}
-                placeholder={messagePlaceholder}
-                suggestedMessages={suggestedMessages.map(msg => msg.text)}
-                showSuggestions={showSuggestions}
+                agentName={settings.display_name}
+                placeholder={settings.message_placeholder}
+                suggestedMessages={settings.suggested_messages.map(msg => msg.text)}
+                showSuggestions={settings.show_suggestions_after_chat}
+                showFeedback={settings.show_feedback}
+                allowRegenerate={settings.allow_regenerate}
+                theme={settings.theme}
               />
             </div>
           </div>

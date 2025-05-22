@@ -5,13 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RefreshCw, SendIcon, Settings, Copy, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-interface ChatMessage {
-  isAgent: boolean;
-  content: string;
-  timestamp: string;
-  feedback?: "like" | "dislike" | null;
-}
+import { ChatMessage } from "@/types/chatInterface";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -20,6 +14,10 @@ interface ChatSectionProps {
   placeholder?: string;
   suggestedMessages?: string[];
   showSuggestions?: boolean;
+  showFeedback?: boolean;
+  allowRegenerate?: boolean;
+  theme?: 'light' | 'dark' | 'system';
+  profilePicture?: string;
 }
 
 // Emoji list for the emoji picker
@@ -31,7 +29,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   agentName = "AI Customer Service",
   placeholder = "Write message here...",
   suggestedMessages = [],
-  showSuggestions = true
+  showSuggestions = true,
+  showFeedback = true,
+  allowRegenerate = true,
+  theme = 'light',
+  profilePicture,
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
@@ -116,6 +118,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   };
 
   const regenerateResponse = () => {
+    if (!allowRegenerate) return;
+    
     // Find the last user message
     const lastUserMessageIndex = [...chatHistory].reverse().findIndex(msg => !msg.isAgent);
     if (lastUserMessageIndex === -1) return;
@@ -142,6 +146,17 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     setMessage(prev => prev + emoji);
   };
 
+  // Apply theme based on settings
+  const themeClasses = {
+    agentBubble: theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-gray-100',
+    userBubble: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
+    background: theme === 'dark' ? 'bg-gray-900' : 'bg-white',
+    text: theme === 'dark' ? 'text-gray-100' : 'text-gray-800',
+    inputBg: theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
+    inputText: theme === 'dark' ? 'text-gray-100' : 'text-gray-800',
+    iconButton: theme === 'dark' ? 'text-gray-400 hover:text-gray-100' : 'text-gray-500 hover:text-gray-800',
+  };
+
   // Loading animation dots
   const LoadingDots = () => (
     <div className="flex space-x-1 items-center">
@@ -156,25 +171,31 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
 
   return (
-    <div className="flex flex-col h-full max-w-[800px] mx-auto">
+    <div className={`flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background}`}>
       {/* Chat Header */}
-      <div className="p-4 border-b flex items-center justify-between">
+      <div className={`p-4 border-b flex items-center justify-between ${themeClasses.background}`}>
         <div className="flex items-center gap-2">
           <Avatar className="h-10 w-10 border-0">
-            <AvatarImage src="/placeholder.svg" alt="Agent" />
+            {profilePicture ? (
+              <AvatarImage src={profilePicture} alt={agentName} />
+            ) : (
+              <AvatarImage src="/placeholder.svg" alt="Agent" />
+            )}
             <AvatarFallback>AI</AvatarFallback>
           </Avatar>
-          <span className="font-medium">{agentName}</span>
+          <span className={`font-medium ${themeClasses.text}`}>{agentName}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={regenerateResponse}>
-            <RefreshCw className="h-5 w-5" />
-          </Button>
+          {allowRegenerate && (
+            <Button variant="ghost" size="icon" className={`h-9 w-9 ${themeClasses.iconButton}`} onClick={regenerateResponse}>
+              <RefreshCw className="h-5 w-5" />
+            </Button>
+          )}
           {toggleSettings && (
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-9 w-9"
+              className={`h-9 w-9 ${themeClasses.iconButton}`}
               onClick={toggleSettings}
             >
               <Settings className="h-5 w-5" />
@@ -184,24 +205,28 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className={`flex-1 overflow-y-auto p-6 ${themeClasses.background}`}>
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
             {msg.isAgent && (
               <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-                <AvatarImage src="/placeholder.svg" alt="Agent" />
+                {profilePicture ? (
+                  <AvatarImage src={profilePicture} alt={agentName} />
+                ) : (
+                  <AvatarImage src="/placeholder.svg" alt="Agent" />
+                )}
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
             )}
             <div className="flex flex-col max-w-[80%]">
               <div className={`rounded-lg p-3 text-[0.875rem] ${
-                msg.isAgent ? 'bg-gray-100' : 'bg-primary text-primary-foreground'
+                msg.isAgent ? themeClasses.agentBubble : themeClasses.userBubble
               }`}>
                 {msg.content}
               </div>
               
               {/* Message actions for agent messages */}
-              {msg.isAgent && (
+              {msg.isAgent && showFeedback && (
                 <div className="flex mt-1 space-x-1">
                   <TooltipProvider>
                     <Tooltip>
@@ -262,10 +287,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         {isTyping && (
           <div className="flex mb-4">
             <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-              <AvatarImage src="/placeholder.svg" alt="Agent" />
+              {profilePicture ? (
+                <AvatarImage src={profilePicture} alt={agentName} />
+              ) : (
+                <AvatarImage src="/placeholder.svg" alt="Agent" />
+              )}
               <AvatarFallback>AI</AvatarFallback>
             </Avatar>
-            <div className="rounded-lg p-3 bg-gray-100 max-w-[80%]">
+            <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.agentBubble}`}>
               <LoadingDots />
             </div>
           </div>
@@ -276,14 +305,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
       {/* Suggested Messages */}
       {shouldShowSuggestions && suggestedMessages.length > 0 && (
-        <div className="p-4 border-t">
+        <div className={`p-4 border-t ${themeClasses.background}`}>
           <div className="flex flex-wrap gap-2">
             {suggestedMessages.map((suggestion, index) => (
               <Button
                 key={index}
                 variant="outline"
                 size="sm"
-                className="rounded-full text-sm"
+                className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
                 onClick={() => handleSuggestedMessageClick(suggestion)}
               >
                 {suggestion}
@@ -294,25 +323,25 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       )}
 
       {/* Chat Input */}
-      <form onSubmit={handleSubmit} className="border-t p-4">
+      <form onSubmit={handleSubmit} className={`border-t p-4 ${themeClasses.background}`}>
         <div className="flex items-center w-full relative">
           <Popover>
             <PopoverTrigger asChild>
               <Button 
                 variant="ghost" 
                 size="icon"
-                className="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 ${themeClasses.iconButton}`}
               >
-                <Smile size={18} className="text-gray-500" />
+                <Smile size={18} />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 p-2">
+            <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
               <div className="grid grid-cols-5 gap-2">
                 {emojis.map((emoji, index) => (
                   <Button
                     key={index}
                     variant="ghost"
-                    className="h-8 w-8 p-0 hover:bg-gray-100"
+                    className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                     onClick={() => insertEmoji(emoji)}
                   >
                     {emoji}
@@ -326,13 +355,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder={placeholder}
-            className="w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary"
+            className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.inputText}`}
           />
           <Button 
             type="submit" 
             size="sm" 
             variant="ghost"
-            className="absolute right-1 rounded-full h-8 w-8"
+            className={`absolute right-1 rounded-full h-8 w-8 ${themeClasses.iconButton}`}
             disabled={!message.trim()}
           >
             <SendIcon size={16} />
