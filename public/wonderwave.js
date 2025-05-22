@@ -20,7 +20,6 @@
     bubbleSize: '60px',
     zIndex: 999999,
     cdnDomain: 'query-spark-start.lovable.app',
-    debug: false
   };
 
   // Store for queued commands before initialization
@@ -175,6 +174,16 @@
       bubbleButton.style.backgroundColor = colorSettings.bubble_color;
     }
     
+    // Update bubble position if specified
+    if (colorSettings.bubble_position) {
+      // Reset both positions first
+      bubbleButton.style.left = '';
+      bubbleButton.style.right = '';
+      
+      // Set the new position
+      bubbleButton.style[colorSettings.bubble_position] = '20px';
+    }
+    
     // If agent is private, hide the bubble
     if (isPrivate) {
       bubbleButton.style.display = 'none';
@@ -239,6 +248,16 @@
             config.userMessageColor = settings.user_message_color;
           }
           // Don't set headerColor so it defaults to white/default
+        }
+        
+        // Apply position from backend settings
+        if (settings.bubble_position) {
+          config.position = settings.bubble_position;
+        }
+        
+        // Apply chat icon from backend settings
+        if (settings.chat_icon) {
+          config.chatIcon = settings.chat_icon;
         }
       }
       

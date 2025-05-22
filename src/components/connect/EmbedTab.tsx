@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,19 +44,11 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
-      // Create an array of config options that will be joined properly with commas
+      // Create an array of config options that will include only agentId
+      // (position and chatIcon will be loaded dynamically from the backend)
       const configOptions = [
         `agentId: "${agentId}"`,
       ];
-      
-      // Add position and chat icon to config when they exist in settings
-      if (settings.bubble_position) {
-        configOptions.push(`position: "${settings.bubble_position}"`);
-      }
-      
-      if (settings.chat_icon) {
-        configOptions.push(`chatIcon: "${settings.chat_icon}"`);
-      }
       
       // Improved script with more robust initialization and error handling
       return `<script>
