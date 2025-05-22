@@ -11,6 +11,7 @@ export const useChatSettings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -31,7 +32,7 @@ export const useChatSettings = () => {
     };
 
     loadSettings();
-  }, [agentId]);
+  }, [agentId, lastSavedAt]);
 
   const updateSetting = <K extends keyof ChatInterfaceSettings>(
     key: K, 
@@ -52,6 +53,7 @@ export const useChatSettings = () => {
       
       if (updatedSettings) {
         setSettings(updatedSettings);
+        setLastSavedAt(new Date().toISOString()); // Update the timestamp to trigger re-fetching
         toast({
           title: "Settings saved",
           description: "Your chat interface settings have been updated successfully."
@@ -146,6 +148,7 @@ export const useChatSettings = () => {
     addSuggestedMessage,
     updateSuggestedMessage,
     deleteSuggestedMessage,
-    uploadImage
+    uploadImage,
+    lastSavedAt
   };
 };

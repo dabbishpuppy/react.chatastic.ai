@@ -9,69 +9,37 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useParams } from "react-router-dom";
 import { ChatInterfaceSettings, defaultChatSettings } from "@/types/chatInterface";
-import { getChatSettings } from "@/services/chatSettingsService";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useChatSettings } from "@/hooks/useChatSettings";
 
 const ChatbotDemo: React.FC = () => {
   const { agentId } = useParams();
   const [primaryColor, setPrimaryColor] = useState("#000000");
-  const [botName, setBotName] = useState(defaultChatSettings.display_name);
   const [productName, setProductName] = useState("Chatbase");
   const [showPopups, setShowPopups] = useState(true);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(defaultChatSettings.theme);
-  const [bubblePosition, setBubblePosition] = useState<'left' | 'right'>(defaultChatSettings.bubble_position);
-  const [showFeedback, setShowFeedback] = useState(defaultChatSettings.show_feedback);
-  const [allowRegenerate, setAllowRegenerate] = useState(defaultChatSettings.allow_regenerate);
+  const [autoShowDelay, setAutoShowDelay] = useState(defaultChatSettings.auto_show_delay);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Use the shared chat settings hook to ensure we have the latest settings
+  const { settings: latestSettings, isLoading: isLoadingSettings } = useChatSettings();
+  
+  // State derived from settings
+  const [botName, setBotName] = useState(defaultChatSettings.display_name);
   const [initialMessage, setInitialMessage] = useState(defaultChatSettings.initial_message);
   const [suggestedMessages, setSuggestedMessages] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(defaultChatSettings.show_suggestions_after_chat);
   const [messagePlaceholder, setMessagePlaceholder] = useState(defaultChatSettings.message_placeholder);
-  const [autoShowDelay, setAutoShowDelay] = useState(defaultChatSettings.auto_show_delay);
+  const [showFeedback, setShowFeedback] = useState(defaultChatSettings.show_feedback);
+  const [allowRegenerate, setAllowRegenerate] = useState(defaultChatSettings.allow_regenerate);
+  const [bubblePosition, setBubblePosition] = useState<'left' | 'right'>(defaultChatSettings.bubble_position);
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(defaultChatSettings.theme);
   const [footer, setFooter] = useState<string | null>(null);
   const [chatIcon, setChatIcon] = useState<string | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Use the shared chat settings hook to ensure we have the latest settings
-  const { settings: latestSettings } = useChatSettings();
-  
-  // Load settings from Supabase if agent ID is available
-  useEffect(() => {
-    const loadSettings = async () => {
-      if (!agentId) {
-        setIsLoading(false);
-        return;
-      }
-      
-      setIsLoading(true);
-      const settings = await getChatSettings(agentId);
-      
-      if (settings) {
-        setTheme(settings.theme);
-        setBotName(settings.display_name);
-        setInitialMessage(settings.initial_message);
-        setSuggestedMessages(settings.suggested_messages.map(msg => msg.text));
-        setShowSuggestions(settings.show_suggestions_after_chat);
-        setMessagePlaceholder(settings.message_placeholder);
-        setShowFeedback(settings.show_feedback);
-        setAllowRegenerate(settings.allow_regenerate);
-        setBubblePosition(settings.bubble_position);
-        setAutoShowDelay(settings.auto_show_delay);
-        setFooter(settings.footer);
-        setChatIcon(settings.chat_icon);
-        setProfilePicture(settings.profile_picture);
-      }
-      
-      setIsLoading(false);
-    };
-    
-    loadSettings();
-  }, [agentId]);
 
   // Update settings when latestSettings changes
   useEffect(() => {
-    if (latestSettings && !isLoading) {
+    if (latestSettings && !isLoadingSettings) {
       setTheme(latestSettings.theme);
       setBotName(latestSettings.display_name);
       setInitialMessage(latestSettings.initial_message);
@@ -85,10 +53,11 @@ const ChatbotDemo: React.FC = () => {
       setFooter(latestSettings.footer);
       setChatIcon(latestSettings.chat_icon);
       setProfilePicture(latestSettings.profile_picture);
+      setIsLoading(false);
     }
-  }, [latestSettings]);
+  }, [latestSettings, isLoadingSettings]);
 
-  if (isLoading) {
+  if (isLoading || isLoadingSettings) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
