@@ -3,10 +3,16 @@ import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
-import { Conversation, getConversationById, deleteAllConversations } from "@/components/activity/ConversationData";
+import { Conversation, getConversationById, hasConversations } from "@/components/activity/ConversationData";
 
 const ActivityPage: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [hasAnyConversations, setHasAnyConversations] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Check if there are any conversations
+    setHasAnyConversations(hasConversations());
+  }, []);
 
   const handleConversationClick = (conversationId: string) => {
     const conversation = getConversationById(conversationId);
@@ -16,6 +22,20 @@ const ActivityPage: React.FC = () => {
   const handleCloseConversation = () => {
     setSelectedConversation(null);
   };
+
+  const EmptyState = () => (
+    <div className="flex flex-col items-center justify-center p-8 text-center h-64">
+      <div className="bg-gray-100 p-4 rounded-full mb-4">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 9H16M8 13H14M9 17H15M20 6.5V17.5C20 18.3284 19.3284 19 18.5 19H5.5C4.67157 19 4 18.3284 4 17.5V6.5C4 5.67157 4.67157 5 5.5 5H18.5C19.3284 5 20 5.67157 20 6.5Z" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <h3 className="text-lg font-medium mb-1">No conversations yet</h3>
+      <p className="text-gray-500 max-w-md">
+        Start chatting with your agent to see conversations appear here.
+      </p>
+    </div>
+  );
 
   return (
     <AgentPageLayout 
@@ -30,19 +50,23 @@ const ActivityPage: React.FC = () => {
             <ChatLogsTab.ActionButtons />
           </div>
         </div>
-        <div className={`flex flex-1 ${selectedConversation ? "pr-4" : ""} overflow-hidden`}>
-          <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
-            <ChatLogsTab onConversationClick={handleConversationClick} hideTitle />
-          </div>
-          {selectedConversation && (
-            <div className="w-1/3 min-w-[320px]">
-              <ConversationView 
-                conversation={selectedConversation} 
-                onClose={handleCloseConversation} 
-              />
+        {!hasAnyConversations ? (
+          <EmptyState />
+        ) : (
+          <div className={`flex flex-1 ${selectedConversation ? "pr-4" : ""} overflow-hidden`}>
+            <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
+              <ChatLogsTab onConversationClick={handleConversationClick} hideTitle />
             </div>
-          )}
-        </div>
+            {selectedConversation && (
+              <div className="w-1/3 min-w-[320px]">
+                <ConversationView 
+                  conversation={selectedConversation} 
+                  onClose={handleCloseConversation} 
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </AgentPageLayout>
   );

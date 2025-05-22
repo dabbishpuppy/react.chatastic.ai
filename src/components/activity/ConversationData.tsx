@@ -67,3 +67,8 @@ export const getAllConversations = (): Conversation[] => {
 export const addConversation = (conversation: Conversation): void => {
   conversationsData.push(conversation);
 };
+
+// Function to check if there are any conversations
+export const hasConversations = (): boolean => {
+  return conversationsData.length > 0;
+};

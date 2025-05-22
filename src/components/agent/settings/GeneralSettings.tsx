@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +6,9 @@ import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import DeleteAgentDialog from "@/components/dashboard/DeleteAgentDialog";
+import DeleteConversationsDialog from "@/components/activity/DeleteConversationsDialog";
 
 const GeneralSettings: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -18,7 +18,9 @@ const GeneralSettings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingConversations, setIsDeletingConversations] = useState(false);
   const [deleteAgentDialogOpen, setDeleteAgentDialogOpen] = useState(false);
+  const [deleteConversationsDialogOpen, setDeleteConversationsDialogOpen] = useState(false);
   const [agent, setAgent] = useState<any>(null);
+  const { toast } = useToast();
 
   // Fetch agent data on component mount
   useEffect(() => {
@@ -91,13 +93,15 @@ const GeneralSettings: React.FC = () => {
       
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Import and call the deleteAllConversations function
+      const { deleteAllConversations } = await import("@/components/activity/ConversationData");
+      deleteAllConversations();
       
       toast({
         title: "Conversations deleted",
         description: "All conversations for this agent have been deleted."
       });
-      
-      // If we had a state for conversations, we would reset it here
       
     } catch (error: any) {
       console.error("Error deleting conversations:", error.message);
@@ -235,32 +239,20 @@ const GeneralSettings: React.FC = () => {
             <span className="font-semibold">This action is not reversible</span>
           </p>
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="ml-auto">
-                Delete all conversations
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete all conversations
-                  associated with this agent.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleDeleteConversations} 
-                  className="bg-red-500 hover:bg-red-600"
-                  disabled={isDeletingConversations}
-                >
-                  {isDeletingConversations ? "Deleting..." : "Delete"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button 
+            variant="destructive" 
+            className="ml-auto"
+            onClick={() => setDeleteConversationsDialogOpen(true)}
+          >
+            Delete all conversations
+          </Button>
+
+          <DeleteConversationsDialog
+            open={deleteConversationsDialogOpen}
+            onOpenChange={setDeleteConversationsDialogOpen}
+            agentName={agentName}
+            onConversationsDeleted={handleDeleteConversations}
+          />
         </CardContent>
       </Card>
 
