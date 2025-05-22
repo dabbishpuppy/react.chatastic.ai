@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useParams } from "react-router-dom";
 import { ChatInterfaceSettings, defaultChatSettings } from "@/types/chatInterface";
 import { getChatSettings } from "@/services/chatSettingsService";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ChatbotDemo: React.FC = () => {
   const { agentId } = useParams();
@@ -264,6 +266,45 @@ const ChatbotDemo: React.FC = () => {
                   onChange={(e) => setFooter(e.target.value)} 
                   placeholder="Footer text (privacy policy, etc.)"
                 />
+              </div>
+              
+              {/* Display profile picture and chat icon previews */}
+              <div className="grid gap-2 pt-4">
+                <Label>Profile Picture</Label>
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12 border border-gray-200">
+                    {profilePicture ? (
+                      <AvatarImage src={profilePicture} alt={botName} />
+                    ) : (
+                      <AvatarFallback className="bg-gray-200 text-gray-600">
+                        {botName?.charAt(0) || "A"}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <span className="text-sm text-gray-500">
+                    {profilePicture ? "Custom profile picture" : "Default avatar"}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label>Chat Icon</Label>
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-black shadow-lg flex items-center justify-center overflow-hidden">
+                    {chatIcon ? (
+                      <img 
+                        src={chatIcon} 
+                        alt="Chat Icon" 
+                        className="h-full w-full object-cover" 
+                      />
+                    ) : (
+                      <span className="text-white text-xl">💬</span>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-500">
+                    {chatIcon ? "Custom chat icon" : "Default chat icon"}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
