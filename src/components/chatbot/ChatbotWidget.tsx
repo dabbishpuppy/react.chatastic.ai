@@ -54,10 +54,40 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // Initial message popups state
+  const [showPopup, setShowPopup] = useState(false);
+  const [currentPopupIndex, setCurrentPopupIndex] = useState(0);
+  const [popupMessages, setPopupMessages] = useState<string[]>([
+    "👋 Hi! I am Chatbase AI, ask me anything about Chatbase!",
+    "By the way, you can create an agent like me for your website! 😊"
+  ]);
+  
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Show popups when chat opens
+  useEffect(() => {
+    if (isOpen && popupMessages.length > 0) {
+      setShowPopup(true);
+      
+      // Auto-advance popups
+      const popupInterval = setInterval(() => {
+        setCurrentPopupIndex(prev => {
+          if (prev >= popupMessages.length - 1) {
+            clearInterval(popupInterval);
+            // Hide popup after the last message
+            setTimeout(() => setShowPopup(false), 3000);
+            return prev;
+          }
+          return prev + 1;
+        });
+      }, 4000);
+      
+      return () => clearInterval(popupInterval);
+    }
+  }, [isOpen, popupMessages.length]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -77,6 +107,9 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
     setMessages([...messages, userMessage]);
     setMessage("");
+    
+    // Hide popup when user sends a message
+    setShowPopup(false);
     
     // Show typing indicator
     setIsTyping(true);
@@ -153,6 +186,18 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
   return (
     <div className="fixed bottom-0 right-6 z-50 flex flex-col items-end">
+      {/* Initial message popup */}
+      {isOpen && showPopup && (
+        <div className="mb-4 mr-16 animate-fade-in">
+          <div 
+            className="rounded-lg shadow-lg p-4 bg-white border border-gray-200 max-w-[280px]"
+            style={{ borderColor: primaryColor }}
+          >
+            <p>{popupMessages[currentPopupIndex]}</p>
+          </div>
+        </div>
+      )}
+
       {/* Chat window */}
       {isOpen && (
         <div className="mb-4 w-[350px] sm:w-[400px] flex flex-col rounded-lg shadow-lg bg-white border border-gray-200 h-[calc(100vh-120px)]">
