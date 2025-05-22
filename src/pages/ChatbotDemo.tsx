@@ -345,7 +345,7 @@ const ChatbotDemo: React.FC = () => {
         </div>
       </div>
       
-      {/* The chatbot widget */}
+      {/* The chatbot widget - Adding hideUserAvatar={true} */}
       <ChatbotWidget 
         productName={productName}
         botName={botName}
@@ -363,6 +363,7 @@ const ChatbotDemo: React.FC = () => {
         footer={footer}
         chatIcon={chatIcon}
         profilePicture={profilePicture}
+        hideUserAvatar={true}
       />
     </div>
   );
