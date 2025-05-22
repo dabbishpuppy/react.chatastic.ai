@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
@@ -27,6 +27,11 @@ const AgentSettingsPage: React.FC = () => {
     }
     return "general";
   };
+
+  // Prevent automatic scrolling when navigating to settings pages
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const activeTab = getActiveTab();
 

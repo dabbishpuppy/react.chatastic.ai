@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,6 +26,7 @@ const ChatInterfaceSettings: React.FC = () => {
   } = useChatSettings();
   
   const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
+  const componentMounted = useRef(false);
   
   // Initial preview messages based on settings
   const [previewMessages, setPreviewMessages] = React.useState([
@@ -36,8 +37,13 @@ const ChatInterfaceSettings: React.FC = () => {
     }
   ]);
 
-  // Update preview when settings change
+  // Update preview when settings change, but don't cause scrolling
   useEffect(() => {
+    if (!componentMounted.current) {
+      componentMounted.current = true;
+      return;
+    }
+    
     setPreviewMessages([
       {
         isAgent: true,
