@@ -1,0 +1,9 @@
+
+# Set CORS headers for JavaScript files
+<FilesMatch "\.(js)$">
+  <IfModule mod_headers.c>
+    Header set Content-Type "application/javascript"
+    Header set Access-Control-Allow-Origin "*"
+    Header set Cache-Control "max-age=86400, public"
+  </IfModule>
+</FilesMatch>
