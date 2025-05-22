@@ -1,14 +1,25 @@
 
 import React, { useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ChatSection from "@/components/agent/ChatSection";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const EmbeddedChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
+  const [searchParams] = useSearchParams();
   const { settings, isLoading } = useChatSettings();
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Get URL parameters for theme and colors if present
+  const themeParam = searchParams.get('theme');
+  const userColorParam = searchParams.get('userColor');
+  const headerColorParam = searchParams.get('headerColor');
+
+  // Use URL parameters if provided, otherwise use settings
+  const theme = themeParam || settings.theme;
+  const userMessageColor = userColorParam || settings.user_message_color;
+  const headerColor = headerColorParam || (settings.sync_colors ? settings.user_message_color : null);
   
   // Add effect to prevent parent page scrolling when interacting with the iframe
   useEffect(() => {
@@ -144,10 +155,13 @@ const EmbeddedChat: React.FC = () => {
           showSuggestions={settings.show_suggestions_after_chat}
           showFeedback={settings.show_feedback}
           allowRegenerate={settings.allow_regenerate}
-          theme={settings.theme}
+          theme={theme as 'light' | 'dark' | 'system'}
           profilePicture={settings.profile_picture || undefined}
           footer={settings.footer || undefined}
           isEmbedded={true}
+          userMessageColor={userMessageColor}
+          headerColor={headerColor}
+          hideUserAvatar={true} // Always hide user avatar in embedded chat
         />
       </ScrollArea>
     </div>

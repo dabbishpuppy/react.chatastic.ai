@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,13 +49,23 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
       const chatIconConfig = settings.chat_icon ? 
         `\n      chatIcon: "${settings.chat_icon}", // Custom chat icon` : '';
         
+      // Add user message color if available
+      const userMessageColorConfig = settings.user_message_color ? 
+        `\n      userMessageColor: "${settings.user_message_color}", // User message color` : '';
+        
+      // Add bubble color (use user message color if sync is enabled, otherwise use primary color)
+      const bubbleColorConfig = settings.sync_colors && settings.user_message_color ? 
+        `\n      bubbleColor: "${settings.user_message_color}", // Chat bubble color` : 
+        settings.primary_color ? 
+        `\n      bubbleColor: "${settings.primary_color}", // Chat bubble color` : '';
+      
       // Improved script with Proxy pattern
       return `<script>
 (function(){
   if(!window.wonderwaveConfig) {
     window.wonderwaveConfig = {
       agentId: "${agentId}",
-      position: "${settings.bubble_position || 'right'}"${chatIconConfig}
+      position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig}
     };
   }
   
@@ -85,9 +96,31 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
 })();
 </script>`;
     } else {
+      // Add color parameters to the iframe URL
+      let iframeSrc = `https://query-spark-start.lovable.app/embed/${agentId}`;
+      const params = [];
+      
+      if (settings.theme) {
+        params.push(`theme=${encodeURIComponent(settings.theme)}`);
+      }
+      
+      if (settings.user_message_color) {
+        params.push(`userColor=${encodeURIComponent(settings.user_message_color)}`);
+      }
+      
+      if (settings.sync_colors && settings.user_message_color) {
+        params.push(`headerColor=${encodeURIComponent(settings.user_message_color)}`);
+      } else if (settings.primary_color) {
+        params.push(`headerColor=${encodeURIComponent(settings.primary_color)}`);
+      }
+      
+      if (params.length > 0) {
+        iframeSrc += `?${params.join('&')}`;
+      }
+      
       // Simplified iframe embedding code
       return `<iframe
-  src="https://query-spark-start.lovable.app/embed/${agentId}"
+  src="${iframeSrc}"
   width="100%"
   style="height: 100%; min-height: 700px"
   frameborder="0"
