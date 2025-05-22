@@ -46,17 +46,11 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
     if (embedType === "bubble") {
       // Create an array of config options that will be joined properly with commas
       const configOptions = [
-        `agentId: "${agentId}"`, 
-        `position: "${settings.bubble_position || 'right'}"`,
+        `agentId: "${agentId}"`,
       ];
       
-      // Include chat icon in config if available
-      if (settings.chat_icon) {
-        configOptions.push(`chatIcon: "${settings.chat_icon}"`);
-      }
-      
-      // Add debug option
-      configOptions.push(`debug: false // Set to true to enable debug logging`);
+      // The position and chat icon will be fetched dynamically from the backend
+      // No need to include them in the config as they'll be loaded from the agent settings
       
       // Improved script with more robust initialization and error handling
       return `<script>
@@ -92,15 +86,11 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   // Load the script
   function loadScript() {
-    console.log('[WonderWave] Loading chat widget script...');
     const script = document.createElement("script");
     script.src = "https://query-spark-start.lovable.app/wonderwave.js";
     script.async = true;
     script.onerror = function() {
       console.error('[WonderWave] Failed to load chat widget script!');
-    };
-    script.onload = function() {
-      console.log('[WonderWave] Chat widget script loaded successfully');
     };
     document.head.appendChild(script);
   }
@@ -157,7 +147,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     </p>
                     
                     <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
-                      <strong>Dynamic Color Settings:</strong> Changes to colors in your chat interface settings will automatically apply to all embedded widgets without needing to update the embed code.
+                      <strong>Dynamic Settings:</strong> Chat bubble position, icon, and all other settings are automatically loaded from your configuration. Changes in your chat interface settings will automatically apply to all embedded widgets without needing to update the embed code.
                     </div>
 
                     <div className="mt-4">
@@ -204,7 +194,6 @@ const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
 <script>
   window.wonderwaveConfig = {
     agentId: "${agentId}",
-    position: "${settings.bubble_position || 'right'}",
     identityHash: "YOUR_GENERATED_HASH", // Add the hash here
     userId: "USER_UUID" // The same user ID used to generate the hash
   };
@@ -233,7 +222,7 @@ const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
                       Add the agent anywhere on your website as an embedded chat window. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
                     <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
-                      <strong>Dynamic Color Settings:</strong> Changes to colors in your chat interface settings will automatically apply to all embedded iframes without needing to update the embed code.
+                      <strong>Dynamic Settings:</strong> All appearance settings are automatically loaded from your configuration. Changes in your chat interface settings will automatically apply to all embedded iframes without needing to update the embed code.
                     </div>
                     <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
                       <strong>Note:</strong> The iframe will automatically resize its height based on content.
