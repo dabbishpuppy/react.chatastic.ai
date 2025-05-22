@@ -1,10 +1,11 @@
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
-import { fetchColorSettingsAndVisibility, isAgentPrivate } from './settings.js';
+import { fetchColorSettingsAndVisibility, isAgentPrivate, shouldCheckVisibility } from './settings.js';
 import { createBubbleButton, showPopups, setBubbleButton } from './ui.js';
 import { openChat, closeChat, toggleChat, destroy as destroyChat, setIframe } from './chat.js';
 
 // Keep track of initialization state
 let initialized = false;
+let visibilityCheckInterval = null;
 
 /**
  * Process any commands that were queued before script loaded
@@ -29,25 +30,33 @@ export function processQueue() {
 export function handleCommand(command, params) {
   log('Handling command:', command, params);
   
+  // First check if we need to refresh visibility
+  if (shouldCheckVisibility()) {
+    const agentId = window.wonderwaveConfig?.agentId;
+    if (agentId) {
+      fetchColorSettingsAndVisibility(agentId);
+    }
+  }
+  
+  // Don't allow any commands if the agent is private
+  if (isAgentPrivate() && command !== 'getState' && command !== 'debug' && command !== 'destroy') {
+    log(`Command ${command} blocked - agent is private`);
+    return 'agent-private';
+  }
+  
   switch (command) {
     case 'init':
       init(params[0]);
       return 'initialized';
     case 'open':
-      if (!isAgentPrivate()) {
-        openChat();
-        return 'opened';
-      }
-      return 'agent-private';
+      openChat();
+      return 'opened';
     case 'close':
       closeChat();
       return 'closed';
     case 'toggle':
-      if (!isAgentPrivate()) {
-        toggleChat();
-        return 'toggled';
-      }
-      return 'agent-private';
+      toggleChat();
+      return 'toggled';
     case 'destroy':
       destroy();
       return 'destroyed';
@@ -101,7 +110,7 @@ export async function init(customConfig = {}) {
     
     // If agent is private, don't initialize the widget
     if (isAgentPrivate()) {
-      log('Agent is private, stopping initialization');
+      log('Agent is private, not initializing widget');
       return;
     }
     
@@ -145,21 +154,26 @@ export async function init(customConfig = {}) {
     
     // Handle any auto-open logic
     if (config.autoOpen) {
-      setTimeout(() => {
-        if (!isAgentPrivate()) {
-          openChat();
-        }
-      }, config.autoOpenDelay || 1000);
+      setTimeout(() => openChat(), config.autoOpenDelay || 1000);
     }
 
     // Auto show popups if enabled
     if (settings && settings.auto_show_delay && settings.auto_show_delay > 0) {
-      setTimeout(() => {
-        if (!isAgentPrivate()) {
-          showPopups(config);
-        }
-      }, settings.auto_show_delay * 1000);
+      setTimeout(() => showPopups(config), settings.auto_show_delay * 1000);
     }
+    
+    // Set up visibility check interval - more frequent checks
+    clearInterval(visibilityCheckInterval);
+    visibilityCheckInterval = setInterval(() => {
+      // Force a re-check of visibility
+      fetchColorSettingsAndVisibility(config.agentId);
+      
+      // If agent becomes private, destroy the widget immediately
+      if (isAgentPrivate()) {
+        log('Agent became private during check interval, destroying widget');
+        destroy();
+      }
+    }, 10000); // Check every 10 seconds
     
     log('Initialization complete');
   } catch (error) {
@@ -174,6 +188,12 @@ export function destroy() {
   destroyChat();
   setBubbleButton(null);
   setIframe(null);
+  
+  // Clear visibility check interval
+  if (visibilityCheckInterval) {
+    clearInterval(visibilityCheckInterval);
+    visibilityCheckInterval = null;
+  }
   
   // Reset initialization state
   initialized = false;

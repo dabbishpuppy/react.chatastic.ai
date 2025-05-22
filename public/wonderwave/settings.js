@@ -5,6 +5,8 @@ import { updateBubbleAppearance } from './bubble.js';
 // Global settings
 let colorSettings = null;
 let isPrivate = false;
+let lastVisibilityCheck = 0;
+const CHECK_INTERVAL = 15000; // 15 seconds
 
 /**
  * Fetch color settings and agent visibility from the backend
@@ -15,113 +17,106 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     return null;
   }
   
+  // Track when we last checked visibility
+  const now = Date.now();
+  lastVisibilityCheck = now;
+  
   try {
     log(`Fetching settings for agent ${agentId}`);
     
-    // First, check agent visibility with better error handling
+    // Always add a unique timestamp to bust cache
+    const timestamp = now;
+    const url = `https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`;
+    
     try {
-      // Add timestamp to prevent caching issues
-      const timestamp = new Date().getTime();
-      const visibilityResponse = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`, {
+      log(`Making request to: ${url}`);
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       });
       
-      log(`Visibility check response status: ${visibilityResponse.status}`);
+      log(`Response status: ${response.status}`);
       
-      // Check for private visibility in ALL responses
+      // Try to parse the response data
+      let data;
       try {
-        const visibilityData = await visibilityResponse.json();
-        log('Visibility data:', visibilityData);
-        
-        // If visibility is specifically marked as private, hide the widget
-        if (visibilityData && visibilityData.visibility === 'private') {
-          log('Agent is marked as PRIVATE, hiding widget');
-          isPrivate = true;
-          
-          // Hide the chat bubble if it exists
-          const existingBubble = document.getElementById('wonderwave-bubble');
-          if (existingBubble) {
-            existingBubble.style.display = 'none';
-          }
-          
-          // If the chat is already open, close it
-          const iframe = document.getElementById('wonderwave-iframe');
-          if (iframe) {
-            const container = document.getElementById('wonderwave-container');
-            if (container) {
-              container.style.display = 'none';
-            }
-          }
-          
-          // Don't fetch color settings if agent is private
-          return null;
-        }
-        
-        // If visibility is not private, set public and continue
-        isPrivate = false;
-        
-        // If agent is now public (was private before), show the bubble
-        const existingBubble = document.getElementById('wonderwave-bubble');
-        if (existingBubble && existingBubble.style.display === 'none') {
-          existingBubble.style.display = 'flex';
-        }
-        
-        // Since we may already have the settings, use them directly
-        if (!visibilityResponse.ok) {
-          // If response is not OK but we've parsed it, return default settings
-          return {
-            bubble_color: defaultConfig.bubbleColor,
-            user_message_color: defaultConfig.bubbleColor,
-            sync_colors: false
-          };
-        }
-        
-        colorSettings = visibilityData;
-        updateBubbleAppearance();
-        
-        return visibilityData;
-      } catch (jsonError) {
-        logError('Error parsing visibility response:', jsonError);
-        // Default to private on parsing errors
-        isPrivate = true;
-        
-        // Hide chat UI if we can't confirm it's public
-        const existingBubble = document.getElementById('wonderwave-bubble');
-        if (existingBubble) {
-          existingBubble.style.display = 'none';
-        }
-        
+        data = await response.json();
+        log('Response data:', data);
+      } catch (parseError) {
+        logError('Error parsing response:', parseError);
+        // Default to private on parsing errors for security
+        hideWidget();
         return null;
       }
-    } catch (visibilityError) {
-      logError('Error fetching visibility, defaulting to PRIVATE for safety:', visibilityError);
-      // Default to private if the visibility check fails for safety
-      isPrivate = true;
       
-      // Hide any existing UI
-      const existingBubble = document.getElementById('wonderwave-bubble');
-      if (existingBubble) {
-        existingBubble.style.display = 'none';
+      // Always check for visibility in the response
+      if (data && data.visibility === 'private') {
+        log('Agent is PRIVATE, hiding widget');
+        hideWidget();
+        return null;
       }
       
+      // If we get here and we previously thought the agent was private, show it
+      if (isPrivate) {
+        log('Agent is now PUBLIC, showing widget');
+        showWidget();
+      }
+      
+      // Store the settings
+      colorSettings = data;
+      
+      // Update any existing bubble with new settings
+      updateBubbleAppearance();
+      
+      return data;
+    } catch (error) {
+      logError('Error fetching settings:', error);
+      // On network errors, default to private for security
+      hideWidget();
       return null;
     }
   } catch (error) {
     logError('Error in fetchColorSettingsAndVisibility:', error);
-    // Default to private on any errors
-    isPrivate = true;
-    
-    // Hide any UI
-    const existingBubble = document.getElementById('wonderwave-bubble');
-    if (existingBubble) {
-      existingBubble.style.display = 'none';
-    }
-    
+    // On errors, default to private for security
+    hideWidget();
     return null;
+  }
+}
+
+/**
+ * Hide the widget components when the agent is private
+ */
+function hideWidget() {
+  isPrivate = true;
+  
+  // Hide the chat bubble if it exists
+  const existingBubble = document.getElementById('wonderwave-bubble');
+  if (existingBubble) {
+    existingBubble.style.display = 'none';
+  }
+  
+  // Hide the chat container if it exists
+  const container = document.getElementById('wonderwave-container');
+  if (container) {
+    container.style.display = 'none';
+  }
+}
+
+/**
+ * Show the widget components when the agent is public
+ */
+function showWidget() {
+  isPrivate = false;
+  
+  // Show the chat bubble if it exists
+  const existingBubble = document.getElementById('wonderwave-bubble');
+  if (existingBubble) {
+    existingBubble.style.display = 'flex';
   }
 }
 
@@ -150,7 +145,19 @@ export function isAgentPrivate() {
  * Set agent privacy status
  */
 export function setAgentPrivacy(privacy) {
-  isPrivate = privacy;
+  if (privacy) {
+    hideWidget();
+  } else {
+    showWidget();
+  }
+}
+
+/**
+ * Check if we need to refresh visibility (if it's been too long since the last check)
+ */
+export function shouldCheckVisibility() {
+  const now = Date.now();
+  return (now - lastVisibilityCheck) > CHECK_INTERVAL;
 }
 
 // Listen for messages to refresh settings
@@ -159,7 +166,7 @@ window.addEventListener('message', function(event) {
     const agentId = event.data.agentId || window.wonderwaveConfig?.agentId;
     if (agentId) {
       log('Received refresh settings message for agent:', agentId);
-      // Force re-check of agent visibility
+      // Force re-check of agent visibility immediately
       fetchColorSettingsAndVisibility(agentId);
     }
   }
@@ -172,4 +179,23 @@ setInterval(() => {
     log('Periodic visibility check for agent:', agentId);
     fetchColorSettingsAndVisibility(agentId);
   }
-}, 30000); // Check every 30 seconds
+}, CHECK_INTERVAL);
+
+// Also check whenever the page becomes visible again
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const agentId = window.wonderwaveConfig?.agentId;
+    if (agentId) {
+      log('Page became visible, checking agent visibility');
+      fetchColorSettingsAndVisibility(agentId);
+    }
+  }
+});
+
+// Run a check immediately when the script loads
+setTimeout(() => {
+  const agentId = window.wonderwaveConfig?.agentId;
+  if (agentId) {
+    fetchColorSettingsAndVisibility(agentId);
+  }
+}, 50);

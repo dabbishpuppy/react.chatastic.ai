@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Content-Type': 'application/json',
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
   'Pragma': 'no-cache',
   'Expires': '0',
   'Surrogate-Control': 'no-store'
@@ -28,7 +28,7 @@ serve(async (req) => {
     
     if (!agentId) {
       return new Response(
-        JSON.stringify({ error: 'Agent ID is required' }),
+        JSON.stringify({ error: 'Agent ID is required', visibility: 'private' }),
         { status: 400, headers: corsHeaders }
       );
     }

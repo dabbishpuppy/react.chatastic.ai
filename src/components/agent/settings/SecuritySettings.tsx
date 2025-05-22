@@ -60,23 +60,35 @@ const SecuritySettings: React.FC = () => {
         console.log("Could not send message to parent window:", e);
       }
       
-      // Also try to make a direct request to force cache invalidation
+      // Make direct requests to force cache invalidation with unique timestamps
       try {
         const timestamp = new Date().getTime();
-        await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`, {
-          method: 'GET',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
+        // Make multiple requests with different cache-busting params to ensure all CDN caches are invalidated
+        await Promise.all([
+          fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`, {
+            method: 'GET',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          }),
+          fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_nocache=${timestamp}`, {
+            method: 'GET',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          })
+        ]);
       } catch (fetchError) {
         console.log("Cache invalidation request failed:", fetchError);
       }
       
       toast({
         title: "Security settings saved",
-        description: `Your agent's visibility has been set to ${visibility.toUpperCase()}. It may take a few moments for the change to propagate to all embedded widgets.`
+        description: `Your agent's visibility has been set to ${visibility.toUpperCase()}. Changes will take effect immediately on newly loaded pages. It may take a few minutes to propagate to all currently open pages.`
       });
     } catch (error) {
       console.error("Error saving security settings:", error);
