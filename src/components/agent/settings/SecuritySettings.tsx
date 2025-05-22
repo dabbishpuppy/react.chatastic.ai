@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { getAgentVisibility, updateAgentVisibility } from "@/services/agentVisibilityService";
 
 const SecuritySettings: React.FC = () => {
   const { agentId } = useParams();
@@ -26,16 +27,7 @@ const SecuritySettings: React.FC = () => {
   
   const fetchAgentVisibility = async () => {
     try {
-      const { data, error } = await supabase
-        .from('agents')
-        .select('visibility')
-        .eq('id', agentId)
-        .maybeSingle();
-        
-      if (error) {
-        console.error("Error fetching agent visibility:", error);
-        return;
-      }
+      const data = await getAgentVisibility(agentId!);
       
       if (data) {
         setVisibility(data.visibility);
@@ -55,24 +47,42 @@ const SecuritySettings: React.FC = () => {
     
     try {
       // Update agent visibility in database
-      const { error } = await supabase
-        .from('agents')
-        .update({ visibility })
-        .eq('id', agentId);
-        
-      if (error) {
-        throw error;
+      await updateAgentVisibility(agentId, visibility);
+      
+      // Force existing widgets to refresh immediately
+      try {
+        // Attempt to broadcast to any iframe parent that might be embedding this
+        window.parent.postMessage({
+          type: 'wonderwave-refresh-settings',
+          agentId: agentId
+        }, '*');
+      } catch (e) {
+        console.log("Could not send message to parent window:", e);
+      }
+      
+      // Also try to make a direct request to force cache invalidation
+      try {
+        const timestamp = new Date().getTime();
+        await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+      } catch (fetchError) {
+        console.log("Cache invalidation request failed:", fetchError);
       }
       
       toast({
         title: "Security settings saved",
-        description: "Your agent's security settings have been updated successfully."
+        description: `Your agent's visibility has been set to ${visibility.toUpperCase()}. It may take a few moments for the change to propagate to all embedded widgets.`
       });
     } catch (error) {
       console.error("Error saving security settings:", error);
       toast({
         title: "Error saving settings",
-        description: "There was an problem updating your security settings. Please try again.",
+        description: "There was a problem updating your security settings. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -107,6 +117,7 @@ const SecuritySettings: React.FC = () => {
             </div>
           </div>
           
+          {/* Additional security features - domain restrictions, rate limiting, etc. */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <label htmlFor="domainRestriction" className="text-sm font-medium">

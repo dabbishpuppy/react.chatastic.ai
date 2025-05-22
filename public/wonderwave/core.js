@@ -1,4 +1,3 @@
-
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate } from './settings.js';
 import { createBubbleButton, showPopups, setBubbleButton } from './ui.js';
@@ -35,14 +34,20 @@ export function handleCommand(command, params) {
       init(params[0]);
       return 'initialized';
     case 'open':
-      openChat();
-      return 'opened';
+      if (!isAgentPrivate()) {
+        openChat();
+        return 'opened';
+      }
+      return 'agent-private';
     case 'close':
       closeChat();
       return 'closed';
     case 'toggle':
-      toggleChat();
-      return 'toggled';
+      if (!isAgentPrivate()) {
+        toggleChat();
+        return 'toggled';
+      }
+      return 'agent-private';
     case 'destroy':
       destroy();
       return 'destroyed';
@@ -50,9 +55,12 @@ export function handleCommand(command, params) {
       setDebugMode(params[0] === true);
       return setDebugMode();
     case 'getState':
+      if (isAgentPrivate()) {
+        return 'agent-private';
+      }
       return initialized ? 'initialized' : 'not-initialized';
     case 'refreshSettings':
-      fetchColorSettingsAndVisibility(window.wonderwaveConfig.agentId);
+      fetchColorSettingsAndVisibility(window.wonderwaveConfig?.agentId);
       return 'refreshing';
     default:
       logError(`Unknown command "${command}"`);
@@ -93,7 +101,7 @@ export async function init(customConfig = {}) {
     
     // If agent is private, don't initialize the widget
     if (isAgentPrivate()) {
-      log('Agent is private, not initializing widget');
+      log('Agent is private, stopping initialization');
       return;
     }
     
@@ -102,19 +110,16 @@ export async function init(customConfig = {}) {
       
       // Apply color settings
       if (settings.sync_colors && settings.user_message_color) {
-        // When sync is enabled, use user message color for both bubble and header
         config.bubbleColor = settings.user_message_color;
         config.headerColor = settings.user_message_color;
         config.userMessageColor = settings.user_message_color;
       } else {
-        // When sync is disabled
         if (settings.bubble_color) {
           config.bubbleColor = settings.bubble_color;
         }
         if (settings.user_message_color) {
           config.userMessageColor = settings.user_message_color;
         }
-        // Don't set headerColor so it defaults to white/default
       }
       
       // Apply position from backend settings
@@ -140,18 +145,21 @@ export async function init(customConfig = {}) {
     
     // Handle any auto-open logic
     if (config.autoOpen) {
-      setTimeout(() => openChat(), config.autoOpenDelay || 1000);
+      setTimeout(() => {
+        if (!isAgentPrivate()) {
+          openChat();
+        }
+      }, config.autoOpenDelay || 1000);
     }
 
     // Auto show popups if enabled
     if (settings && settings.auto_show_delay && settings.auto_show_delay > 0) {
-      setTimeout(() => showPopups(config), settings.auto_show_delay * 1000);
+      setTimeout(() => {
+        if (!isAgentPrivate()) {
+          showPopups(config);
+        }
+      }, settings.auto_show_delay * 1000);
     }
-    
-    // Set up recurring visibility check (every 30 seconds)
-    setInterval(() => {
-      fetchColorSettingsAndVisibility(config.agentId);
-    }, 30000);
     
     log('Initialization complete');
   } catch (error) {

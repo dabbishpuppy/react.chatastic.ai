@@ -6,7 +6,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Content-Type': 'application/json'
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+  'Surrogate-Control': 'no-store'
 };
 
 serve(async (req) => {
@@ -38,7 +43,7 @@ serve(async (req) => {
       .from('agents')
       .select('visibility')
       .eq('id', agentId)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
 
     // If agent doesn't exist or there's an error fetching it
     if (agentError) {
@@ -46,9 +51,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
-          error: 'Agent not found or is private'
+          error: 'Error fetching agent'
         }),
-        { status: 404, headers: corsHeaders }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -65,6 +70,7 @@ serve(async (req) => {
 
     // If the agent is private, return an appropriate response
     if (agentData.visibility === 'private') {
+      console.log(`Agent ${agentId} is PRIVATE`);
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
@@ -74,17 +80,20 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Agent ${agentId} is PUBLIC, fetching settings`);
+
     // Fetch the chat interface settings for the agent
     const { data: settings, error: settingsError } = await supabase
       .from('chat_interface_settings')
       .select('*')
       .eq('agent_id', agentId)
-      .maybeSingle(); // Changed from .single() to .maybeSingle()
+      .maybeSingle();
 
     if (settingsError) {
       console.error('Error fetching settings:', settingsError);
       return new Response(
         JSON.stringify({ 
+          visibility: 'public',
           error: 'Error fetching chat settings',
           bubble_color: '#3B82F6',
           user_message_color: '#3B82F6',
@@ -98,6 +107,7 @@ serve(async (req) => {
     if (!settings) {
       return new Response(
         JSON.stringify({
+          visibility: 'public',
           bubble_color: '#3B82F6',
           user_message_color: '#3B82F6',
           sync_colors: false
@@ -120,9 +130,10 @@ serve(async (req) => {
       }
     }
 
-    // Make sure to format the response properly
+    // Make sure to format the response properly and include the visibility
     const formattedSettings = {
       ...settings,
+      visibility: 'public',
       suggested_messages: parsedSuggestedMessages
     };
 
@@ -134,6 +145,7 @@ serve(async (req) => {
     console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ 
+        visibility: 'private', // Default to private on error for security
         error: 'Internal server error',
         bubble_color: '#3B82F6',
         user_message_color: '#3B82F6', 
