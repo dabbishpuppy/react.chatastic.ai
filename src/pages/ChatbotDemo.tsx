@@ -121,6 +121,7 @@ const ChatbotDemo: React.FC = () => {
         productName={productName}
         botName={botName}
         primaryColor={primaryColor}
+        showPopups={showPopups}
       />
     </div>
   );

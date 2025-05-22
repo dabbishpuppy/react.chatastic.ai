@@ -22,6 +22,7 @@ interface ChatbotWidgetProps {
   botAvatar?: string;
   userAvatar?: string;
   primaryColor?: string;
+  showPopups?: boolean;
 }
 
 // Emoji list for the emoji picker
@@ -33,6 +34,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   botAvatar = "/placeholder.svg",
   userAvatar,
   primaryColor = "#000000",
+  showPopups = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -41,12 +43,11 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Initial message popups state
-  const [showPopup, setShowPopup] = useState(false);
-  const [currentPopupIndex, setCurrentPopupIndex] = useState(0);
   const [popupMessages] = useState<string[]>([
     `👋 Hi! I am ${botName}, ask me anything about ${productName}!`,
     `By the way, you can create an agent like me for your website! 😊`
   ]);
+  const [visiblePopups, setVisiblePopups] = useState<number[]>([]);
   
   // Set initial welcome messages when component mounts
   useEffect(() => {
@@ -77,27 +78,28 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
   // Show popups when chat is closed
   useEffect(() => {
-    // Only show popups when chat is closed
-    if (!isOpen) {
-      setShowPopup(true);
+    if (!isOpen && showPopups) {
+      // Reset visible popups when chat closes
+      setVisiblePopups([]);
       
-      // Auto-advance popups
-      const popupInterval = setInterval(() => {
-        setCurrentPopupIndex(prev => {
-          if (prev >= popupMessages.length - 1) {
-            // Start over from the first message
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 4000);
+      // Show first popup after a short delay
+      const firstPopupTimeout = setTimeout(() => {
+        setVisiblePopups([0]);
+        
+        // Show second popup after another delay
+        const secondPopupTimeout = setTimeout(() => {
+          setVisiblePopups([0, 1]);
+        }, 2000);
+        
+        return () => clearTimeout(secondPopupTimeout);
+      }, 1000);
       
-      return () => clearInterval(popupInterval);
+      return () => clearTimeout(firstPopupTimeout);
     } else {
-      // Hide popup when chat is open
-      setShowPopup(false);
+      // Hide popups when chat is open
+      setVisiblePopups([]);
     }
-  }, [isOpen, popupMessages.length]);
+  }, [isOpen, showPopups]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -117,9 +119,6 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
     setMessages([...messages, userMessage]);
     setMessage("");
-    
-    // Hide popup when user sends a message
-    setShowPopup(false);
     
     // Show typing indicator
     setIsTyping(true);
@@ -196,15 +195,38 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
 
   return (
     <div className="fixed bottom-0 right-6 z-50 flex flex-col items-end">
-      {/* Initial message popup - only show when chat is closed */}
-      {!isOpen && showPopup && (
-        <div className="mb-4 mr-16 animate-fade-in">
-          <div 
-            className="rounded-lg shadow-lg p-4 bg-white border border-gray-200 max-w-[280px]"
-            style={{ borderColor: primaryColor }}
-          >
-            <p>{popupMessages[currentPopupIndex]}</p>
-          </div>
+      {/* Initial message popups - only show when chat is closed */}
+      {!isOpen && showPopups && visiblePopups.length > 0 && (
+        <div className="mb-4 mr-16 flex flex-col gap-2">
+          {visiblePopups.includes(0) && (
+            <div 
+              className="rounded-lg shadow-lg p-4 bg-white border border-gray-200 max-w-[280px] transition-opacity duration-500 opacity-100 animate-fade-in"
+              style={{ borderColor: primaryColor }}
+            >
+              <div className="flex">
+                <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
+                  <AvatarImage src={botAvatar} alt={botName} />
+                  <AvatarFallback>AI</AvatarFallback>
+                </Avatar>
+                <p>{popupMessages[0]}</p>
+              </div>
+            </div>
+          )}
+          
+          {visiblePopups.includes(1) && (
+            <div 
+              className="rounded-lg shadow-lg p-4 bg-white border border-gray-200 max-w-[280px] transition-opacity duration-500 opacity-100 animate-fade-in"
+              style={{ borderColor: primaryColor }}
+            >
+              <div className="flex">
+                <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
+                  <AvatarImage src={botAvatar} alt={botName} />
+                  <AvatarFallback>AI</AvatarFallback>
+                </Avatar>
+                <p>{popupMessages[1]}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
