@@ -1,6 +1,28 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
+import { Json } from "@/integrations/supabase/types";
+
+// Helper function to parse suggested messages from JSON
+const parseSuggestedMessages = (data: any): SuggestedMessage[] => {
+  if (!data.suggested_messages) return [];
+  
+  try {
+    if (typeof data.suggested_messages === 'string') {
+      return JSON.parse(data.suggested_messages);
+    } else if (Array.isArray(data.suggested_messages)) {
+      // Make sure each item has id and text properties
+      return data.suggested_messages.map((msg: any) => ({
+        id: msg.id || `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        text: msg.text || (typeof msg === 'string' ? msg : '')
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error parsing suggested messages:', error);
+    return [];
+  }
+};
 
 export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise<ChatInterfaceSettings | null> => {
   try {
@@ -35,10 +57,8 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
-        ...data as any,
-        suggested_messages: typeof data.suggested_messages === 'string' 
-          ? JSON.parse(data.suggested_messages)
-          : (data.suggested_messages as SuggestedMessage[] || []),
+        ...data,
+        suggested_messages: parseSuggestedMessages(data)
       };
       
       return result;
@@ -72,10 +92,8 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
-        ...data as any,
-        suggested_messages: typeof data.suggested_messages === 'string' 
-          ? JSON.parse(data.suggested_messages)
-          : (data.suggested_messages as SuggestedMessage[] || []),
+        ...data,
+        suggested_messages: parseSuggestedMessages(data)
       };
       
       return result;
@@ -102,12 +120,10 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
     // If no settings exist yet, return null
     if (!data) return null;
     
-    // Parse the suggested_messages JSON if it's a string
+    // Parse the suggested_messages JSON
     const parsedData: ChatInterfaceSettings = {
-      ...data as any,
-      suggested_messages: typeof data.suggested_messages === 'string' 
-        ? JSON.parse(data.suggested_messages)
-        : (data.suggested_messages as SuggestedMessage[] || []),
+      ...data,
+      suggested_messages: parseSuggestedMessages(data)
     };
     
     return parsedData;

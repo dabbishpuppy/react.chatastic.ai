@@ -17,6 +17,7 @@ interface ChatSectionProps {
   allowRegenerate?: boolean;
   theme?: 'light' | 'dark' | 'system';
   profilePicture?: string;
+  chatIcon?: string;
   footer?: string | null;
 }
 
@@ -34,6 +35,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   allowRegenerate = true,
   theme = 'light',
   profilePicture,
+  chatIcon,
   footer,
 }) => {
   const [message, setMessage] = useState("");
@@ -246,7 +248,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                         <p>Like</p>
                       </TooltipContent>
                     </Tooltip>
-
+                    
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -262,7 +264,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                         <p>Dislike</p>
                       </TooltipContent>
                     </Tooltip>
-
+                    
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -369,6 +371,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             <SendIcon size={16} />
           </Button>
         </form>
+        
+        {/* Chat Icon (New) */}
+        {chatIcon && (
+          <div className="flex justify-end mt-3">
+            <Avatar className="h-10 w-10 border-0">
+              <AvatarImage src={chatIcon} alt="Chat Icon" />
+              <AvatarFallback>💬</AvatarFallback>
+            </Avatar>
+          </div>
+        )}
         
         {/* Footer */}
         {footer && (

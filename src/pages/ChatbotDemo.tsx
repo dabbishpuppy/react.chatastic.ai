@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import { Input } from "@/components/ui/input";
@@ -29,6 +28,7 @@ const ChatbotDemo: React.FC = () => {
   const [autoShowDelay, setAutoShowDelay] = useState(1);
   const [footer, setFooter] = useState<string | null>(null);
   const [chatIcon, setChatIcon] = useState<string | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Load settings from Supabase if agent ID is available
@@ -55,6 +55,7 @@ const ChatbotDemo: React.FC = () => {
         setAutoShowDelay(settings.auto_show_delay);
         setFooter(settings.footer);
         setChatIcon(settings.chat_icon);
+        setProfilePicture(settings.profile_picture);
       }
       
       setIsLoading(false);
@@ -286,6 +287,7 @@ const ChatbotDemo: React.FC = () => {
         messagePlaceholder={messagePlaceholder}
         footer={footer}
         chatIcon={chatIcon}
+        profilePicture={profilePicture}
       />
     </div>
   );

@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -36,7 +35,7 @@ const ChatInterfaceSettings: React.FC = () => {
   ]);
 
   // Update preview when settings change
-  React.useEffect(() => {
+  useEffect(() => {
     setPreviewMessages([
       {
         isAgent: true,
@@ -310,6 +309,9 @@ const ChatInterfaceSettings: React.FC = () => {
                 showFeedback={settings.show_feedback}
                 allowRegenerate={settings.allow_regenerate}
                 theme={settings.theme}
+                profilePicture={settings.profile_picture || undefined}
+                chatIcon={settings.chat_icon || undefined}
+                footer={settings.footer || undefined}
               />
             </div>
           </div>
