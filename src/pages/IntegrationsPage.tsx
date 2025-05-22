@@ -42,26 +42,25 @@ const IntegrationsPage: React.FC = () => {
     if (!agentId) return '';
     
     return `<script>
-  (function(){
-    if(!window.chatbaseConfig) {
-      window.chatbaseConfig = {
-        agentId: "${agentId}",
-      };
-    }
+(function(){
+  if(!window.wonderwaveConfig) {
+    window.wonderwaveConfig = {
+      agentId: "${agentId}",
+    };
+  }
+  
+  if(!window.wonderwave||window.wonderwave("getState")!=="initialized"){
+    window.wonderwave=(...args)=>{
+      if(!window.wonderwave.q){window.wonderwave.q=[];}
+      window.wonderwave.q.push(args);
+    };
     
-    if(!window.chatbase||window.chatbase("getState")=="initialized"){
-      window.chatbase=(...arguments)=>{
-        if(!window.chatbase.q){window.chatbase.q=[];}
-        window.chatbase.q.push(arguments);
-      };
-      window.chatbase.d={};
-      
-      const script = document.createElement("script");
-      script.src = "https://cdn.example.com/chatbase.js";
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  })();
+    const script = document.createElement("script");
+    script.src = "https://query-spark-start.lovable.app/wonderwave.js";
+    script.async = true;
+    document.head.appendChild(script);
+  }
+})();
 </script>`;
   };
 

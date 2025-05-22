@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
-import { AlertTriangle } from "lucide-react";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
 
 interface EmbedTabProps {
@@ -116,22 +115,6 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     <p className="text-sm text-gray-500 mb-4">
                       Embed a chat bubble on your website that opens a chatbot when clicked. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
-                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200 mb-4">
-                      <strong>Important:</strong> The position setting (right or left) in the code must match your chat interface settings.
-                    </div>
-
-                    <div className="text-sm bg-blue-50 p-3 rounded-md border border-blue-200 mb-4">
-                      <p className="font-medium text-blue-700">Server Configuration</p>
-                      <p className="text-blue-600 mt-1">
-                        Ensure your server hosting <code>wonderwave.js</code> includes these HTTP headers:
-                      </p>
-                      <pre className="mt-2 p-2 bg-blue-100 rounded text-xs overflow-x-auto">
-                        <code>
-Content-Type: application/javascript
-Access-Control-Allow-Origin: *
-                        </code>
-                      </pre>
-                    </div>
 
                     <div className="mt-4">
                       <Button 
