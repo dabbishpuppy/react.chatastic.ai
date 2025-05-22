@@ -64,6 +64,11 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
       } else if (settings.primary_color) {
         configOptions.push(`bubbleColor: "${settings.primary_color}"`);
       }
+
+      // Only add header color if sync is enabled, otherwise default to white by not setting
+      if (settings.sync_colors && settings.user_message_color) {
+        configOptions.push(`headerColor: "${settings.user_message_color}"`);
+      }
       
       // Add debug option
       configOptions.push(`debug: false // Set to true to enable debug logging`);
@@ -138,11 +143,11 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         params.push(`userColor=${encodeURIComponent(settings.user_message_color)}`);
       }
       
+      // Only add header color if sync is enabled
       if (settings.sync_colors && settings.user_message_color) {
         params.push(`headerColor=${encodeURIComponent(settings.user_message_color)}`);
-      } else if (settings.primary_color) {
-        params.push(`headerColor=${encodeURIComponent(settings.primary_color)}`);
       }
+      // Do not add headerColor when sync is disabled (white/default will be used)
       
       if (params.length > 0) {
         iframeSrc += `?${params.join('&')}`;
