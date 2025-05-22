@@ -23,28 +23,6 @@ export function createBubbleButton(config) {
   
   const colorSettings = getColorSettings();
   
-  // Use custom chat icon if specified in config or settings, otherwise use default
-  if (colorSettings && colorSettings.chat_icon) {
-    log('Using custom chat icon from settings:', colorSettings.chat_icon);
-    bubbleButton.innerHTML = `<img src="${colorSettings.chat_icon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
-  } else if (config.chatIcon) {
-    log('Using custom chat icon from config:', config.chatIcon);
-    bubbleButton.innerHTML = `<img src="${config.chatIcon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
-  } else {
-    log('Using default chat icon');
-    bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
-  }
-  
-  // Determine bubble color
-  let bubbleColor;
-  if (colorSettings && colorSettings.bubble_color) {
-    bubbleColor = colorSettings.bubble_color;
-  } else if (config.bubbleColor) {
-    bubbleColor = config.bubbleColor;
-  } else {
-    bubbleColor = defaultConfig.bubbleColor;
-  }
-  
   // Apply styles
   Object.assign(bubbleButton.style, {
     position: 'fixed',
@@ -53,7 +31,6 @@ export function createBubbleButton(config) {
     width: config.bubbleSize,
     height: config.bubbleSize,
     borderRadius: '50%',
-    backgroundColor: bubbleColor,
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
     cursor: 'pointer',
     zIndex: config.zIndex,
@@ -61,9 +38,11 @@ export function createBubbleButton(config) {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-    color: '#FFFFFF',
     overflow: 'hidden',
   });
+
+  // Set the content based on availability of chat icon
+  updateBubbleContent(config);
   
   // Add hover effect
   bubbleButton.onmouseenter = function() {
@@ -90,6 +69,51 @@ export function createBubbleButton(config) {
   // Append to the document
   document.body.appendChild(bubbleButton);
   log('Bubble button created and added to DOM');
+}
+
+/**
+ * Update the bubble content (icon or default chat icon)
+ */
+function updateBubbleContent(config) {
+  if (!bubbleButton) return;
+  
+  const colorSettings = getColorSettings();
+  
+  // Use custom chat icon if specified in config or settings, otherwise use default
+  if (colorSettings && colorSettings.chat_icon) {
+    log('Using custom chat icon from settings:', colorSettings.chat_icon);
+    // For custom icon, use it as full background image
+    bubbleButton.innerHTML = '';
+    bubbleButton.style.backgroundImage = `url("${colorSettings.chat_icon}")`;
+    bubbleButton.style.backgroundSize = 'cover';
+    bubbleButton.style.backgroundPosition = 'center';
+    bubbleButton.style.backgroundColor = 'transparent';
+  } else if (config && config.chatIcon) {
+    log('Using custom chat icon from config:', config.chatIcon);
+    // For custom icon in config, use it as full background image
+    bubbleButton.innerHTML = '';
+    bubbleButton.style.backgroundImage = `url("${config.chatIcon}")`;
+    bubbleButton.style.backgroundSize = 'cover';
+    bubbleButton.style.backgroundPosition = 'center';
+    bubbleButton.style.backgroundColor = 'transparent';
+  } else {
+    log('Using default chat icon');
+    // For default icon, remove background image and add SVG
+    bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
+    bubbleButton.style.backgroundImage = 'none';
+    
+    // Determine bubble color for default icon
+    let bubbleColor;
+    if (colorSettings && colorSettings.bubble_color) {
+      bubbleColor = colorSettings.bubble_color;
+    } else if (config.bubbleColor) {
+      bubbleColor = config.bubbleColor;
+    } else {
+      bubbleColor = defaultConfig.bubbleColor;
+    }
+    bubbleButton.style.backgroundColor = bubbleColor;
+    bubbleButton.style.color = '#FFFFFF';
+  }
 }
 
 /**
@@ -223,21 +247,12 @@ function showPopupMessage(message, index, config, container) {
 export function updateBubbleAppearance() {
   const bubbleButton = document.getElementById('wonderwave-bubble');
   const colorSettings = getColorSettings();
+  const config = window.wonderwaveConfig || defaultConfig;
   
   if (!bubbleButton || !colorSettings) return;
   
-  // If we have a chat icon, use it instead of the default SVG
-  if (colorSettings.chat_icon) {
-    bubbleButton.innerHTML = `<img src="${colorSettings.chat_icon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
-  } else {
-    // Revert to default chat icon
-    bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
-  }
-  
-  // Update bubble color if specified and there's no chat icon (chat icon overrides bubble color)
-  if (!colorSettings.chat_icon && colorSettings.bubble_color) {
-    bubbleButton.style.backgroundColor = colorSettings.bubble_color;
-  }
+  // Update the bubble content
+  updateBubbleContent(config);
   
   // Update bubble position if specified
   if (colorSettings.bubble_position) {
