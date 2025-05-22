@@ -80,7 +80,9 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     
     // Now fetch color settings since agent is public or visibility check failed
     try {
-      const response = await fetch(`https://${defaultConfig.cdnDomain}/api/chat-settings/${agentId}`);
+      // Add timestamp to URL to prevent caching issues
+      const timestamp = new Date().getTime();
+      const response = await fetch(`https://${defaultConfig.cdnDomain}/api/chat-settings/${agentId}?_t=${timestamp}`);
       
       if (!response.ok) {
         log(`Chat settings fetch returned status: ${response.status}`);
@@ -91,7 +93,12 @@ export async function fetchColorSettingsAndVisibility(agentId) {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         logError('Expected JSON response but got:', contentType);
-        return null;
+        // Return default settings instead of null
+        return {
+          bubble_color: defaultConfig.bubbleColor,
+          user_message_color: defaultConfig.bubbleColor,
+          sync_colors: false
+        };
       }
       
       try {
@@ -110,15 +117,28 @@ export async function fetchColorSettingsAndVisibility(agentId) {
         return data;
       } catch (jsonError) {
         logError('Error parsing settings JSON:', jsonError);
-        return null;
+        // Return default settings
+        return {
+          bubble_color: defaultConfig.bubbleColor,
+          user_message_color: defaultConfig.bubbleColor,
+          sync_colors: false
+        };
       }
     } catch (settingsError) {
       logError('Error fetching settings:', settingsError);
-      return null;
+      return {
+        bubble_color: defaultConfig.bubbleColor,
+        user_message_color: defaultConfig.bubbleColor,
+        sync_colors: false
+      };
     }
   } catch (error) {
     logError('Error in fetchColorSettingsAndVisibility:', error);
-    return null;
+    return {
+      bubble_color: defaultConfig.bubbleColor,
+      user_message_color: defaultConfig.bubbleColor,
+      sync_colors: false
+    };
   }
 }
 
