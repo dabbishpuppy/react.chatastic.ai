@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,39 +58,62 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         settings.primary_color ? 
         `\n      bubbleColor: "${settings.primary_color}", // Chat bubble color` : '';
       
-      // Improved script with Proxy pattern
+      // Improved script with more robust initialization and error handling
       return `<script>
 (function(){
-  if(!window.wonderwaveConfig) {
-    window.wonderwaveConfig = {
-      agentId: "${agentId}",
-      position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig}
-    };
-  }
+  // Define the config first - this is crucial
+  window.wonderwaveConfig = {
+    agentId: "${agentId}",
+    position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig},
+    debug: false // Set to true to enable debug logging
+  };
   
-  if(!window.wonderwave || window.wonderwave("getState") !== "initialized") {
-    window.wonderwave = (...args) => {
-      window.wonderwave.q = window.wonderwave.q || [];
-      window.wonderwave.q.push(args);
-    };
+  // Create a proxy handler for the wonderwave function
+  function createWonderwaveProxy() {
+    // Create a queue if it doesn't exist
+    if(!window.wonderwave || !window.wonderwave.q) {
+      window.wonderwave = function(...args) {
+        window.wonderwave.q = window.wonderwave.q || [];
+        window.wonderwave.q.push(args);
+        return null; // Return null by default before init
+      };
+      window.wonderwave.q = [];
+    }
     
-    // Add Proxy for better method handling
-    window.wonderwave = new Proxy(window.wonderwave, {
+    // Return a proxy to handle methods more elegantly
+    return new Proxy(window.wonderwave, {
       get(target, prop) {
-        if (prop === "q") return target.q;
+        if (prop === 'q') return target.q;
         return (...args) => target(prop, ...args);
       }
     });
-
-    const onLoad = function() {
-      const script = document.createElement("script");
-      script.src = "https://query-spark-start.lovable.app/wonderwave.js";
-      script.async = true;
-      document.head.appendChild(script);
+  }
+  
+  // Set up wonderwave with the proxy pattern
+  window.wonderwave = createWonderwaveProxy();
+  
+  // Load the script
+  function loadScript() {
+    console.log('[WonderWave] Loading chat widget script...');
+    const script = document.createElement("script");
+    script.src = "https://query-spark-start.lovable.app/wonderwave.js";
+    script.async = true;
+    script.onerror = function() {
+      console.error('[WonderWave] Failed to load chat widget script!');
     };
+    script.onload = function() {
+      console.log('[WonderWave] Chat widget script loaded successfully');
+    };
+    document.head.appendChild(script);
+  }
 
-    if (document.readyState === "complete") onLoad();
-    else window.addEventListener("load", onLoad);
+  // Load the script when the page is ready
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    // If already loaded
+    setTimeout(loadScript, 1);
+  } else {
+    // Wait for DOMContentLoaded
+    window.addEventListener("DOMContentLoaded", loadScript);
   }
 })();
 </script>`;

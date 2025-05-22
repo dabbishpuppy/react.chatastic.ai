@@ -1,6 +1,6 @@
 
 /**
- * WonderWave Chat Widget v1.0
+ * WonderWave Chat Widget v1.1
  * A lightweight embeddable chat widget for any website
  */
 (function() {
@@ -10,6 +10,7 @@
   let initialized = false;
   let iframe = null;
   let bubbleButton = null;
+  let debugMode = false;
   
   // Default configuration
   const defaultConfig = {
@@ -18,14 +19,29 @@
     bubbleSize: '60px',
     zIndex: 999999,
     cdnDomain: 'query-spark-start.lovable.app',
+    debug: false
   };
 
   // Store for queued commands before initialization
   let commandQueue = [];
   
+  // Simple logging function that only logs when debug mode is enabled
+  function log(...args) {
+    if (debugMode || (window.wonderwaveConfig && window.wonderwaveConfig.debug)) {
+      console.log('[WonderWave]', ...args);
+    }
+  }
+
+  // Log errors always to help with debugging
+  function logError(...args) {
+    console.error('[WonderWave Error]', ...args);
+  }
+  
   // Process any commands that were queued before script loaded
   function processQueue() {
     const queue = window.wonderwave.q || [];
+    log('Processing command queue, length:', queue.length);
+    
     while (queue.length > 0) {
       const args = queue.shift();
       if (args && args.length > 0) {
@@ -38,32 +54,42 @@
   
   // Handle various commands
   function handleCommand(command, params) {
+    log('Handling command:', command, params);
+    
     switch (command) {
       case 'init':
         init(params[0]);
-        break;
+        return 'initialized';
       case 'open':
         openChat();
-        break;
+        return 'opened';
       case 'close':
         closeChat();
-        break;
+        return 'closed';
       case 'toggle':
         toggleChat();
-        break;
+        return 'toggled';
       case 'destroy':
         destroy();
-        break;
+        return 'destroyed';
+      case 'debug':
+        debugMode = params[0] === true;
+        log('Debug mode set to:', debugMode);
+        return debugMode;
       case 'getState':
         return initialized ? 'initialized' : 'not-initialized';
       default:
-        console.warn(`WonderWave: Unknown command "${command}"`);
+        logError(`Unknown command "${command}"`);
+        return 'error-unknown-command';
     }
   }
   
   // Initialize the chat widget
   function init(customConfig = {}) {
-    if (initialized) return;
+    if (initialized) {
+      log('Already initialized, skipping');
+      return;
+    }
     
     // Merge default config with window.wonderwaveConfig and any custom config
     const config = {
@@ -72,44 +98,62 @@
       ...customConfig
     };
     
+    // Set debug mode from config
+    debugMode = config.debug === true;
+    
+    log('Initializing with config:', config);
+    
     // Validate required config
     if (!config.agentId) {
-      console.error('WonderWave: agentId is required in window.wonderwaveConfig');
+      logError('agentId is required in window.wonderwaveConfig');
       return;
     }
     
-    // Create the bubble button
-    createBubbleButton(config);
-    
-    // Mark as initialized
-    initialized = true;
-    
-    // Process any queued commands
-    processQueue();
-    
-    // Handle any auto-open logic
-    if (config.autoOpen) {
-      setTimeout(() => openChat(), config.autoOpenDelay || 1000);
-    }
+    try {
+      // Create the bubble button
+      createBubbleButton(config);
+      
+      // Mark as initialized
+      initialized = true;
+      
+      // Process any queued commands
+      processQueue();
+      
+      // Handle any auto-open logic
+      if (config.autoOpen) {
+        setTimeout(() => openChat(), config.autoOpenDelay || 1000);
+      }
 
-    // Auto show popups if enabled
-    if (config.autoShowDelay && config.autoShowDelay > 0) {
-      setTimeout(() => showPopups(config), config.autoShowDelay * 1000);
+      // Auto show popups if enabled
+      if (config.autoShowDelay && config.autoShowDelay > 0) {
+        setTimeout(() => showPopups(config), config.autoShowDelay * 1000);
+      }
+      
+      log('Initialization complete');
+    } catch (error) {
+      logError('Error during initialization:', error);
     }
   }
   
   // Create the chat bubble button
   function createBubbleButton(config) {
     // Create the bubble button if it doesn't exist
-    if (bubbleButton) return;
+    if (bubbleButton) {
+      log('Bubble button already exists, skipping creation');
+      return;
+    }
+    
+    log('Creating bubble button');
     
     bubbleButton = document.createElement('div');
     bubbleButton.id = 'wonderwave-bubble';
     
     // Use custom chat icon if specified in config, otherwise use default
     if (config.chatIcon) {
+      log('Using custom chat icon:', config.chatIcon);
       bubbleButton.innerHTML = `<img src="${config.chatIcon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
     } else {
+      log('Using default chat icon');
       bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
     }
     
@@ -149,6 +193,7 @@
     
     // Append to the document
     document.body.appendChild(bubbleButton);
+    log('Bubble button created and added to DOM');
   }
 
   // Show initial message popups
@@ -380,9 +425,11 @@
   // Open the chat widget
   function openChat() {
     if (!initialized) {
-      console.warn('WonderWave: Chat not initialized. Call init() first.');
+      logError('Chat not initialized. Call init() first.');
       return;
     }
+    
+    log('Opening chat');
     
     // Clear any popups when opening chat
     const popupsContainer = document.getElementById('wonderwave-popups');
@@ -414,6 +461,8 @@
   
   // Close the chat widget
   function closeChat() {
+    log('Closing chat');
+    
     const container = document.getElementById('wonderwave-container');
     if (container) {
       container.style.opacity = '0';
@@ -440,6 +489,8 @@
   
   // Toggle the chat widget
   function toggleChat() {
+    log('Toggling chat');
+    
     const container = document.getElementById('wonderwave-container');
     if (container && container.style.display !== 'none' && container.style.opacity !== '0') {
       closeChat();
@@ -450,6 +501,8 @@
   
   // Destroy the widget
   function destroy() {
+    log('Destroying widget');
+    
     // Remove the bubble button
     if (bubbleButton && bubbleButton.parentNode) {
       bubbleButton.parentNode.removeChild(bubbleButton);
@@ -474,6 +527,8 @@
     
     // Reset initialization state
     initialized = false;
+    
+    log('Widget destroyed');
   }
   
   // Create the public API
@@ -484,8 +539,24 @@
   // Add the command queue to the API
   window.wonderwave.q = window.wonderwave.q || [];
   
-  // Initialize automatically if config is present
-  if (window.wonderwaveConfig) {
-    init();
+  // Add event listener for when the DOM is fully loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    log('DOM loaded, checking for auto-initialization');
+    
+    // Initialize automatically if config is present
+    if (window.wonderwaveConfig) {
+      log('Config found, auto-initializing');
+      init();
+    }
+  });
+  
+  // Also check if we can initialize immediately if the DOM is already loaded
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    log('DOM already loaded, checking for auto-initialization');
+    
+    if (window.wonderwaveConfig) {
+      log('Config found, auto-initializing');
+      setTimeout(init, 0); // Use setTimeout to ensure this runs after the script execution
+    }
   }
 })();
