@@ -1,5 +1,6 @@
+
 import React, { useState, ReactNode, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Logo from "@/components/layout/Logo";
@@ -28,11 +29,33 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const location = useLocation();
 
-  // Modified effect to prevent auto-scrolling - removed scroll reset
+  // Determine if we're on the chat interface settings page
+  const isChatInterfacePage = location.pathname.includes('chat-interface');
+
+  // Apply overscroll behavior to prevent unwanted scrolling
   useEffect(() => {
-    // Keep tab state but don't manipulate scroll position
-  }, [activeTab]);
+    if (contentRef.current) {
+      if (isChatInterfacePage) {
+        // Apply specific styles for the chat interface settings page
+        contentRef.current.style.overscrollBehavior = 'contain';
+        contentRef.current.style.scrollBehavior = 'auto';
+      } else {
+        // Reset for other pages
+        contentRef.current.style.overscrollBehavior = '';
+        contentRef.current.style.scrollBehavior = '';
+      }
+    }
+    
+    // Cleanup function
+    return () => {
+      if (contentRef.current) {
+        contentRef.current.style.overscrollBehavior = '';
+        contentRef.current.style.scrollBehavior = '';
+      }
+    };
+  }, [isChatInterfacePage]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
@@ -90,7 +113,7 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
         {/* Main content with its own scroll */}
         <div 
           ref={contentRef} 
-          className="flex-1 overflow-auto"
+          className={`flex-1 overflow-auto ${isChatInterfacePage ? 'settings-scroll-container' : ''}`}
         >
           {children}
         </div>

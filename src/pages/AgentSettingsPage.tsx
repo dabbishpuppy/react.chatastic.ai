@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
@@ -15,6 +15,7 @@ const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
   const location = useLocation();
   const isMobile = useIsMobile();
+  const contentRef = useRef<HTMLDivElement>(null);
   
   // Extract the active tab from the URL
   const getActiveTab = () => {
@@ -45,9 +46,30 @@ const AgentSettingsPage: React.FC = () => {
     }
   };
 
+  // Prevent unwanted scrolling when textarea/inputs are focused on the chat-interface page
+  useEffect(() => {
+    if (activeTab === "chat-interface") {
+      // Ensure the page doesn't scroll when navigating to this tab
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
+      
+      // Disable auto-scrolling behavior for the page
+      document.body.style.overscrollBehavior = 'contain';
+      
+      return () => {
+        // Reset when navigating away
+        document.body.style.overscrollBehavior = '';
+      };
+    }
+  }, [activeTab]);
+
   return (
     <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
-      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
+      <div 
+        className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen settings-scroll-container"
+        ref={contentRef}
+      >
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
         {/* Settings content */}

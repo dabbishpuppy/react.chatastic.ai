@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { Slot } from "@radix-ui/react-slot"
@@ -78,7 +79,7 @@ const FormItem = React.forwardRef<
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div ref={ref} className={cn("space-y-2", className)} {...props} />
+      <div ref={ref} className={cn("space-y-2 scroll-mt-0", className)} {...props} />
     </FormItemContext.Provider>
   )
 })
@@ -106,6 +107,15 @@ const FormControl = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof Slot>
 >(({ ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
+  
+  // Prevent auto-scroll behavior when control is focused
+  const handleFocus = (e: React.FocusEvent) => {
+    if (props.onFocus) {
+      // @ts-ignore - we're handling a generic focus event
+      props.onFocus(e);
+    }
+    e.preventDefault();
+  };
 
   return (
     <Slot
@@ -117,6 +127,8 @@ const FormControl = React.forwardRef<
           : `${formDescriptionId} ${formMessageId}`
       }
       aria-invalid={!!error}
+      onFocus={handleFocus}
+      className="scroll-mt-0"
       {...props}
     />
   )

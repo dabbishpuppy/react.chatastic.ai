@@ -104,3 +104,21 @@ body.iframe-embedded {
   overflow: hidden;
   transition: height 0.2s ease-in-out;
 }
+
+/* Global input and textarea scroll prevention */
+textarea, input, select {
+  scroll-margin: 0 !important;
+  scroll-padding: 0 !important;
+  overflow-anchor: none;
+}
+
+textarea:focus, input:focus, select:focus {
+  scroll-behavior: auto;
+  scroll-margin-block: 0 !important;
+}
+
+/* Scroll prevention for the chat interface settings page */
+.settings-scroll-container {
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+}
