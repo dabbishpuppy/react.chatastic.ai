@@ -20,7 +20,9 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     
     // First, check agent visibility with better error handling
     try {
-      const visibilityResponse = await fetch(`https://${defaultConfig.cdnDomain}/api/agent-visibility/${agentId}`);
+      // Add timestamp to prevent caching issues
+      const timestamp = new Date().getTime();
+      const visibilityResponse = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`);
       
       if (!visibilityResponse.ok) {
         log(`Agent visibility check returned status: ${visibilityResponse.status}`);
@@ -36,8 +38,8 @@ export async function fetchColorSettingsAndVisibility(agentId) {
             const visibilityData = await visibilityResponse.json();
             log('Fetched visibility data:', visibilityData);
             
-            // Update the private flag
-            if (visibilityData?.visibility === 'private') {
+            // Update the private flag if "visibility" property exists
+            if (visibilityData && visibilityData.visibility === 'private') {
               isPrivate = true;
               
               // If private, hide the chat bubble if it exists
@@ -65,6 +67,18 @@ export async function fetchColorSettingsAndVisibility(agentId) {
               if (bubbleButton) {
                 bubbleButton.style.display = 'flex';
               }
+              
+              // Since we already have the settings from the visibility check,
+              // we can use them directly
+              colorSettings = visibilityData;
+              
+              // Update existing bubble if it exists
+              const bubbleButton = document.getElementById('wonderwave-bubble');
+              if (bubbleButton) {
+                updateBubbleAppearance();
+              }
+              
+              return visibilityData;
             }
           } catch (jsonError) {
             logError('Error parsing visibility JSON:', jsonError);
@@ -78,16 +92,20 @@ export async function fetchColorSettingsAndVisibility(agentId) {
       isPrivate = false;
     }
     
-    // Now fetch color settings since agent is public or visibility check failed
+    // If we reach here, it means we need to get the settings again or the visibility check failed
     try {
       // Add timestamp to URL to prevent caching issues
       const timestamp = new Date().getTime();
-      const response = await fetch(`https://${defaultConfig.cdnDomain}/api/chat-settings/${agentId}?_t=${timestamp}`);
+      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`);
       
       if (!response.ok) {
         log(`Chat settings fetch returned status: ${response.status}`);
-        // Return null but don't throw, we'll use default settings
-        return null;
+        // Return default settings but don't throw
+        return {
+          bubble_color: defaultConfig.bubbleColor,
+          user_message_color: defaultConfig.bubbleColor,
+          sync_colors: false
+        };
       }
       
       const contentType = response.headers.get('content-type');
