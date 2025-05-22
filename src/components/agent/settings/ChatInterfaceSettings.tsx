@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,7 @@ import EditableSuggestedMessage from "./EditableSuggestedMessage";
 import ImageUpload from "./ImageUpload";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ColorPicker from "./ColorPicker";
+import ImageCropDialog from "./ImageCropDialog";
 
 const ChatInterfaceSettings: React.FC = () => {
   const {
@@ -89,7 +89,7 @@ const ChatInterfaceSettings: React.FC = () => {
   };
 
   // Handle file selection for image upload with cropping
-  const handleFileSelect = async (file: File, type: 'profile' | 'icon') => {
+  const handleFileSelect = (file: File, type: 'profile' | 'icon') => {
     // Create a URL for the file
     const url = URL.createObjectURL(file);
     // Show crop dialog with the image URL
@@ -98,21 +98,33 @@ const ChatInterfaceSettings: React.FC = () => {
       type,
       imageUrl: url
     });
+    
+    // This function doesn't need to return a Promise<string> since we're not using the return value
+    // and we're handling the cropping separately
+    return Promise.resolve(url);
   };
 
   // Handle crop completion and upload
   const handleCropComplete = async (croppedImage: File) => {
     try {
+      let url: string | null = null;
+      
       if (showCropDialog.type === 'profile') {
-        await uploadImage(croppedImage, 'profile');
+        url = await uploadImage(croppedImage, 'profile');
       } else {
-        await uploadImage(croppedImage, 'icon');
+        url = await uploadImage(croppedImage, 'icon');
       }
+      
+      // Close the crop dialog regardless of result
+      setShowCropDialog({ visible: false, type: 'profile', imageUrl: '' });
+      
+      // Return the URL for TypeScript compliance
+      return url || '';
     } catch (error) {
       console.error("Error uploading cropped image:", error);
-    } finally {
       // Close the crop dialog
       setShowCropDialog({ visible: false, type: 'profile', imageUrl: '' });
+      return '';
     }
   };
 
@@ -445,7 +457,7 @@ const ChatInterfaceSettings: React.FC = () => {
 
           {settings.chat_icon && (
             <div className="mt-4 flex justify-end">
-              <div className="h-16 w-16 rounded-full shadow-lg overflow-hidden">
+              <div className="h-20 w-20 rounded-full shadow-lg overflow-hidden">
                 <img 
                   src={settings.chat_icon} 
                   alt="Chat Icon"
@@ -459,46 +471,12 @@ const ChatInterfaceSettings: React.FC = () => {
 
       {/* Image Crop Dialog */}
       {showCropDialog.visible && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">
-                Add a {showCropDialog.type === 'profile' ? 'Profile picture' : 'Chat icon'}
-              </h3>
-              <Button variant="ghost" size="icon" onClick={handleCropCancel}>
-                <span className="sr-only">Close</span>
-                ✕
-              </Button>
-            </div>
-            <div className="bg-gray-900 aspect-square relative rounded-lg overflow-hidden">
-              <img 
-                src={showCropDialog.imageUrl} 
-                alt="Preview" 
-                className="w-full h-full object-contain"
-              />
-              <div className="absolute inset-0 pointer-events-none border-2 border-white rounded-full m-auto w-[90%] h-[90%] flex items-center justify-center">
-                <div className="border-[1px] border-white/30 w-full h-full rounded-full"></div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={handleCropCancel}>
-                Change image
-              </Button>
-              <Button onClick={() => {
-                // In a real implementation we would apply cropping. 
-                // For now, we'll just convert the URL back to a file
-                fetch(showCropDialog.imageUrl)
-                  .then(res => res.blob())
-                  .then(blob => {
-                    const file = new File([blob], "cropped-image.png", { type: "image/png" });
-                    handleCropComplete(file);
-                  });
-              }}>
-                Attach image
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ImageCropDialog
+          imageUrl={showCropDialog.imageUrl}
+          title={`Add a ${showCropDialog.type === 'profile' ? 'Profile picture' : 'Chat icon'}`}
+          onCrop={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
       )}
     </div>
   );
