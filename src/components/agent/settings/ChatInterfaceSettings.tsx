@@ -9,6 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/use-toast";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import ChatSection from "@/components/agent/ChatSection";
+import { Trash } from "lucide-react";
+
+interface SuggestedMessage {
+  id: string;
+  text: string;
+}
 
 const ChatInterfaceSettings: React.FC = () => {
   const [initialMessage, setInitialMessage] = useState("👋 Hej! Jag är AI assistenten til Agora. Hva kan jeg hjelpe deg med i dag?");
@@ -22,6 +28,13 @@ const ChatInterfaceSettings: React.FC = () => {
   const [autoShowDelay, setAutoShowDelay] = useState("1");
   const [footer, setFooter] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Suggested messages state
+  const [suggestedMessages, setSuggestedMessages] = useState<SuggestedMessage[]>([
+    { id: "1", text: "Suggest 1" },
+    { id: "2", text: "Suggest 2" }
+  ]);
+  const [newSuggestedMessage, setNewSuggestedMessage] = useState("");
   
   // Initial preview message based on settings
   const [previewMessages, setPreviewMessages] = useState([
@@ -55,6 +68,20 @@ const ChatInterfaceSettings: React.FC = () => {
     }, 1000);
   };
 
+  const addSuggestedMessage = () => {
+    if (newSuggestedMessage.trim()) {
+      setSuggestedMessages([
+        ...suggestedMessages, 
+        { id: Date.now().toString(), text: newSuggestedMessage.trim() }
+      ]);
+      setNewSuggestedMessage("");
+    }
+  };
+
+  const deleteSuggestedMessage = (id: string) => {
+    setSuggestedMessages(suggestedMessages.filter(msg => msg.id !== id));
+  };
+
   return (
     <div className="flex flex-col md:flex-row border-t">
       {/* Left panel - Settings */}
@@ -84,10 +111,42 @@ const ChatInterfaceSettings: React.FC = () => {
                   Suggested messages
                 </label>
                 
-                <div className="pl-5 space-y-2">
-                  <Button variant="outline" size="sm" className="text-sm h-8 px-3">
-                    + Add suggested message
-                  </Button>
+                <div className="space-y-2 border rounded-md p-4 bg-gray-50">
+                  {suggestedMessages.map((msg) => (
+                    <div key={msg.id} className="flex items-center justify-between gap-2 p-2 bg-white border rounded">
+                      <div className="flex-1 overflow-hidden text-ellipsis">
+                        {msg.text}
+                        <span className="ml-2 text-xs text-gray-400">
+                          {msg.text.length}/40
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteSuggestedMessage(msg.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      value={newSuggestedMessage}
+                      onChange={(e) => setNewSuggestedMessage(e.target.value)}
+                      maxLength={40}
+                      placeholder="Add a suggested message"
+                      className="flex-1"
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={addSuggestedMessage}
+                      disabled={!newSuggestedMessage.trim()}
+                    >
+                      Add
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-between mt-2">
@@ -274,6 +333,8 @@ const ChatInterfaceSettings: React.FC = () => {
                 initialMessages={previewMessages}
                 agentName={displayName}
                 placeholder={messagePlaceholder}
+                suggestedMessages={suggestedMessages.map(msg => msg.text)}
+                showSuggestions={showSuggestions}
               />
             </div>
           </div>

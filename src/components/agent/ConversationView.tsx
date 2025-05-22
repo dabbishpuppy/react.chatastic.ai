@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Conversation, Message } from "../activity/ConversationData";
 
@@ -16,7 +17,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({ conversation, onClo
       }) 
     : "Unknown time";
 
-  // Fix sender property issue by using the role property that exists in our Message type
   const renderMessage = (message: Message) => {
     const isUser = message.role === 'user';
     

@@ -18,6 +18,8 @@ interface ChatSectionProps {
   toggleSettings?: () => void;
   agentName?: string;
   placeholder?: string;
+  suggestedMessages?: string[];
+  showSuggestions?: boolean;
 }
 
 // Emoji list for the emoji picker
@@ -27,7 +29,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   initialMessages = [], 
   toggleSettings,
   agentName = "AI Customer Service",
-  placeholder = "Write message here..."
+  placeholder = "Write message here...",
+  suggestedMessages = [],
+  showSuggestions = true
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(initialMessages.length ? initialMessages : [
@@ -39,6 +43,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [userHasMessaged, setUserHasMessaged] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,15 +64,22 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     e.preventDefault();
     if (!message.trim()) return;
 
+    submitMessage(message);
+  };
+
+  const submitMessage = (text: string) => {
     // Add user message to chat history
     setChatHistory([...chatHistory, {
       isAgent: false,
-      content: message,
+      content: text,
       timestamp: new Date().toISOString()
     }]);
     
     // Clear message input
     setMessage("");
+
+    // Mark that user has sent a message
+    setUserHasMessaged(true);
     
     // Show typing animation
     setIsTyping(true);
@@ -81,6 +93,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         timestamp: new Date().toISOString()
       }]);
     }, 1500);
+  };
+
+  const handleSuggestedMessageClick = (text: string) => {
+    submitMessage(text);
   };
 
   const copyMessageToClipboard = (content: string) => {
@@ -134,6 +150,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "600ms"}}></div>
     </div>
   );
+
+  // Should we show suggested messages?
+  // Show if we have suggestions AND either user hasn't messaged yet OR showSuggestions is true
+  const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
 
   return (
     <div className="flex flex-col h-full max-w-[800px] mx-auto">
@@ -253,6 +273,25 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Suggested Messages */}
+      {shouldShowSuggestions && suggestedMessages.length > 0 && (
+        <div className="p-4 border-t">
+          <div className="flex flex-wrap gap-2">
+            {suggestedMessages.map((suggestion, index) => (
+              <Button
+                key={index}
+                variant="outline"
+                size="sm"
+                className="rounded-full text-sm"
+                onClick={() => handleSuggestedMessageClick(suggestion)}
+              >
+                {suggestion}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Chat Input */}
       <form onSubmit={handleSubmit} className="border-t p-4">
