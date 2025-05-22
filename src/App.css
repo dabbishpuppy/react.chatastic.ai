@@ -80,3 +80,14 @@ body.embedded-chat {
 .scroll-container::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* Additional styles to prevent iframe scrolling */
+iframe {
+  overflow: hidden;
+}
+
+body.iframe-embedded {
+  touch-action: none;
+  -webkit-overflow-scrolling: auto;
+  overscroll-behavior: none;
+}

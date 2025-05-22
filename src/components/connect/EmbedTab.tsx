@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,13 +56,12 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   })();
 </script>`;
     } else {
-      // Iframe embedding with the correct agent path that exists
+      // Iframe embedding with the correct agent path that exists - removed microphone permission
       return `<iframe
   src="https://query-spark-start.lovable.app/embed/${agentId}"
   width="100%" 
   height="600px"
   frameborder="0"
-  allow="microphone"
 ></iframe>`;
     }
   };

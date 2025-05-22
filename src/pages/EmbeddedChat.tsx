@@ -12,6 +12,7 @@ const EmbeddedChat: React.FC = () => {
   // Add effect to prevent parent page scrolling when interacting with the iframe
   useEffect(() => {
     const preventParentScrolling = (e: Event) => {
+      e.preventDefault();
       e.stopPropagation();
     };
 
