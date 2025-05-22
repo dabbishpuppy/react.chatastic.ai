@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
@@ -29,12 +29,27 @@ const AgentSettingsPage: React.FC = () => {
     return "general";
   };
 
-  // Prevent automatic scrolling when navigating to settings pages
-  // Use a more aggressive approach to ensure scroll position is always at the top
-  useEffect(() => {
+  // Use both useLayoutEffect (runs before DOM painting) and useEffect for redundancy
+  useLayoutEffect(() => {
+    // Disable browser's automatic scroll restoration
+    if (window.history && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    
+    // Force scroll to top immediately before paint
+    window.scrollTo(0, 0);
+    
     // Add settings-page class to html element
     document.documentElement.classList.add('settings-page');
     
+    return () => {
+      document.documentElement.classList.remove('settings-page');
+    };
+  }, [location.pathname]);
+  
+  // Prevent automatic scrolling when navigating to settings pages
+  // Use a more aggressive approach to ensure scroll position is always at the top
+  useEffect(() => {
     // Force scroll to top
     window.scrollTo(0, 0);
     
@@ -46,10 +61,16 @@ const AgentSettingsPage: React.FC = () => {
     // Add a small delay to counter any browser-specific scroll restoration
     const timer = setTimeout(() => {
       window.scrollTo(0, 0);
+      
+      // Add an additional timer for extra safety
+      const secondTimer = setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 100);
+      
+      return () => clearTimeout(secondTimer);
     }, 50);
     
     return () => {
-      document.documentElement.classList.remove('settings-page');
       clearTimeout(timer);
     };
   }, [location.pathname]);

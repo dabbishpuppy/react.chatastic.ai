@@ -4,11 +4,19 @@ html.settings-page,
 html.settings-page body {
   scroll-behavior: auto !important;
   overflow-anchor: none !important;
+  scroll-margin-top: 0 !important;
+  scroll-margin-bottom: 0 !important;
+  scroll-padding-top: 0 !important;
+  scroll-padding-bottom: 0 !important;
 }
 
 .no-auto-scroll {
   scroll-behavior: auto !important;
   overflow-anchor: none !important;
+  scroll-margin-top: 0 !important;
+  scroll-margin-bottom: 0 !important;
+  scroll-padding-top: 0 !important;
+  scroll-padding-bottom: 0 !important;
 }
 
 .no-auto-scroll * {
@@ -16,4 +24,9 @@ html.settings-page body {
   scroll-margin-bottom: 0 !important;
   scroll-padding-top: 0 !important;
   scroll-padding-bottom: 0 !important;
+}
+
+/* Prevent automatic focus on inputs */
+.no-auto-focus {
+  outline: none !important;
 }

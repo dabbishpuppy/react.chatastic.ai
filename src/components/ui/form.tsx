@@ -107,17 +107,24 @@ const FormControl = React.forwardRef<
 >(({ ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
+  // Handle any autoFocus props and force them to false
+  const cleanedProps = { ...props };
+  if ('autoFocus' in cleanedProps) {
+    cleanedProps.autoFocus = false;
+  }
+
   return (
     <Slot
       ref={ref}
       id={formItemId}
+      className="no-auto-focus"
       aria-describedby={
         !error
           ? `${formDescriptionId}`
           : `${formDescriptionId} ${formMessageId}`
       }
       aria-invalid={!!error}
-      {...props}
+      {...cleanedProps}
     />
   )
 })

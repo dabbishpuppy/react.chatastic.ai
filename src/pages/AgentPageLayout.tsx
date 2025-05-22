@@ -30,14 +30,32 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // Modified effect to prevent auto-scrolling - removed scroll reset
+  // Prevent automatic scrolling when component mounts
   useEffect(() => {
-    // Keep tab state but don't manipulate scroll position
+    if (window.history && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    
+    // Force scroll to top
+    window.scrollTo(0, 0);
+    
+    // Remove focus from any element
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, []);
+
+  // Prevent scroll on tab change
+  useEffect(() => {
+    // Don't manipulate scroll position on tab change
   }, [activeTab]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
     setPageTitle(tabLabel);
+    
+    // Force scroll to top
+    window.scrollTo(0, 0);
     
     // Close mobile sidebar when navigation happens
     if (isMobile) {
@@ -91,8 +109,11 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
         {/* Main content with its own scroll */}
         <div 
           ref={contentRef} 
-          className="flex-1 overflow-auto"
-          style={{ scrollBehavior: 'auto' }}
+          className="flex-1 overflow-auto no-auto-scroll"
+          style={{ 
+            scrollBehavior: 'auto',
+            overflowAnchor: 'none',
+          }}
         >
           {children}
         </div>
