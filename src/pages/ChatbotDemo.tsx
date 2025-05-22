@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import { Input } from "@/components/ui/input";
@@ -12,6 +11,7 @@ import { useParams } from "react-router-dom";
 import { ChatInterfaceSettings, defaultChatSettings } from "@/types/chatInterface";
 import { getChatSettings } from "@/services/chatSettingsService";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useChatSettings } from "@/hooks/useChatSettings";
 
 const ChatbotDemo: React.FC = () => {
   const { agentId } = useParams();
@@ -32,6 +32,9 @@ const ChatbotDemo: React.FC = () => {
   const [chatIcon, setChatIcon] = useState<string | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Use the shared chat settings hook to ensure we have the latest settings
+  const { settings: latestSettings } = useChatSettings();
   
   // Load settings from Supabase if agent ID is available
   useEffect(() => {
@@ -65,6 +68,25 @@ const ChatbotDemo: React.FC = () => {
     
     loadSettings();
   }, [agentId]);
+
+  // Update settings when latestSettings changes
+  useEffect(() => {
+    if (latestSettings && !isLoading) {
+      setTheme(latestSettings.theme);
+      setBotName(latestSettings.display_name);
+      setInitialMessage(latestSettings.initial_message);
+      setSuggestedMessages(latestSettings.suggested_messages.map(msg => msg.text));
+      setShowSuggestions(latestSettings.show_suggestions_after_chat);
+      setMessagePlaceholder(latestSettings.message_placeholder);
+      setShowFeedback(latestSettings.show_feedback);
+      setAllowRegenerate(latestSettings.allow_regenerate);
+      setBubblePosition(latestSettings.bubble_position);
+      setAutoShowDelay(latestSettings.auto_show_delay);
+      setFooter(latestSettings.footer);
+      setChatIcon(latestSettings.chat_icon);
+      setProfilePicture(latestSettings.profile_picture);
+    }
+  }, [latestSettings]);
 
   if (isLoading) {
     return (

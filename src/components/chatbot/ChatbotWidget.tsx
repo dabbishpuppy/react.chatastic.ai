@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -543,20 +542,24 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         </div>
       )}
       
-      {/* Floating button */}
+      {/* Floating button - updated styling to match the screenshot */}
       <Button
         onClick={toggleChat}
         className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
         style={{ backgroundColor: primaryColor }}
       >
         {isOpen ? (
-          <ChevronDown size={24} />
+          <ChevronDown size={24} className="text-white" />
         ) : (
           <>
             {chatIcon ? (
-              <img src={chatIcon} alt="Chat" className="h-8 w-8 object-cover" />
+              <div className="h-full w-full flex items-center justify-center">
+                <span className="text-white">
+                  <MessageCircle size={24} />
+                </span>
+              </div>
             ) : (
-              <MessageCircle size={24} />
+              <MessageCircle size={24} className="text-white" />
             )}
           </>
         )}

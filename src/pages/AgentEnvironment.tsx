@@ -69,7 +69,7 @@ const AgentEnvironment: React.FC = () => {
                     }
                   ]}
                   footer={settings.footer || undefined}
-                  chatIcon={settings.chat_icon || undefined}
+                  // chatIcon prop removed as requested
                 />
               </div>
             )}
