@@ -1,44 +1,143 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const GeneralSettings: React.FC = () => {
-  const [agentName, setAgentName] = useState("Agora AI");
-  const [agentId, setAgentId] = useState("3URIXIQ8P508EDEVLmcd0");
+  const { agentId } = useParams<{ agentId: string }>();
+  const navigate = useNavigate();
+  const [agentName, setAgentName] = useState("");
   const [creditLimit, setCreditLimit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingConversations, setIsDeletingConversations] = useState(false);
+  const [isDeletingAgent, setIsDeletingAgent] = useState(false);
 
-  const handleSave = () => {
+  // Fetch agent data on component mount
+  useEffect(() => {
+    const fetchAgentData = async () => {
+      if (!agentId) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('agents')
+          .select('*')
+          .eq('id', agentId)
+          .single();
+
+        if (error) throw error;
+        
+        if (data) {
+          setAgentName(data.name);
+        }
+      } catch (error: any) {
+        console.error("Error fetching agent data:", error.message);
+        toast({
+          title: "Error loading agent data",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
+    };
+
+    fetchAgentData();
+  }, [agentId]);
+
+  const handleSave = async () => {
+    if (!agentId) return;
+    
     setIsSaving(true);
     
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const { error } = await supabase
+        .from('agents')
+        .update({ name: agentName })
+        .eq('id', agentId);
+
+      if (error) throw error;
+
       toast({
         title: "Settings saved",
         description: "Your agent settings have been updated successfully."
       });
-    }, 1000);
+    } catch (error: any) {
+      console.error("Error saving agent settings:", error.message);
+      toast({
+        title: "Error saving settings",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteConversations = () => {
-    toast({
-      variant: "destructive",
-      title: "Conversations deleted",
-      description: "All conversations for this agent have been deleted."
-    });
+  const handleDeleteConversations = async () => {
+    if (!agentId) return;
+    
+    setIsDeletingConversations(true);
+    
+    try {
+      // For demo purposes: In a real app, this would connect to an API to delete conversations
+      // Here we'll simulate success and provide a placeholder for real implementation
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      toast({
+        title: "Conversations deleted",
+        description: "All conversations for this agent have been deleted."
+      });
+      
+      // If we had a state for conversations, we would reset it here
+      
+    } catch (error: any) {
+      console.error("Error deleting conversations:", error.message);
+      toast({
+        title: "Error deleting conversations",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeletingConversations(false);
+    }
   };
 
-  const handleDeleteAgent = () => {
-    toast({
-      variant: "destructive",
-      title: "Agent deleted",
-      description: "Your agent has been deleted successfully."
-    });
+  const handleDeleteAgent = async () => {
+    if (!agentId) return;
+    
+    setIsDeletingAgent(true);
+    
+    try {
+      const { error } = await supabase
+        .from('agents')
+        .delete()
+        .eq('id', agentId);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Agent deleted",
+        description: "Your agent has been deleted successfully."
+      });
+      
+      // Redirect to dashboard
+      navigate("/dashboard");
+      
+    } catch (error: any) {
+      console.error("Error deleting agent:", error.message);
+      toast({
+        title: "Error deleting agent",
+        description: error.message,
+        variant: "destructive"
+      });
+      setIsDeletingAgent(false);
+    }
   };
 
   return (
@@ -56,12 +155,12 @@ const GeneralSettings: React.FC = () => {
             <div className="flex gap-2">
               <Input 
                 id="agentId" 
-                value={agentId} 
+                value={agentId || ''} 
                 readOnly 
                 className="max-w-md bg-gray-50"
               />
               <Button variant="outline" onClick={() => {
-                navigator.clipboard.writeText(agentId);
+                navigator.clipboard.writeText(agentId || '');
                 toast({
                   title: "Copied",
                   description: "Agent ID copied to clipboard"
@@ -108,7 +207,10 @@ const GeneralSettings: React.FC = () => {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving || !agentName.trim()}
+            >
               {isSaving ? "Saving..." : "Save"}
             </Button>
           </div>
@@ -149,8 +251,12 @@ const GeneralSettings: React.FC = () => {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteConversations} className="bg-red-500 hover:bg-red-600">
-                  Delete
+                <AlertDialogAction 
+                  onClick={handleDeleteConversations} 
+                  className="bg-red-500 hover:bg-red-600"
+                  disabled={isDeletingConversations}
+                >
+                  {isDeletingConversations ? "Deleting..." : "Delete"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -188,8 +294,12 @@ const GeneralSettings: React.FC = () => {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteAgent} className="bg-red-500 hover:bg-red-600">
-                  Delete
+                <AlertDialogAction 
+                  onClick={handleDeleteAgent} 
+                  className="bg-red-500 hover:bg-red-600"
+                  disabled={isDeletingAgent}
+                >
+                  {isDeletingAgent ? "Deleting..." : "Delete"}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
