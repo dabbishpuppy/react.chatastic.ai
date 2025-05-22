@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,9 @@ interface ChatSectionProps {
   chatIcon?: string;
   footer?: string | null;
   footerClassName?: string;
-  isEmbedded?: boolean; // New prop to identify if this is in an iframe
+  isEmbedded?: boolean;
+  userMessageColor?: string | null;
+  headerColor?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -40,20 +43,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   chatIcon,
   footer,
   footerClassName = "",
-  isEmbedded = false, // Default to false
+  isEmbedded = false,
+  userMessageColor = null,
+  headerColor = null,
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
     if (initialMessages.length) {
-      // Add a user message "Hello, World!" after the initial message
-      return [
-        ...initialMessages,
-        {
-          isAgent: false,
-          content: "Hello, World!",
-          timestamp: new Date(Date.now() + 1000).toISOString()
-        }
-      ];
+      return initialMessages;
     }
     
     return [
@@ -248,6 +245,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Should we show suggested messages?
   const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
 
+  // User message style with custom color
+  const userMessageStyle = userMessageColor ? {
+    backgroundColor: userMessageColor,
+    color: getContrastColor(userMessageColor)
+  } : {};
+
   // Determine container classes based on whether this is embedded or not
   const containerClasses = isEmbedded 
     ? `flex flex-col h-full w-full ${themeClasses.background} overflow-hidden`
@@ -256,7 +259,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   return (
     <div className={containerClasses} ref={chatContainerRef}>
       {/* Chat Header */}
-      <div className={`p-4 border-b flex items-center justify-between ${themeClasses.background}`}>
+      <div 
+        className={`p-4 border-b flex items-center justify-between ${themeClasses.background}`}
+        style={headerColor ? { backgroundColor: headerColor, color: getContrastColor(headerColor) } : {}}
+      >
         <div className="flex items-center gap-2">
           <Avatar className="h-10 w-10 border-0">
             {profilePicture ? (
@@ -267,11 +273,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               </AvatarFallback>
             )}
           </Avatar>
-          <span className={`font-medium ${themeClasses.text}`}>{agentName}</span>
+          <span className={headerColor ? "" : `font-medium ${themeClasses.text}`}>{agentName}</span>
         </div>
         <div className="flex items-center gap-2">
           {allowRegenerate && (
-            <Button variant="ghost" size="icon" className={`h-9 w-9 ${themeClasses.iconButton}`} onClick={regenerateResponse}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className={headerColor ? "text-inherit hover:bg-white/20" : `h-9 w-9 ${themeClasses.iconButton}`} 
+              onClick={regenerateResponse}
+            >
               <RefreshCw className="h-5 w-5" />
             </Button>
           )}
@@ -279,7 +290,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             <Button 
               variant="ghost" 
               size="icon" 
-              className={`h-9 w-9 ${themeClasses.iconButton}`}
+              className={headerColor ? "text-inherit hover:bg-white/20" : `h-9 w-9 ${themeClasses.iconButton}`}
               onClick={toggleSettings}
             >
               <Settings className="h-5 w-5" />
@@ -304,9 +315,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               </Avatar>
             )}
             <div className="flex flex-col max-w-[80%]">
-              <div className={`rounded-lg p-3 text-[0.875rem] ${
-                msg.isAgent ? themeClasses.agentBubble : themeClasses.userBubble
-              }`}>
+              <div 
+                className={`rounded-lg p-3 text-[0.875rem] ${
+                  msg.isAgent ? themeClasses.agentBubble : themeClasses.userBubble
+                }`}
+                style={msg.isAgent ? {} : userMessageStyle}
+              >
                 {msg.content}
               </div>
               
@@ -482,5 +496,29 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     </div>
   );
 };
+
+// Helper function to determine contrasting text color for a background
+function getContrastColor(hex: string): string {
+  // Convert hex to RGB
+  let r = 0, g = 0, b = 0;
+  
+  if (hex.length === 4) {
+    // #RGB format
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    // #RRGGBB format
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return white or black based on luminance
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
 
 export default ChatSection;

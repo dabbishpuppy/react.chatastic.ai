@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,6 +36,7 @@ interface ChatbotWidgetProps {
   footer?: string | null;
   chatIcon?: string | null;
   profilePicture?: string | null;
+  userMessageColor?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -59,6 +61,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   footer,
   chatIcon,
   profilePicture,
+  userMessageColor,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -279,6 +282,12 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   // Display the proper avatar based on availability
   const displayBotAvatar = profilePicture || botAvatar;
 
+  // User message style with custom color
+  const userMessageStyle = userMessageColor ? {
+    backgroundColor: userMessageColor,
+    color: getContrastColor(userMessageColor)
+  } : {};
+
   return (
     <div className={`fixed bottom-0 ${positionClasses.container} z-50 flex flex-col`}>
       {/* Initial message popups - only show when chat is closed */}
@@ -363,6 +372,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                         ? themeClasses.botBubble
                         : themeClasses.userBubble
                     }`}
+                    style={msg.sender === "bot" ? {} : userMessageStyle}
                   >
                     {msg.content}
                   </div>
@@ -569,5 +579,29 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     </div>
   );
 };
+
+// Helper function to determine contrasting text color for a background
+function getContrastColor(hex: string): string {
+  // Convert hex to RGB
+  let r = 0, g = 0, b = 0;
+  
+  if (hex.length === 4) {
+    // #RGB format
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    // #RRGGBB format
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return white or black based on luminance
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
 
 export default ChatbotWidget;

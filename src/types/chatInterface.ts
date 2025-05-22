@@ -20,6 +20,8 @@ export interface ChatInterfaceSettings {
   show_suggestions_after_chat: boolean;
   auto_show_delay: number;
   footer?: string | null;
+  user_message_color?: string | null;
+  bubble_color?: string | null;
 }
 
 export interface ChatMessage {
@@ -40,4 +42,6 @@ export const defaultChatSettings: ChatInterfaceSettings = {
   bubble_position: 'right',
   show_suggestions_after_chat: true,
   auto_show_delay: 1,
+  user_message_color: '#3B82F6',
+  bubble_color: '#3B82F6',
 }

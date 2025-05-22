@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import EditableSuggestedMessage from "./EditableSuggestedMessage";
 import ImageUpload from "./ImageUpload";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import ColorPicker from "./ColorPicker";
 
 const ChatInterfaceSettings: React.FC = () => {
   const {
@@ -25,6 +27,7 @@ const ChatInterfaceSettings: React.FC = () => {
   } = useChatSettings();
   
   const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
+  const [syncColorWithHeader, setSyncColorWithHeader] = React.useState(false);
   
   // Initial preview messages based on settings
   const [previewMessages, setPreviewMessages] = React.useState([
@@ -32,6 +35,11 @@ const ChatInterfaceSettings: React.FC = () => {
       isAgent: true,
       content: settings.initial_message,
       timestamp: new Date().toISOString()
+    },
+    {
+      isAgent: false,
+      content: "Hello, World!",
+      timestamp: new Date(Date.now() + 1000).toISOString()
     }
   ]);
 
@@ -42,9 +50,39 @@ const ChatInterfaceSettings: React.FC = () => {
         isAgent: true,
         content: settings.initial_message,
         timestamp: new Date().toISOString()
+      },
+      {
+        isAgent: false,
+        content: "Hello, World!",
+        timestamp: new Date(Date.now() + 1000).toISOString()
       }
     ]);
   }, [settings.initial_message]);
+
+  // Handle color sync with header
+  useEffect(() => {
+    if (syncColorWithHeader && settings.bubble_color) {
+      updateSetting("user_message_color", settings.bubble_color);
+    }
+  }, [syncColorWithHeader, settings.bubble_color]);
+  
+  // Handle bubble color change
+  const handleBubbleColorChange = (color: string) => {
+    updateSetting("bubble_color", color);
+    
+    if (syncColorWithHeader) {
+      updateSetting("user_message_color", color);
+    }
+  };
+  
+  // Handle syncing user message color with header
+  const handleSyncChange = (checked: boolean) => {
+    setSyncColorWithHeader(checked);
+    
+    if (checked && settings.bubble_color) {
+      updateSetting("user_message_color", settings.bubble_color);
+    }
+  };
   
   if (isLoading) {
     return (
@@ -203,6 +241,40 @@ const ChatInterfaceSettings: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">
+                  User message color
+                </label>
+                <ColorPicker
+                  color={settings.user_message_color || "#3B82F6"}
+                  onChange={(color) => updateSetting("user_message_color", color)}
+                  onReset={() => updateSetting("user_message_color", "#3B82F6")}
+                />
+                
+                <div className="flex items-center mt-2">
+                  <Switch
+                    id="syncColors"
+                    checked={syncColorWithHeader}
+                    onCheckedChange={handleSyncChange}
+                    className="mr-2"
+                  />
+                  <label htmlFor="syncColors" className="text-sm font-medium">
+                    Sync user message color with agent header
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">
+                  Chat bubble button color
+                </label>
+                <ColorPicker
+                  color={settings.bubble_color || "#3B82F6"}
+                  onChange={handleBubbleColorChange}
+                  onReset={() => updateSetting("bubble_color", "#3B82F6")}
+                />
+              </div>
               
               <div className="space-y-2">
                 <label htmlFor="displayName" className="block text-sm font-medium">
@@ -312,13 +384,18 @@ const ChatInterfaceSettings: React.FC = () => {
                 theme={settings.theme}
                 profilePicture={settings.profile_picture || undefined}
                 footer={settings.footer || undefined}
+                userMessageColor={settings.user_message_color}
+                headerColor={settings.bubble_color}
               />
             </div>
           </div>
           
-          {/* Chat icon preview - aligned to the right and without text */}
+          {/* Chat icon preview - aligned to the right */}
           <div className="mt-4 flex justify-end">
-            <div className="h-12 w-12 rounded-full bg-black shadow-lg flex items-center justify-center overflow-hidden">
+            <div 
+              className="h-12 w-12 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
+              style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
+            >
               {settings.chat_icon ? (
                 <img 
                   src={settings.chat_icon} 
