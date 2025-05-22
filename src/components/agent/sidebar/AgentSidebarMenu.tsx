@@ -18,7 +18,8 @@ import {
   ChevronUp,
   LayoutDashboard,
   MessageSquare,
-  UserRound
+  UserRound,
+  MessageCircle
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
 import SidebarSubmenuItem from "./SidebarSubmenuItem";
@@ -124,6 +125,8 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
         { id: "custom-domains", label: "Domains", path: "settings/custom-domains", icon: <Globe size={14} /> }
       ]
     },
+    // Add Chatbot Demo link
+    { id: "chatbot-demo", label: "Chatbot Demo", icon: <MessageCircle size={18} /> },
   ];
 
   const handleClick = (tabId: string, tabLabel: string, hasSubmenu?: boolean, e?: React.MouseEvent) => {
@@ -141,6 +144,12 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     // Then handle navigation with replace: true to avoid page jumps
     if (tabId === "dashboard") {
       navigate(`/dashboard`, { replace: true });
+      return;
+    }
+    
+    // Handle the Chatbot Demo navigation
+    if (tabId === "chatbot-demo") {
+      navigate(`/chatbot`, { replace: true });
       return;
     }
     
@@ -247,4 +256,3 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
 };
 
 export default AgentSidebarMenu;
-
