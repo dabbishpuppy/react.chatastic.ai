@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,13 +57,42 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   })();
 </script>`;
     } else {
-      // Iframe embedding with the correct agent path that exists - removed microphone permission
-      return `<iframe
-  src="https://query-spark-start.lovable.app/embed/${agentId}"
-  width="100%" 
-  height="600px"
-  frameborder="0"
-></iframe>`;
+      // Iframe embedding with auto-resizing capability
+      return `<!-- Iframe with auto-height adjustment -->
+<div id="wonderwave-chat-container" style="width: 100%; overflow: hidden;">
+  <iframe
+    id="wonderwave-chat-iframe"
+    src="https://query-spark-start.lovable.app/embed/${agentId}"
+    width="100%" 
+    height="600px"
+    frameborder="0"
+    scrolling="no"
+    style="transition: height 0.2s ease-in-out;"
+  ></iframe>
+</div>
+
+<script>
+  // Listen for height changes from the iframe
+  window.addEventListener('message', function(event) {
+    // Verify the message is from our iframe
+    if (event.data && event.data.type === 'resize-iframe') {
+      // Only resize if the message is for our specific agent
+      if (event.data.agentId === '${agentId}') {
+        const iframe = document.getElementById('wonderwave-chat-iframe');
+        if (iframe) {
+          // Add a small buffer to prevent scrollbars (optional)
+          iframe.style.height = (event.data.height + 10) + 'px';
+          
+          // Also update the container if needed
+          const container = document.getElementById('wonderwave-chat-container');
+          if (container) {
+            container.style.height = (event.data.height + 10) + 'px';
+          }
+        }
+      }
+    }
+  });
+</script>`;
     }
   };
   
@@ -108,7 +138,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                       Add the agent anywhere on your website as an embedded chat window. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
                     <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
-                      <strong>Note:</strong> You can adjust the width and height parameters to fit your website layout.
+                      <strong>Note:</strong> The iframe will automatically resize its height based on content, preventing scrolling issues.
                     </div>
                   </div>
                 </div>

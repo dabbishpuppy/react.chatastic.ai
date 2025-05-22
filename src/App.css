@@ -91,3 +91,16 @@ body.iframe-embedded {
   -webkit-overflow-scrolling: auto;
   overscroll-behavior: none;
 }
+
+/* Styles for enhanced iframe resize behavior */
+.auto-resize-iframe {
+  width: 100%;
+  border: none;
+  transition: height 0.2s ease-in-out;
+}
+
+.iframe-container {
+  width: 100%;
+  overflow: hidden;
+  transition: height 0.2s ease-in-out;
+}

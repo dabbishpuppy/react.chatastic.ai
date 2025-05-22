@@ -79,6 +79,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     // Use a smoother scroll for embedded content to prevent parent page scrolling
     if (isEmbedded && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      
+      // Notify parent window about new content height
+      if (window.self !== window.top) {
+        window.parent.postMessage({ 
+          type: 'message-sent'
+        }, '*');
+      }
     } else {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
@@ -152,6 +159,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         content: "I'm here to help you with any questions or tasks!",
         timestamp: new Date().toISOString()
       }]);
+      
+      // Trigger a resize message when receiving a response
+      if (isEmbedded && window.self !== window.top) {
+        setTimeout(() => {
+          window.parent.postMessage({ type: 'message-sent' }, '*');
+        }, 100);
+      }
     }, 1500);
   };
 

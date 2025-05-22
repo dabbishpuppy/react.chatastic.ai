@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ChatSection from "@/components/agent/ChatSection";
@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 const EmbeddedChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const { settings, isLoading } = useChatSettings();
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Add effect to prevent parent page scrolling when interacting with the iframe
   useEffect(() => {
@@ -62,6 +63,63 @@ const EmbeddedChat: React.FC = () => {
     };
   }, []);
 
+  // Set up ResizeObserver to watch for size changes and communicate with parent
+  useEffect(() => {
+    // Only run this in an iframe context
+    if (window.self === window.top) return;
+    
+    const sendHeightToParent = () => {
+      if (containerRef.current) {
+        const height = containerRef.current.scrollHeight;
+        // Send message to parent with new height
+        window.parent.postMessage({ 
+          type: 'resize-iframe', 
+          height: height,
+          agentId: agentId 
+        }, '*');
+      }
+    };
+    
+    // Create a ResizeObserver to detect content changes
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver((entries) => {
+        sendHeightToParent();
+      });
+      
+      if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
+      }
+      
+      // Also observe the body element for any changes
+      resizeObserver.observe(document.body);
+      
+      return () => {
+        if (containerRef.current) {
+          resizeObserver.unobserve(containerRef.current);
+        }
+        resizeObserver.unobserve(document.body);
+        resizeObserver.disconnect();
+      };
+    }
+    
+    // Fallback for browsers without ResizeObserver
+    const interval = setInterval(sendHeightToParent, 500);
+    
+    // Send initial height after render
+    setTimeout(sendHeightToParent, 100);
+    
+    // Send height on chat updates
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'message-sent') {
+        setTimeout(sendHeightToParent, 100);
+      }
+    });
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [agentId]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center w-full h-screen bg-white">
@@ -72,7 +130,7 @@ const EmbeddedChat: React.FC = () => {
 
   // Use the chat settings from the agent but don't pass the chat icon
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden">
+    <div className="w-full h-screen flex flex-col overflow-hidden" ref={containerRef}>
       <ScrollArea className="w-full h-full overflow-hidden">
         <ChatSection 
           initialMessages={[{
