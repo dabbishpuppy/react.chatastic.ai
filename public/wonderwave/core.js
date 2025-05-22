@@ -1,3 +1,4 @@
+
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate } from './settings.js';
 import { createBubbleButton, showPopups, setBubbleButton } from './ui.js';
@@ -124,6 +125,7 @@ export async function init(customConfig = {}) {
       // Apply chat icon from backend settings
       if (settings.chat_icon) {
         config.chatIcon = settings.chat_icon;
+        log('Setting chat icon from settings:', settings.chat_icon);
       }
     }
     

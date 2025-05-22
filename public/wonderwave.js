@@ -33,10 +33,17 @@
     // Set up wonderwave with the proxy pattern
     window.wonderwave = createWonderwaveProxy();
     
-    // Load the main module using dynamic import
+    // Load the main module using dynamic import, but first check if currentScript is available
     const script = document.createElement('script');
     script.type = 'module';
-    script.src = document.currentScript.src.replace('/wonderwave.js', '/wonderwave/index.js');
+    
+    // Get the source path safely, handling cases where currentScript might be null
+    const sourcePath = document.currentScript ? 
+      document.currentScript.src.replace('/wonderwave.js', '/wonderwave/index.js') : 
+      // Fallback to a default path if currentScript is null
+      'https://query-spark-start.lovable.app/wonderwave/index.js';
+      
+    script.src = sourcePath;
     document.head.appendChild(script);
   }
   
