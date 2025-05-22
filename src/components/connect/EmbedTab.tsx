@@ -30,11 +30,33 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
-      return embedCode;
+      // Chat bubble embed code using wonderwave instead of chatbase
+      return `<script>
+  (function(){
+    if(!window.wonderwaveConfig) {
+      window.wonderwaveConfig = {
+        agentId: "${agentId}",
+      };
+    }
+    
+    if(!window.wonderwave || window.wonderwave("getState") == "initialized"){
+      window.wonderwave = (...arguments) => {
+        if(!window.wonderwave.q) { window.wonderwave.q = []; }
+        window.wonderwave.q.push(arguments);
+      };
+      window.wonderwave.d = {};
+      
+      const script = document.createElement("script");
+      script.src = "https://wonderwave-embed.vercel.app/wonderwave.js";
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  })();
+</script>`;
     } else {
-      // For iframe embedding
+      // Iframe embedding with a working URL
       return `<iframe
-  src="https://example.com/embed/${agentId}"
+  src="https://wonderwave-embed.vercel.app/embed/${agentId}"
   width="100%"
   height="600px"
   frameborder="0"
