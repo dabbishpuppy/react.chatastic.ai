@@ -1,4 +1,3 @@
-
 import React, { useState, ReactNode, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
@@ -30,22 +29,15 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // Prevent auto-scrolling when component mounts
+  // Modified effect to prevent auto-scrolling - removed scroll reset
   useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-  }, [activeTab]); // Reset scroll position when tab changes
+    // Keep tab state but don't manipulate scroll position
+  }, [activeTab]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
     setPageTitle(tabLabel);
     
-    // Ensure scroll position is reset to top when tab changes
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-
     // Close mobile sidebar when navigation happens
     if (isMobile) {
       setMobileSidebarOpen(false);
