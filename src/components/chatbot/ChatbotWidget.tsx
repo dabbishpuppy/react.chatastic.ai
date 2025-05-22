@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,6 +37,7 @@ interface ChatbotWidgetProps {
   profilePicture?: string | null;
   userMessageColor?: string | null;
   bubbleColor?: string | null;
+  hideUserAvatar?: boolean; // Added prop to hide user avatar
 }
 
 // Emoji list for the emoji picker
@@ -64,6 +64,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   profilePicture,
   userMessageColor,
   bubbleColor,
+  hideUserAvatar = false, // Default value for hideUserAvatar
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
