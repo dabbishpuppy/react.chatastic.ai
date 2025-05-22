@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -8,7 +7,7 @@ import { Menu } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
   id: string;
@@ -144,7 +143,10 @@ const Dashboard = () => {
 
   const handleTeamCreated = async (newTeam) => {
     try {
-      // Insert the new team
+      console.log("Creating team:", newTeam);
+      console.log("Current auth status:", !!supabase.auth.getSession());
+      
+      // Insert the new team - user_id will be handled by RLS policy
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .insert({
@@ -153,7 +155,12 @@ const Dashboard = () => {
         .select()
         .single();
 
-      if (teamError) throw teamError;
+      if (teamError) {
+        console.error('Team creation error details:', teamError);
+        throw teamError;
+      }
+
+      console.log("Team created:", teamData);
 
       // Add the current user as an owner of the team
       const { error: memberError } = await supabase
@@ -164,7 +171,10 @@ const Dashboard = () => {
           role: 'owner'
         });
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Team member creation error:', memberError);
+        throw memberError;
+      }
 
       // Format the new team for the UI
       const formattedTeam: Team = {
