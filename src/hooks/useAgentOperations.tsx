@@ -11,7 +11,7 @@ export const useAgentOperations = (
 ) => {
   const { toast } = useToast();
 
-  const handleAgentCreated = async (newAgent: Omit<Agent, 'id'>) => {
+  const handleAgentCreated = async (newAgent: Omit<Agent, "id">) => {
     if (!selectedTeam) {
       toast({
         title: "Error creating agent",
@@ -29,7 +29,7 @@ export const useAgentOperations = (
           team_id: selectedTeam.id,
           color: newAgent.color,
           image: newAgent.image || '/placeholder.svg',
-          status: 'active'
+          status: newAgent.status || 'active'
         })
         .select()
         .single();

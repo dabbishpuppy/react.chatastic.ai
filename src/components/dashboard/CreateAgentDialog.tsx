@@ -21,6 +21,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Agent } from "@/types/dashboard";
 
 // Define the form schema
 const formSchema = z.object({
@@ -54,12 +55,7 @@ interface CreateAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teams: Team[];
-  onAgentCreated: (agent: {
-    name: string;
-    image?: string;
-    color: string;
-    status?: string;
-  }) => void;
+  onAgentCreated: (agent: Omit<Agent, "id">) => void;
 }
 
 const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
@@ -88,11 +84,12 @@ const CreateAgentDialog: React.FC<CreateAgentDialogProps> = ({
     const autoAssignedColor = agentColorPalette[colorIndex];
     
     // Create a new agent with the form values
-    const newAgent = {
+    const newAgent: Omit<Agent, "id"> = {
       name: values.name,
       image: "/placeholder.svg",
       color: autoAssignedColor,
-      status: "active"
+      status: "active",
+      team_id: selectedTeam.id
     };
 
     onAgentCreated(newAgent);

@@ -4,7 +4,7 @@ export interface Agent {
   name: string;
   image: string;
   color: string;
-  status: string;
+  status?: string;
   team_id: string;
 }
 

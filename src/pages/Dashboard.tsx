@@ -11,6 +11,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useTeamsData } from "@/hooks/useTeamsData";
 import { useTeamOperations } from "@/hooks/useTeamOperations";
 import { useAgentOperations } from "@/hooks/useAgentOperations";
+import { Agent } from "@/types/dashboard";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("agents");
