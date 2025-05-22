@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -50,6 +50,9 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
   team,
   onTeamEdited,
 }) => {
+  const [isNameChanged, setIsNameChanged] = useState(false);
+  const [originalName, setOriginalName] = useState("");
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -57,11 +60,20 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
     },
   });
 
-  React.useEffect(() => {
+  const watchedName = form.watch("name");
+
+  useEffect(() => {
     if (open) {
+      setOriginalName(team.name);
       form.reset({ name: team.name });
+      setIsNameChanged(false);
     }
   }, [open, team.name, form]);
+
+  useEffect(() => {
+    // Check if the current name differs from the original name
+    setIsNameChanged(watchedName !== originalName);
+  }, [watchedName, originalName]);
 
   const onSubmit = (values: FormValues) => {
     // Update the team with the new values
@@ -108,7 +120,9 @@ const EditTeamDialog: React.FC<EditTeamDialogProps> = ({
               >
                 Cancel
               </Button>
-              <Button type="submit">Save Changes</Button>
+              <Button type="submit" disabled={!isNameChanged}>
+                Save Changes
+              </Button>
             </DialogFooter>
           </form>
         </Form>
