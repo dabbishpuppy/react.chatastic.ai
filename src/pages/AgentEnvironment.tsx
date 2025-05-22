@@ -5,9 +5,11 @@ import ChatSection from "@/components/agent/ChatSection";
 import LLMSettingsPanel from "@/components/agent/LLMSettingsPanel";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
+import { useChatSettings } from "@/hooks/useChatSettings";
 
 const AgentEnvironment: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
+  const { settings, isLoading } = useChatSettings();
 
   const toggleSettings = () => {
     setShowSettings(!showSettings);
@@ -43,9 +45,34 @@ const AgentEnvironment: React.FC = () => {
         >
           {/* White chat container on top of dotted background with max-width and padding top/bottom */}
           <div className="max-w-[30rem] w-full h-full py-8">
-            <div className="w-full h-full rounded-lg overflow-hidden bg-white shadow-sm border border-gray-100">
-              <ChatSection toggleSettings={toggleSettings} />
-            </div>
+            {isLoading ? (
+              <div className="w-full h-full flex justify-center items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+              </div>
+            ) : (
+              <div className="w-full h-full rounded-lg overflow-hidden bg-white shadow-sm border border-gray-100">
+                <ChatSection 
+                  toggleSettings={toggleSettings} 
+                  agentName={settings.display_name}
+                  placeholder={settings.message_placeholder}
+                  suggestedMessages={settings.suggested_messages.map(msg => msg.text)}
+                  showSuggestions={settings.show_suggestions_after_chat}
+                  showFeedback={settings.show_feedback}
+                  allowRegenerate={settings.allow_regenerate}
+                  theme={settings.theme}
+                  profilePicture={settings.profile_picture || undefined}
+                  initialMessages={[
+                    {
+                      isAgent: true,
+                      content: settings.initial_message,
+                      timestamp: new Date().toISOString()
+                    }
+                  ]}
+                  footer={settings.footer || undefined}
+                  chatIcon={settings.chat_icon || undefined}
+                />
+              </div>
+            )}
           </div>
         </div>
         
