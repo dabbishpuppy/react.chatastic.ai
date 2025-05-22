@@ -44,26 +44,14 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
-      // Create an array of config options that will be joined properly with commas
-      const configOptions = [
-        `agentId: "${agentId}"`, 
-        `position: "${settings.bubble_position || 'right'}"`,
-      ];
-      
-      // Include chat icon in config if available
-      if (settings.chat_icon) {
-        configOptions.push(`chatIcon: "${settings.chat_icon}"`);
-      }
-      
-      // Add debug option
-      configOptions.push(`debug: false // Set to true to enable debug logging`);
-      
-      // Improved script with more robust initialization and error handling
+      // Only include agent ID in the configuration
+      // Position and chat icon will be loaded dynamically from backend settings
       return `<script>
 (function(){
   // Define the config first - this is crucial
   window.wonderwaveConfig = {
-    ${configOptions.join(',\n    ')}
+    agentId: "${agentId}",
+    debug: false // Set to true to enable debug logging
   };
   
   // Create a proxy handler for the wonderwave function
