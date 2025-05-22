@@ -120,6 +120,19 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                       <strong>Important:</strong> The position setting (right or left) in the code must match your chat interface settings.
                     </div>
 
+                    <div className="text-sm bg-blue-50 p-3 rounded-md border border-blue-200 mb-4">
+                      <p className="font-medium text-blue-700">Server Configuration</p>
+                      <p className="text-blue-600 mt-1">
+                        Ensure your server hosting <code>wonderwave.js</code> includes these HTTP headers:
+                      </p>
+                      <pre className="mt-2 p-2 bg-blue-100 rounded text-xs overflow-x-auto">
+                        <code>
+Content-Type: application/javascript
+Access-Control-Allow-Origin: *
+                        </code>
+                      </pre>
+                    </div>
+
                     <div className="mt-4">
                       <Button 
                         variant="outline" 
