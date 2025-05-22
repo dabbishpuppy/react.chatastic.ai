@@ -158,6 +158,15 @@
           }
           // Don't set headerColor so it defaults to white/default
         }
+        
+        // Apply profile picture and chat icon if available
+        if (settings.profile_picture) {
+          config.profilePicture = settings.profile_picture;
+        }
+        
+        if (settings.chat_icon) {
+          config.chatIcon = settings.chat_icon;
+        }
       }
       
       // Create the bubble button

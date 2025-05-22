@@ -5,18 +5,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
 
-interface EmbedTabProps {
-  embedCode?: string;
-  agentId?: string;
-}
-
-export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) => {
+export const EmbedTab: React.FC = () => {
   const [copyText, setCopyText] = useState("Copy");
   const [embedType, setEmbedType] = useState<"bubble" | "iframe">("bubble");
   const [showIdentityVerification, setShowIdentityVerification] = useState(false);
   const { settings } = useChatSettings();
+  const { agentId } = settings;
   
   const handleCopy = () => {
     const embedCode = getEmbedCode();
@@ -49,11 +44,6 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         `agentId: "${agentId}"`, 
         `position: "${settings.bubble_position || 'right'}"`,
       ];
-      
-      // Include chat icon in config if available
-      if (settings.chat_icon) {
-        configOptions.push(`chatIcon: "${settings.chat_icon}"`);
-      }
       
       // Add debug option
       configOptions.push(`debug: false // Set to true to enable debug logging`);
@@ -157,7 +147,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     </p>
                     
                     <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
-                      <strong>Dynamic Color Settings:</strong> Changes to colors in your chat interface settings will automatically apply to all embedded widgets without needing to update the embed code.
+                      <strong>Automatic Updates:</strong> Changes to colors, chat icon, profile picture, and other settings in your chat interface will automatically apply to all embedded widgets without needing to update the embed code.
                     </div>
 
                     <div className="mt-4">
@@ -233,7 +223,7 @@ const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
                       Add the agent anywhere on your website as an embedded chat window. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
                     <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
-                      <strong>Dynamic Color Settings:</strong> Changes to colors in your chat interface settings will automatically apply to all embedded iframes without needing to update the embed code.
+                      <strong>Automatic Updates:</strong> Changes to colors, profile picture, and other settings in your chat interface will automatically apply to all embedded iframes without needing to update the embed code.
                     </div>
                     <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
                       <strong>Note:</strong> The iframe will automatically resize its height based on content.
