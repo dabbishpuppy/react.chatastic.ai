@@ -34,6 +34,7 @@ interface ChatbotWidgetProps {
   messagePlaceholder?: string;
   footer?: string | null;
   chatIcon?: string | null;
+  profilePicture?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -57,6 +58,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   messagePlaceholder = "Message...",
   footer,
   chatIcon,
+  profilePicture,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");

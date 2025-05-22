@@ -24,6 +24,22 @@ const parseSuggestedMessages = (data: any): SuggestedMessage[] => {
   }
 };
 
+// Helper function to ensure theme is one of the allowed values
+const validateTheme = (theme: string): 'light' | 'dark' | 'system' => {
+  if (theme === 'light' || theme === 'dark' || theme === 'system') {
+    return theme;
+  }
+  return 'light'; // Default to light if invalid
+};
+
+// Helper function to ensure bubble position is one of the allowed values
+const validateBubblePosition = (position: string): 'left' | 'right' => {
+  if (position === 'left' || position === 'right') {
+    return position;
+  }
+  return 'right'; // Default to right if invalid
+};
+
 export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise<ChatInterfaceSettings | null> => {
   try {
     if (settings.id) {
@@ -58,7 +74,9 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       // Transform to expected type
       const result: ChatInterfaceSettings = {
         ...data,
-        suggested_messages: parseSuggestedMessages(data)
+        suggested_messages: parseSuggestedMessages(data),
+        theme: validateTheme(data.theme),
+        bubble_position: validateBubblePosition(data.bubble_position)
       };
       
       return result;
@@ -93,7 +111,9 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       // Transform to expected type
       const result: ChatInterfaceSettings = {
         ...data,
-        suggested_messages: parseSuggestedMessages(data)
+        suggested_messages: parseSuggestedMessages(data),
+        theme: validateTheme(data.theme),
+        bubble_position: validateBubblePosition(data.bubble_position)
       };
       
       return result;
@@ -120,10 +140,12 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
     // If no settings exist yet, return null
     if (!data) return null;
     
-    // Parse the suggested_messages JSON
+    // Parse the suggested_messages JSON and ensure theme is valid
     const parsedData: ChatInterfaceSettings = {
       ...data,
-      suggested_messages: parseSuggestedMessages(data)
+      suggested_messages: parseSuggestedMessages(data),
+      theme: validateTheme(data.theme),
+      bubble_position: validateBubblePosition(data.bubble_position)
     };
     
     return parsedData;
