@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,8 @@ interface ChatSectionProps {
   profilePicture?: string;
   chatIcon?: string;
   footer?: string | null;
-  footerClassName?: string; // Added footerClassName prop
+  footerClassName?: string;
+  isEmbedded?: boolean; // New prop to identify if this is in an iframe
 }
 
 // Emoji list for the emoji picker
@@ -38,7 +40,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   profilePicture,
   chatIcon,
   footer,
-  footerClassName = "", // Default to empty string
+  footerClassName = "",
+  isEmbedded = false, // Default to false
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
@@ -194,8 +197,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Should we show suggested messages?
   const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
 
+  // Determine container classes based on whether this is embedded or not
+  const containerClasses = isEmbedded 
+    ? `flex flex-col h-full w-full ${themeClasses.background}`
+    : `flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background}`;
+
   return (
-    <div className={`flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background}`}>
+    <div className={containerClasses}>
       {/* Chat Header */}
       <div className={`p-4 border-b flex items-center justify-between ${themeClasses.background}`}>
         <div className="flex items-center gap-2">
@@ -401,8 +409,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           </Button>
         </form>
         
-        {/* Chat Icon (New) */}
-        {chatIcon && (
+        {/* Chat Icon - Only show when not in embedded mode */}
+        {chatIcon && !isEmbedded && (
           <div className="flex justify-end mt-3">
             <Avatar className="h-10 w-10 border-0">
               <AvatarImage src={chatIcon} alt="Chat Icon" />

@@ -16,7 +16,7 @@ const EmbeddedChat: React.FC = () => {
     );
   }
 
-  // Use the chat settings from the agent
+  // Use the chat settings from the agent but don't pass the chat icon
   return (
     <div className="w-full h-screen flex flex-col">
       <ChatSection 
@@ -33,8 +33,9 @@ const EmbeddedChat: React.FC = () => {
         allowRegenerate={settings.allow_regenerate}
         theme={settings.theme}
         profilePicture={settings.profile_picture || undefined}
-        chatIcon={settings.chat_icon || undefined}
+        // Removed chatIcon prop
         footer={settings.footer || undefined}
+        isEmbedded={true} // Add a flag to indicate this is an embedded view
       />
     </div>
   );
