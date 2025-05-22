@@ -47,7 +47,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
       window.wonderwave.d = {};
       
       const script = document.createElement("script");
-      script.src = "https://wonderwave-embed.vercel.app/wonderwave.js";
+      script.src = "https://query-spark-start.lovable.app/wonderwave.js";
       script.async = true;
       document.head.appendChild(script);
     }
@@ -56,7 +56,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
     } else {
       // Iframe embedding with a working URL
       return `<iframe
-  src="https://wonderwave-embed.vercel.app/embed/${agentId}"
+  src="https://query-spark-start.lovable.app/embed/${agentId}"
   width="100%"
   height="600px"
   frameborder="0"

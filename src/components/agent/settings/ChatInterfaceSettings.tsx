@@ -279,7 +279,7 @@ const ChatInterfaceSettings: React.FC = () => {
                       }
                     }}
                   />
-                  <span>seconds (negative to disable)</span>
+                  <span className="text-sm text-gray-500">seconds (negative to disable)</span>
                 </div>
               </div>
               
@@ -312,6 +312,7 @@ const ChatInterfaceSettings: React.FC = () => {
                 theme={settings.theme}
                 profilePicture={settings.profile_picture || undefined}
                 footer={settings.footer || undefined}
+                footerClassName="bg-[#f5f5f5]" // Add background color to the footer
               />
             </div>
           </div>
