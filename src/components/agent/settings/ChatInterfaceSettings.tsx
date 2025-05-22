@@ -312,26 +312,22 @@ const ChatInterfaceSettings: React.FC = () => {
                 theme={settings.theme}
                 profilePicture={settings.profile_picture || undefined}
                 footer={settings.footer || undefined}
-                footerClassName="bg-[#f5f5f5]" // Add background color to the footer
               />
             </div>
           </div>
           
-          {/* Chat icon preview outside the chat window */}
-          <div className="mt-4 flex justify-center">
-            <div className="text-center">
-              <p className="mb-2 text-sm font-medium text-gray-500">Chat Icon Preview</p>
-              <div className="h-12 w-12 rounded-full bg-black shadow-lg flex items-center justify-center mx-auto overflow-hidden">
-                {settings.chat_icon ? (
-                  <img 
-                    src={settings.chat_icon} 
-                    alt="Chat Icon" 
-                    className="h-full w-full object-cover" 
-                  />
-                ) : (
-                  <span className="text-white text-xl">💬</span>
-                )}
-              </div>
+          {/* Chat icon preview - aligned to the right and without text */}
+          <div className="mt-4 flex justify-end">
+            <div className="h-12 w-12 rounded-full bg-black shadow-lg flex items-center justify-center overflow-hidden">
+              {settings.chat_icon ? (
+                <img 
+                  src={settings.chat_icon} 
+                  alt="Chat Icon" 
+                  className="h-full w-full object-cover" 
+                />
+              ) : (
+                <span className="text-white text-xl">💬</span>
+              )}
             </div>
           </div>
         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,13 +44,17 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
+      // Include chat icon in config if available
+      const chatIconConfig = settings.chat_icon ? 
+        `\n      chatIcon: "${settings.chat_icon}", // Custom chat icon` : '';
+        
       // Improved script with Proxy pattern
       return `<script>
 (function(){
   if(!window.wonderwaveConfig) {
     window.wonderwaveConfig = {
       agentId: "${agentId}",
-      position: "${settings.bubble_position || 'right'}" // Use the position from settings
+      position: "${settings.bubble_position || 'right'}"${chatIconConfig}
     };
   }
   

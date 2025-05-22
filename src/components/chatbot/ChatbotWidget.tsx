@@ -542,7 +542,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         </div>
       )}
       
-      {/* Floating button - updated styling to match the screenshot */}
+      {/* Floating button - styled to match wonderwave.js */}
       <Button
         onClick={toggleChat}
         className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
@@ -553,14 +553,15 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         ) : (
           <>
             {chatIcon ? (
-              <div className="h-full w-full flex items-center justify-center">
-                <span className="text-white">
-                  <MessageCircle size={24} />
-                </span>
-              </div>
-            ) : (
-              <MessageCircle size={24} className="text-white" />
-            )}
+              <div className="h-full w-full flex items-center justify-center overflow-hidden">
+                <img 
+                  src={chatIcon} 
+                  alt="Chat" 
+                  className="h-full w-full object-cover" 
+                />
+              ) : (
+                <MessageCircle size={24} className="text-white" />
+              )}
           </>
         )}
       </Button>

@@ -25,6 +25,20 @@ const IntegrationsPage: React.FC = () => {
     if (!searchParams.has("tab")) {
       navigate(`/agent/${agentId}/integrations?tab=embed`, { replace: true });
     }
+    
+    // Hide any existing chat widget on this page
+    const existingBubble = document.getElementById('wonderwave-bubble');
+    if (existingBubble) {
+      existingBubble.style.display = 'none';
+    }
+    
+    // Cleanup when leaving the page
+    return () => {
+      const bubble = document.getElementById('wonderwave-bubble');
+      if (bubble) {
+        bubble.style.display = 'flex';
+      }
+    };
   }, []);
 
   // Get the current tab title
@@ -109,7 +123,7 @@ const IntegrationsPage: React.FC = () => {
           )}
         </div>
         
-        {/* Preview the chatbot widget with current settings */}
+        {/* Preview the chatbot widget with current settings - only show on embed tab */}
         {settings && tab === "embed" && (
           <ChatbotWidget 
             productName="Your Website"
