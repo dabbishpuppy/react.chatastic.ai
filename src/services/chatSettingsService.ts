@@ -42,26 +42,34 @@ const validateBubblePosition = (position: string): 'left' | 'right' => {
 
 export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise<ChatInterfaceSettings | null> => {
   try {
+    // If no agent_id is provided, create/update settings without associating with an agent
+    const settingsData = {
+      initial_message: settings.initial_message,
+      suggested_messages: JSON.stringify(settings.suggested_messages),
+      message_placeholder: settings.message_placeholder,
+      show_feedback: settings.show_feedback,
+      allow_regenerate: settings.allow_regenerate,
+      theme: settings.theme,
+      display_name: settings.display_name,
+      profile_picture: settings.profile_picture,
+      chat_icon: settings.chat_icon,
+      bubble_position: settings.bubble_position,
+      show_suggestions_after_chat: settings.show_suggestions_after_chat,
+      auto_show_delay: settings.auto_show_delay,
+      footer: settings.footer,
+      updated_at: new Date().toISOString(),
+    };
+    
+    // Only include agent_id if it exists and is valid
+    if (settings.agent_id && settings.agent_id !== "undefined") {
+      Object.assign(settingsData, { agent_id: settings.agent_id });
+    }
+
     if (settings.id) {
       // Update existing settings
       const { data, error } = await supabase
         .from("chat_interface_settings")
-        .update({
-          initial_message: settings.initial_message,
-          suggested_messages: JSON.stringify(settings.suggested_messages),
-          message_placeholder: settings.message_placeholder,
-          show_feedback: settings.show_feedback,
-          allow_regenerate: settings.allow_regenerate,
-          theme: settings.theme,
-          display_name: settings.display_name,
-          profile_picture: settings.profile_picture,
-          chat_icon: settings.chat_icon,
-          bubble_position: settings.bubble_position,
-          show_suggestions_after_chat: settings.show_suggestions_after_chat,
-          auto_show_delay: settings.auto_show_delay,
-          footer: settings.footer,
-          updated_at: new Date().toISOString(),
-        })
+        .update(settingsData)
         .eq('id', settings.id)
         .select('*')
         .single();
@@ -84,22 +92,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       // Create new settings
       const { data, error } = await supabase
         .from("chat_interface_settings")
-        .insert({
-          agent_id: settings.agent_id,
-          initial_message: settings.initial_message,
-          suggested_messages: JSON.stringify(settings.suggested_messages),
-          message_placeholder: settings.message_placeholder,
-          show_feedback: settings.show_feedback,
-          allow_regenerate: settings.allow_regenerate,
-          theme: settings.theme,
-          display_name: settings.display_name,
-          profile_picture: settings.profile_picture,
-          chat_icon: settings.chat_icon,
-          bubble_position: settings.bubble_position,
-          show_suggestions_after_chat: settings.show_suggestions_after_chat,
-          auto_show_delay: settings.auto_show_delay,
-          footer: settings.footer,
-        })
+        .insert(settingsData)
         .select('*')
         .single();
 
@@ -126,6 +119,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
 
 export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSettings | null> => {
   try {
+    if (!agentId || agentId === "undefined") {
+      console.error('Invalid agent ID for fetching chat settings');
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from("chat_interface_settings")
       .select('*')
@@ -161,6 +159,11 @@ export const uploadChatAsset = async (
   type: 'profile' | 'icon'
 ): Promise<string | null> => {
   try {
+    if (!agentId || agentId === "undefined") {
+      console.error('Invalid agent ID for uploading chat asset');
+      return null;
+    }
+    
     const fileExt = file.name.split('.').pop();
     const fileName = `${type}_${Date.now()}${fileExt ? `.${fileExt}` : ''}`;
     const filePath = `${agentId}/${fileName}`;

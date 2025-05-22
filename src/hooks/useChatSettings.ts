@@ -12,26 +12,37 @@ export const useChatSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Check if agentId is valid (not undefined or the string "undefined")
+  const validAgentId = agentId && agentId !== "undefined" ? agentId : null;
+
   useEffect(() => {
     const loadSettings = async () => {
-      if (!agentId) return;
-      
       setIsLoading(true);
-      const data = await getChatSettings(agentId);
       
-      if (data) {
-        setSettings(data);
+      if (validAgentId) {
+        // Try to load settings if we have a valid agent ID
+        const data = await getChatSettings(validAgentId);
+        
+        if (data) {
+          setSettings(data);
+        } else {
+          setSettings({
+            ...defaultChatSettings,
+            agent_id: validAgentId
+          });
+        }
       } else {
+        // No valid agent ID, just use default settings with no agent_id
         setSettings({
-          ...defaultChatSettings,
-          agent_id: agentId
+          ...defaultChatSettings
         });
       }
+      
       setIsLoading(false);
     };
 
     loadSettings();
-  }, [agentId]);
+  }, [validAgentId]);
 
   const updateSetting = <K extends keyof ChatInterfaceSettings>(
     key: K, 
@@ -41,13 +52,12 @@ export const useChatSettings = () => {
   };
 
   const handleSave = async () => {
-    if (!agentId) return;
-    
     setIsSaving(true);
     try {
       const updatedSettings = await saveChatSettings({
         ...settings,
-        agent_id: agentId
+        // Only include agent_id if we have a valid one
+        ...(validAgentId && { agent_id: validAgentId })
       });
       
       if (updatedSettings) {
@@ -102,11 +112,18 @@ export const useChatSettings = () => {
   };
 
   const uploadImage = async (file: File, type: 'profile' | 'icon') => {
-    if (!agentId) return null;
+    if (!validAgentId) {
+      toast({
+        title: "Upload Failed",
+        description: "Cannot upload without a valid agent ID.",
+        variant: "destructive"
+      });
+      return null;
+    }
     
     setIsUploading(true);
     try {
-      const url = await uploadChatAsset(file, agentId, type);
+      const url = await uploadChatAsset(file, validAgentId, type);
       
       if (url) {
         if (type === 'profile') {
