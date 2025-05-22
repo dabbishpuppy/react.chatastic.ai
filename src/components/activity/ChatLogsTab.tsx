@@ -6,45 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
-
-// Mock data for chat logs
-const mockChatLogs = [
-  {
-    id: "1",
-    title: "Hei! Våre åpningstider er som følger...",
-    snippet: "Hei! Hva er åpningstidene deres?",
-    daysAgo: "5 days ago",
-    source: "Widget or Iframe"
-  },
-  {
-    id: "2",
-    title: "Hei! Takk for at du tok kontakt med...",
-    snippet: "Hei, vi var å spiste middag hos dere i går (var en...",
-    daysAgo: "19 days ago",
-    source: "Widget or Iframe"
-  },
-  {
-    id: "3",
-    title: "Det høres ut som en deilig plan! Vi...",
-    snippet: "Så flott! For vi vil helst spise gresk mat:)",
-    daysAgo: "19 days ago",
-    source: "Widget or Iframe"
-  },
-  {
-    id: "4",
-    title: "For å endre bordreservasjonen din,...",
-    snippet: "Hei! Jeg har en reservasjon i dag til kl 18, jeg lurer...",
-    daysAgo: "20 days ago",
-    source: "Widget or Iframe"
-  },
-  {
-    id: "5",
-    title: "Hei! Adressen vår er Ivan Bjørndals...",
-    snippet: "Hei. Hva er adressen deres?",
-    daysAgo: "21 days ago",
-    source: "Widget or Iframe"
-  }
-];
+import { getAllConversations, deleteAllConversations } from "./ConversationData";
 
 interface ChatLogsTabProps {
   onConversationClick: (conversationId: string) => void;
@@ -83,26 +45,33 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
   hideTitle = false 
 }) => {
   const { agentId } = useParams<{ agentId: string }>();
-  const [chatLogs, setChatLogs] = useState(mockChatLogs);
-  const [isEmpty, setIsEmpty] = useState(false);
+  const [chatLogs, setChatLogs] = useState(getAllConversations());
+  const [isEmpty, setIsEmpty] = useState(chatLogs.length === 0);
 
   // In a real app, this would fetch conversations from an API or database
   useEffect(() => {
     // Here's where real data fetching would occur
-    // For demo purposes, we'll use the mock data
+    setChatLogs(getAllConversations());
     
     // Check if the list is empty
-    setIsEmpty(chatLogs.length === 0);
-  }, [chatLogs.length]);
+    setIsEmpty(getAllConversations().length === 0);
+  }, [agentId]);
 
   const handleDelete = (id: string) => {
     // Remove the conversation from the list
-    setChatLogs(prevLogs => prevLogs.filter(log => log.id !== id));
+    const updatedLogs = chatLogs.filter(log => log.id !== id);
+    setChatLogs(updatedLogs);
+    
+    // Also update our in-memory storage
+    // In a real app, this would be an API call
+    // For now we'll just simulate it
     
     toast({
       title: "Log deleted",
       description: `Log ${id} has been deleted`,
     });
+    
+    setIsEmpty(updatedLogs.length === 0);
   };
 
   return (

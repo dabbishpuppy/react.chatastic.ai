@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
-import { Conversation, getConversationById } from "@/components/activity/ConversationData";
+import { Conversation, getConversationById, deleteAllConversations } from "@/components/activity/ConversationData";
 
 const ActivityPage: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);

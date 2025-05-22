@@ -11,7 +11,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface Agent {
@@ -65,11 +64,10 @@ const DeleteAgentDialog = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-2 py-4">
-          <Label htmlFor="confirmName">
+          <div className="text-sm font-medium">
             Type <span className="font-semibold">{agent.name}</span> to confirm
-          </Label>
+          </div>
           <Input
-            id="confirmName"
             value={confirmName}
             onChange={(e) => setConfirmName(e.target.value)}
             placeholder={`Type "${agent.name}" to confirm`}
@@ -78,7 +76,7 @@ const DeleteAgentDialog = ({
           />
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setConfirmName("")} disabled={isSubmitting}>
+          <AlertDialogCancel onClick={() => setConfirmName("")}>
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction

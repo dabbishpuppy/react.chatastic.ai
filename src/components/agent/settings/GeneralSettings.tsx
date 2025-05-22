@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "@/components/ui/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import DeleteAgentDialog from "@/components/dashboard/DeleteAgentDialog";
 
 const GeneralSettings: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -16,7 +17,8 @@ const GeneralSettings: React.FC = () => {
   const [creditLimit, setCreditLimit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeletingConversations, setIsDeletingConversations] = useState(false);
-  const [isDeletingAgent, setIsDeletingAgent] = useState(false);
+  const [deleteAgentDialogOpen, setDeleteAgentDialogOpen] = useState(false);
+  const [agent, setAgent] = useState<any>(null);
 
   // Fetch agent data on component mount
   useEffect(() => {
@@ -34,6 +36,7 @@ const GeneralSettings: React.FC = () => {
         
         if (data) {
           setAgentName(data.name);
+          setAgent(data);
         }
       } catch (error: any) {
         console.error("Error fetching agent data:", error.message);
@@ -108,16 +111,14 @@ const GeneralSettings: React.FC = () => {
     }
   };
 
-  const handleDeleteAgent = async () => {
-    if (!agentId) return;
-    
-    setIsDeletingAgent(true);
+  const handleAgentDeleted = async (deletedAgentId: string) => {
+    if (!deletedAgentId) return;
     
     try {
       const { error } = await supabase
         .from('agents')
         .delete()
-        .eq('id', agentId);
+        .eq('id', deletedAgentId);
 
       if (error) throw error;
       
@@ -136,7 +137,6 @@ const GeneralSettings: React.FC = () => {
         description: error.message,
         variant: "destructive"
       });
-      setIsDeletingAgent(false);
     }
   };
 
@@ -278,32 +278,22 @@ const GeneralSettings: React.FC = () => {
             <span className="font-semibold">This action is not reversible</span>
           </p>
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" className="ml-auto">
-                Delete agent
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete your agent
-                  and all data associated with it.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleDeleteAgent} 
-                  className="bg-red-500 hover:bg-red-600"
-                  disabled={isDeletingAgent}
-                >
-                  {isDeletingAgent ? "Deleting..." : "Delete"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button 
+            variant="destructive" 
+            className="ml-auto"
+            onClick={() => setDeleteAgentDialogOpen(true)}
+          >
+            Delete agent
+          </Button>
+
+          {agent && (
+            <DeleteAgentDialog 
+              open={deleteAgentDialogOpen}
+              onOpenChange={setDeleteAgentDialogOpen}
+              agent={agent}
+              onAgentDeleted={handleAgentDeleted}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
