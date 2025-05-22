@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,29 +45,14 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   const getEmbedCode = () => {
     if (embedType === "bubble") {
       // Create an array of config options that will be joined properly with commas
-      const configOptions = [`agentId: "${agentId}"`, `position: "${settings.bubble_position || 'right'}"`];
+      const configOptions = [
+        `agentId: "${agentId}"`, 
+        `position: "${settings.bubble_position || 'right'}"`,
+      ];
       
       // Include chat icon in config if available
       if (settings.chat_icon) {
         configOptions.push(`chatIcon: "${settings.chat_icon}"`);
-      }
-      
-      // Set user message color if available
-      if (settings.user_message_color) {
-        configOptions.push(`userMessageColor: "${settings.user_message_color}"`);
-      }
-      
-      // Apply colors based on sync setting
-      if (settings.sync_colors && settings.user_message_color) {
-        // When sync is enabled, use user message color for both bubble and header
-        configOptions.push(`bubbleColor: "${settings.user_message_color}"`);
-        configOptions.push(`headerColor: "${settings.user_message_color}"`);
-      } else {
-        // When sync is disabled, use primary color for bubble (if available) and don't set headerColor
-        // Not setting headerColor will default to white in the widget
-        if (settings.primary_color) {
-          configOptions.push(`bubbleColor: "${settings.primary_color}"`);
-        }
       }
       
       // Add debug option
@@ -132,28 +116,8 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
 })();
 </script>`;
     } else {
-      // Add color parameters to the iframe URL
+      // Add only agent ID to the iframe URL - colors will be loaded from the backend
       let iframeSrc = `https://query-spark-start.lovable.app/embed/${agentId}`;
-      const params = [];
-      
-      if (settings.theme) {
-        params.push(`theme=${encodeURIComponent(settings.theme)}`);
-      }
-      
-      // Always add userColor if it exists
-      if (settings.user_message_color) {
-        params.push(`userColor=${encodeURIComponent(settings.user_message_color)}`);
-      }
-      
-      // Only add headerColor when sync is enabled
-      if (settings.sync_colors && settings.user_message_color) {
-        params.push(`headerColor=${encodeURIComponent(settings.user_message_color)}`);
-      }
-      // When sync is disabled, don't add headerColor so it defaults to white/default
-      
-      if (params.length > 0) {
-        iframeSrc += `?${params.join('&')}`;
-      }
       
       // Simplified iframe embedding code
       return `<iframe
@@ -170,7 +134,10 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
       <Card>
         <CardHeader>
           <CardTitle>Embed your AI chatbot</CardTitle>
-          <CardDescription>Choose how to embed your agent on your website</CardDescription>
+          <CardDescription>
+            Choose how to embed your agent on your website.
+            Any color settings updated here will be automatically applied everywhere the widget is embedded.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <Tabs defaultValue="bubble" className="w-full" onValueChange={(value) => setEmbedType(value as "bubble" | "iframe")}>
@@ -188,6 +155,10 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     <p className="text-sm text-gray-500 mb-4">
                       Embed a chat bubble on your website that opens a chatbot when clicked. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
+                    
+                    <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
+                      <strong>Dynamic Color Settings:</strong> Changes to colors in your chat interface settings will automatically apply to all embedded widgets without needing to update the embed code.
+                    </div>
 
                     <div className="mt-4">
                       <Button 
@@ -261,6 +232,9 @@ const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
                     <p className="text-sm text-gray-500 mb-4">
                       Add the agent anywhere on your website as an embedded chat window. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
+                    <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md border border-green-200 mb-4">
+                      <strong>Dynamic Color Settings:</strong> Changes to colors in your chat interface settings will automatically apply to all embedded iframes without needing to update the embed code.
+                    </div>
                     <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
                       <strong>Note:</strong> The iframe will automatically resize its height based on content.
                     </div>

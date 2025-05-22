@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -15,7 +16,7 @@ const EmbeddedChat: React.FC = () => {
   const userColorParam = searchParams.get('userColor');
   const headerColorParam = searchParams.get('headerColor');
 
-  // Use URL parameters if provided, otherwise use settings
+  // Use URL parameters if provided, otherwise use settings from database
   const theme = themeParam || settings.theme;
   const userMessageColor = userColorParam || settings.user_message_color;
   

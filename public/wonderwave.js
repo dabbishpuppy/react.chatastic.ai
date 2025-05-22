@@ -1,6 +1,6 @@
 
 /**
- * WonderWave Chat Widget v1.1
+ * WonderWave Chat Widget v1.2
  * A lightweight embeddable chat widget for any website
  */
 (function() {
@@ -11,6 +11,7 @@
   let iframe = null;
   let bubbleButton = null;
   let debugMode = false;
+  let colorSettings = null;
   
   // Default configuration
   const defaultConfig = {
@@ -84,8 +85,32 @@
     }
   }
   
+  // Fetch color settings from the backend
+  async function fetchColorSettings(agentId) {
+    if (!agentId) {
+      log('No agentId provided for fetching color settings');
+      return null;
+    }
+    
+    try {
+      log(`Fetching color settings for agent ${agentId}`);
+      const response = await fetch(`https://query-spark-start.lovable.app/api/chat-settings/${agentId}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      log('Fetched color settings:', data);
+      return data;
+    } catch (error) {
+      logError('Error fetching color settings:', error);
+      return null;
+    }
+  }
+  
   // Initialize the chat widget
-  function init(customConfig = {}) {
+  async function init(customConfig = {}) {
     if (initialized) {
       log('Already initialized, skipping');
       return;
@@ -108,8 +133,33 @@
       logError('agentId is required in window.wonderwaveConfig');
       return;
     }
-    
+
     try {
+      // Fetch color settings from the backend
+      const settings = await fetchColorSettings(config.agentId);
+      colorSettings = settings;
+      
+      if (settings) {
+        log('Applying color settings from backend');
+        
+        // Apply color settings
+        if (settings.sync_colors && settings.user_message_color) {
+          // When sync is enabled, use user message color for both bubble and header
+          config.bubbleColor = settings.user_message_color;
+          config.headerColor = settings.user_message_color;
+          config.userMessageColor = settings.user_message_color;
+        } else {
+          // When sync is disabled
+          if (settings.bubble_color) {
+            config.bubbleColor = settings.bubble_color;
+          }
+          if (settings.user_message_color) {
+            config.userMessageColor = settings.user_message_color;
+          }
+          // Don't set headerColor so it defaults to white/default
+        }
+      }
+      
       // Create the bubble button
       createBubbleButton(config);
       
@@ -125,8 +175,8 @@
       }
 
       // Auto show popups if enabled
-      if (config.autoShowDelay && config.autoShowDelay > 0) {
-        setTimeout(() => showPopups(config), config.autoShowDelay * 1000);
+      if (settings && settings.auto_show_delay && settings.auto_show_delay > 0) {
+        setTimeout(() => showPopups(config), settings.auto_show_delay * 1000);
       }
       
       log('Initialization complete');
@@ -225,7 +275,7 @@
     }
     
     // Get initial messages to show
-    const initialMessage = config.initialMessage || '👋 Hi! How can I help you today?';
+    const initialMessage = colorSettings?.initial_message || config.initialMessage || '👋 Hi! How can I help you today?';
     const messages = initialMessage.split('\n').filter(Boolean);
     
     // Show the first message

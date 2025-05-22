@@ -35,7 +35,8 @@ export const ShareTab: React.FC = () => {
         <CardContent className="space-y-6">
           <h3 className="text-lg font-medium">Direct Link</h3>
           <p className="text-sm text-gray-500">
-            Share this link to let others chat with your agent directly
+            Share this link to let others chat with your agent directly. 
+            All your color settings will be automatically applied.
           </p>
           
           <div className="relative border rounded-md bg-gray-50 p-4">
