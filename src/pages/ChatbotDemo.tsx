@@ -4,13 +4,13 @@ import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 const ChatbotDemo: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState("#000000");
   const [botName, setBotName] = useState("Chatbase AI Agent");
   const [productName, setProductName] = useState("Chatbase");
+  const [showPopups, setShowPopups] = useState(true);
 
   return (
     <div className="min-h-screen p-8 bg-gray-50">
@@ -67,7 +67,11 @@ const ChatbotDemo: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label htmlFor="popups">Initial Message Popups</Label>
-                <Switch id="popups" defaultChecked />
+                <Switch 
+                  id="popups" 
+                  checked={showPopups}
+                  onCheckedChange={setShowPopups}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="feedback">Collect Feedback</Label>
@@ -100,7 +104,7 @@ const ChatbotDemo: React.FC = () => {
               Features:
             </p>
             <ul className="list-disc pl-6 mb-4 space-y-2">
-              <li><strong>Initial message popups</strong> - Engaging speech-bubble style messages</li>
+              <li><strong>Initial message popups</strong> - Engaging speech-bubble style messages that appear when chat is closed</li>
               <li>Full-height chat interface</li>
               <li>Loading animation while waiting for responses</li>
               <li>Like/Dislike buttons for feedback</li>
