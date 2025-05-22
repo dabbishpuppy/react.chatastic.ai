@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,7 +118,7 @@ const IntegrationsPage: React.FC = () => {
   const renderVisibilityWarning = () => {
     if (visibility === "private") {
       return (
-        <Alert variant="warning" className="mb-6">
+        <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Private Agent</AlertTitle>
           <AlertDescription>
