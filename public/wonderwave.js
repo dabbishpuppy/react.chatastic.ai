@@ -108,6 +108,45 @@
       return null;
     }
   }
+
+  // Refresh color settings and update UI accordingly
+  async function refreshSettings(agentId) {
+    if (!agentId) {
+      log('No agentId provided for refreshing settings');
+      return;
+    }
+
+    try {
+      const newSettings = await fetchColorSettings(agentId);
+      
+      if (newSettings) {
+        // Update our stored settings
+        colorSettings = newSettings;
+        log('Settings refreshed from backend:', newSettings);
+        
+        // Update the bubble button with new settings if it exists
+        if (bubbleButton) {
+          const config = { 
+            ...defaultConfig, 
+            ...(window.wonderwaveConfig || {}),
+            chatIcon: newSettings.chat_icon,
+            bubbleColor: newSettings.bubble_color,
+            position: newSettings.bubble_position
+          };
+          
+          // Update the button visuals (color/icon)
+          updateBubbleButton(false);
+          
+          // Update position if needed
+          bubbleButton.style.left = '';
+          bubbleButton.style.right = '';
+          bubbleButton.style[config.position] = '20px';
+        }
+      }
+    } catch (error) {
+      logError('Error refreshing settings:', error);
+    }
+  }
   
   // Initialize the chat widget
   async function init(customConfig = {}) {
@@ -196,6 +235,12 @@
       }
       
       log('Initialization complete');
+
+      // Add polling for settings changes every 30 seconds
+      setInterval(() => {
+        refreshSettings(config.agentId);
+      }, 30000); // 30 seconds
+      
     } catch (error) {
       logError('Error during initialization:', error);
     }
@@ -633,6 +678,15 @@
   
   // Add the command queue to the API
   window.wonderwave.q = window.wonderwave.q || [];
+
+  // Add a method to manually refresh settings
+  window.wonderwave.refreshSettings = function() {
+    if (window.wonderwaveConfig && window.wonderwaveConfig.agentId) {
+      refreshSettings(window.wonderwaveConfig.agentId);
+      return true;
+    }
+    return false;
+  };
   
   // Add event listener for when the DOM is fully loaded
   document.addEventListener('DOMContentLoaded', function() {
