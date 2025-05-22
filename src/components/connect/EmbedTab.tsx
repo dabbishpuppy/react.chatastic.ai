@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
+import { AlertTriangle } from "lucide-react";
 
 interface EmbedTabProps {
   embedCode?: string;
@@ -100,6 +101,25 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     </p>
                     <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
                       <strong>Important:</strong> The position setting (right or left) in the code must match your chat interface settings.
+                    </div>
+                    
+                    <div className="mt-4 text-sm bg-red-50 p-3 rounded-md border border-red-200 flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
+                      <div>
+                        <p className="text-red-700 font-medium">CORS Configuration Required</p>
+                        <p className="text-red-600 mt-1">
+                          For the chat bubble to work properly on external websites, your server hosting <code>wonderwave.js</code> must have these headers:
+                        </p>
+                        <pre className="mt-2 p-2 bg-red-100 rounded text-xs overflow-x-auto">
+                          <code>
+Content-Type: application/javascript
+Access-Control-Allow-Origin: *
+                          </code>
+                        </pre>
+                        <p className="mt-2 text-red-600">
+                          If you're experiencing CORS errors, please ensure these headers are configured on your server.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
