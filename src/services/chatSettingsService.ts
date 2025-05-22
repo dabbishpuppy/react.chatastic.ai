@@ -25,10 +25,13 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id)
-        .select()
+        .select('*')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating settings:', error);
+        throw error;
+      }
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
@@ -59,10 +62,13 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
           auto_show_delay: settings.auto_show_delay,
           footer: settings.footer,
         })
-        .select()
+        .select('*')
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating settings:', error);
+        throw error;
+      }
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
@@ -84,11 +90,14 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
   try {
     const { data, error } = await supabase
       .from('chat_interface_settings')
-      .select()
+      .select('*')
       .eq('agent_id', agentId)
       .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error fetching chat settings:', error);
+      throw error;
+    }
     
     // If no settings exist yet, return null
     if (!data) return null;
@@ -121,7 +130,10 @@ export const uploadChatAsset = async (
       .from('chat_interface_assets')
       .upload(filePath, file);
       
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw uploadError;
+    }
     
     const { data } = supabase.storage
       .from('chat_interface_assets')
