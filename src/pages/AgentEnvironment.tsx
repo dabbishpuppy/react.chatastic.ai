@@ -26,6 +26,9 @@ const AgentEnvironment: React.FC = () => {
     </Button>
   );
 
+  // Determine the header color based on sync settings
+  const headerColor = settings.sync_colors ? settings.user_message_color : null;
+
   return (
     <AgentPageLayout 
       defaultActiveTab="playground" 
@@ -69,7 +72,9 @@ const AgentEnvironment: React.FC = () => {
                     }
                   ]}
                   footer={settings.footer || undefined}
-                  // chatIcon prop removed as requested
+                  userMessageColor={settings.user_message_color}
+                  headerColor={headerColor}
+                  hideUserAvatar={true}
                 />
               </div>
             )}
