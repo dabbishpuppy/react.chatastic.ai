@@ -21,6 +21,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Team } from "@/types/dashboard";
 
 // Define the form schema
 const formSchema = z.object({
@@ -32,19 +33,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface CreateTeamDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onTeamCreated: (team: {
-    id?: string;
-    name: string;
-    isActive?: boolean;
-    agents?: any[];
-    metrics?: {
-      totalConversations: number;
-      avgResponseTime: string;
-      usagePercent: number;
-      apiCalls: number;
-      satisfaction: number;
-    };
-  }) => void;
+  onTeamCreated: (team: Omit<Team, 'id' | 'isActive' | 'agents' | 'metrics'>) => void;
 }
 
 const CreateTeamDialog: React.FC<CreateTeamDialogProps> = ({

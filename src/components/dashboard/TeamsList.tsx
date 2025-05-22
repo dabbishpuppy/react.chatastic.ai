@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, ChevronDown, ChevronUp, Plus, MoreHorizontal, Edit, Trash2 } from "lucide-react";
@@ -12,14 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-
-interface Team {
-  id: string;
-  name: string;
-  isActive: boolean;
-  agents: any[];
-  metrics?: any;
-}
+import { Team } from "@/types/dashboard";
 
 interface TeamsListProps {
   teams: Team[];
@@ -27,7 +19,7 @@ interface TeamsListProps {
   isExpanded: boolean;
   onToggleExpand: () => void;
   onTeamSelect: (team: Team) => void;
-  onTeamCreated?: (team: Team) => void;
+  onTeamCreated?: (team: Omit<Team, 'id' | 'isActive' | 'agents' | 'metrics'>) => void;
   onTeamEdited?: (team: Team) => void;
   onTeamDeleted?: (teamId: string) => void;
 }
@@ -63,7 +55,7 @@ const TeamsList = ({
   };
 
   // Handle creating a new team
-  const handleTeamCreated = (newTeam: Team) => {
+  const handleTeamCreated = (newTeam: Omit<Team, 'id' | 'isActive' | 'agents' | 'metrics'>) => {
     if (onTeamCreated) {
       onTeamCreated(newTeam);
     }

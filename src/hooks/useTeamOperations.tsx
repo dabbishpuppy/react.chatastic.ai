@@ -23,7 +23,8 @@ export const useTeamOperations = (
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .insert({
-          name: newTeam.name
+          name: newTeam.name,
+          created_by: user?.id // Set the created_by field to current user's ID
         })
         .select()
         .single();
