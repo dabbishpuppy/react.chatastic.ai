@@ -19,6 +19,7 @@ export type Database = {
           status: string | null
           team_id: string
           updated_at: string | null
+          visibility: string
         }
         Insert: {
           color: string
@@ -29,6 +30,7 @@ export type Database = {
           status?: string | null
           team_id: string
           updated_at?: string | null
+          visibility?: string
         }
         Update: {
           color?: string
@@ -39,6 +41,7 @@ export type Database = {
           status?: string | null
           team_id?: string
           updated_at?: string | null
+          visibility?: string
         }
         Relationships: [
           {

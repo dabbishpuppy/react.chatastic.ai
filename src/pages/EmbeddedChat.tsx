@@ -1,15 +1,19 @@
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ChatSection from "@/components/agent/ChatSection";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { AlertCircle } from "lucide-react";
 
 const EmbeddedChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [searchParams] = useSearchParams();
   const { settings, isLoading } = useChatSettings();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [agentVisibility, setAgentVisibility] = useState<string | null>(null);
+  const [visibilityLoading, setVisibilityLoading] = useState(true);
   
   // Get URL parameters for theme and colors if present
   const themeParam = searchParams.get('theme');
@@ -17,15 +21,45 @@ const EmbeddedChat: React.FC = () => {
   const headerColorParam = searchParams.get('headerColor');
 
   // Use URL parameters if provided, otherwise use settings from database
-  const theme = themeParam || settings.theme;
-  const userMessageColor = userColorParam || settings.user_message_color;
+  const theme = themeParam || settings?.theme;
+  const userMessageColor = userColorParam || settings?.user_message_color;
   
   // For header color:
   // 1. Use headerColorParam if provided in URL
   // 2. If not in URL but sync is enabled, use user message color
   // 3. Otherwise, use null to get default white header
   const headerColor = headerColorParam || 
-    (settings.sync_colors ? settings.user_message_color : null);
+    (settings?.sync_colors ? settings?.user_message_color : null);
+  
+  // Fetch agent visibility when the component mounts
+  useEffect(() => {
+    const fetchAgentVisibility = async () => {
+      if (!agentId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('agents')
+          .select('visibility')
+          .eq('id', agentId)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching agent visibility:", error);
+          return;
+        }
+        
+        if (data) {
+          setAgentVisibility(data.visibility);
+        }
+      } catch (error) {
+        console.error("Error in fetchAgentVisibility:", error);
+      } finally {
+        setVisibilityLoading(false);
+      }
+    };
+    
+    fetchAgentVisibility();
+  }, [agentId]);
   
   // Add effect to prevent parent page scrolling when interacting with the iframe
   useEffect(() => {
@@ -137,10 +171,28 @@ const EmbeddedChat: React.FC = () => {
     };
   }, [agentId]);
 
-  if (isLoading) {
+  if (isLoading || visibilityLoading) {
     return (
       <div className="flex items-center justify-center w-full h-screen bg-white">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  // If agent is private, show an error message
+  if (agentVisibility === "private") {
+    return (
+      <div className="w-full h-screen flex items-center justify-center p-4 bg-white">
+        <div className="text-center max-w-md">
+          <div className="flex justify-center mb-4">
+            <AlertCircle className="h-12 w-12 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">This Agent is Private</h2>
+          <p className="text-gray-600">
+            The owner of this agent has set it to private mode. 
+            It cannot be accessed or embedded on external websites.
+          </p>
+        </div>
       </div>
     );
   }

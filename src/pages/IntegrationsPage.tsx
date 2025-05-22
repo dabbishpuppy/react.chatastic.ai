@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,9 @@ import ShareTab from "@/components/connect/ShareTab";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ChatbotWidget from "@/components/chatbot/ChatbotWidget";
+import { supabase } from "@/integrations/supabase/client";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const IntegrationsPage: React.FC = () => {
   const { agentId } = useParams();
@@ -19,6 +22,40 @@ const IntegrationsPage: React.FC = () => {
   
   // Use chat settings to get the latest settings
   const { settings, isLoading } = useChatSettings();
+  
+  // Add state for agent visibility
+  const [visibility, setVisibility] = useState<string>("public");
+  const [visibilityLoading, setVisibilityLoading] = useState<boolean>(true);
+  
+  // Fetch agent visibility when the component mounts
+  useEffect(() => {
+    const fetchAgentVisibility = async () => {
+      if (!agentId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('agents')
+          .select('visibility')
+          .eq('id', agentId)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching agent visibility:", error);
+          return;
+        }
+        
+        if (data) {
+          setVisibility(data.visibility);
+        }
+      } catch (error) {
+        console.error("Error in fetchAgentVisibility:", error);
+      } finally {
+        setVisibilityLoading(false);
+      }
+    };
+    
+    fetchAgentVisibility();
+  }, [agentId]);
   
   // Set the URL parameter when the component mounts if it doesn't exist
   useEffect(() => {
@@ -78,8 +115,38 @@ const IntegrationsPage: React.FC = () => {
 </script>`;
   };
 
+  // Render visibility restriction warning if agent is private
+  const renderVisibilityWarning = () => {
+    if (visibility === "private") {
+      return (
+        <Alert variant="warning" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Private Agent</AlertTitle>
+          <AlertDescription>
+            This agent is currently set to private. It cannot be embedded or shared with others.
+            To enable embedding and sharing, change the agent's visibility to 'Public' in the Security settings.
+          </AlertDescription>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-2"
+            onClick={() => navigate(`/agent/${agentId}/settings/security`)}
+          >
+            Go to Security Settings
+          </Button>
+        </Alert>
+      );
+    }
+    return null;
+  };
+
   // Render the appropriate tab content based on the URL parameter
   const renderTabContent = () => {
+    // If agent is private, don't show the regular tab content
+    if (visibility === "private") {
+      return renderVisibilityWarning();
+    }
+    
     switch (tab) {
       case "embed":
         return <EmbedTab embedCode={getEmbedCode()} agentId={agentId} />;
@@ -114,7 +181,7 @@ const IntegrationsPage: React.FC = () => {
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <h1 className="text-3xl font-bold mb-6">{getTabTitle()}</h1>
         <div className="bg-white rounded-lg p-6">
-          {isLoading ? (
+          {isLoading || visibilityLoading ? (
             <div className="flex justify-center items-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
             </div>
@@ -124,7 +191,7 @@ const IntegrationsPage: React.FC = () => {
         </div>
         
         {/* Preview the chatbot widget with current settings - only show on embed tab */}
-        {settings && tab === "embed" && (
+        {settings && tab === "embed" && visibility === "public" && (
           <ChatbotWidget 
             productName="Your Website"
             botName={settings.display_name}
