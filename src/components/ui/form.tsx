@@ -13,35 +13,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 
-// Custom Form component that prevents scroll restoration
-const Form = React.forwardRef<
-  HTMLFormElement,
-  React.FormHTMLAttributes<HTMLFormElement>
->(({ className, onSubmit, children, ...props }, ref) => {
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (onSubmit) {
-      onSubmit(e);
-    }
-    // Prevent any scroll restoration after submit
-    window.scrollTo({ top: window.scrollY });
-  };
-  
-  return (
-    <FormProvider {...(props as any)}>
-      <form 
-        ref={ref}
-        className={className}
-        onSubmit={handleSubmit}
-        style={{ scrollMargin: 0, scrollPadding: 0 }}
-        {...props}
-      >
-        {children}
-      </form>
-    </FormProvider>
-  );
-});
-Form.displayName = "Form";
+const Form = FormProvider
 
 type FormFieldContextValue<
   TFieldValues extends FieldValues = FieldValues,
