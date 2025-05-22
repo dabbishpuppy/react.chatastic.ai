@@ -5,22 +5,11 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import TeamPerformanceOverview from "./dashboard-cards/TeamPerformanceOverview";
 import AgentStatusSummary from "./dashboard-cards/AgentStatusSummary";
 import RecentActivityFeed from "./dashboard-cards/RecentActivityFeed";
+import { Team } from "@/types/dashboard";
 
 interface TeamDashboardProps {
-  team: {
-    id: string;
-    name: string;
-    isActive: boolean;
-    agents: any[];
-    metrics: {
-      totalConversations: number;
-      avgResponseTime: string;
-      usagePercent: number;
-      apiCalls: number;
-      satisfaction: number;
-    };
-  };
-  teamsList: any[];
+  team: Team;
+  teamsList: Team[];
 }
 
 const TeamDashboard: React.FC<TeamDashboardProps> = ({ team, teamsList }) => {
