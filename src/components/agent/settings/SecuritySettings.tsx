@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +30,7 @@ const SecuritySettings: React.FC = () => {
         .from('agents')
         .select('visibility')
         .eq('id', agentId)
-        .single();
+        .maybeSingle();
         
       if (error) {
         console.error("Error fetching agent visibility:", error);
@@ -40,6 +39,9 @@ const SecuritySettings: React.FC = () => {
       
       if (data) {
         setVisibility(data.visibility);
+      } else {
+        // If no agent is found, keep the default "public" visibility
+        console.log("No agent found with ID:", agentId);
       }
     } catch (error) {
       console.error("Error in fetchAgentVisibility:", error);

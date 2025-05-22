@@ -38,14 +38,26 @@ serve(async (req) => {
       .from('agents')
       .select('visibility')
       .eq('id', agentId)
-      .single();
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
-    if (agentError || !agentData) {
+    // If agent doesn't exist or there's an error fetching it
+    if (agentError) {
       console.error('Error fetching agent:', agentError);
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
           error: 'Agent not found or is private'
+        }),
+        { status: 404, headers: corsHeaders }
+      );
+    }
+
+    // If no agent data found
+    if (!agentData) {
+      return new Response(
+        JSON.stringify({ 
+          visibility: 'private',
+          error: 'Agent not found'
         }),
         { status: 404, headers: corsHeaders }
       );
@@ -67,7 +79,7 @@ serve(async (req) => {
       .from('chat_interface_settings')
       .select('*')
       .eq('agent_id', agentId)
-      .maybeSingle();
+      .maybeSingle(); // Changed from .single() to .maybeSingle()
 
     if (settingsError) {
       console.error('Error fetching settings:', settingsError);

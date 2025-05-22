@@ -8,7 +8,7 @@ export const getAgentVisibility = async (agentId: string) => {
       .from('agents')
       .select('visibility')
       .eq('id', agentId)
-      .single();
+      .maybeSingle();
       
     if (error) {
       throw error;

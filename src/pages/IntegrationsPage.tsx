@@ -45,7 +45,8 @@ const IntegrationsPage: React.FC = () => {
         if (data) {
           setVisibility(data.visibility);
         } else {
-          // Default to public if no data is found
+          // Default to public if no agent is found
+          console.log("No agent found with ID:", agentId);
           setVisibility("public");
         }
       } catch (error) {
