@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
@@ -15,6 +15,26 @@ const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
   const location = useLocation();
   const isMobile = useIsMobile();
+  
+  // Force scroll to top when navigating to this page
+  useEffect(() => {
+    // Use a small delay to ensure this happens after any other focus events
+    const scrollTimer = setTimeout(() => {
+      window.scrollTo(0, 0);
+      
+      // Prevent scroll restoration for this page
+      if (history.scrollRestoration) {
+        history.scrollRestoration = 'manual';
+      }
+      
+      // Ensure no element has focus that might scroll the page
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }, 50);
+    
+    return () => clearTimeout(scrollTimer);
+  }, [location.pathname]);
   
   // Extract the active tab from the URL
   const getActiveTab = () => {
@@ -47,16 +67,20 @@ const AgentSettingsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
-      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
+      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen overflow-y-auto" style={{ overscrollBehavior: 'none' }}>
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
         {/* Settings content */}
-        <div className="bg-white rounded-lg p-6">
+        <div className="bg-white rounded-lg p-6 scroll-m-0" style={{ scrollMarginTop: 0 }}>
           <Routes>
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="general" element={<GeneralSettings />} />
             <Route path="ai" element={<AISettings />} />
-            <Route path="chat-interface" element={<ChatInterfaceSettings />} />
+            <Route path="chat-interface" element={
+              <div className="overflow-visible scroll-m-0" style={{ overscrollBehavior: 'none' }}>
+                <ChatInterfaceSettings />
+              </div>
+            } />
             <Route path="security" element={<SecuritySettings />} />
             <Route path="leads" element={<LeadsSettings />} />
             <Route path="notifications" element={<NotificationsSettings />} />
