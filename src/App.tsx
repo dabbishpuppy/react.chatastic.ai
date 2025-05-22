@@ -25,6 +25,7 @@ import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
 import ChatbotDemo from "./pages/ChatbotDemo";
+import EmbeddedChat from "./pages/EmbeddedChat"; // Add import for the new page
 
 const queryClient = new QueryClient();
 
@@ -105,6 +106,10 @@ function App() {
               
               {/* Public demo route */}
               <Route path="/chatbot" element={<ChatbotDemo />} />
+              
+              {/* Embedded chat route - public, no authentication required */}
+              <Route path="/embed/:agentId" element={<EmbeddedChat />} />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
