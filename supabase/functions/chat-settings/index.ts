@@ -15,6 +15,9 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Log the full URL for debugging
+  console.log('Request URL:', req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -22,11 +25,24 @@ serve(async (req) => {
 
   try {
     // Get the agent ID from the URL
+    // There are multiple ways to extract path parameters:
     const url = new URL(req.url);
+    console.log('URL pathname:', url.pathname);
+    
+    // Method 1: Extract from path segments
     const pathParts = url.pathname.split('/');
+    console.log('Path parts:', pathParts);
     const agentId = pathParts[pathParts.length - 1];
     
-    if (!agentId) {
+    // Alternative Method 2: Check for query parameters (in case clients use that)
+    const queryAgentId = url.searchParams.get('agentId');
+    
+    // Use path parameter first, fall back to query parameter
+    const finalAgentId = agentId || queryAgentId;
+    
+    console.log('Extracted agentId:', finalAgentId);
+    
+    if (!finalAgentId) {
       return new Response(
         JSON.stringify({ error: 'Agent ID is required', visibility: 'private' }),
         { status: 400, headers: corsHeaders }
@@ -42,7 +58,7 @@ serve(async (req) => {
     const { data: agentData, error: agentError } = await supabase
       .from('agents')
       .select('visibility')
-      .eq('id', agentId)
+      .eq('id', finalAgentId)
       .maybeSingle();
 
     // If agent doesn't exist or there's an error fetching it
@@ -70,7 +86,7 @@ serve(async (req) => {
 
     // If the agent is private, return an appropriate response
     if (agentData.visibility === 'private') {
-      console.log(`Agent ${agentId} is PRIVATE`);
+      console.log(`Agent ${finalAgentId} is PRIVATE`);
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
@@ -80,13 +96,13 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Agent ${agentId} is PUBLIC, fetching settings`);
+    console.log(`Agent ${finalAgentId} is PUBLIC, fetching settings`);
 
     // Fetch the chat interface settings for the agent
     const { data: settings, error: settingsError } = await supabase
       .from('chat_interface_settings')
       .select('*')
-      .eq('agent_id', agentId)
+      .eq('agent_id', finalAgentId)
       .maybeSingle();
 
     if (settingsError) {
