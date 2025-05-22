@@ -55,6 +55,7 @@ export type Database = {
           agent_id: string | null
           allow_regenerate: boolean
           auto_show_delay: number
+          bubble_color: string | null
           bubble_position: string
           chat_icon: string | null
           created_at: string
@@ -63,17 +64,21 @@ export type Database = {
           id: string
           initial_message: string
           message_placeholder: string
+          primary_color: string | null
           profile_picture: string | null
           show_feedback: boolean
           show_suggestions_after_chat: boolean
           suggested_messages: Json
+          sync_colors: boolean | null
           theme: string
           updated_at: string
+          user_message_color: string | null
         }
         Insert: {
           agent_id?: string | null
           allow_regenerate?: boolean
           auto_show_delay?: number
+          bubble_color?: string | null
           bubble_position?: string
           chat_icon?: string | null
           created_at?: string
@@ -82,17 +87,21 @@ export type Database = {
           id?: string
           initial_message?: string
           message_placeholder?: string
+          primary_color?: string | null
           profile_picture?: string | null
           show_feedback?: boolean
           show_suggestions_after_chat?: boolean
           suggested_messages?: Json
+          sync_colors?: boolean | null
           theme?: string
           updated_at?: string
+          user_message_color?: string | null
         }
         Update: {
           agent_id?: string | null
           allow_regenerate?: boolean
           auto_show_delay?: number
+          bubble_color?: string | null
           bubble_position?: string
           chat_icon?: string | null
           created_at?: string
@@ -101,12 +110,15 @@ export type Database = {
           id?: string
           initial_message?: string
           message_placeholder?: string
+          primary_color?: string | null
           profile_picture?: string | null
           show_feedback?: boolean
           show_suggestions_after_chat?: boolean
           suggested_messages?: Json
+          sync_colors?: boolean | null
           theme?: string
           updated_at?: string
+          user_message_color?: string | null
         }
         Relationships: [
           {
