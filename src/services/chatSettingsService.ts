@@ -7,7 +7,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
     if (settings.id) {
       // Update existing settings
       const { data, error } = await supabase
-        .from('chat_interface_settings')
+        .from("chat_interface_settings")
         .update({
           initial_message: settings.initial_message,
           suggested_messages: JSON.stringify(settings.suggested_messages),
@@ -35,17 +35,17 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
-        ...data,
+        ...data as any,
         suggested_messages: typeof data.suggested_messages === 'string' 
           ? JSON.parse(data.suggested_messages)
-          : (data.suggested_messages || []),
+          : (data.suggested_messages as SuggestedMessage[] || []),
       };
       
       return result;
     } else {
       // Create new settings
       const { data, error } = await supabase
-        .from('chat_interface_settings')
+        .from("chat_interface_settings")
         .insert({
           agent_id: settings.agent_id,
           initial_message: settings.initial_message,
@@ -72,10 +72,10 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
-        ...data,
+        ...data as any,
         suggested_messages: typeof data.suggested_messages === 'string' 
           ? JSON.parse(data.suggested_messages)
-          : (data.suggested_messages || []),
+          : (data.suggested_messages as SuggestedMessage[] || []),
       };
       
       return result;
@@ -89,7 +89,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
 export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSettings | null> => {
   try {
     const { data, error } = await supabase
-      .from('chat_interface_settings')
+      .from("chat_interface_settings")
       .select('*')
       .eq('agent_id', agentId)
       .single();
@@ -104,10 +104,10 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
     
     // Parse the suggested_messages JSON if it's a string
     const parsedData: ChatInterfaceSettings = {
-      ...data,
+      ...data as any,
       suggested_messages: typeof data.suggested_messages === 'string' 
         ? JSON.parse(data.suggested_messages)
-        : (data.suggested_messages || []),
+        : (data.suggested_messages as SuggestedMessage[] || []),
     };
     
     return parsedData;
@@ -124,7 +124,8 @@ export const uploadChatAsset = async (
 ): Promise<string | null> => {
   try {
     const fileExt = file.name.split('.').pop();
-    const filePath = `${agentId}/${type}_${Date.now()}.${fileExt}`;
+    const fileName = `${type}_${Date.now()}${fileExt ? `.${fileExt}` : ''}`;
+    const filePath = `${agentId}/${fileName}`;
     
     const { error: uploadError } = await supabase.storage
       .from('chat_interface_assets')

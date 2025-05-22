@@ -50,6 +50,74 @@ export type Database = {
           },
         ]
       }
+      chat_interface_settings: {
+        Row: {
+          agent_id: string | null
+          allow_regenerate: boolean
+          auto_show_delay: number
+          bubble_position: string
+          chat_icon: string | null
+          created_at: string
+          display_name: string
+          footer: string | null
+          id: string
+          initial_message: string
+          message_placeholder: string
+          profile_picture: string | null
+          show_feedback: boolean
+          show_suggestions_after_chat: boolean
+          suggested_messages: Json
+          theme: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          allow_regenerate?: boolean
+          auto_show_delay?: number
+          bubble_position?: string
+          chat_icon?: string | null
+          created_at?: string
+          display_name?: string
+          footer?: string | null
+          id?: string
+          initial_message?: string
+          message_placeholder?: string
+          profile_picture?: string | null
+          show_feedback?: boolean
+          show_suggestions_after_chat?: boolean
+          suggested_messages?: Json
+          theme?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          allow_regenerate?: boolean
+          auto_show_delay?: number
+          bubble_position?: string
+          chat_icon?: string | null
+          created_at?: string
+          display_name?: string
+          footer?: string | null
+          id?: string
+          initial_message?: string
+          message_placeholder?: string
+          profile_picture?: string | null
+          show_feedback?: boolean
+          show_suggestions_after_chat?: boolean
+          suggested_messages?: Json
+          theme?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_interface_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string | null
