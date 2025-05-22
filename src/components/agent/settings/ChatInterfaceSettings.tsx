@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +26,7 @@ const ChatInterfaceSettings: React.FC = () => {
   } = useChatSettings();
   
   const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
-  const [syncColorWithHeader, setSyncColorWithHeader] = React.useState(false);
+  const [syncColorWithHeader, setSyncColorWithHeader] = React.useState(settings.sync_colors || false);
   const [showCropDialog, setShowCropDialog] = React.useState<{
     visible: boolean;
     type: 'profile' | 'icon';
@@ -64,6 +63,13 @@ const ChatInterfaceSettings: React.FC = () => {
     ]);
   }, [settings.initial_message]);
 
+  // Update to handle sync_colors property
+  useEffect(() => {
+    if (settings.sync_colors !== undefined) {
+      setSyncColorWithHeader(settings.sync_colors);
+    }
+  }, [settings.sync_colors]);
+
   // Handle color sync with header only when explicitly requested
   useEffect(() => {
     if (syncColorWithHeader && settings.bubble_color) {
@@ -83,6 +89,7 @@ const ChatInterfaceSettings: React.FC = () => {
   // Handle syncing user message color with header
   const handleSyncChange = (checked: boolean) => {
     setSyncColorWithHeader(checked);
+    updateSetting("sync_colors", checked);
     
     if (checked && settings.bubble_color) {
       updateSetting("user_message_color", settings.bubble_color);

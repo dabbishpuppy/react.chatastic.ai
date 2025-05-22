@@ -24,7 +24,13 @@ export const useChatSettings = () => {
         const data = await getChatSettings(validAgentId);
         
         if (data) {
-          setSettings(data);
+          // Ensure we have the sync_colors and primary_color properties
+          setSettings({
+            ...defaultChatSettings,
+            ...data,
+            sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
+            primary_color: data.primary_color || '#3B82F6'
+          });
         } else {
           setSettings({
             ...defaultChatSettings,

@@ -59,6 +59,8 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       footer: settings.footer,
       user_message_color: settings.user_message_color,
       bubble_color: settings.bubble_color,
+      sync_colors: settings.sync_colors,
+      primary_color: settings.primary_color,
       updated_at: new Date().toISOString(),
     };
     

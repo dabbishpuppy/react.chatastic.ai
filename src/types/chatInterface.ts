@@ -22,6 +22,8 @@ export interface ChatInterfaceSettings {
   footer?: string | null;
   user_message_color?: string | null;
   bubble_color?: string | null;
+  primary_color?: string | null;
+  sync_colors?: boolean;
 }
 
 export interface ChatMessage {
@@ -44,4 +46,6 @@ export const defaultChatSettings: ChatInterfaceSettings = {
   auto_show_delay: 1,
   user_message_color: '#3B82F6',
   bubble_color: '#3B82F6',
+  sync_colors: false,
+  primary_color: '#3B82F6'
 }
