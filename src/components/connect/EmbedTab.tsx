@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
+import { useChatSettings } from "@/hooks/useChatSettings";
 
 interface EmbedTabProps {
   embedCode?: string;
@@ -14,6 +15,7 @@ interface EmbedTabProps {
 export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) => {
   const [copyText, setCopyText] = useState("Copy");
   const [embedType, setEmbedType] = useState<"bubble" | "iframe">("bubble");
+  const { settings } = useChatSettings();
   
   const handleCopy = () => {
     const scriptText = document.querySelector("pre code")?.textContent;
@@ -30,13 +32,13 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
-      // Chat bubble embed code using wonderwave instead of chatbase
+      // Chat bubble embed code using wonderwave with settings from the chat interface
       return `<script>
   (function(){
     if(!window.wonderwaveConfig) {
       window.wonderwaveConfig = {
         agentId: "${agentId}",
-        position: "right" // Set the position to "right" or "left"
+        position: "${settings.bubble_position || 'right'}" // Use the position from settings
       };
     }
     
@@ -55,9 +57,9 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   })();
 </script>`;
     } else {
-      // Iframe embedding with a working URL that points to the agent page
+      // Iframe embedding with the correct agent path that honors chat settings
       return `<iframe
-  src="https://query-spark-start.lovable.app/embed/${agentId}"
+  src="https://query-spark-start.lovable.app/chat/${agentId}"
   width="100%" 
   height="600px"
   frameborder="0"
