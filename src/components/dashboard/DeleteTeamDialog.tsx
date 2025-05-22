@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface Team {
   id: string;
@@ -35,6 +35,7 @@ const DeleteTeamDialog: React.FC<DeleteTeamDialogProps> = ({
   onTeamDeleted,
 }) => {
   const [confirmName, setConfirmName] = useState("");
+  const { toast } = useToast();
   
   const handleDelete = () => {
     if (confirmName === team.name) {

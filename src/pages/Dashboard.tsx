@@ -24,7 +24,7 @@ interface Team {
   name: string;
   isActive: boolean;
   agents: Agent[];
-  metrics?: {
+  metrics: {
     totalConversations: number;
     avgResponseTime: string;
     usagePercent: number;
@@ -470,7 +470,12 @@ const Dashboard = () => {
                 You haven't created any teams yet. Create your first team to get started.
               </p>
               <Button 
-                onClick={() => document.querySelector('[aria-label="Create team"]')?.click()}
+                onClick={() => {
+                  const createTeamButton = document.querySelector('[aria-label="Create team"]');
+                  if (createTeamButton instanceof HTMLElement) {
+                    createTeamButton.click();
+                  }
+                }}
                 size="lg"
               >
                 Create Your First Team

@@ -116,6 +116,14 @@ export type Database = {
         Args: { team_id: string }
         Returns: Database["public"]["Enums"]["team_role"]
       }
+      is_team_member: {
+        Args: { team_id: string }
+        Returns: boolean
+      }
+      is_team_owner: {
+        Args: { team_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       team_role: "owner" | "admin" | "member"
