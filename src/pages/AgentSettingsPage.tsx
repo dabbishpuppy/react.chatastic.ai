@@ -46,9 +46,9 @@ const AgentSettingsPage: React.FC = () => {
   };
 
   return (
-    <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={true}>
+    <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
       <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
-        {/* Removed duplicate h1 title that was here */}
+        <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
         {/* Settings content */}
         <div className="bg-white rounded-lg p-6">

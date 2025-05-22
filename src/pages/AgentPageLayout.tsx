@@ -92,24 +92,6 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
           ref={contentRef} 
           className="flex-1 overflow-auto"
         >
-          {showPageTitle && !isMobile && (
-            <div 
-              className="p-6 pb-0 flex justify-between items-center"
-              style={{ 
-                backgroundImage: 'radial-gradient(#e0e0e0 1px, transparent 1px)', 
-                backgroundSize: '16px 16px',
-                backgroundPosition: '0 0',
-                backgroundColor: '#f9f9f9'
-              }}
-            >
-              <h1 className="text-3xl font-bold text-[#221F26]">{pageTitle}</h1>
-              {headerActions && (
-                <div className="flex items-center space-x-2">
-                  {headerActions}
-                </div>
-              )}
-            </div>
-          )}
           {children}
         </div>
       </div>
