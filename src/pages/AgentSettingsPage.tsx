@@ -10,6 +10,7 @@ import LeadsSettings from "@/components/agent/settings/LeadsSettings";
 import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
 import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
+import "../styles/scroll-reset.css";
 
 const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
@@ -29,8 +30,28 @@ const AgentSettingsPage: React.FC = () => {
   };
 
   // Prevent automatic scrolling when navigating to settings pages
+  // Use a more aggressive approach to ensure scroll position is always at the top
   useEffect(() => {
+    // Add settings-page class to html element
+    document.documentElement.classList.add('settings-page');
+    
+    // Force scroll to top
     window.scrollTo(0, 0);
+    
+    // Also try to prevent any automatic focus
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    
+    // Add a small delay to counter any browser-specific scroll restoration
+    const timer = setTimeout(() => {
+      window.scrollTo(0, 0);
+    }, 50);
+    
+    return () => {
+      document.documentElement.classList.remove('settings-page');
+      clearTimeout(timer);
+    };
   }, [location.pathname]);
 
   const activeTab = getActiveTab();
@@ -52,11 +73,11 @@ const AgentSettingsPage: React.FC = () => {
 
   return (
     <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
-      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
+      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen no-auto-scroll">
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
         {/* Settings content */}
-        <div className="bg-white rounded-lg p-6">
+        <div className="bg-white rounded-lg p-6 no-auto-scroll">
           <Routes>
             <Route path="/" element={<Navigate to="general" replace />} />
             <Route path="general" element={<GeneralSettings />} />

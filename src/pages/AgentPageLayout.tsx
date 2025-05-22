@@ -1,3 +1,4 @@
+
 import React, { useState, ReactNode, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
@@ -91,6 +92,7 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
         <div 
           ref={contentRef} 
           className="flex-1 overflow-auto"
+          style={{ scrollBehavior: 'auto' }}
         >
           {children}
         </div>

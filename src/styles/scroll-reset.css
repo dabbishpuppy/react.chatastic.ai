@@ -1,0 +1,19 @@
+
+/* Global CSS to override automatic scroll restoration behavior */
+html.settings-page,
+html.settings-page body {
+  scroll-behavior: auto !important;
+  overflow-anchor: none !important;
+}
+
+.no-auto-scroll {
+  scroll-behavior: auto !important;
+  overflow-anchor: none !important;
+}
+
+.no-auto-scroll * {
+  scroll-margin-top: 0 !important;
+  scroll-margin-bottom: 0 !important;
+  scroll-padding-top: 0 !important;
+  scroll-padding-bottom: 0 !important;
+}

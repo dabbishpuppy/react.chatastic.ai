@@ -62,7 +62,7 @@ const ChatInterfaceSettings: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row border-t">
+    <div className="flex flex-col md:flex-row border-t" style={{ scrollBehavior: 'auto' }}>
       {/* Left panel - Settings */}
       <div className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-0">
         <div className="space-y-6 p-6">
@@ -81,6 +81,8 @@ const ChatInterfaceSettings: React.FC = () => {
                   value={settings.initial_message}
                   onChange={(e) => updateSetting("initial_message", e.target.value)}
                   className="h-24"
+                  autoFocus={false}
+                  tabIndex={1}
                 />
                 <p className="text-xs text-gray-500">Enter each message in a new line.</p>
               </div>
