@@ -1,4 +1,3 @@
-
 import React, { useState, ReactNode, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import AgentSidebar from "@/components/agent/AgentSidebar";
@@ -30,23 +29,9 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  // Effect to disable scroll restoration and prevent auto-scroll behaviors
+  // Modified effect to prevent auto-scrolling - removed scroll reset
   useEffect(() => {
-    // Disable browser's automatic scroll restoration
-    if (history.scrollRestoration) {
-      history.scrollRestoration = 'manual';
-    }
-
-    // Reset any previous scroll position
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-
-    return () => {
-      if (history.scrollRestoration) {
-        history.scrollRestoration = 'auto';
-      }
-    };
+    // Keep tab state but don't manipulate scroll position
   }, [activeTab]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
@@ -57,12 +42,6 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
     if (isMobile) {
       setMobileSidebarOpen(false);
     }
-    
-    // Reset scroll position on tab change
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-    window.scrollTo(0, 0);
   };
 
   const sidebarContent = (
@@ -72,7 +51,7 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   );
 
   return (
-    <div className="flex flex-col h-screen" style={{ overflow: 'hidden' }}>
+    <div className="flex flex-col h-screen">
       {/* Mobile header */}
       {isMobile && (
         <div className="p-4 border-b border-gray-200 flex items-center">
@@ -108,16 +87,10 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
           </div>
         )}
 
-        {/* Main content with its own scroll and proper containment */}
+        {/* Main content with its own scroll */}
         <div 
           ref={contentRef} 
           className="flex-1 overflow-auto"
-          style={{ 
-            overscrollBehavior: 'contain', 
-            height: '100vh',
-            scrollMargin: 0,
-            scrollPadding: 0
-          }}
         >
           {children}
         </div>

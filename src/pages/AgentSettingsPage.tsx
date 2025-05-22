@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Routes, Route, useParams, useLocation, Navigate } from "react-router-dom";
 import AgentPageLayout from "./AgentPageLayout";
 import GeneralSettings from "@/components/agent/settings/GeneralSettings";
@@ -10,39 +10,6 @@ import LeadsSettings from "@/components/agent/settings/LeadsSettings";
 import NotificationsSettings from "@/components/agent/settings/NotificationsSettings";
 import CustomDomainsSettings from "@/components/agent/settings/CustomDomainsSettings";
 import { useIsMobile } from "@/hooks/use-mobile";
-
-// Scroll restoration manager component
-const ScrollManager = () => {
-  useEffect(() => {
-    // Disable browser's automatic scroll restoration
-    if (history.scrollRestoration) {
-      history.scrollRestoration = 'manual';
-    }
-
-    // Reset scroll position to top when component mounts
-    window.scrollTo(0, 0);
-    
-    // Prevent any default focus behavior
-    const preventScroll = (e: Event) => {
-      e.preventDefault();
-    };
-
-    // Attach global handlers to capture and prevent scroll
-    window.addEventListener('scroll', preventScroll, { passive: false });
-    
-    return () => {
-      // Clean up event listeners
-      window.removeEventListener('scroll', preventScroll);
-      
-      // Reset scroll restoration to browser default on unmount
-      if (history.scrollRestoration) {
-        history.scrollRestoration = 'auto';
-      }
-    };
-  }, []);
-  
-  return null;
-};
 
 const AgentSettingsPage: React.FC = () => {
   const { agentId } = useParams();
@@ -78,20 +45,9 @@ const AgentSettingsPage: React.FC = () => {
     }
   };
 
-  // Reset scroll position on route change
-  useEffect(() => {
-    // Manual scroll to top on route changes
-    window.scrollTo(0, 0);
-  }, [location.pathname]);
-
   return (
     <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
-      {/* Add ScrollManager to handle scroll behavior */}
-      <ScrollManager />
-      <div 
-        className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen"
-        style={{ overscrollBehavior: 'contain' }}
-      >
+      <div className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen">
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
         {/* Settings content */}

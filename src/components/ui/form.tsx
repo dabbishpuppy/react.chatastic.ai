@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { Slot } from "@radix-ui/react-slot"
@@ -79,17 +78,7 @@ const FormItem = React.forwardRef<
 
   return (
     <FormItemContext.Provider value={{ id }}>
-      <div 
-        ref={ref} 
-        className={cn("space-y-2", className)} 
-        {...props}
-        style={{
-          scrollMargin: 0,
-          scrollPadding: 0,
-          overscrollBehavior: 'none',
-          ...(props.style || {})
-        }}
-      />
+      <div ref={ref} className={cn("space-y-2", className)} {...props} />
     </FormItemContext.Provider>
   )
 })
