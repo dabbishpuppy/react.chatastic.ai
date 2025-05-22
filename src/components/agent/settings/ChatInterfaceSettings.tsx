@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,11 +67,11 @@ const ChatInterfaceSettings: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <label htmlFor="initialMessage" className="block text-sm font-medium">
+                <label htmlFor="initialMessageField" className="block text-sm font-medium">
                   Initial messages
                 </label>
                 <Textarea
-                  id="initialMessage"
+                  id="initialMessageField"
                   value={settings.initial_message}
                   onChange={(e) => updateSetting("initial_message", e.target.value)}
                   className="h-24"
