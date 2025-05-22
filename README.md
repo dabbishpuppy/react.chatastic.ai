@@ -1,8 +1,21 @@
+
 # Welcome to your Lovable project
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/457a2427-6b8c-4723-9fd8-547ebd4354d9
+
+## Chat Interface Features
+
+This project includes a fully customizable AI chatbot interface with the following features:
+
+- **Customizable appearance**: Change colors, themes, position, and more
+- **Suggested messages**: Add quick-click message suggestions for users
+- **Initial messages**: Personalize the greeting messages
+- **Feedback collection**: Allow users to like/dislike responses
+- **Profile customization**: Upload custom profile pictures and chat icons
+
+Settings made in the chat interface page are automatically synchronized with the chatbot preview and embed code.
 
 ## How can I edit this code?
 

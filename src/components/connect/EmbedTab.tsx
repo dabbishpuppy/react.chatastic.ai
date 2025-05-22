@@ -2,16 +2,44 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/use-toast";
+import { Link } from "react-router-dom";
 
-export const EmbedTab: React.FC = () => {
+interface EmbedTabProps {
+  embedCode?: string;
+  agentId?: string;
+}
+
+export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) => {
   const [copyText, setCopyText] = useState("Copy");
+  const [embedType, setEmbedType] = useState<"bubble" | "iframe">("bubble");
   
   const handleCopy = () => {
     const scriptText = document.querySelector("pre code")?.textContent;
     if (scriptText) {
       navigator.clipboard.writeText(scriptText);
       setCopyText("Copied!");
+      toast({
+        title: "Code copied",
+        description: "The embed code has been copied to your clipboard."
+      });
       setTimeout(() => setCopyText("Copy"), 2000);
+    }
+  };
+  
+  const getEmbedCode = () => {
+    if (embedType === "bubble") {
+      return embedCode;
+    } else {
+      // For iframe embedding
+      return `<iframe
+  src="https://example.com/embed/${agentId}"
+  width="100%"
+  height="600px"
+  frameborder="0"
+  allow="microphone"
+></iframe>`;
     }
   };
   
@@ -19,71 +47,77 @@ export const EmbedTab: React.FC = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Embed</CardTitle>
+          <CardTitle>Embed your AI chatbot</CardTitle>
           <CardDescription>Choose how to embed your agent on your website</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex flex-col space-y-6">
-            <div className="flex items-start space-x-4 p-4 border rounded-md">
-              <div className="flex items-center h-5">
-                <input
-                  type="radio"
-                  id="chat-bubble"
-                  name="embed-option"
-                  defaultChecked
-                  className="h-4 w-4 border-gray-300 text-primary focus:ring-primary"
-                />
+          <Tabs defaultValue="bubble" className="w-full" onValueChange={(value) => setEmbedType(value as "bubble" | "iframe")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="bubble">Chat Bubble</TabsTrigger>
+              <TabsTrigger value="iframe">Iframe</TabsTrigger>
+            </TabsList>
+            <TabsContent value="bubble" className="pt-4">
+              <div className="p-4 border rounded-md">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-1">
+                    <h3 className="font-medium mb-2">
+                      Embed a chat bubble <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Recommended</span>
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Embed a chat bubble on your website that opens a chatbot when clicked. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1">
-                <label htmlFor="chat-bubble" className="font-medium">
-                  Embed a chat bubble <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Recommended</span>
-                </label>
-                <p className="text-sm text-gray-500 mt-1">
-                  Embed a chat bubble on your website. Allows you to use all the advanced features of the agent. Explore the <a href="#" className="text-blue-600 hover:underline">docs</a>.
-                </p>
-              </div>
-            </div>
+            </TabsContent>
             
-            <div className="flex items-start space-x-4 p-4 border rounded-md">
-              <div className="flex items-center h-5">
-                <input
-                  type="radio"
-                  id="iframe"
-                  name="embed-option"
-                  className="h-4 w-4 border-gray-300 text-primary focus:ring-primary"
-                />
+            <TabsContent value="iframe" className="pt-4">
+              <div className="p-4 border rounded-md">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-1">
+                    <h3 className="font-medium mb-2">
+                      Embed the iframe directly
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Add the agent anywhere on your website as an embedded chat window. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex-1">
-                <label htmlFor="iframe" className="font-medium">
-                  Embed the iframe directly
-                </label>
-                <p className="text-sm text-gray-500 mt-1">
-                  Add the agent anywhere on your website
-                </p>
-              </div>
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
           
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Configuration</h3>
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">On the site</h4>
-              <p className="text-sm text-gray-500">www.example.com</p>
-              
-              <div className="relative border rounded-md bg-gray-50 p-4">
-                <pre className="text-xs overflow-x-auto">
-                  <code>
-{`<script>
-  (function(){if(!window.chatbase||window.chatbase("getState")=="initialized"){window.chatbase=(...arguments)=>{if(!window.chatbase.q){window.chatbase.q=[];}window.chatbase.q.push(arguments);};window.chatbase.d={};}})();
-</script>`}
-                  </code>
-                </pre>
-                <Button variant="outline" size="sm" className="absolute top-2 right-2" onClick={handleCopy}>
-                  {copyText}
-                </Button>
-              </div>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium">Embed code</h3>
+              <Button variant="outline" size="sm" onClick={handleCopy}>
+                {copyText}
+              </Button>
+            </div>
+            
+            <div className="relative border rounded-md bg-gray-50 p-4">
+              <pre className="text-xs overflow-x-auto max-h-60">
+                <code className="block whitespace-pre">
+                  {getEmbedCode()}
+                </code>
+              </pre>
             </div>
           </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Need more help?</CardTitle>
+          <CardDescription>Check out our documentation for more information on embedding your chatbot</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" className="mr-2">
+            View Documentation
+          </Button>
+          <Button variant="outline">
+            Contact Support
+          </Button>
         </CardContent>
       </Card>
     </div>

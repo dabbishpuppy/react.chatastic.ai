@@ -113,12 +113,21 @@ export const useChatSettings = () => {
 
   const uploadImage = async (file: File, type: 'profile' | 'icon') => {
     if (!validAgentId) {
+      // Create a temporary URL for preview without storing in Supabase
+      const tempUrl = URL.createObjectURL(file);
+      
+      if (type === 'profile') {
+        updateSetting('profile_picture', tempUrl);
+      } else {
+        updateSetting('chat_icon', tempUrl);
+      }
+      
       toast({
-        title: "Upload Failed",
-        description: "Cannot upload without a valid agent ID.",
-        variant: "destructive"
+        title: "Preview Only",
+        description: "Image will not be permanently saved until you associate with an agent ID.",
       });
-      return null;
+      
+      return tempUrl;
     }
     
     setIsUploading(true);
