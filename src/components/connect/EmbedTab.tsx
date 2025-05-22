@@ -21,9 +21,9 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   const { settings } = useChatSettings();
   
   const handleCopy = () => {
-    const scriptText = document.querySelector("pre code")?.textContent;
-    if (scriptText) {
-      navigator.clipboard.writeText(scriptText);
+    const embedCode = getEmbedCode();
+    if (embedCode) {
+      navigator.clipboard.writeText(embedCode);
       setCopyText("Copied!");
       toast({
         title: "Code copied",
@@ -116,27 +116,8 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     <p className="text-sm text-gray-500 mb-4">
                       Embed a chat bubble on your website that opens a chatbot when clicked. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
-                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
+                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200 mb-4">
                       <strong>Important:</strong> The position setting (right or left) in the code must match your chat interface settings.
-                    </div>
-                    
-                    <div className="mt-4 text-sm bg-red-50 p-3 rounded-md border border-red-200 flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
-                      <div>
-                        <p className="text-red-700 font-medium">CORS Configuration Required</p>
-                        <p className="text-red-600 mt-1">
-                          For the chat bubble to work properly on external websites, your server hosting <code>wonderwave.js</code> must have these headers:
-                        </p>
-                        <pre className="mt-2 p-2 bg-red-100 rounded text-xs overflow-x-auto">
-                          <code>
-Content-Type: application/javascript
-Access-Control-Allow-Origin: *
-                          </code>
-                        </pre>
-                        <p className="mt-2 text-red-600">
-                          If you're experiencing CORS errors, please ensure these headers are configured on your server.
-                        </p>
-                      </div>
                     </div>
 
                     <div className="mt-4">
