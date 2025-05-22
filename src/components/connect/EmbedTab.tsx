@@ -45,28 +45,35 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   
   const getEmbedCode = () => {
     if (embedType === "bubble") {
+      // Create an array of config options that will be joined properly with commas
+      const configOptions = [`agentId: "${agentId}"`, `position: "${settings.bubble_position || 'right'}"`];
+      
       // Include chat icon in config if available
-      const chatIconConfig = settings.chat_icon ? 
-        `\n      chatIcon: "${settings.chat_icon}",` : '';
-        
+      if (settings.chat_icon) {
+        configOptions.push(`chatIcon: "${settings.chat_icon}"`);
+      }
+      
       // Add user message color if available
-      const userMessageColorConfig = settings.user_message_color ? 
-        `\n      userMessageColor: "${settings.user_message_color}",` : '';
-        
+      if (settings.user_message_color) {
+        configOptions.push(`userMessageColor: "${settings.user_message_color}"`);
+      }
+      
       // Add bubble color (use user message color if sync is enabled, otherwise use primary color)
-      const bubbleColorConfig = settings.sync_colors && settings.user_message_color ? 
-        `\n      bubbleColor: "${settings.user_message_color}",` : 
-        settings.primary_color ? 
-        `\n      bubbleColor: "${settings.primary_color}",` : '';
+      if (settings.sync_colors && settings.user_message_color) {
+        configOptions.push(`bubbleColor: "${settings.user_message_color}"`);
+      } else if (settings.primary_color) {
+        configOptions.push(`bubbleColor: "${settings.primary_color}"`);
+      }
+      
+      // Add debug option
+      configOptions.push(`debug: false // Set to true to enable debug logging`);
       
       // Improved script with more robust initialization and error handling
       return `<script>
 (function(){
   // Define the config first - this is crucial
   window.wonderwaveConfig = {
-    agentId: "${agentId}",
-    position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig},
-    debug: false // Set to true to enable debug logging
+    ${configOptions.join(',\n    ')}
   };
   
   // Create a proxy handler for the wonderwave function
