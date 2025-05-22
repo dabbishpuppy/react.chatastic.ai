@@ -5,12 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
-import { useChatSettings } from "@/hooks/useChatSettings";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export const ShareTab: React.FC = () => {
   const { agentId } = useParams();
-  const { settings } = useChatSettings();
   const demoUrl = `https://query-spark-start.lovable.app/embed/${agentId || 'YOURUNIQUEID'}`;
   const [copyText, setCopyText] = useState("Copy");
   
@@ -39,32 +36,8 @@ export const ShareTab: React.FC = () => {
           <h3 className="text-lg font-medium">Direct Link</h3>
           <p className="text-sm text-gray-500">
             Share this link to let others chat with your agent directly. 
-            All your color settings and appearance customizations will be automatically applied.
+            All your color settings will be automatically applied.
           </p>
-          
-          <div className="flex items-center space-x-4 mb-4">
-            {settings.profile_picture ? (
-              <Avatar>
-                <AvatarImage src={settings.profile_picture} alt="Agent" />
-                <AvatarFallback>AI</AvatarFallback>
-              </Avatar>
-            ) : (
-              <div 
-                className="w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: settings.user_message_color || "#3B82F6" }}
-              >
-                <span className="text-white text-sm font-medium">
-                  {settings.display_name?.substring(0, 2).toUpperCase() || "AI"}
-                </span>
-              </div>
-            )}
-            <div>
-              <p className="font-medium">{settings.display_name}</p>
-              <p className="text-sm text-gray-500">
-                {settings.sync_colors ? "Colors synced with user messages" : "Default header styling"}
-              </p>
-            </div>
-          </div>
           
           <div className="relative border rounded-md bg-gray-50 p-4">
             <Input 
@@ -79,37 +52,6 @@ export const ShareTab: React.FC = () => {
               <Button variant="outline" size="sm" onClick={handleVisit}>
                 Visit
               </Button>
-            </div>
-          </div>
-          
-          <div className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
-            <p><strong>Automatic updates:</strong> When you modify your chat interface settings, all shared links and embeds will automatically update without requiring any changes to the embed code.</p>
-          </div>
-
-          <div className="mt-6">
-            <h3 className="text-lg font-medium mb-3">Chat bubble preview</h3>
-            <div className="flex justify-end mb-2">
-              <div className="flex flex-col items-center">
-                {settings.chat_icon ? (
-                  <div className="h-16 w-16 rounded-full shadow-lg overflow-hidden">
-                    <img 
-                      src={settings.chat_icon} 
-                      alt="Chat Icon"
-                      className="h-full w-full object-cover" 
-                    />
-                  </div>
-                ) : (
-                  <div 
-                    className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center"
-                    style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
-                  >
-                    <span className="text-white text-xl">💬</span>
-                  </div>
-                )}
-                <p className="text-sm text-gray-500 mt-2">
-                  {settings.chat_icon ? "Using custom chat icon" : "Using default bubble color"}
-                </p>
-              </div>
             </div>
           </div>
         </CardContent>
