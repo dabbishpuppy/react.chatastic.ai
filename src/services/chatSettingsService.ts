@@ -65,6 +65,14 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       Object.assign(settingsData, { agent_id: settings.agent_id });
     }
 
+    // For local preview mode (no persistence), just return the settings as is
+    if (!settings.agent_id || settings.agent_id === "undefined") {
+      return {
+        ...settings,
+        id: settings.id || 'preview-settings'
+      };
+    }
+
     if (settings.id) {
       // Update existing settings
       const { data, error } = await supabase

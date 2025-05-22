@@ -112,17 +112,29 @@ export const useChatSettings = () => {
   };
 
   const uploadImage = async (file: File, type: 'profile' | 'icon') => {
-    if (!validAgentId) {
-      toast({
-        title: "Upload Failed",
-        description: "Cannot upload without a valid agent ID.",
-        variant: "destructive"
-      });
-      return null;
-    }
-    
     setIsUploading(true);
     try {
+      // Use a temporary URL for the image when there's no valid agent ID
+      if (!validAgentId) {
+        // Create a local object URL for preview purposes
+        const localUrl = URL.createObjectURL(file);
+        
+        // Update the appropriate setting with the temporary URL
+        if (type === 'profile') {
+          updateSetting('profile_picture', localUrl);
+        } else {
+          updateSetting('chat_icon', localUrl);
+        }
+        
+        toast({
+          title: "Image Added",
+          description: "Image has been added for preview. Save settings to finalize changes.",
+        });
+        
+        return localUrl;
+      }
+      
+      // If we have a valid agent ID, proceed with the actual upload
       const url = await uploadChatAsset(file, validAgentId, type);
       
       if (url) {
