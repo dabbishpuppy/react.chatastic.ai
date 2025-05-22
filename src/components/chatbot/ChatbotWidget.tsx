@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, ChevronDown, Copy, RefreshCw, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,6 +36,7 @@ interface ChatbotWidgetProps {
   chatIcon?: string | null;
   profilePicture?: string | null;
   userMessageColor?: string | null;
+  bubbleColor?: string | null;
 }
 
 // Emoji list for the emoji picker
@@ -62,6 +62,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   chatIcon,
   profilePicture,
   userMessageColor,
+  bubbleColor,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -288,6 +289,9 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
+  // Use the provided bubble color or fallback to primaryColor
+  const bubbleBackgroundColor = bubbleColor || primaryColor;
+
   return (
     <div className={`fixed bottom-0 ${positionClasses.container} z-50 flex flex-col`}>
       {/* Initial message popups - only show when chat is closed */}
@@ -324,7 +328,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           {/* Chat header */}
           <div 
             className={`p-4 flex items-center justify-between border-b ${themeClasses.header}`} 
-            style={{ backgroundColor: primaryColor, color: 'white' }}
+            style={{ backgroundColor: bubbleBackgroundColor, color: getContrastColor(bubbleBackgroundColor) }}
           >
             <div className="flex items-center gap-2">
               <Avatar className="h-8 w-8 bg-white">
@@ -372,7 +376,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                         ? themeClasses.botBubble
                         : themeClasses.userBubble
                     }`}
-                    style={msg.sender === "bot" ? {} : userMessageStyle}
+                    style={msg.sender === "user" ? userMessageStyle : {}}
                   >
                     {msg.content}
                   </div>
@@ -450,16 +454,6 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                     </div>
                   )}
                 </div>
-                
-                {msg.sender === "user" && (
-                  <Avatar className="h-8 w-8 ml-2 mt-1 flex-shrink-0">
-                    {userAvatar ? (
-                      <AvatarImage src={userAvatar} alt="User" />
-                    ) : (
-                      <AvatarFallback className="bg-gray-200 text-gray-600">U</AvatarFallback>
-                    )}
-                  </Avatar>
-                )}
               </div>
             ))}
             
@@ -556,7 +550,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
       <Button
         onClick={toggleChat}
         className="rounded-full h-14 w-14 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
-        style={{ backgroundColor: primaryColor }}
+        style={{ backgroundColor: bubbleBackgroundColor }}
       >
         {isOpen ? (
           <ChevronDown size={24} className="text-white" />

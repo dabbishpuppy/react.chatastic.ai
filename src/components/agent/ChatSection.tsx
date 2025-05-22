@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -24,6 +23,7 @@ interface ChatSectionProps {
   isEmbedded?: boolean;
   userMessageColor?: string | null;
   headerColor?: string | null;
+  hideUserAvatar?: boolean;
 }
 
 // Emoji list for the emoji picker
@@ -46,6 +46,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   isEmbedded = false,
   userMessageColor = null,
   headerColor = null,
+  hideUserAvatar = false,
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
@@ -380,7 +381,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
               )}
             </div>
             
-            {!msg.isAgent && (
+            {!msg.isAgent && !hideUserAvatar && (
               <Avatar className="h-8 w-8 ml-2 mt-1 border-0">
                 <AvatarFallback className="bg-gray-200 text-gray-600">U</AvatarFallback>
               </Avatar>

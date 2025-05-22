@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -386,6 +385,7 @@ const ChatInterfaceSettings: React.FC = () => {
                 footer={settings.footer || undefined}
                 userMessageColor={settings.user_message_color}
                 headerColor={settings.bubble_color}
+                hideUserAvatar={true}
               />
             </div>
           </div>
@@ -393,7 +393,7 @@ const ChatInterfaceSettings: React.FC = () => {
           {/* Chat icon preview - aligned to the right */}
           <div className="mt-4 flex justify-end">
             <div 
-              className="h-12 w-12 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
+              className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
               style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
             >
               {settings.chat_icon ? (
