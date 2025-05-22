@@ -65,7 +65,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   // Define the config first - this is crucial
   window.wonderwaveConfig = {
     agentId: "${agentId}",
-    position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig}
+    position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig},
     debug: false // Set to true to enable debug logging
   };
   
