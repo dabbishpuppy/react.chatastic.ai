@@ -1,6 +1,6 @@
 
 import { log, logError, defaultConfig } from './utils.js';
-import { updateBubbleAppearance } from './ui.js';
+import { updateBubbleAppearance } from './bubble.js';
 
 // Global settings
 let colorSettings = null;
@@ -73,10 +73,7 @@ export async function fetchColorSettingsAndVisibility(agentId) {
               colorSettings = visibilityData;
               
               // Update existing bubble if it exists
-              const bubbleElement = document.getElementById('wonderwave-bubble');
-              if (bubbleElement) {
-                updateBubbleAppearance();
-              }
+              updateBubbleAppearance();
               
               return visibilityData;
             }
@@ -127,10 +124,7 @@ export async function fetchColorSettingsAndVisibility(agentId) {
         colorSettings = data;
         
         // Update existing bubble if it exists
-        const bubbleElement = document.getElementById('wonderwave-bubble');
-        if (bubbleElement) {
-          updateBubbleAppearance();
-        }
+        updateBubbleAppearance();
         
         return data;
       } catch (jsonError) {
