@@ -50,8 +50,14 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         `agentId: "${agentId}"`,
       ];
       
-      // The position and chat icon will be fetched dynamically from the backend
-      // No need to include them in the config as they'll be loaded from the agent settings
+      // Add position and chat icon to config when they exist in settings
+      if (settings.bubble_position) {
+        configOptions.push(`position: "${settings.bubble_position}"`);
+      }
+      
+      if (settings.chat_icon) {
+        configOptions.push(`chatIcon: "${settings.chat_icon}"`);
+      }
       
       // Improved script with more robust initialization and error handling
       return `<script>
