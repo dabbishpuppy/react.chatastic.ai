@@ -1,3 +1,4 @@
+
 /**
  * WonderWave Chat Widget v1.3
  * A lightweight embeddable chat widget for any website
@@ -20,7 +21,6 @@
     bubbleSize: '60px',
     zIndex: 999999,
     cdnDomain: 'query-spark-start.lovable.app',
-    debug: false
   };
 
   // Store for queued commands before initialization
@@ -88,30 +88,6 @@
     }
   }
   
-  // Check if a response is valid JSON
-  async function getJsonResponse(response) {
-    // First check if the response is ok
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    // Check the content type header
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        return await response.json();
-      } catch (e) {
-        logError('Failed to parse JSON response:', e);
-        throw new Error('Invalid JSON response');
-      }
-    } else {
-      // Not a JSON response
-      const text = await response.text();
-      logError('Non-JSON response received:', text.substring(0, 100) + '...');
-      throw new Error('Response is not JSON');
-    }
-  }
-  
   // Fetch color settings and agent visibility from the backend
   async function fetchColorSettingsAndVisibility(agentId) {
     if (!agentId) {
@@ -122,70 +98,76 @@
     try {
       log(`Fetching settings for agent ${agentId}`);
       
-      // First, check agent visibility
-      const visibilityUrl = `https://query-spark-start.lovable.app/api/agent-visibility/${agentId}`;
-      
+      // First, check agent visibility with better error handling
       try {
-        log('Fetching visibility from:', visibilityUrl);
-        const visibilityResponse = await fetch(visibilityUrl);
-        const visibilityData = await getJsonResponse(visibilityResponse);
+        const visibilityResponse = await fetch(`https://${defaultConfig.cdnDomain}/api/agent-visibility/${agentId}`);
         
-        log('Fetched visibility data:', visibilityData);
-        
-        // Update the private flag
-        if (visibilityData?.visibility === 'private') {
-          isPrivate = true;
-          
-          // If private, hide the chat bubble if it exists
-          if (bubbleButton) {
-            bubbleButton.style.display = 'none';
-          }
-          
-          // If the chat is already open, close it
-          if (iframe) {
-            closeChat();
-          }
-          
-          // Don't fetch color settings if agent is private
-          return null;
+        if (!visibilityResponse.ok) {
+          log(`Agent visibility check returned status: ${visibilityResponse.status}`);
+          // Don't throw, continue with public visibility as fallback
         } else {
-          isPrivate = false;
+          const visibilityData = await visibilityResponse.json();
+          log('Fetched visibility data:', visibilityData);
           
-          // If agent is now public (was private before), show the bubble
-          if (bubbleButton) {
-            bubbleButton.style.display = 'flex';
+          // Update the private flag
+          if (visibilityData?.visibility === 'private') {
+            isPrivate = true;
+            
+            // If private, hide the chat bubble if it exists
+            if (bubbleButton) {
+              bubbleButton.style.display = 'none';
+            }
+            
+            // If the chat is already open, close it
+            if (iframe) {
+              closeChat();
+            }
+            
+            // Don't fetch color settings if agent is private
+            return null;
+          } else {
+            isPrivate = false;
+            
+            // If agent is now public (was private before), show the bubble
+            if (bubbleButton) {
+              bubbleButton.style.display = 'flex';
+            }
           }
         }
       } catch (visibilityError) {
-        logError('Error fetching agent visibility:', visibilityError);
-        // Don't fail completely if visibility check fails
-        // Continue with fetching settings
+        logError('Error fetching visibility, defaulting to public:', visibilityError);
+        // Default to public if the visibility check fails
+        isPrivate = false;
       }
       
-      // Now fetch color settings since agent is public
-      const settingsUrl = `https://query-spark-start.lovable.app/api/chat-settings/${agentId}`;
-      
+      // Now fetch color settings since agent is public or visibility check failed
       try {
-        log('Fetching settings from:', settingsUrl);
-        const response = await fetch(settingsUrl);
-        const data = await getJsonResponse(response);
+        const response = await fetch(`https://${defaultConfig.cdnDomain}/api/chat-settings/${agentId}`);
         
-        if (data) {
-          log('Fetched color settings:', data);
-          
-          // Update the stored color settings
-          colorSettings = data;
-          
-          // Update existing bubble if it exists
-          if (bubbleButton) {
-            updateBubbleAppearance();
-          }
-          
-          return data;
-        } else {
-          log('No settings data returned');
+        if (!response.ok) {
+          log(`Chat settings fetch returned status: ${response.status}`);
+          // Return null but don't throw, we'll use default settings
           return null;
         }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          logError('Expected JSON response but got:', contentType);
+          return null;
+        }
+        
+        const data = await response.json();
+        log('Fetched color settings:', data);
+        
+        // Update the stored color settings
+        colorSettings = data;
+        
+        // Update existing bubble if it exists
+        if (bubbleButton) {
+          updateBubbleAppearance();
+        }
+        
+        return data;
       } catch (settingsError) {
         logError('Error fetching settings:', settingsError);
         return null;
@@ -211,6 +193,16 @@
     // Update bubble color if specified and there's no chat icon (chat icon overrides bubble color)
     if (!colorSettings.chat_icon && colorSettings.bubble_color) {
       bubbleButton.style.backgroundColor = colorSettings.bubble_color;
+    }
+    
+    // Update bubble position if specified
+    if (colorSettings.bubble_position) {
+      // Reset both positions first
+      bubbleButton.style.left = '';
+      bubbleButton.style.right = '';
+      
+      // Set the new position
+      bubbleButton.style[colorSettings.bubble_position] = '20px';
     }
     
     // If agent is private, hide the bubble
@@ -278,10 +270,15 @@
           }
           // Don't set headerColor so it defaults to white/default
         }
-
-        // Apply position from settings if available
+        
+        // Apply position from backend settings
         if (settings.bubble_position) {
           config.position = settings.bubble_position;
+        }
+        
+        // Apply chat icon from backend settings
+        if (settings.chat_icon) {
+          config.chatIcon = settings.chat_icon;
         }
       }
       
@@ -328,10 +325,13 @@
     bubbleButton = document.createElement('div');
     bubbleButton.id = 'wonderwave-bubble';
     
-    // Use custom chat icon if specified in settings, otherwise use default
+    // Use custom chat icon if specified in config or settings, otherwise use default
     if (colorSettings && colorSettings.chat_icon) {
       log('Using custom chat icon from settings:', colorSettings.chat_icon);
       bubbleButton.innerHTML = `<img src="${colorSettings.chat_icon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
+    } else if (config.chatIcon) {
+      log('Using custom chat icon from config:', config.chatIcon);
+      bubbleButton.innerHTML = `<img src="${config.chatIcon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
     } else {
       log('Using default chat icon');
       bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
@@ -682,7 +682,9 @@
       const config = { ...defaultConfig, ...(window.wonderwaveConfig || {}) };
       
       // Use custom chat icon if specified in config, otherwise use default
-      if (config.chatIcon) {
+      if (colorSettings && colorSettings.chat_icon) {
+        bubbleButton.innerHTML = `<img src="${colorSettings.chat_icon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
+      } else if (config.chatIcon) {
         bubbleButton.innerHTML = `<img src="${config.chatIcon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
       } else {
         bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;

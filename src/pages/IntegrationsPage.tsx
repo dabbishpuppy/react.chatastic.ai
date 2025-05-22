@@ -25,7 +25,6 @@ const IntegrationsPage: React.FC = () => {
   // Add state for agent visibility
   const [visibility, setVisibility] = useState<string>("public");
   const [visibilityLoading, setVisibilityLoading] = useState<boolean>(true);
-  const [visibilityError, setVisibilityError] = useState<string | null>(null);
   
   // Fetch agent visibility when the component mounts
   useEffect(() => {
@@ -33,9 +32,6 @@ const IntegrationsPage: React.FC = () => {
       if (!agentId) return;
       
       try {
-        setVisibilityLoading(true);
-        setVisibilityError(null);
-        
         const { data, error } = await supabase
           .from('agents')
           .select('visibility')
@@ -44,7 +40,6 @@ const IntegrationsPage: React.FC = () => {
           
         if (error) {
           console.error("Error fetching agent visibility:", error);
-          setVisibilityError("Failed to fetch agent visibility status");
           return;
         }
         
@@ -53,7 +48,6 @@ const IntegrationsPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Error in fetchAgentVisibility:", error);
-        setVisibilityError("An unexpected error occurred while checking agent visibility");
       } finally {
         setVisibilityLoading(false);
       }
@@ -124,7 +118,7 @@ const IntegrationsPage: React.FC = () => {
   const renderVisibilityWarning = () => {
     if (visibility === "private") {
       return (
-        <Alert variant="warning" className="mb-6">
+        <Alert variant="destructive" className="mb-6">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Private Agent</AlertTitle>
           <AlertDescription>
@@ -139,20 +133,6 @@ const IntegrationsPage: React.FC = () => {
           >
             Go to Security Settings
           </Button>
-        </Alert>
-      );
-    }
-    return null;
-  };
-
-  // Display error message if there was an error fetching visibility
-  const renderError = () => {
-    if (visibilityError) {
-      return (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{visibilityError}</AlertDescription>
         </Alert>
       );
     }
