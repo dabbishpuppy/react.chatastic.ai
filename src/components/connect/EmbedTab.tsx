@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,17 +47,17 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
     if (embedType === "bubble") {
       // Include chat icon in config if available
       const chatIconConfig = settings.chat_icon ? 
-        `\n      chatIcon: "${settings.chat_icon}", // Custom chat icon` : '';
+        `\n      chatIcon: "${settings.chat_icon}",` : '';
         
       // Add user message color if available
       const userMessageColorConfig = settings.user_message_color ? 
-        `\n      userMessageColor: "${settings.user_message_color}", // User message color` : '';
+        `\n      userMessageColor: "${settings.user_message_color}",` : '';
         
       // Add bubble color (use user message color if sync is enabled, otherwise use primary color)
       const bubbleColorConfig = settings.sync_colors && settings.user_message_color ? 
-        `\n      bubbleColor: "${settings.user_message_color}", // Chat bubble color` : 
+        `\n      bubbleColor: "${settings.user_message_color}",` : 
         settings.primary_color ? 
-        `\n      bubbleColor: "${settings.primary_color}", // Chat bubble color` : '';
+        `\n      bubbleColor: "${settings.primary_color}",` : '';
       
       // Improved script with more robust initialization and error handling
       return `<script>
@@ -64,7 +65,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   // Define the config first - this is crucial
   window.wonderwaveConfig = {
     agentId: "${agentId}",
-    position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig},
+    position: "${settings.bubble_position || 'right'}"${chatIconConfig}${userMessageColorConfig}${bubbleColorConfig}
     debug: false // Set to true to enable debug logging
   };
   
