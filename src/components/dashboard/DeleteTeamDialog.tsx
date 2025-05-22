@@ -12,14 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-
-interface Team {
-  id: string;
-  name: string;
-  isActive: boolean;
-  agents: any[];
-  metrics?: any;
-}
+import { Team } from "@/types/dashboard";
 
 interface DeleteTeamDialogProps {
   open: boolean;
@@ -73,12 +66,12 @@ const DeleteTeamDialog: React.FC<DeleteTeamDialogProps> = ({
         
         <div className="py-4">
           <label className="text-sm font-medium block mb-2">
-            Please type your team name to confirm
+            Type {team.name} to confirm
           </label>
           <Input
             value={confirmName}
             onChange={(e) => setConfirmName(e.target.value)}
-            placeholder="Enter team name to confirm"
+            placeholder={`Type "${team.name}" to confirm`}
           />
         </div>
 
