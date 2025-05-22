@@ -57,9 +57,9 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   })();
 </script>`;
     } else {
-      // Iframe embedding with the correct agent path that honors chat settings
+      // Iframe embedding with the correct agent path that exists
       return `<iframe
-  src="https://query-spark-start.lovable.app/chat/${agentId}"
+  src="https://query-spark-start.lovable.app/embed/${agentId}"
   width="100%" 
   height="600px"
   frameborder="0"
