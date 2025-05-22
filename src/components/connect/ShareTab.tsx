@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
+import { useParams } from "react-router-dom";
 
 export const ShareTab: React.FC = () => {
-  const demoUrl = "https://www.example.com/chatbot-iframe/YOURUNIQUEID";
+  const { agentId } = useParams();
+  const demoUrl = `https://query-spark-start.lovable.app/embed/${agentId || 'YOURUNIQUEID'}`;
   const [copyText, setCopyText] = useState("Copy");
   
   const handleCopy = () => {
@@ -31,9 +33,9 @@ export const ShareTab: React.FC = () => {
           <CardDescription>Share your agent with others</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <h3 className="text-lg font-medium">www.example.com</h3>
+          <h3 className="text-lg font-medium">Direct Link</h3>
           <p className="text-sm text-gray-500">
-            To add the agent anywhere on your website, add this iframe to your html code
+            Share this link to let others chat with your agent directly
           </p>
           
           <div className="relative border rounded-md bg-gray-50 p-4">

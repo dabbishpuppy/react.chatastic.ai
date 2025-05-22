@@ -53,21 +53,22 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         configOptions.push(`chatIcon: "${settings.chat_icon}"`);
       }
       
-      // Add user message color if available
+      // Set user message color if available
       if (settings.user_message_color) {
         configOptions.push(`userMessageColor: "${settings.user_message_color}"`);
       }
       
-      // Add bubble color (use user message color if sync is enabled, otherwise use primary color)
+      // Apply colors based on sync setting
       if (settings.sync_colors && settings.user_message_color) {
+        // When sync is enabled, use user message color for both bubble and header
         configOptions.push(`bubbleColor: "${settings.user_message_color}"`);
-      } else if (settings.primary_color) {
-        configOptions.push(`bubbleColor: "${settings.primary_color}"`);
-      }
-
-      // Only add header color if sync is enabled, otherwise default to white by not setting
-      if (settings.sync_colors && settings.user_message_color) {
         configOptions.push(`headerColor: "${settings.user_message_color}"`);
+      } else {
+        // When sync is disabled, use primary color for bubble (if available) and don't set headerColor
+        // Not setting headerColor will default to white in the widget
+        if (settings.primary_color) {
+          configOptions.push(`bubbleColor: "${settings.primary_color}"`);
+        }
       }
       
       // Add debug option
@@ -139,15 +140,16 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         params.push(`theme=${encodeURIComponent(settings.theme)}`);
       }
       
+      // Always add userColor if it exists
       if (settings.user_message_color) {
         params.push(`userColor=${encodeURIComponent(settings.user_message_color)}`);
       }
       
-      // Only add header color if sync is enabled
+      // Only add headerColor when sync is enabled
       if (settings.sync_colors && settings.user_message_color) {
         params.push(`headerColor=${encodeURIComponent(settings.user_message_color)}`);
       }
-      // Do not add headerColor when sync is disabled (white/default will be used)
+      // When sync is disabled, don't add headerColor so it defaults to white/default
       
       if (params.length > 0) {
         iframeSrc += `?${params.join('&')}`;

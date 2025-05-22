@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -19,7 +18,13 @@ const EmbeddedChat: React.FC = () => {
   // Use URL parameters if provided, otherwise use settings
   const theme = themeParam || settings.theme;
   const userMessageColor = userColorParam || settings.user_message_color;
-  const headerColor = headerColorParam || (settings.sync_colors ? settings.user_message_color : null);
+  
+  // For header color:
+  // 1. Use headerColorParam if provided in URL
+  // 2. If not in URL but sync is enabled, use user message color
+  // 3. Otherwise, use null to get default white header
+  const headerColor = headerColorParam || 
+    (settings.sync_colors ? settings.user_message_color : null);
   
   // Add effect to prevent parent page scrolling when interacting with the iframe
   useEffect(() => {

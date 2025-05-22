@@ -353,13 +353,13 @@
     }
     
     // Append theme and color parameters 
-    if (config.theme || config.userMessageColor || config.bubbleColor) {
+    if (config.theme || config.userMessageColor || config.headerColor) {
       const separator = iframeSrc.includes('?') ? '&' : '?';
       let params = [];
       
       if (config.theme) params.push(`theme=${encodeURIComponent(config.theme)}`);
       if (config.userMessageColor) params.push(`userColor=${encodeURIComponent(config.userMessageColor)}`);
-      if (config.bubbleColor) params.push(`headerColor=${encodeURIComponent(config.bubbleColor)}`);
+      if (config.headerColor) params.push(`headerColor=${encodeURIComponent(config.headerColor)}`);
       
       iframeSrc += separator + params.join('&');
     }
