@@ -19,6 +19,7 @@ interface ChatSectionProps {
   profilePicture?: string;
   chatIcon?: string;
   footer?: string | null;
+  footerClassName?: string; // Added footerClassName prop
 }
 
 // Emoji list for the emoji picker
@@ -37,6 +38,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   profilePicture,
   chatIcon,
   footer,
+  footerClassName = "", // Default to empty string
 }) => {
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
@@ -411,7 +413,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         
         {/* Footer */}
         {footer && (
-          <div className={`mt-3 text-xs text-center ${themeClasses.text}`}>
+          <div className={`mt-3 text-xs text-center ${themeClasses.text} ${footerClassName}`}>
             {footer}
           </div>
         )}

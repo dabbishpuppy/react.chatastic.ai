@@ -36,6 +36,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
     if(!window.wonderwaveConfig) {
       window.wonderwaveConfig = {
         agentId: "${agentId}",
+        position: "right" // Set the position to "right" or "left"
       };
     }
     
@@ -54,10 +55,10 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   })();
 </script>`;
     } else {
-      // Iframe embedding with a working URL
+      // Iframe embedding with a working URL that points to the agent page
       return `<iframe
   src="https://query-spark-start.lovable.app/embed/${agentId}"
-  width="100%"
+  width="100%" 
   height="600px"
   frameborder="0"
   allow="microphone"
@@ -88,6 +89,9 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     <p className="text-sm text-gray-500 mb-4">
                       Embed a chat bubble on your website that opens a chatbot when clicked. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
+                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
+                      <strong>Important:</strong> The position setting (right or left) in the code must match your chat interface settings.
+                    </div>
                   </div>
                 </div>
               </div>
@@ -103,6 +107,9 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
                     <p className="text-sm text-gray-500 mb-4">
                       Add the agent anywhere on your website as an embedded chat window. Customize the appearance in your <Link to={`/agent/${agentId}/settings/chat-interface`} className="text-blue-600 hover:underline">chat interface settings</Link>.
                     </p>
+                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
+                      <strong>Note:</strong> You can adjust the width and height parameters to fit your website layout.
+                    </div>
                   </div>
                 </div>
               </div>
