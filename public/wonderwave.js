@@ -106,31 +106,43 @@
           log(`Agent visibility check returned status: ${visibilityResponse.status}`);
           // Don't throw, continue with public visibility as fallback
         } else {
-          const visibilityData = await visibilityResponse.json();
-          log('Fetched visibility data:', visibilityData);
-          
-          // Update the private flag
-          if (visibilityData?.visibility === 'private') {
-            isPrivate = true;
-            
-            // If private, hide the chat bubble if it exists
-            if (bubbleButton) {
-              bubbleButton.style.display = 'none';
-            }
-            
-            // If the chat is already open, close it
-            if (iframe) {
-              closeChat();
-            }
-            
-            // Don't fetch color settings if agent is private
-            return null;
+          // Check if response is JSON before parsing
+          const contentType = visibilityResponse.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            log(`Expected JSON response for visibility but got: ${contentType}`);
+            // Continue with default public visibility
           } else {
-            isPrivate = false;
-            
-            // If agent is now public (was private before), show the bubble
-            if (bubbleButton) {
-              bubbleButton.style.display = 'flex';
+            try {
+              const visibilityData = await visibilityResponse.json();
+              log('Fetched visibility data:', visibilityData);
+              
+              // Update the private flag
+              if (visibilityData?.visibility === 'private') {
+                isPrivate = true;
+                
+                // If private, hide the chat bubble if it exists
+                if (bubbleButton) {
+                  bubbleButton.style.display = 'none';
+                }
+                
+                // If the chat is already open, close it
+                if (iframe) {
+                  closeChat();
+                }
+                
+                // Don't fetch color settings if agent is private
+                return null;
+              } else {
+                isPrivate = false;
+                
+                // If agent is now public (was private before), show the bubble
+                if (bubbleButton) {
+                  bubbleButton.style.display = 'flex';
+                }
+              }
+            } catch (jsonError) {
+              logError('Error parsing visibility JSON:', jsonError);
+              // Continue with default public visibility
             }
           }
         }
@@ -156,18 +168,23 @@
           return null;
         }
         
-        const data = await response.json();
-        log('Fetched color settings:', data);
-        
-        // Update the stored color settings
-        colorSettings = data;
-        
-        // Update existing bubble if it exists
-        if (bubbleButton) {
-          updateBubbleAppearance();
+        try {
+          const data = await response.json();
+          log('Fetched color settings:', data);
+          
+          // Update the stored color settings
+          colorSettings = data;
+          
+          // Update existing bubble if it exists
+          if (bubbleButton) {
+            updateBubbleAppearance();
+          }
+          
+          return data;
+        } catch (jsonError) {
+          logError('Error parsing settings JSON:', jsonError);
+          return null;
         }
-        
-        return data;
       } catch (settingsError) {
         logError('Error fetching settings:', settingsError);
         return null;

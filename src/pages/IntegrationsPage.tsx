@@ -26,6 +26,7 @@ const IntegrationsPage: React.FC = () => {
   // Add state for agent visibility
   const [visibility, setVisibility] = useState<string>("public");
   const [visibilityLoading, setVisibilityLoading] = useState<boolean>(true);
+  const [visibilityError, setVisibilityError] = useState<boolean>(false);
   
   // Fetch agent visibility when the component mounts
   useEffect(() => {
@@ -33,22 +34,28 @@ const IntegrationsPage: React.FC = () => {
       if (!agentId) return;
       
       try {
+        setVisibilityError(false);
         const { data, error } = await supabase
           .from('agents')
           .select('visibility')
           .eq('id', agentId)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to avoid PGRST116 error
           
         if (error) {
           console.error("Error fetching agent visibility:", error);
+          setVisibilityError(true);
           return;
         }
         
         if (data) {
           setVisibility(data.visibility);
+        } else {
+          // Default to public if no data is found
+          setVisibility("public");
         }
       } catch (error) {
         console.error("Error in fetchAgentVisibility:", error);
+        setVisibilityError(true);
       } finally {
         setVisibilityLoading(false);
       }
@@ -140,8 +147,29 @@ const IntegrationsPage: React.FC = () => {
     return null;
   };
 
+  // Render error message if visibility fetch fails
+  const renderVisibilityError = () => {
+    if (visibilityError) {
+      return (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            There was a problem fetching the agent's visibility status. The preview may not be available.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    return null;
+  };
+
   // Render the appropriate tab content based on the URL parameter
   const renderTabContent = () => {
+    // Show error if visibility fetch failed
+    if (visibilityError) {
+      return renderVisibilityError();
+    }
+    
     // If agent is private, don't show the regular tab content
     if (visibility === "private") {
       return renderVisibilityWarning();
@@ -191,7 +219,7 @@ const IntegrationsPage: React.FC = () => {
         </div>
         
         {/* Preview the chatbot widget with current settings - only show on embed tab */}
-        {settings && tab === "embed" && visibility === "public" && (
+        {settings && tab === "embed" && visibility === "public" && !visibilityError && (
           <ChatbotWidget 
             productName="Your Website"
             botName={settings.display_name}
