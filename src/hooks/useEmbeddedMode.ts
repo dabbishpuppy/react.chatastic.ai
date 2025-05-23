@@ -26,15 +26,16 @@ export const useEmbeddedMode = (
           setTimeUntilReset(event.data.timeUntilReset || null);
           
           if (event.data.timeUntilReset) {
+            let currentTime = event.data.timeUntilReset;
             const interval = setInterval(() => {
-              setTimeUntilReset(prev => {
-                if (prev === null || prev <= 1) {
-                  clearInterval(interval);
-                  setRateLimitError(null);
-                  return null;
-                }
-                return prev - 1;
-              });
+              currentTime = currentTime - 1;
+              if (currentTime <= 0) {
+                clearInterval(interval);
+                setRateLimitError(null);
+                setTimeUntilReset(null);
+              } else {
+                setTimeUntilReset(currentTime);
+              }
             }, 1000);
           }
         }
