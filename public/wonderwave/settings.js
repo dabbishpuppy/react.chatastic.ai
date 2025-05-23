@@ -1,4 +1,3 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
 
