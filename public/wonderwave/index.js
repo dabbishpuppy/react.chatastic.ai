@@ -26,25 +26,6 @@ import { log, logError } from './utils.js';
   // Add the command queue to the API
   window.wonderwave.q = window.wonderwave.q || [];
   
-  // Log that the script has loaded
-  log('WonderWave script loaded');
-  
-  // Function to ensure the chat bubble is created
-  const ensureBubbleExists = () => {
-    log('Ensuring bubble exists');
-    const bubbleExists = document.getElementById('wonderwave-bubble');
-    if (!bubbleExists && window.wonderwaveConfig) {
-      log('No bubble found, creating one');
-      import('./bubble.js').then(({ createBubbleButton }) => {
-        createBubbleButton(window.wonderwaveConfig);
-      }).catch(err => {
-        logError('Error importing bubble module:', err);
-      });
-    } else {
-      log('Bubble already exists or no config found');
-    }
-  };
-  
   // Add event listener for when the DOM is fully loaded
   document.addEventListener('DOMContentLoaded', function() {
     log('DOM loaded, checking for auto-initialization');
@@ -53,9 +34,6 @@ import { log, logError } from './utils.js';
     if (window.wonderwaveConfig) {
       log('Config found, auto-initializing');
       init();
-      
-      // Ensure bubble is created after a small delay
-      setTimeout(ensureBubbleExists, 500);
     }
   });
   
@@ -65,14 +43,7 @@ import { log, logError } from './utils.js';
     
     if (window.wonderwaveConfig) {
       log('Config found, auto-initializing');
-      setTimeout(() => {
-        init();
-        // Ensure bubble is created after a small delay
-        setTimeout(ensureBubbleExists, 500);
-      }, 0); // Use setTimeout to ensure this runs after the script execution
+      setTimeout(init, 0); // Use setTimeout to ensure this runs after the script execution
     }
   }
-  
-  // Set up a periodic check to ensure the bubble exists
-  setInterval(ensureBubbleExists, 5000);
 })();

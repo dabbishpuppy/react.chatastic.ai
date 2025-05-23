@@ -24,21 +24,19 @@ export function createBubbleButton(config) {
   Object.assign(bubbleButton.style, {
     position: 'fixed',
     bottom: '20px',
-    [config.position || 'right']: '20px',
-    width: config.bubbleSize || '60px',
-    height: config.bubbleSize || '60px',
+    [config.position]: '20px',
+    width: config.bubbleSize,
+    height: config.bubbleSize,
     borderRadius: '50%',
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
     cursor: 'pointer',
-    zIndex: config.zIndex || '9999',
+    zIndex: config.zIndex,
     display: isAgentPrivate() ? 'none' : 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
     overflow: 'hidden',
   });
-
-  log(`Bubble created with position: ${config.position || 'right'}, visibility: ${isAgentPrivate() ? 'hidden' : 'visible'}`);
 
   // Set the content based on availability of chat icon
   updateBubbleContent(config);
@@ -61,7 +59,6 @@ export function createBubbleButton(config) {
   // Add click handler
   bubbleButton.onclick = function() {
     if (!isAgentPrivate()) {
-      log('Bubble clicked, toggling chat');
       // Import dynamically to avoid circular dependencies
       import('./chat.js').then(({ toggleChat }) => {
         toggleChat();
@@ -72,22 +69,15 @@ export function createBubbleButton(config) {
   // Append to the document
   document.body.appendChild(bubbleButton);
   log('Bubble button created and added to DOM');
-
-  // Return for chaining
-  return bubbleButton;
 }
 
 /**
  * Update the bubble content (icon or default chat icon)
  */
 export function updateBubbleContent(config) {
-  if (!bubbleButton) {
-    log('No bubble button found to update content');
-    return;
-  }
+  if (!bubbleButton) return;
   
   const colorSettings = getColorSettings();
-  log('Updating bubble content with settings:', colorSettings);
   
   // Use custom chat icon if specified in config or settings, otherwise use default
   if (colorSettings && colorSettings.chat_icon) {
@@ -116,13 +106,10 @@ export function updateBubbleContent(config) {
     let bubbleColor;
     if (colorSettings && colorSettings.bubble_color) {
       bubbleColor = colorSettings.bubble_color;
-      log('Using bubble color from settings:', bubbleColor);
-    } else if (config && config.bubbleColor) {
+    } else if (config.bubbleColor) {
       bubbleColor = config.bubbleColor;
-      log('Using bubble color from config:', bubbleColor);
     } else {
-      bubbleColor = defaultConfig.bubbleColor || '#3B82F6';
-      log('Using default bubble color:', bubbleColor);
+      bubbleColor = defaultConfig.bubbleColor;
     }
     bubbleButton.style.backgroundColor = bubbleColor;
     bubbleButton.style.color = '#FFFFFF';
@@ -137,17 +124,7 @@ export function updateBubbleAppearance() {
   const colorSettings = getColorSettings();
   const config = window.wonderwaveConfig || defaultConfig;
   
-  if (!existingBubble) {
-    log('No bubble found to update appearance, creating one');
-    return createBubbleButton(config);
-  }
-  
-  if (!colorSettings) {
-    log('No color settings available for bubble appearance update');
-    return;
-  }
-  
-  log('Updating bubble appearance with settings:', colorSettings);
+  if (!existingBubble || !colorSettings) return;
   
   // Update the bubble content
   bubbleButton = existingBubble;
@@ -155,7 +132,6 @@ export function updateBubbleAppearance() {
   
   // Update bubble position if specified
   if (colorSettings.bubble_position) {
-    log(`Setting bubble position to ${colorSettings.bubble_position}`);
     // Reset both positions first
     existingBubble.style.left = '';
     existingBubble.style.right = '';
@@ -167,13 +143,9 @@ export function updateBubbleAppearance() {
   // If agent is private, hide the bubble
   if (isAgentPrivate()) {
     existingBubble.style.display = 'none';
-    log('Agent is private, hiding bubble');
   } else if (existingBubble.style.display === 'none') {
     existingBubble.style.display = 'flex';
-    log('Agent is public, showing bubble');
   }
-  
-  return existingBubble;
 }
 
 /**
@@ -189,11 +161,3 @@ export function getBubbleButton() {
 export function setBubbleButton(button) {
   bubbleButton = button;
 }
-
-// Create bubble immediately when imported if config exists
-setTimeout(() => {
-  if (window.wonderwaveConfig) {
-    log('Attempting immediate bubble creation on module import');
-    createBubbleButton(window.wonderwaveConfig);
-  }
-}, 100);
