@@ -17,6 +17,7 @@ const SecuritySettings: React.FC = () => {
   const [rateLimitTime, setRateLimitTime] = useState("240");
   const [rateLimitMessage, setRateLimitMessage] = useState("Too many messages in a row");
   const [isSaving, setIsSaving] = useState(false);
+  const [hasAccess, setHasAccess] = useState(true);
   
   // Fetch the current visibility setting when component mounts
   useEffect(() => {
@@ -31,17 +32,24 @@ const SecuritySettings: React.FC = () => {
       
       if (data) {
         setVisibility(data.visibility);
-      } else {
-        // If no agent is found, keep the default "public" visibility
+        setHasAccess(true);
+      } else if (data === null) {
+        // Agent not found
         console.log("No agent found with ID:", agentId);
+        setHasAccess(false);
+      } else if (data.visibility === 'private') {
+        // Agent exists but is private, could be access issue
+        setVisibility('private');
+        setHasAccess(false);
       }
     } catch (error) {
       console.error("Error in fetchAgentVisibility:", error);
+      setHasAccess(false);
     }
   };
 
   const handleSave = async () => {
-    if (!agentId) return;
+    if (!agentId || !hasAccess) return;
     
     setIsSaving(true);
     
@@ -65,7 +73,7 @@ const SecuritySettings: React.FC = () => {
         const timestamp = new Date().getTime();
         // Make multiple requests with different cache-busting params to ensure all CDN caches are invalidated
         await Promise.all([
-          fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`, {
+          fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`, {
             method: 'GET',
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -73,7 +81,7 @@ const SecuritySettings: React.FC = () => {
               'Expires': '0'
             }
           }),
-          fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_nocache=${timestamp}`, {
+          fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_nocache=${timestamp}`, {
             method: 'GET',
             headers: {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -101,6 +109,24 @@ const SecuritySettings: React.FC = () => {
       setIsSaving(false);
     }
   };
+
+  if (!hasAccess) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Security</CardTitle>
+            <CardDescription>You don't have access to modify this agent's security settings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500">
+              This agent either doesn't exist or you don't have the necessary permissions to modify its settings.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

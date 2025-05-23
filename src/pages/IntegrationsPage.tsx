@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
-import { supabase } from "@/integrations/supabase/client";
+import { getAgentVisibility } from "@/services/agentVisibilityService";
 import { IntegrationsContent } from "@/components/connect/integrations/IntegrationsContent";
 import { TabNavigation } from "@/components/connect/integrations/TabNavigation";
 import { ChatbotPreview } from "@/components/connect/integrations/ChatbotPreview";
@@ -30,28 +30,23 @@ const IntegrationsPage: React.FC = () => {
       
       try {
         setVisibilityError(false);
-        const { data, error } = await supabase
-          .from('agents')
-          .select('visibility')
-          .eq('id', agentId)
-          .maybeSingle();
-          
-        if (error) {
-          console.error("Error fetching agent visibility:", error);
-          setVisibilityError(true);
-          return;
-        }
+        const data = await getAgentVisibility(agentId);
         
         if (data) {
           setVisibility(data.visibility);
-        } else {
-          // Default to public if no agent is found
+        } else if (data === null) {
+          // Agent not found
           console.log("No agent found with ID:", agentId);
+          setVisibility("private");
+          setVisibilityError(true);
+        } else {
+          // Default to public if we get some other response
           setVisibility("public");
         }
       } catch (error) {
         console.error("Error in fetchAgentVisibility:", error);
         setVisibilityError(true);
+        setVisibility("private"); // Default to private on error for security
       } finally {
         setVisibilityLoading(false);
       }
