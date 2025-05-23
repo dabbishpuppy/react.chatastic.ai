@@ -45,6 +45,14 @@ export const useMessageHandling = (
     setUserHasMessaged(true);
     setIsTyping(true);
     
+    // Reset waiting state immediately to re-enable input
+    setIsWaitingForRateLimit(false);
+    
+    // Focus input field after clearing message
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
+    
     setTimeout(() => {
       setIsTyping(false);
       setChatHistory(prev => [...prev, {
@@ -52,6 +60,11 @@ export const useMessageHandling = (
         content: "I'm here to help you with any questions or tasks!",
         timestamp: new Date().toISOString()
       }]);
+      
+      // Focus input field again after agent response
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 10);
       
       if (isEmbedded && window.self !== window.top) {
         setTimeout(() => {
@@ -92,9 +105,10 @@ export const useMessageHandling = (
   const handleSuggestedMessageClick = (text: string) => {
     submitMessage(text);
     
-    if (isEmbedded) {
-      setTimeout(() => inputRef.current?.focus(), 0);
-    }
+    // Focus input field after suggested message click for all modes
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
   };
 
   const copyMessageToClipboard = (content: string) => {
@@ -129,11 +143,21 @@ export const useMessageHandling = (
         content: "Here's an alternative response to your question.",
         timestamp: new Date().toISOString()
       }]);
+      
+      // Focus input field after regenerate
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 10);
     }, 1500);
   };
 
   const insertEmoji = (emoji: string) => {
     setMessage(prev => prev + emoji);
+    
+    // Focus input field after emoji insertion
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
   };
 
   return {
