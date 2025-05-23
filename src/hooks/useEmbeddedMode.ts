@@ -1,6 +1,5 @@
 
 import { useEffect, useRef } from "react";
-import { toast } from "@/components/ui/use-toast";
 
 export const useEmbeddedMode = (
   isEmbedded: boolean,
@@ -49,13 +48,6 @@ export const useEmbeddedMode = (
           setTimeUntilReset(event.data.timeUntilReset || null);
           pendingMessageRef.current = null;
           
-          // Show toast notification for rate limit
-          toast({
-            title: "Rate Limit Reached",
-            description: event.data.message || 'Too many messages. Please wait and try again.',
-            variant: "destructive",
-          });
-          
           if (event.data.timeUntilReset) {
             let currentTime = event.data.timeUntilReset;
             const interval = setInterval(() => {
@@ -96,14 +88,14 @@ export const useEmbeddedMode = (
       return;
     }
 
-    // Show waiting state with placeholder
-    setIsWaitingForRateLimit(true);
-    setRateLimitError(null);
-    
     console.log('Sending message to parent for rate limit check:', messageContent);
     
     // Store the message for fallback
     pendingMessageRef.current = messageContent;
+    
+    // Set waiting state
+    setIsWaitingForRateLimit(true);
+    setRateLimitError(null);
     
     // Send message to parent
     window.parent.postMessage({
