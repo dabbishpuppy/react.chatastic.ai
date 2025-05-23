@@ -58,6 +58,9 @@ export function showPopups(config) {
 function showPopupMessage(message, index, config, container) {
   const popup = document.createElement('div');
   
+  // Add a flag to track removal state
+  popup._isRemoving = false;
+  
   // Style the popup
   Object.assign(popup.style, {
     backgroundColor: '#FFFFFF',
@@ -97,32 +100,59 @@ function showPopupMessage(message, index, config, container) {
     popup.style.transform = 'translateY(0)';
   }, 10);
   
-  // Auto dismiss after a while
-  setTimeout(() => {
+  // Safe removal function
+  const safeRemovePopup = () => {
+    // Prevent multiple removal attempts
+    if (popup._isRemoving) {
+      return;
+    }
+    popup._isRemoving = true;
+    
     popup.style.opacity = '0';
     popup.style.transform = 'translateY(10px)';
     
     setTimeout(() => {
-      if (container.contains(popup)) {
-        container.removeChild(popup);
+      // Double-check that the popup still exists and has a parent before removing
+      if (popup && popup.parentNode && container.contains(popup)) {
+        try {
+          popup.remove(); // Use modern remove() method instead of removeChild
+        } catch (error) {
+          log('Error removing popup:', error);
+        }
       }
       
-      // Remove container if empty
-      if (container.children.length === 0) {
-        document.body.removeChild(container);
-      }
+      // Clean up container if empty
+      cleanupContainer(container);
     }, 300);
+  };
+  
+  // Auto dismiss after a while
+  setTimeout(() => {
+    safeRemovePopup();
   }, 8000); // Show for 8 seconds
   
   // Click to dismiss
   popup.onclick = function() {
-    popup.style.opacity = '0';
-    popup.style.transform = 'translateY(10px)';
-    
-    setTimeout(() => {
-      if (container.contains(popup)) {
-        container.removeChild(popup);
-      }
-    }, 300);
+    safeRemovePopup();
   };
+}
+
+/**
+ * Safely clean up the popups container
+ */
+function cleanupContainer(container) {
+  // Add a small delay to allow for any pending operations
+  setTimeout(() => {
+    // Check if container still exists and is empty
+    if (container && container.parentNode && container.children.length === 0) {
+      try {
+        // Check if the container is still in the DOM before removing
+        if (document.body.contains(container)) {
+          container.remove(); // Use modern remove() method
+        }
+      } catch (error) {
+        log('Error removing popups container:', error);
+      }
+    }
+  }, 100);
 }
