@@ -1,3 +1,4 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { getBubbleButton } from './ui.js';
@@ -207,7 +208,7 @@ function handleMessageSend(messageData) {
     recordMessage(config.agentId, currentRateLimitSettings);
   }
   
-  // Allow the message to be sent
+  // Allow the message to be sent immediately
   try {
     const allowMessage = {
       type: 'message-allowed',

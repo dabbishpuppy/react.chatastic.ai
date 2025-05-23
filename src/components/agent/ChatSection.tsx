@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { RefreshCw, SendIcon, Settings, Copy, ThumbsUp, ThumbsDown, Smile } from
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChatMessage } from "@/types/chatInterface";
+import { AlertCircle } from "lucide-react";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -162,22 +162,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       return () => window.removeEventListener('message', handleMessage);
     }
   }, [isEmbedded, message]);
-
-  // Add timeout mechanism for rate limit check
-  useEffect(() => {
-    if (isWaitingForRateLimit) {
-      console.log('Setting timeout for rate limit check');
-      const timeout = setTimeout(() => {
-        console.log('Rate limit timeout - proceeding with message');
-        setIsWaitingForRateLimit(false);
-        setRateLimitError(null);
-        // If no response from parent after 5 seconds, proceed with message
-        proceedWithMessage(message);
-      }, 5000);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [isWaitingForRateLimit, message]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -486,24 +470,20 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             </div>
           </div>
         )}
-
-        {/* Rate limit error message */}
+        
+        {/* Rate limit error message - Moved here for better visibility */}
         {rateLimitError && (
-          <div className="flex mb-4">
-            <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-              {profilePicture ? (
-                <AvatarImage src={profilePicture} alt={agentName} />
-              ) : (
-                <AvatarFallback className="bg-red-100 text-red-600">!</AvatarFallback>
-              )}
-            </Avatar>
-            <div className="rounded-lg p-3 max-w-[80%] bg-red-50 border border-red-200">
-              <p className="text-red-700 text-sm">{rateLimitError}</p>
-              {timeUntilReset && (
-                <p className="text-red-600 text-xs mt-1">
-                  Try again in {timeUntilReset} seconds
-                </p>
-              )}
+          <div className="p-3 border-t border-b bg-red-50">
+            <div className="flex items-start">
+              <AlertCircle className="text-red-600 h-5 w-5 mt-0.5 mr-2 flex-shrink-0" />
+              <div>
+                <p className="text-red-700 text-sm font-medium">{rateLimitError}</p>
+                {timeUntilReset && (
+                  <p className="text-red-600 text-xs mt-1">
+                    Try again in {timeUntilReset} seconds
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -511,8 +491,25 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Fixed footer section with suggestions and input */}
+      {/* Fixed footer section with rate limit error, suggestions, and input */}
       <div className={`flex-shrink-0 ${themeClasses.background}`}>
+        {/* Rate limit error message - Moved here for better visibility */}
+        {rateLimitError && (
+          <div className="p-3 border-t border-b bg-red-50">
+            <div className="flex items-start">
+              <AlertCircle className="text-red-600 h-5 w-5 mt-0.5 mr-2 flex-shrink-0" />
+              <div>
+                <p className="text-red-700 text-sm font-medium">{rateLimitError}</p>
+                {timeUntilReset && (
+                  <p className="text-red-600 text-xs mt-1">
+                    Try again in {timeUntilReset} seconds
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Suggested Messages */}
         {shouldShowSuggestions && suggestedMessages.length > 0 && (
           <div className={`p-4 border-t ${themeClasses.background}`}>
