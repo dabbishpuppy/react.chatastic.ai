@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, SendIcon, Settings, Copy, ThumbsUp, ThumbsDown, Smile } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChatMessage } from "@/types/chatInterface";
-import { AlertCircle } from "lucide-react";
+import ChatHeader from "./chat/ChatHeader";
+import ChatMessage as ChatMessageComponent from "./chat/ChatMessage";
+import ChatInput from "./chat/ChatInput";
+import LoadingDots from "./chat/LoadingDots";
+import RateLimitError from "./chat/RateLimitError";
+import SuggestedMessages from "./chat/SuggestedMessages";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -27,8 +28,23 @@ interface ChatSectionProps {
   hideUserAvatar?: boolean;
 }
 
-// Emoji list for the emoji picker
-const emojis = ["😊", "👍", "👋", "🙏", "❤️", "🎉", "🔥", "✨", "🤔", "😂", "🚀", "👏", "🌟", "💡", "👀", "💪", "🙌", "👌", "💯", "🎯"];
+// Helper function to determine contrasting text color for a background
+function getContrastColor(hex: string): string {
+  let r = 0, g = 0, b = 0;
+  
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
   initialMessages = [], 
@@ -298,15 +314,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     footerBg: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-white border-t text-gray-500',
   };
 
-  // Loading animation dots
-  const LoadingDots = () => (
-    <div className="flex space-x-1 items-center">
-      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "0ms"}}></div>
-      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "300ms"}}></div>
-      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "600ms"}}></div>
-    </div>
-  );
-
   // Should we show suggested messages?
   const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
 
@@ -324,133 +331,33 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   return (
     <div className={containerClasses} ref={chatContainerRef}>
       {/* Chat Header */}
-      <div 
-        className={`p-4 border-b flex items-center justify-between flex-shrink-0 ${themeClasses.background}`}
-        style={headerColor ? { backgroundColor: headerColor, color: getContrastColor(headerColor) } : {}}
-      >
-        <div className="flex items-center gap-2">
-          <Avatar className="h-10 w-10 border-0">
-            {profilePicture ? (
-              <AvatarImage src={profilePicture} alt={agentName} />
-            ) : (
-              <AvatarFallback className="bg-gray-200 text-gray-600">
-                {agentName.charAt(0)}
-              </AvatarFallback>
-            )}
-          </Avatar>
-          <span className={headerColor ? "" : `font-medium ${themeClasses.text}`}>{agentName}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {allowRegenerate && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={headerColor ? "text-inherit hover:bg-white/20" : `h-9 w-9 ${themeClasses.iconButton}`} 
-              onClick={regenerateResponse}
-            >
-              <RefreshCw className="h-5 w-5" />
-            </Button>
-          )}
-          {toggleSettings && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className={headerColor ? "text-inherit hover:bg-white/20" : `h-9 w-9 ${themeClasses.iconButton}`}
-              onClick={toggleSettings}
-            >
-              <Settings className="h-5 w-5" />
-            </Button>
-          )}
-        </div>
-      </div>
+      <ChatHeader
+        agentName={agentName}
+        profilePicture={profilePicture}
+        allowRegenerate={allowRegenerate}
+        toggleSettings={toggleSettings}
+        onRegenerate={regenerateResponse}
+        headerColor={headerColor}
+        backgroundColor={themeClasses.background}
+        iconButtonClass={themeClasses.iconButton}
+      />
 
       {/* Chat Messages - Scrollable area */}
       <div className={`flex-1 overflow-y-auto p-6 ${themeClasses.background} scroll-container`}>
         {chatHistory.map((msg, idx) => (
-          <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
-            {msg.isAgent && (
-              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-                {profilePicture ? (
-                  <AvatarImage src={profilePicture} alt={agentName} />
-                ) : (
-                  <AvatarFallback className="bg-gray-200 text-gray-600">
-                    {agentName.charAt(0)}
-                  </AvatarFallback>
-                )}
-              </Avatar>
-            )}
-            <div className="flex flex-col max-w-[80%]">
-              <div 
-                className={`rounded-lg p-3 text-[0.875rem] ${
-                  msg.isAgent ? themeClasses.agentBubble : themeClasses.userBubble
-                }`}
-                style={msg.isAgent ? {} : userMessageStyle}
-              >
-                {msg.content}
-              </div>
-              
-              {/* Message actions for agent messages */}
-              {msg.isAgent && showFeedback && (
-                <div className="flex mt-1 space-x-1">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          onClick={() => handleFeedback(msg.timestamp, "like")}
-                          variant="ghost"
-                          size="icon"
-                          className={`h-6 w-6 rounded-full ${msg.feedback === "like" ? "bg-green-100" : ""}`}
-                        >
-                          <ThumbsUp size={14} className={msg.feedback === "like" ? "text-green-600" : "text-gray-500"} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Like</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          onClick={() => handleFeedback(msg.timestamp, "dislike")}
-                          variant="ghost"
-                          size="icon"
-                          className={`h-6 w-6 rounded-full ${msg.feedback === "dislike" ? "bg-red-100" : ""}`}
-                        >
-                          <ThumbsDown size={14} className={msg.feedback === "dislike" ? "text-red-600" : "text-gray-500"} />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Dislike</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          onClick={() => copyMessageToClipboard(msg.content)}
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 rounded-full"
-                        >
-                          <Copy size={14} className="text-gray-500" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Copy</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              )}
-            </div>
-            
-            {!msg.isAgent && !hideUserAvatar && (
-              <Avatar className="h-8 w-8 ml-2 mt-1 border-0">
-                <AvatarFallback className="bg-gray-200 text-gray-600">U</AvatarFallback>
-              </Avatar>
-            )}
-          </div>
+          <ChatMessageComponent
+            key={idx}
+            message={msg}
+            agentName={agentName}
+            profilePicture={profilePicture}
+            showFeedback={showFeedback}
+            hideUserAvatar={hideUserAvatar}
+            onFeedback={handleFeedback}
+            onCopy={copyMessageToClipboard}
+            agentBubbleClass={themeClasses.agentBubble}
+            userBubbleClass={themeClasses.userBubble}
+            userMessageStyle={userMessageStyle}
+          />
         ))}
         
         {/* Loading indicator */}
@@ -471,161 +378,52 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           </div>
         )}
         
-        {/* Rate limit error message - Moved here for better visibility */}
-        {rateLimitError && (
-          <div className="p-3 border-t border-b bg-red-50">
-            <div className="flex items-start">
-              <AlertCircle className="text-red-600 h-5 w-5 mt-0.5 mr-2 flex-shrink-0" />
-              <div>
-                <p className="text-red-700 text-sm font-medium">{rateLimitError}</p>
-                {timeUntilReset && (
-                  <p className="text-red-600 text-xs mt-1">
-                    Try again in {timeUntilReset} seconds
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-        
         <div ref={messagesEndRef} />
       </div>
 
       {/* Fixed footer section with rate limit error, suggestions, and input */}
       <div className={`flex-shrink-0 ${themeClasses.background}`}>
-        {/* Rate limit error message - Moved here for better visibility */}
+        {/* Rate limit error message */}
         {rateLimitError && (
-          <div className="p-3 border-t border-b bg-red-50">
-            <div className="flex items-start">
-              <AlertCircle className="text-red-600 h-5 w-5 mt-0.5 mr-2 flex-shrink-0" />
-              <div>
-                <p className="text-red-700 text-sm font-medium">{rateLimitError}</p>
-                {timeUntilReset && (
-                  <p className="text-red-600 text-xs mt-1">
-                    Try again in {timeUntilReset} seconds
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+          <RateLimitError 
+            message={rateLimitError} 
+            timeUntilReset={timeUntilReset} 
+          />
         )}
 
         {/* Suggested Messages */}
         {shouldShowSuggestions && suggestedMessages.length > 0 && (
-          <div className={`p-4 border-t ${themeClasses.background}`}>
-            <div className="flex flex-wrap gap-2">
-              {suggestedMessages.map((suggestion, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  size="sm"
-                  className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
-                  onClick={() => handleSuggestedMessageClick(suggestion)}
-                  disabled={isWaitingForRateLimit}
-                >
-                  {suggestion}
-                </Button>
-              ))}
-            </div>
-          </div>
+          <SuggestedMessages
+            messages={suggestedMessages}
+            onMessageClick={handleSuggestedMessageClick}
+            isWaitingForRateLimit={isWaitingForRateLimit}
+            theme={theme}
+            backgroundColor={themeClasses.background}
+          />
         )}
 
         {/* Chat Input */}
-        <div className={`border-t p-4 ${themeClasses.background}`}>
-          <form onSubmit={handleSubmit} className="flex items-center w-full relative">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 z-10 ${themeClasses.iconButton}`}
-                  disabled={isWaitingForRateLimit}
-                  type="button"
-                >
-                  <Smile size={18} />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
-                <div className="grid grid-cols-5 gap-2">
-                  {emojis.map((emoji, index) => (
-                    <Button
-                      key={index}
-                      variant="ghost"
-                      className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                      onClick={() => insertEmoji(emoji)}
-                      disabled={isWaitingForRateLimit}
-                      type="button"
-                    >
-                      {emoji}
-                    </Button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-            <input
-              ref={inputRef}
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
-              className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.inputText}`}
-              disabled={isWaitingForRateLimit}
-            />
-            <Button 
-              type="submit" 
-              size="sm" 
-              variant="ghost"
-              className={`absolute right-1 rounded-full h-8 w-8 ${themeClasses.iconButton}`}
-              disabled={!message.trim() || isWaitingForRateLimit}
-            >
-              <SendIcon size={16} />
-            </Button>
-          </form>
-          
-          {/* Chat Icon - Only show when not in embedded mode */}
-          {chatIcon && !isEmbedded && (
-            <div className="flex justify-end mt-3">
-              <Avatar className="h-10 w-10 border-0">
-                <AvatarImage src={chatIcon} alt="Chat Icon" />
-                <AvatarFallback>💬</AvatarFallback>
-              </Avatar>
-            </div>
-          )}
-          
-          {/* Footer */}
-          {footer && (
-            <div className={`mt-3 text-xs text-center ${themeClasses.text} ${footerClassName}`}>
-              {footer}
-            </div>
-          )}
-        </div>
+        <ChatInput
+          message={message}
+          setMessage={setMessage}
+          onSubmit={handleSubmit}
+          isWaitingForRateLimit={isWaitingForRateLimit}
+          placeholder={placeholder}
+          inputRef={inputRef}
+          chatIcon={chatIcon}
+          isEmbedded={isEmbedded}
+          footer={footer}
+          footerClassName={footerClassName}
+          theme={theme}
+          inputBackgroundClass={themeClasses.inputBg}
+          inputTextClass={themeClasses.inputText}
+          iconButtonClass={themeClasses.iconButton}
+          textClass={themeClasses.text}
+          onEmojiInsert={insertEmoji}
+        />
       </div>
     </div>
   );
 };
-
-// Helper function to determine contrasting text color for a background
-function getContrastColor(hex: string): string {
-  // Convert hex to RGB
-  let r = 0, g = 0, b = 0;
-  
-  if (hex.length === 4) {
-    // #RGB format
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    // #RRGGBB format
-    r = parseInt(hex.substring(1, 3), 16);
-    g = parseInt(hex.substring(3, 5), 16);
-    b = parseInt(hex.substring(5, 7), 16);
-  }
-  
-  // Calculate luminance
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  
-  // Return white or black based on luminance
-  return luminance > 0.5 ? '#000000' : '#FFFFFF';
-}
 
 export default ChatSection;
