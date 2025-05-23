@@ -1,4 +1,3 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
 
@@ -36,7 +35,8 @@ export async function fetchColorSettingsAndVisibility(agentId) {
       headers: {
         'Accept': 'application/json',
         'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`
+        'Authorization': `Bearer ${supabaseKey}`,
+        'Content-Type': 'application/json'
       }
     });
     
