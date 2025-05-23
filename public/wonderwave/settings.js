@@ -1,3 +1,4 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
 
@@ -31,7 +32,6 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     log(`Making request to: ${url}`);
     
     const response = await fetch(url, {
-      method: 'GET',
       headers: {
         'Accept': 'application/json'
       }
