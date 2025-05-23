@@ -68,8 +68,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     ];
   });
   const [isTyping, setIsTyping] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null);
+  const [isWaitingForRateLimit, setIsWaitingForRateLimit] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [userHasMessaged, setUserHasMessaged] = useState(true); // Set to true since we already added a user message
+  const [userHasMessaged, setUserHasMessaged] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -120,9 +123,44 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
   }, [isEmbedded]);
 
+  // Listen for messages from parent window (rate limiting responses)
+  useEffect(() => {
+    if (isEmbedded && window.self !== window.top) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'message-allowed') {
+          setIsWaitingForRateLimit(false);
+          setRateLimitError(null);
+          // Proceed with sending the message
+          proceedWithMessage(event.data.originalMessage?.content || message);
+        } else if (event.data?.type === 'rate-limit-error') {
+          setIsWaitingForRateLimit(false);
+          setRateLimitError(event.data.message || 'Too many messages. Please wait.');
+          setTimeUntilReset(event.data.timeUntilReset || null);
+          
+          // Start countdown timer
+          if (event.data.timeUntilReset) {
+            const interval = setInterval(() => {
+              setTimeUntilReset(prev => {
+                if (prev === null || prev <= 1) {
+                  clearInterval(interval);
+                  setRateLimitError(null);
+                  return null;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          }
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
+  }, [isEmbedded, message]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || isWaitingForRateLimit) return;
 
     submitMessage(message);
     
@@ -133,8 +171,24 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   };
 
   const submitMessage = (text: string) => {
+    // If embedded, ask parent window for rate limit check
+    if (isEmbedded && window.self !== window.top) {
+      setIsWaitingForRateLimit(true);
+      window.parent.postMessage({
+        type: 'send-message',
+        content: text,
+        timestamp: new Date().toISOString()
+      }, '*');
+      return;
+    }
+
+    // Non-embedded flow - proceed directly
+    proceedWithMessage(text);
+  };
+
+  const proceedWithMessage = (text: string) => {
     // Add user message to chat history
-    setChatHistory([...chatHistory, {
+    setChatHistory(prev => [...prev, {
       isAgent: false,
       content: text,
       timestamp: new Date().toISOString()
@@ -406,6 +460,27 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             </div>
           </div>
         )}
+
+        {/* Rate limit error message */}
+        {rateLimitError && (
+          <div className="flex mb-4">
+            <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+              {profilePicture ? (
+                <AvatarImage src={profilePicture} alt={agentName} />
+              ) : (
+                <AvatarFallback className="bg-red-100 text-red-600">!</AvatarFallback>
+              )}
+            </Avatar>
+            <div className="rounded-lg p-3 max-w-[80%] bg-red-50 border border-red-200">
+              <p className="text-red-700 text-sm">{rateLimitError}</p>
+              {timeUntilReset && (
+                <p className="text-red-600 text-xs mt-1">
+                  Try again in {timeUntilReset} seconds
+                </p>
+              )}
+            </div>
+          </div>
+        )}
         
         <div ref={messagesEndRef} />
       </div>
@@ -421,6 +496,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 size="sm"
                 className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
                 onClick={() => handleSuggestedMessageClick(suggestion)}
+                disabled={isWaitingForRateLimit}
               >
                 {suggestion}
               </Button>
@@ -438,6 +514,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                 variant="ghost" 
                 size="icon"
                 className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 ${themeClasses.iconButton}`}
+                disabled={isWaitingForRateLimit}
               >
                 <Smile size={18} />
               </Button>
@@ -450,6 +527,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
                     variant="ghost"
                     className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                     onClick={() => insertEmoji(emoji)}
+                    disabled={isWaitingForRateLimit}
                   >
                     {emoji}
                   </Button>
@@ -462,16 +540,17 @@ const ChatSection: React.FC<ChatSectionProps> = ({
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={placeholder}
+            placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
             className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.inputText}`}
             onFocus={(e) => isEmbedded && e.currentTarget.scrollIntoView(false)}
+            disabled={isWaitingForRateLimit}
           />
           <Button 
             type="submit" 
             size="sm" 
             variant="ghost"
             className={`absolute right-1 rounded-full h-8 w-8 ${themeClasses.iconButton}`}
-            disabled={!message.trim()}
+            disabled={!message.trim() || isWaitingForRateLimit}
           >
             <SendIcon size={16} />
           </Button>

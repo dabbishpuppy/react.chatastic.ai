@@ -171,6 +171,7 @@ export function handleIframeMessage(event) {
         
       case 'send-message':
         // Handle message sending with rate limiting
+        log('Received send-message request from iframe:', event.data);
         handleMessageSend(event.data);
         break;
     }
@@ -182,28 +183,38 @@ export function handleIframeMessage(event) {
  */
 function handleMessageSend(messageData) {
   const config = window.wonderwaveConfig;
-  if (!config || !config.agentId) return;
+  if (!config || !config.agentId) {
+    log('No config or agentId available for rate limiting');
+    return;
+  }
+  
+  log('Checking rate limit for message:', messageData);
   
   // Check rate limit
   const rateLimitResult = canSendMessage();
+  log('Rate limit check result:', rateLimitResult);
   
   if (!rateLimitResult.allowed) {
     // Show rate limit error
+    log('Rate limit exceeded, showing error');
     showRateLimitError(rateLimitResult);
     return;
   }
   
   // Record the message timestamp
   if (currentRateLimitSettings) {
+    log('Recording message for rate limiting');
     recordMessage(config.agentId, currentRateLimitSettings);
   }
   
   // Allow the message to be sent
   try {
-    iframe.contentWindow.postMessage({
+    const allowMessage = {
       type: 'message-allowed',
       originalMessage: messageData
-    }, '*');
+    };
+    iframe.contentWindow.postMessage(allowMessage, '*');
+    log('Sent message-allowed to iframe:', allowMessage);
   } catch (error) {
     logError('Error sending message allowed confirmation:', error);
   }
