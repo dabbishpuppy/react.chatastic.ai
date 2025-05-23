@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -127,12 +128,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   useEffect(() => {
     if (isEmbedded && window.self !== window.top) {
       const handleMessage = (event: MessageEvent) => {
+        console.log('Received message from parent:', event.data);
+        
         if (event.data?.type === 'message-allowed') {
+          console.log('Message allowed by parent');
           setIsWaitingForRateLimit(false);
           setRateLimitError(null);
           // Proceed with sending the message
           proceedWithMessage(event.data.originalMessage?.content || message);
         } else if (event.data?.type === 'rate-limit-error') {
+          console.log('Rate limit error from parent:', event.data);
           setIsWaitingForRateLimit(false);
           setRateLimitError(event.data.message || 'Too many messages. Please wait.');
           setTimeUntilReset(event.data.timeUntilReset || null);
@@ -158,6 +163,22 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
   }, [isEmbedded, message]);
 
+  // Add timeout mechanism for rate limit check
+  useEffect(() => {
+    if (isWaitingForRateLimit) {
+      console.log('Setting timeout for rate limit check');
+      const timeout = setTimeout(() => {
+        console.log('Rate limit timeout - proceeding with message');
+        setIsWaitingForRateLimit(false);
+        setRateLimitError(null);
+        // If no response from parent after 5 seconds, proceed with message
+        proceedWithMessage(message);
+      }, 5000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isWaitingForRateLimit, message]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || isWaitingForRateLimit) return;
@@ -171,8 +192,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   };
 
   const submitMessage = (text: string) => {
+    console.log('Submitting message:', text, 'isEmbedded:', isEmbedded);
+    
     // If embedded, ask parent window for rate limit check
     if (isEmbedded && window.self !== window.top) {
+      console.log('Sending message to parent for rate limit check');
       setIsWaitingForRateLimit(true);
       window.parent.postMessage({
         type: 'send-message',
@@ -187,6 +211,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   };
 
   const proceedWithMessage = (text: string) => {
+    console.log('Proceeding with message:', text);
+    
     // Add user message to chat history
     setChatHistory(prev => [...prev, {
       isAgent: false,
@@ -308,14 +334,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   // Determine container classes based on whether this is embedded or not
   const containerClasses = isEmbedded 
-    ? `flex flex-col h-full w-full ${themeClasses.background} overflow-hidden`
+    ? `flex flex-col h-screen w-full ${themeClasses.background} overflow-hidden`
     : `flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background}`;
 
   return (
     <div className={containerClasses} ref={chatContainerRef}>
       {/* Chat Header */}
       <div 
-        className={`p-4 border-b flex items-center justify-between ${themeClasses.background}`}
+        className={`p-4 border-b flex items-center justify-between flex-shrink-0 ${themeClasses.background}`}
         style={headerColor ? { backgroundColor: headerColor, color: getContrastColor(headerColor) } : {}}
       >
         <div className="flex items-center gap-2">
@@ -354,7 +380,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         </div>
       </div>
 
-      {/* Chat Messages */}
+      {/* Chat Messages - Scrollable area */}
       <div className={`flex-1 overflow-y-auto p-6 ${themeClasses.background} scroll-container`}>
         {chatHistory.map((msg, idx) => (
           <div key={idx} className={`flex mb-4 ${msg.isAgent ? '' : 'justify-end'}`}>
@@ -485,93 +511,97 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Messages */}
-      {shouldShowSuggestions && suggestedMessages.length > 0 && (
-        <div className={`p-4 border-t ${themeClasses.background}`}>
-          <div className="flex flex-wrap gap-2">
-            {suggestedMessages.map((suggestion, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
-                className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
-                onClick={() => handleSuggestedMessageClick(suggestion)}
-                disabled={isWaitingForRateLimit}
-              >
-                {suggestion}
-              </Button>
-            ))}
+      {/* Fixed footer section with suggestions and input */}
+      <div className={`flex-shrink-0 ${themeClasses.background}`}>
+        {/* Suggested Messages */}
+        {shouldShowSuggestions && suggestedMessages.length > 0 && (
+          <div className={`p-4 border-t ${themeClasses.background}`}>
+            <div className="flex flex-wrap gap-2">
+              {suggestedMessages.map((suggestion, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
+                  onClick={() => handleSuggestedMessageClick(suggestion)}
+                  disabled={isWaitingForRateLimit}
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Chat Input */}
-      <div className={`border-t p-4 ${themeClasses.background}`}>
-        <form onSubmit={handleSubmit} className="flex items-center w-full relative">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 ${themeClasses.iconButton}`}
-                disabled={isWaitingForRateLimit}
-              >
-                <Smile size={18} />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
-              <div className="grid grid-cols-5 gap-2">
-                {emojis.map((emoji, index) => (
-                  <Button
-                    key={index}
-                    variant="ghost"
-                    className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    onClick={() => insertEmoji(emoji)}
-                    disabled={isWaitingForRateLimit}
-                  >
-                    {emoji}
-                  </Button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <input
-            ref={inputRef}
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
-            className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.inputText}`}
-            onFocus={(e) => isEmbedded && e.currentTarget.scrollIntoView(false)}
-            disabled={isWaitingForRateLimit}
-          />
-          <Button 
-            type="submit" 
-            size="sm" 
-            variant="ghost"
-            className={`absolute right-1 rounded-full h-8 w-8 ${themeClasses.iconButton}`}
-            disabled={!message.trim() || isWaitingForRateLimit}
-          >
-            <SendIcon size={16} />
-          </Button>
-        </form>
-        
-        {/* Chat Icon - Only show when not in embedded mode */}
-        {chatIcon && !isEmbedded && (
-          <div className="flex justify-end mt-3">
-            <Avatar className="h-10 w-10 border-0">
-              <AvatarImage src={chatIcon} alt="Chat Icon" />
-              <AvatarFallback>💬</AvatarFallback>
-            </Avatar>
-          </div>
-        )}
-        
-        {/* Footer */}
-        {footer && (
-          <div className={`mt-3 text-xs text-center ${themeClasses.text} ${footerClassName}`}>
-            {footer}
-          </div>
-        )}
+        {/* Chat Input */}
+        <div className={`border-t p-4 ${themeClasses.background}`}>
+          <form onSubmit={handleSubmit} className="flex items-center w-full relative">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 z-10 ${themeClasses.iconButton}`}
+                  disabled={isWaitingForRateLimit}
+                  type="button"
+                >
+                  <Smile size={18} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
+                <div className="grid grid-cols-5 gap-2">
+                  {emojis.map((emoji, index) => (
+                    <Button
+                      key={index}
+                      variant="ghost"
+                      className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                      onClick={() => insertEmoji(emoji)}
+                      disabled={isWaitingForRateLimit}
+                      type="button"
+                    >
+                      {emoji}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <input
+              ref={inputRef}
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
+              className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.inputText}`}
+              disabled={isWaitingForRateLimit}
+            />
+            <Button 
+              type="submit" 
+              size="sm" 
+              variant="ghost"
+              className={`absolute right-1 rounded-full h-8 w-8 ${themeClasses.iconButton}`}
+              disabled={!message.trim() || isWaitingForRateLimit}
+            >
+              <SendIcon size={16} />
+            </Button>
+          </form>
+          
+          {/* Chat Icon - Only show when not in embedded mode */}
+          {chatIcon && !isEmbedded && (
+            <div className="flex justify-end mt-3">
+              <Avatar className="h-10 w-10 border-0">
+                <AvatarImage src={chatIcon} alt="Chat Icon" />
+                <AvatarFallback>💬</AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+          
+          {/* Footer */}
+          {footer && (
+            <div className={`mt-3 text-xs text-center ${themeClasses.text} ${footerClassName}`}>
+              {footer}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
