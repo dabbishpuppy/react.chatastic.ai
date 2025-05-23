@@ -1,10 +1,64 @@
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { getBubbleButton } from './ui.js';
+import { isRateLimitExceeded, recordMessage, getRateLimitStatus } from './rateLimit.js';
 
 // Reference to iframe
 let iframe = null;
 let chatOpen = false; // Track chat state - renamed from isOpen to avoid conflicts
+let currentRateLimitSettings = null; // Store current rate limit settings
+
+/**
+ * Set rate limit settings from the server
+ */
+export function setRateLimitSettings(settings) {
+  currentRateLimitSettings = settings;
+  log('Rate limit settings updated:', settings);
+}
+
+/**
+ * Check if a message can be sent (rate limit check)
+ */
+function canSendMessage() {
+  const config = window.wonderwaveConfig;
+  if (!config || !config.agentId || !currentRateLimitSettings) {
+    return { allowed: true };
+  }
+  
+  const rateLimitCheck = isRateLimitExceeded(config.agentId, currentRateLimitSettings);
+  
+  if (rateLimitCheck.exceeded) {
+    const status = getRateLimitStatus(config.agentId, currentRateLimitSettings);
+    return {
+      allowed: false,
+      message: status.message,
+      resetTime: status.resetTime,
+      timeUntilReset: status.timeUntilReset
+    };
+  }
+  
+  return { allowed: true, remaining: rateLimitCheck.remaining };
+}
+
+/**
+ * Show rate limit error message in the chat
+ */
+function showRateLimitError(errorInfo) {
+  if (!iframe) return;
+  
+  try {
+    const message = {
+      type: 'rate-limit-error',
+      message: errorInfo.message,
+      timeUntilReset: errorInfo.timeUntilReset
+    };
+    
+    iframe.contentWindow.postMessage(message, '*');
+    log('Sent rate limit error to iframe:', message);
+  } catch (error) {
+    logError('Error sending rate limit message to iframe:', error);
+  }
+}
 
 /**
  * Create and open the chat iframe
@@ -114,7 +168,44 @@ export function handleIframeMessage(event) {
         // Handle close button click inside iframe
         closeChat();
         break;
+        
+      case 'send-message':
+        // Handle message sending with rate limiting
+        handleMessageSend(event.data);
+        break;
     }
+  }
+}
+
+/**
+ * Handle message sending with rate limiting
+ */
+function handleMessageSend(messageData) {
+  const config = window.wonderwaveConfig;
+  if (!config || !config.agentId) return;
+  
+  // Check rate limit
+  const rateLimitResult = canSendMessage();
+  
+  if (!rateLimitResult.allowed) {
+    // Show rate limit error
+    showRateLimitError(rateLimitResult);
+    return;
+  }
+  
+  // Record the message timestamp
+  if (currentRateLimitSettings) {
+    recordMessage(config.agentId, currentRateLimitSettings);
+  }
+  
+  // Allow the message to be sent
+  try {
+    iframe.contentWindow.postMessage({
+      type: 'message-allowed',
+      originalMessage: messageData
+    }, '*');
+  } catch (error) {
+    logError('Error sending message allowed confirmation:', error);
   }
 }
 

@@ -16,6 +16,10 @@ export type Database = {
           id: string
           image: string | null
           name: string
+          rate_limit_enabled: boolean
+          rate_limit_message: string
+          rate_limit_messages: number
+          rate_limit_time_window: number
           status: string | null
           team_id: string
           updated_at: string | null
@@ -27,6 +31,10 @@ export type Database = {
           id?: string
           image?: string | null
           name: string
+          rate_limit_enabled?: boolean
+          rate_limit_message?: string
+          rate_limit_messages?: number
+          rate_limit_time_window?: number
           status?: string | null
           team_id: string
           updated_at?: string | null
@@ -38,6 +46,10 @@ export type Database = {
           id?: string
           image?: string | null
           name?: string
+          rate_limit_enabled?: boolean
+          rate_limit_message?: string
+          rate_limit_messages?: number
+          rate_limit_time_window?: number
           status?: string | null
           team_id?: string
           updated_at?: string | null

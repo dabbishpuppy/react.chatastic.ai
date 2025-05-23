@@ -1,6 +1,6 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
+import { setRateLimitSettings } from './chat.js';
 
 // Global settings
 let colorSettings = null;
@@ -79,6 +79,16 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     // Store the settings
     colorSettings = data;
     
+    // Set rate limiting settings in chat module
+    if (data && (data.rate_limit_enabled || data.rate_limit_messages || data.rate_limit_time_window || data.rate_limit_message)) {
+      setRateLimitSettings({
+        rate_limit_enabled: data.rate_limit_enabled,
+        rate_limit_messages: data.rate_limit_messages,
+        rate_limit_time_window: data.rate_limit_time_window,
+        rate_limit_message: data.rate_limit_message
+      });
+    }
+    
     // Update any existing bubble with new settings
     updateBubbleAppearance();
     
@@ -99,7 +109,11 @@ function getDefaultSettings() {
     visibility: 'public',
     bubble_color: '#3B82F6',
     user_message_color: '#3B82F6',
-    sync_colors: false
+    sync_colors: false,
+    rate_limit_enabled: false,
+    rate_limit_messages: 20,
+    rate_limit_time_window: 240,
+    rate_limit_message: 'Too many messages in a row'
   };
 }
 

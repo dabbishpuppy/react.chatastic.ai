@@ -1,182 +1,135 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Configure CORS headers for browser access from any domain
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-  'Surrogate-Control': 'no-store'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 serve(async (req) => {
-  // Log the full URL for debugging
-  console.log('Request URL:', req.url);
   console.log('Request method:', req.method);
+  console.log('Request URL:', req.url);
   console.log('Request headers:', Object.fromEntries(req.headers.entries()));
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 200 
+    });
   }
 
   try {
-    // Get the agent ID from the URL
+    // Extract agentId from query parameters
     const url = new URL(req.url);
     const agentId = url.searchParams.get('agentId');
     
     console.log('Extracted agentId:', agentId);
     
-    if (!agentId || agentId.length < 10) {
-      console.log('Invalid or missing agent ID');
+    if (!agentId) {
       return new Response(
-        JSON.stringify({ 
-          error: 'Agent ID is missing or invalid', 
-          visibility: 'private',
-          bubble_color: '#3B82F6',
-          user_message_color: '#3B82F6',
-          sync_colors: false
-        }),
-        { status: 400, headers: corsHeaders }
+        JSON.stringify({ error: 'Agent ID is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
 
-    // Initialize Supabase client with service role for better access
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Checking agent visibility for:', agentId);
 
-    // First check if the agent exists and is public
-    const { data: agentData, error: agentError } = await supabase
+    // Check agent visibility and get security settings
+    const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('visibility')
+      .select('visibility, rate_limit_enabled, rate_limit_messages, rate_limit_time_window, rate_limit_message')
       .eq('id', agentId)
-      .maybeSingle();
+      .single();
 
-    // If agent doesn't exist or there's an error fetching it
     if (agentError) {
       console.error('Error fetching agent:', agentError);
       return new Response(
-        JSON.stringify({ 
-          visibility: 'private',
-          error: 'Error fetching agent',
-          bubble_color: '#3B82F6',
-          user_message_color: '#3B82F6',
-          sync_colors: false
-        }),
-        { status: 200, headers: corsHeaders } // Return 200 instead of 500 to avoid 406 errors
+        JSON.stringify({ error: 'Agent not found' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
 
-    // If no agent data found
-    if (!agentData) {
-      console.log('Agent not found:', agentId);
-      return new Response(
-        JSON.stringify({ 
-          visibility: 'private',
-          error: 'Agent not found',
-          bubble_color: '#3B82F6',
-          user_message_color: '#3B82F6',
-          sync_colors: false
-        }),
-        { status: 200, headers: corsHeaders } // Return 200 instead of 404
-      );
-    }
-
-    // If the agent is private, return an appropriate response
-    if (agentData.visibility === 'private') {
+    if (agent.visibility === 'private') {
       console.log(`Agent ${agentId} is PRIVATE`);
       return new Response(
-        JSON.stringify({ 
-          visibility: 'private',
-          error: 'This agent is set to private'
-        }),
-        { status: 200, headers: corsHeaders } // Return 200 instead of 403
+        JSON.stringify({ visibility: 'private' }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       );
     }
 
-    console.log(`Agent ${agentId} is PUBLIC, fetching settings`);
+    console.log(`Agent ${agentId} is PUBLIC, fetching chat interface settings`);
 
-    // Fetch the chat interface settings for the agent
+    // Get chat interface settings
     const { data: settings, error: settingsError } = await supabase
       .from('chat_interface_settings')
       .select('*')
       .eq('agent_id', agentId)
-      .maybeSingle();
+      .single();
 
-    if (settingsError) {
-      console.error('Error fetching settings:', settingsError);
-      return new Response(
-        JSON.stringify({ 
-          visibility: 'public',
-          error: 'Error fetching chat settings',
-          bubble_color: '#3B82F6',
-          user_message_color: '#3B82F6',
-          sync_colors: false
-        }),
-        { status: 200, headers: corsHeaders } // Always return 200 for successful API calls
-      );
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error('Error fetching chat interface settings:', settingsError);
     }
 
-    // If no settings exist yet, return default values
-    if (!settings) {
-      console.log('No settings found, returning defaults');
-      return new Response(
-        JSON.stringify({
-          visibility: 'public',
-          bubble_color: '#3B82F6',
-          user_message_color: '#3B82F6',
-          sync_colors: false
-        }),
-        { headers: corsHeaders }
-      );
-    }
-
-    // Parse suggested messages from JSON if needed
-    let parsedSuggestedMessages = [];
-    if (settings.suggested_messages) {
-      try {
-        if (typeof settings.suggested_messages === 'string') {
-          parsedSuggestedMessages = JSON.parse(settings.suggested_messages);
-        } else if (Array.isArray(settings.suggested_messages)) {
-          parsedSuggestedMessages = settings.suggested_messages;
-        }
-      } catch (error) {
-        console.error('Error parsing suggested messages:', error);
-      }
-    }
-
-    // Make sure to format the response properly and include the visibility
-    const formattedSettings = {
-      ...settings,
-      visibility: 'public',
-      suggested_messages: parsedSuggestedMessages
+    // Construct response with all settings including rate limiting
+    const response = {
+      visibility: agent.visibility,
+      rate_limit_enabled: agent.rate_limit_enabled,
+      rate_limit_messages: agent.rate_limit_messages,
+      rate_limit_time_window: agent.rate_limit_time_window,
+      rate_limit_message: agent.rate_limit_message,
+      // Chat interface settings
+      display_name: settings?.display_name || 'AI Assistant',
+      initial_message: settings?.initial_message || '👋 Hi! How can I help you today?',
+      bubble_color: settings?.bubble_color,
+      user_message_color: settings?.user_message_color,
+      sync_colors: settings?.sync_colors || false,
+      theme: settings?.theme || 'light',
+      profile_picture: settings?.profile_picture,
+      chat_icon: settings?.chat_icon,
+      bubble_position: settings?.bubble_position || 'right',
+      footer: settings?.footer,
+      primary_color: settings?.primary_color,
+      show_feedback: settings?.show_feedback ?? true,
+      allow_regenerate: settings?.allow_regenerate ?? true,
+      suggested_messages: settings?.suggested_messages || [],
+      show_suggestions_after_chat: settings?.show_suggestions_after_chat ?? true,
+      auto_show_delay: settings?.auto_show_delay ?? 1,
+      message_placeholder: settings?.message_placeholder || 'Write message here...'
     };
 
-    console.log('Returning settings:', formattedSettings);
-
     return new Response(
-      JSON.stringify(formattedSettings),
-      { headers: corsHeaders }
+      JSON.stringify(response),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
+
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error in chat-settings function:', error);
     return new Response(
-      JSON.stringify({ 
-        visibility: 'private', // Default to private on error for security
-        error: 'Internal server error',
-        bubble_color: '#3B82F6',
-        user_message_color: '#3B82F6', 
-        sync_colors: false
-      }),
-      { status: 200, headers: corsHeaders } // Return 200 instead of 500 to avoid client errors
+      JSON.stringify({ error: 'Internal server error' }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
