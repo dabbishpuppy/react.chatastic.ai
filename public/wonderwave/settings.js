@@ -26,7 +26,7 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     
     // Always add a unique timestamp to bust cache
     const timestamp = now;
-    const url = `https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings/${agentId}?_t=${timestamp}`;
+    const url = `https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`;
     
     try {
       log(`Making request to: ${url}`);
