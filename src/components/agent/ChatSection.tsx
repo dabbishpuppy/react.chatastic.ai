@@ -7,7 +7,7 @@ import RateLimitError from "./chat/RateLimitError";
 import SuggestedMessages from "./chat/SuggestedMessages";
 import ChatMessages from "./chat/ChatMessages";
 import ChatContainer from "./chat/ChatContainer";
-import { useMessageHandling } from "@/hooks/useMessageHandling";
+import {  useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
 
 interface ChatSectionProps {
@@ -182,7 +182,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           setMessage={setMessage}
           onSubmit={handleSubmit}
           isWaitingForRateLimit={isWaitingForRateLimit}
-          placeholder={placeholder}
+          placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
           inputRef={inputRef}
           chatIcon={chatIcon}
           isEmbedded={isEmbedded}

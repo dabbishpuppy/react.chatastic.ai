@@ -1,6 +1,7 @@
 
 import { useState, useRef } from "react";
 import { ChatMessage } from "@/types/chatInterface";
+import { useEmbeddedMode } from "@/hooks/useEmbeddedMode";
 
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
@@ -70,20 +71,36 @@ export const useMessageHandling = (
     }, 1500);
   };
 
-  // Simple message submission - same logic as chat bubble
+  // Set up embedded mode hook for rate limiting
+  const { sendMessageToParent } = useEmbeddedMode(
+    isEmbedded,
+    message,
+    setIsWaitingForRateLimit,
+    setRateLimitError,
+    setTimeUntilReset,
+    proceedWithMessage
+  );
+
+  // Simple message submission with rate limiting
   const submitMessage = (text: string) => {
     console.log('Submitting message:', text);
     
-    // Clear input immediately - same as chat bubble
+    // Clear input immediately
     setMessage("");
     
-    // Add message to chat immediately - same as chat bubble
+    // For embedded mode, use rate limiting
+    if (isEmbedded && window.self !== window.top) {
+      sendMessageToParent(text);
+      return;
+    }
+    
+    // For non-embedded mode, proceed directly
     proceedWithMessage(text);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || isWaitingForRateLimit) return;
 
     const messageToSend = message.trim();
     submitMessage(messageToSend);
@@ -94,6 +111,8 @@ export const useMessageHandling = (
   };
 
   const handleSuggestedMessageClick = (text: string) => {
+    if (isWaitingForRateLimit) return;
+    
     submitMessage(text);
     
     // Focus input field after suggested message click
