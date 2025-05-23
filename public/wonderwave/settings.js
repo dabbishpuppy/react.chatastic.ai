@@ -1,3 +1,4 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
 
@@ -30,6 +31,7 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     const url = `${baseUrl}/functions/v1/chat-settings?agentId=${agentId}&_t=${now}`;
     
     log(`Making request to: ${url}`);
+    log(`Using auth key: ${supabaseKey.substring(0, 15)}...`);
     
     const response = await fetch(url, {
       headers: {
