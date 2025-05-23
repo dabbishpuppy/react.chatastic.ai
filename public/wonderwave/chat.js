@@ -4,7 +4,7 @@ import { getBubbleButton } from './ui.js';
 
 // Reference to iframe
 let iframe = null;
-let isOpen = false; // Track chat state
+let chatOpen = false; // Track chat state - renamed from isOpen to avoid conflicts
 
 /**
  * Create and open the chat iframe
@@ -133,7 +133,7 @@ export function openChat() {
   }
   
   log('Opening chat');
-  isOpen = true;
+  chatOpen = true;
   
   // Clear any popups when opening chat
   const popupsContainer = document.getElementById('wonderwave-popups');
@@ -186,7 +186,7 @@ export function openChat() {
  */
 export function closeChat() {
   log('Closing chat');
-  isOpen = false;
+  chatOpen = false;
   
   const container = document.getElementById('wonderwave-container');
   if (container) {
@@ -301,5 +301,5 @@ export function setIframe(newIframe) {
  * Get chat state
  */
 export function isOpen() {
-  return isOpen;
+  return chatOpen;
 }
