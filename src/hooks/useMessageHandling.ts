@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -43,9 +44,6 @@ export const useMessageHandling = (
     setUserHasMessaged(true);
     setIsTyping(true);
     
-    // Reset waiting state immediately to re-enable input
-    setIsWaitingForRateLimit(false);
-    
     // Focus input field after clearing message
     setTimeout(() => {
       inputRef.current?.focus();
@@ -72,37 +70,33 @@ export const useMessageHandling = (
     }, 1500);
   };
 
-  const submitMessage = (text: string, sendMessageToParent?: (message: string) => void) => {
-    console.log('Submitting message:', text, 'isEmbedded:', isEmbedded);
+  // Simple message submission - same logic as chat bubble
+  const submitMessage = (text: string) => {
+    console.log('Submitting message:', text);
     
-    // CRITICAL FIX: Clear the message immediately regardless of embedded mode
+    // Clear input immediately - same as chat bubble
     setMessage("");
     
-    if (isEmbedded && window.self !== window.top && sendMessageToParent) {
-      console.log('Using sendMessageToParent function');
-      sendMessageToParent(text);
-      return;
-    }
-
+    // Add message to chat immediately - same as chat bubble
     proceedWithMessage(text);
   };
 
-  const handleSubmit = (e: React.FormEvent, sendMessageToParent?: (message: string) => void) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isWaitingForRateLimit) return;
+    if (!message.trim()) return;
 
     const messageToSend = message.trim();
-    submitMessage(messageToSend, sendMessageToParent);
+    submitMessage(messageToSend);
     
     if (isEmbedded) {
       e.stopPropagation();
     }
   };
 
-  const handleSuggestedMessageClick = (text: string, sendMessageToParent?: (message: string) => void) => {
-    submitMessage(text, sendMessageToParent);
+  const handleSuggestedMessageClick = (text: string) => {
+    submitMessage(text);
     
-    // Focus input field after suggested message click for all modes
+    // Focus input field after suggested message click
     setTimeout(() => {
       inputRef.current?.focus();
     }, 10);

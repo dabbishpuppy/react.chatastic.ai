@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -8,7 +9,6 @@ import ChatMessages from "./chat/ChatMessages";
 import ChatContainer from "./chat/ChatContainer";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
-import { useEmbeddedMode } from "@/hooks/useEmbeddedMode";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -86,20 +86,10 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     copyMessageToClipboard,
     handleFeedback,
     regenerateResponse,
-    insertEmoji,
-    proceedWithMessage
+    insertEmoji
   } = useMessageHandling(initialMessages, isEmbedded);
 
   const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
-
-  const { sendMessageToParent } = useEmbeddedMode(
-    isEmbedded,
-    message,
-    setIsWaitingForRateLimit,
-    setRateLimitError,
-    setTimeUntilReset,
-    proceedWithMessage
-  );
 
   // Update chat when initialMessages prop changes
   useEffect(() => {
@@ -179,7 +169,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         {shouldShowSuggestions && suggestedMessages.length > 0 && (
           <SuggestedMessages
             messages={suggestedMessages}
-            onMessageClick={(text) => handleSuggestedMessageClick(text, sendMessageToParent)}
+            onMessageClick={handleSuggestedMessageClick}
             isWaitingForRateLimit={isWaitingForRateLimit}
             theme={theme}
             backgroundColor={themeClasses.background}
@@ -190,7 +180,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         <ChatInput
           message={message}
           setMessage={setMessage}
-          onSubmit={(e) => handleSubmit(e, sendMessageToParent)}
+          onSubmit={handleSubmit}
           isWaitingForRateLimit={isWaitingForRateLimit}
           placeholder={placeholder}
           inputRef={inputRef}
