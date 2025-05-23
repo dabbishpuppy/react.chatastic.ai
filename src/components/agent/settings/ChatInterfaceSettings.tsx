@@ -10,7 +10,7 @@ import EditableSuggestedMessage from "./EditableSuggestedMessage";
 import ImageUpload from "./ImageUpload";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ColorPicker from "./ColorPicker";
-import ImageCropDialog from "./ImageCropDialog";
+import ImageCropper from "./ImageCropper";
 
 const ChatInterfaceSettings: React.FC = () => {
   const {
@@ -361,7 +361,7 @@ const ChatInterfaceSettings: React.FC = () => {
                   shape="circle"
                   size="md"
                 />
-                <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB.</p>
+                <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB. Background will be automatically removed.</p>
               </div>
               
               <div className="space-y-2">
@@ -375,7 +375,7 @@ const ChatInterfaceSettings: React.FC = () => {
                   shape="circle"
                   size="md"
                 />
-                <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB.</p>
+                <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB. Background will be automatically removed.</p>
               </div>
               
               <div className="space-y-2">
@@ -480,14 +480,13 @@ const ChatInterfaceSettings: React.FC = () => {
       </div>
 
       {/* Image Crop Dialog */}
-      {showCropDialog.visible && (
-        <ImageCropDialog
-          imageUrl={showCropDialog.imageUrl}
-          title={`Add a ${showCropDialog.type === 'profile' ? 'Profile picture' : 'Chat icon'}`}
-          onCrop={handleCropComplete}
-          onCancel={handleCropCancel}
-        />
-      )}
+      <ImageCropper
+        imageUrl={showCropDialog.imageUrl}
+        title={`Add a ${showCropDialog.type === 'profile' ? 'Profile picture' : 'Chat icon'}`}
+        onCrop={handleCropComplete}
+        onCancel={handleCropCancel}
+        isOpen={showCropDialog.visible}
+      />
     </div>
   );
 };

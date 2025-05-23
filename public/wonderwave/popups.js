@@ -75,6 +75,9 @@ function showPopupMessage(message, index, config, container) {
     marginBottom: '8px',
     marginRight: config.position === 'right' ? '0' : 'auto',
     marginLeft: config.position === 'left' ? '0' : 'auto',
+    color: '#000000', // Fix: Ensure black text color
+    fontSize: '14px',
+    lineHeight: '1.4'
   });
   
   // Add message with optional profile picture
@@ -84,11 +87,11 @@ function showPopupMessage(message, index, config, container) {
         <div style="width: 24px; height: 24px; border-radius: 50%; overflow: hidden; flex-shrink: 0;">
           <img src="${config.profilePicture}" alt="Agent" style="width: 100%; height: 100%; object-fit: cover;">
         </div>
-        <div>${message}</div>
+        <div style="color: #000000;">${message}</div>
       </div>
     `;
   } else {
-    popup.innerHTML = `<div>${message}</div>`;
+    popup.innerHTML = `<div style="color: #000000;">${message}</div>`;
   }
   
   // Add to DOM

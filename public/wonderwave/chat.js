@@ -1,10 +1,10 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { getBubbleButton } from './ui.js';
 
 // Reference to iframe
 let iframe = null;
+let isOpen = false; // Track chat state
 
 /**
  * Create and open the chat iframe
@@ -133,6 +133,7 @@ export function openChat() {
   }
   
   log('Opening chat');
+  isOpen = true;
   
   // Clear any popups when opening chat
   const popupsContainer = document.getElementById('wonderwave-popups');
@@ -156,9 +157,26 @@ export function openChat() {
     }
   }
   
-  // Update bubble button with close icon
+  // Update bubble button with close icon and bubble color background
   const bubbleButton = getBubbleButton();
   if (bubbleButton) {
+    const config = { ...defaultConfig, ...(window.wonderwaveConfig || {}) };
+    const colorSettings = getColorSettings();
+    
+    // Always show bubble color with X icon when open, regardless of chat icon
+    let bubbleColor;
+    if (colorSettings && colorSettings.bubble_color) {
+      bubbleColor = colorSettings.bubble_color;
+    } else if (config.bubbleColor) {
+      bubbleColor = config.bubbleColor;
+    } else {
+      bubbleColor = defaultConfig.bubbleColor;
+    }
+    
+    // Remove any background image and set bubble color
+    bubbleButton.style.backgroundImage = 'none';
+    bubbleButton.style.backgroundColor = bubbleColor;
+    bubbleButton.style.color = '#FFFFFF';
     bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
   }
 }
@@ -168,6 +186,7 @@ export function openChat() {
  */
 export function closeChat() {
   log('Closing chat');
+  isOpen = false;
   
   const container = document.getElementById('wonderwave-container');
   if (container) {
@@ -180,19 +199,41 @@ export function closeChat() {
     }, 300);
   }
   
-  // Restore chat icon on the button
+  // Restore proper icon on the button based on chat icon availability
   const bubbleButton = getBubbleButton();
   if (bubbleButton) {
     const config = { ...defaultConfig, ...(window.wonderwaveConfig || {}) };
     const colorSettings = getColorSettings();
     
-    // Use custom chat icon if specified in config, otherwise use default
+    // Use custom chat icon if specified in config or settings, otherwise use default with bubble color
     if (colorSettings && colorSettings.chat_icon) {
-      bubbleButton.innerHTML = `<img src="${colorSettings.chat_icon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
+      bubbleButton.innerHTML = '';
+      bubbleButton.style.backgroundImage = `url("${colorSettings.chat_icon}")`;
+      bubbleButton.style.backgroundSize = 'cover';
+      bubbleButton.style.backgroundPosition = 'center';
+      bubbleButton.style.backgroundColor = 'transparent';
     } else if (config.chatIcon) {
-      bubbleButton.innerHTML = `<img src="${config.chatIcon}" alt="Chat" style="width: 100%; height: 100%; object-fit: cover;">`;
+      bubbleButton.innerHTML = '';
+      bubbleButton.style.backgroundImage = `url("${config.chatIcon}")`;
+      bubbleButton.style.backgroundSize = 'cover';
+      bubbleButton.style.backgroundPosition = 'center';
+      bubbleButton.style.backgroundColor = 'transparent';
     } else {
+      // Default icon with bubble color
       bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
+      bubbleButton.style.backgroundImage = 'none';
+      
+      // Determine bubble color for default icon
+      let bubbleColor;
+      if (colorSettings && colorSettings.bubble_color) {
+        bubbleColor = colorSettings.bubble_color;
+      } else if (config.bubbleColor) {
+        bubbleColor = config.bubbleColor;
+      } else {
+        bubbleColor = defaultConfig.bubbleColor;
+      }
+      bubbleButton.style.backgroundColor = bubbleColor;
+      bubbleButton.style.color = '#FFFFFF';
     }
   }
 }
@@ -254,4 +295,11 @@ export function getIframe() {
  */
 export function setIframe(newIframe) {
   iframe = newIframe;
+}
+
+/**
+ * Get chat state
+ */
+export function isOpen() {
+  return isOpen;
 }
