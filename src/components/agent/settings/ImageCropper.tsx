@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { pipeline, env } from '@huggingface/transformers';
 
 // Configure transformers.js to always download models
@@ -24,37 +24,61 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
   isOpen,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
+  const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 200, height: 200 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
+  // Load the image when the URL changes or dialog opens
   useEffect(() => {
     if (isOpen && imageUrl) {
       const img = new Image();
+      
       img.onload = () => {
-        if (imageRef.current) {
-          imageRef.current = img;
-          drawCanvas();
-          // Center the crop area
-          const size = Math.min(img.width, img.height) * 0.8;
-          setCropArea({
-            x: (img.width - size) / 2,
-            y: (img.height - size) / 2,
-            width: size,
-            height: size
-          });
-        }
+        setImageObj(img);
+        setImageLoaded(true);
+        
+        // Center the crop area after the image is loaded
+        const size = Math.min(img.width, img.height) * 0.8;
+        setCropArea({
+          x: (img.width - size) / 2,
+          y: (img.height - size) / 2,
+          width: size,
+          height: size
+        });
       };
+      
+      img.onerror = () => {
+        console.error("Failed to load image");
+      };
+      
       img.src = imageUrl;
+      
+      // Clean up function
+      return () => {
+        img.onload = null;
+        img.onerror = null;
+      };
+    } else {
+      setImageLoaded(false);
+      setImageObj(null);
     }
   }, [isOpen, imageUrl]);
 
+  // Draw the canvas whenever the image or crop area changes
+  useEffect(() => {
+    if (imageLoaded && imageObj) {
+      drawCanvas();
+    }
+  }, [cropArea, imageLoaded, imageObj]);
+
   const drawCanvas = () => {
     const canvas = canvasRef.current;
-    const img = imageRef.current;
+    const img = imageObj;
+    
     if (!canvas || !img) return;
 
     const ctx = canvas.getContext('2d');
@@ -105,10 +129,6 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
     ctx.fillRect(cropX + cropW - handleSize, cropY + cropH - handleSize, handleSize, handleSize);
   };
 
-  useEffect(() => {
-    drawCanvas();
-  }, [cropArea]);
-
   const handleMouseDown = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -122,7 +142,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || !imageObj) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -136,8 +156,8 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
 
     setCropArea(prev => ({
       ...prev,
-      x: Math.max(0, Math.min(prev.x + deltaX, imageRef.current!.width - prev.width)),
-      y: Math.max(0, Math.min(prev.y + deltaY, imageRef.current!.height - prev.height))
+      x: Math.max(0, Math.min(prev.x + deltaX, imageObj.width - prev.width)),
+      y: Math.max(0, Math.min(prev.y + deltaY, imageObj.height - prev.height))
     }));
 
     setDragStart({ x, y });
@@ -234,8 +254,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
   };
 
   const handleCrop = async () => {
-    const img = imageRef.current;
-    if (!img) return;
+    if (!imageObj) return;
 
     setIsProcessing(true);
     try {
@@ -250,7 +269,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
 
       // Draw cropped portion
       ctx.drawImage(
-        img,
+        imageObj,
         cropArea.x, cropArea.y, cropArea.width, cropArea.height,
         0, 0, cropArea.width, cropArea.height
       );
@@ -288,6 +307,9 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Drag to reposition the crop area. The background will be automatically removed.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -302,15 +324,11 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
             />
           </div>
           
-          <p className="text-sm text-gray-500">
-            Drag to reposition the crop area. The background will be automatically removed.
-          </p>
-          
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onCancel} disabled={isProcessing}>
               Cancel
             </Button>
-            <Button onClick={handleCrop} disabled={isProcessing}>
+            <Button onClick={handleCrop} disabled={isProcessing || !imageLoaded}>
               {isProcessing ? "Processing..." : "Crop & Remove Background"}
             </Button>
           </div>
