@@ -99,12 +99,18 @@ function hideWidget() {
   const existingBubble = document.getElementById('wonderwave-bubble');
   if (existingBubble) {
     existingBubble.style.display = 'none';
+    log('Hiding bubble with ID: wonderwave-bubble');
+  } else {
+    log('No bubble found with ID: wonderwave-bubble to hide');
   }
   
   // Hide the chat container if it exists
   const container = document.getElementById('wonderwave-container');
   if (container) {
     container.style.display = 'none';
+    log('Hiding container with ID: wonderwave-container');
+  } else {
+    log('No container found with ID: wonderwave-container to hide');
   }
 }
 
@@ -118,6 +124,9 @@ function showWidget() {
   const existingBubble = document.getElementById('wonderwave-bubble');
   if (existingBubble) {
     existingBubble.style.display = 'flex';
+    log('Showing bubble with ID: wonderwave-bubble');
+  } else {
+    log('No bubble found with ID: wonderwave-bubble to show');
   }
 }
 
@@ -146,6 +155,7 @@ export function isAgentPrivate() {
  * Set agent privacy status
  */
 export function setAgentPrivacy(privacy) {
+  log(`Setting agent privacy to ${privacy ? 'private' : 'public'}`);
   if (privacy) {
     hideWidget();
   } else {
@@ -160,6 +170,34 @@ export function shouldCheckVisibility() {
   const now = Date.now();
   return (now - lastVisibilityCheck) > CHECK_INTERVAL;
 }
+
+// Manually create bubble if it doesn't exist after a few seconds
+setTimeout(() => {
+  const existingBubble = document.getElementById('wonderwave-bubble');
+  if (!existingBubble && !isPrivate) {
+    log('No bubble found after timeout, attempting to create one');
+    
+    // Import bubble module dynamically to avoid circular dependencies
+    import('./bubble.js').then(({ createBubbleButton }) => {
+      const config = window.wonderwaveConfig || defaultConfig;
+      createBubbleButton(config);
+      log('Bubble creation attempted via timeout');
+    }).catch(err => {
+      logError('Error importing bubble module:', err);
+    });
+  }
+}, 2000);
+
+// Force initial bubble creation
+setTimeout(() => {
+  import('./bubble.js').then(({ createBubbleButton }) => {
+    log('Force creating bubble on page load');
+    const config = window.wonderwaveConfig || defaultConfig;
+    createBubbleButton(config);
+  }).catch(err => {
+    logError('Error importing bubble module for initial creation:', err);
+  });
+}, 500);
 
 // Listen for messages to refresh settings
 window.addEventListener('message', function(event) {
