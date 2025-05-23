@@ -9,7 +9,7 @@ let lastVisibilityCheck = 0;
 const CHECK_INTERVAL = 15000; // 15 seconds
 
 /**
- * Fetch color settings and agent visibility from the backend
+ * Fetch color settings and agent visibility from the Supabase edge function
  */
 export async function fetchColorSettingsAndVisibility(agentId) {
   if (!agentId) {
@@ -24,9 +24,11 @@ export async function fetchColorSettingsAndVisibility(agentId) {
   try {
     log(`Fetching settings for agent ${agentId}`);
     
-    // Always add a unique timestamp to bust cache
+    // Build the URL to the edge function with cache busting
     const timestamp = now;
-    const url = `https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`;
+    const config = window.wonderwaveConfig || defaultConfig;
+    const baseUrl = config.supabaseUrl || 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
+    const url = `${baseUrl}/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`;
     
     try {
       log(`Making request to: ${url}`);
@@ -41,6 +43,13 @@ export async function fetchColorSettingsAndVisibility(agentId) {
       });
       
       log(`Response status: ${response.status}`);
+      
+      // If response is not 200 OK, hide widget for security
+      if (!response.ok) {
+        log(`Response not OK (${response.status}), hiding widget for security`);
+        hideWidget();
+        return null;
+      }
       
       // Try to parse the response data
       let data;
