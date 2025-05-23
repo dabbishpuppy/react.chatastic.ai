@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
-import ChatMessage as ChatMessageComponent from "./chat/ChatMessage";
+import ChatMessageComponent from "./chat/ChatMessage";
 import ChatInput from "./chat/ChatInput";
 import LoadingDots from "./chat/LoadingDots";
 import RateLimitError from "./chat/RateLimitError";
