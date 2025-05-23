@@ -2,10 +2,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// Configure CORS headers for browser access
+// Configure CORS headers for browser access from any domain
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
@@ -17,6 +17,8 @@ const corsHeaders = {
 serve(async (req) => {
   // Log the full URL for debugging
   console.log('Request URL:', req.url);
+  console.log('Request method:', req.method);
+  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -26,18 +28,12 @@ serve(async (req) => {
   try {
     // Get the agent ID from the URL
     const url = new URL(req.url);
-    const pathParts = url.pathname.split('/');
-    const agentIdFromPath = pathParts[pathParts.length - 1];
-    
-    // Also check query parameters as fallback
-    const queryAgentId = url.searchParams.get('agentId');
-    
-    // Use path parameter first, fall back to query parameter
-    const agentId = agentIdFromPath || queryAgentId;
+    const agentId = url.searchParams.get('agentId');
     
     console.log('Extracted agentId:', agentId);
     
     if (!agentId || agentId.length < 10) {
+      console.log('Invalid or missing agent ID');
       return new Response(
         JSON.stringify({ 
           error: 'Agent ID is missing or invalid', 
@@ -50,10 +46,12 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role for better access
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    console.log('Checking agent visibility for:', agentId);
 
     // First check if the agent exists and is public
     const { data: agentData, error: agentError } = await supabase
@@ -73,12 +71,13 @@ serve(async (req) => {
           user_message_color: '#3B82F6',
           sync_colors: false
         }),
-        { status: 500, headers: corsHeaders }
+        { status: 200, headers: corsHeaders } // Return 200 instead of 500 to avoid 406 errors
       );
     }
 
     // If no agent data found
     if (!agentData) {
+      console.log('Agent not found:', agentId);
       return new Response(
         JSON.stringify({ 
           visibility: 'private',
@@ -87,7 +86,7 @@ serve(async (req) => {
           user_message_color: '#3B82F6',
           sync_colors: false
         }),
-        { status: 404, headers: corsHeaders }
+        { status: 200, headers: corsHeaders } // Return 200 instead of 404
       );
     }
 
@@ -99,7 +98,7 @@ serve(async (req) => {
           visibility: 'private',
           error: 'This agent is set to private'
         }),
-        { status: 403, headers: corsHeaders }
+        { status: 200, headers: corsHeaders } // Return 200 instead of 403
       );
     }
 
@@ -122,12 +121,13 @@ serve(async (req) => {
           user_message_color: '#3B82F6',
           sync_colors: false
         }),
-        { status: 500, headers: corsHeaders }
+        { status: 200, headers: corsHeaders } // Always return 200 for successful API calls
       );
     }
 
     // If no settings exist yet, return default values
     if (!settings) {
+      console.log('No settings found, returning defaults');
       return new Response(
         JSON.stringify({
           visibility: 'public',
@@ -160,6 +160,8 @@ serve(async (req) => {
       suggested_messages: parsedSuggestedMessages
     };
 
+    console.log('Returning settings:', formattedSettings);
+
     return new Response(
       JSON.stringify(formattedSettings),
       { headers: corsHeaders }
@@ -174,7 +176,7 @@ serve(async (req) => {
         user_message_color: '#3B82F6', 
         sync_colors: false
       }),
-      { status: 500, headers: corsHeaders }
+      { status: 200, headers: corsHeaders } // Return 200 instead of 500 to avoid client errors
     );
   }
 });

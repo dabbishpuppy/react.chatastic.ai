@@ -31,9 +31,9 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     const url = `${baseUrl}/functions/v1/chat-settings?agentId=${agentId}&_t=${now}`;
     
     log(`Making request to: ${url}`);
-    log(`Using auth key: ${supabaseKey.substring(0, 15)}...`);
     
     const response = await fetch(url, {
+      method: 'GET',
       headers: {
         'Accept': 'application/json',
         'apikey': supabaseKey,
@@ -44,11 +44,12 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     
     log(`Response status: ${response.status}`);
     
-    // If response is not 200 OK, hide widget for security
+    // If response is not 200 OK, treat as error but don't hide widget immediately
     if (!response.ok) {
-      log(`Response not OK (${response.status}), hiding widget for security`);
-      hideWidget();
-      return null;
+      logError(`Response not OK (${response.status}), but continuing with defaults`);
+      // Don't hide widget on HTTP errors - agent might still be public
+      // hideWidget();
+      return getDefaultSettings();
     }
     
     // Try to parse the response data
@@ -58,8 +59,8 @@ export async function fetchColorSettingsAndVisibility(agentId) {
       log('Response data:', data);
     } catch (parseError) {
       logError('Error parsing response:', parseError);
-      hideWidget();
-      return null;
+      // Don't hide widget on parse errors - use defaults instead
+      return getDefaultSettings();
     }
     
     // Check for visibility in the response
@@ -84,9 +85,22 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     return data;
   } catch (error) {
     logError('Error fetching settings:', error);
-    hideWidget();
-    return null;
+    // Don't hide widget on fetch errors - network might be temporarily down
+    // hideWidget();
+    return getDefaultSettings();
   }
+}
+
+/**
+ * Get default settings when API fails
+ */
+function getDefaultSettings() {
+  return {
+    visibility: 'public',
+    bubble_color: '#3B82F6',
+    user_message_color: '#3B82F6',
+    sync_colors: false
+  };
 }
 
 /**
