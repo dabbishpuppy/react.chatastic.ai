@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -93,7 +92,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
 
-  useEmbeddedMode(
+  const { sendMessageToParent } = useEmbeddedMode(
     isEmbedded,
     message,
     setIsWaitingForRateLimit,
@@ -180,7 +179,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         {shouldShowSuggestions && suggestedMessages.length > 0 && (
           <SuggestedMessages
             messages={suggestedMessages}
-            onMessageClick={handleSuggestedMessageClick}
+            onMessageClick={(text) => handleSuggestedMessageClick(text, sendMessageToParent)}
             isWaitingForRateLimit={isWaitingForRateLimit}
             theme={theme}
             backgroundColor={themeClasses.background}
@@ -191,7 +190,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         <ChatInput
           message={message}
           setMessage={setMessage}
-          onSubmit={handleSubmit}
+          onSubmit={(e) => handleSubmit(e, sendMessageToParent)}
           isWaitingForRateLimit={isWaitingForRateLimit}
           placeholder={placeholder}
           inputRef={inputRef}

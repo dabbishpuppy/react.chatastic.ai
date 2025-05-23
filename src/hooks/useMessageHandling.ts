@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -74,36 +73,31 @@ export const useMessageHandling = (
     }, 1500);
   };
 
-  const submitMessage = (text: string) => {
+  const submitMessage = (text: string, sendMessageToParent?: (message: string) => void) => {
     console.log('Submitting message:', text, 'isEmbedded:', isEmbedded);
     
-    if (isEmbedded && window.self !== window.top) {
-      console.log('Sending message to parent for rate limit check');
-      setIsWaitingForRateLimit(true);
-      window.parent.postMessage({
-        type: 'send-message',
-        content: text,
-        timestamp: new Date().toISOString()
-      }, '*');
+    if (isEmbedded && window.self !== window.top && sendMessageToParent) {
+      console.log('Using sendMessageToParent function');
+      sendMessageToParent(text);
       return;
     }
 
     proceedWithMessage(text);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, sendMessageToParent?: (message: string) => void) => {
     e.preventDefault();
     if (!message.trim() || isWaitingForRateLimit) return;
 
-    submitMessage(message);
+    submitMessage(message, sendMessageToParent);
     
     if (isEmbedded) {
       e.stopPropagation();
     }
   };
 
-  const handleSuggestedMessageClick = (text: string) => {
-    submitMessage(text);
+  const handleSuggestedMessageClick = (text: string, sendMessageToParent?: (message: string) => void) => {
+    submitMessage(text, sendMessageToParent);
     
     // Focus input field after suggested message click for all modes
     setTimeout(() => {

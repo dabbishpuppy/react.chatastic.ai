@@ -57,25 +57,6 @@ export const useEmbeddedMode = (
               }
             }, 1000);
           }
-        } else if (event.data?.type === 'send-message') {
-          // Store the message being sent for timeout fallback
-          pendingMessageRef.current = event.data.content;
-          
-          // Set up timeout fallback - if parent doesn't respond in 3 seconds, proceed anyway
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
-          
-          timeoutRef.current = setTimeout(() => {
-            console.log('Parent window did not respond to rate limit check, proceeding with message');
-            setIsWaitingForRateLimit(false);
-            setRateLimitError(null);
-            if (pendingMessageRef.current) {
-              proceedWithMessage(pendingMessageRef.current);
-              pendingMessageRef.current = null;
-            }
-            timeoutRef.current = null;
-          }, 3000);
         }
       };
 
@@ -91,4 +72,47 @@ export const useEmbeddedMode = (
       };
     }
   }, [isEmbedded, message, setIsWaitingForRateLimit, setRateLimitError, setTimeUntilReset, proceedWithMessage]);
+
+  // Function to send message to parent and set up timeout
+  const sendMessageToParent = (messageContent: string) => {
+    if (!isEmbedded || window.self === window.top) {
+      // Not in iframe, proceed directly
+      proceedWithMessage(messageContent);
+      return;
+    }
+
+    console.log('Sending message to parent for rate limit check:', messageContent);
+    
+    // Store the message for fallback
+    pendingMessageRef.current = messageContent;
+    
+    // Set waiting state
+    setIsWaitingForRateLimit(true);
+    setRateLimitError(null);
+    
+    // Send message to parent
+    window.parent.postMessage({
+      type: 'send-message',
+      content: messageContent,
+      timestamp: new Date().toISOString()
+    }, '*');
+    
+    // Set up timeout fallback - if parent doesn't respond in 3 seconds, proceed anyway
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    timeoutRef.current = setTimeout(() => {
+      console.log('Parent window did not respond to rate limit check, proceeding with message');
+      setIsWaitingForRateLimit(false);
+      setRateLimitError(null);
+      if (pendingMessageRef.current) {
+        proceedWithMessage(pendingMessageRef.current);
+        pendingMessageRef.current = null;
+      }
+      timeoutRef.current = null;
+    }, 3000);
+  };
+
+  return { sendMessageToParent };
 };
