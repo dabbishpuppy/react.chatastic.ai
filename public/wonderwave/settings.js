@@ -1,3 +1,4 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
 
@@ -23,16 +24,19 @@ export async function fetchColorSettingsAndVisibility(agentId) {
   try {
     log(`Fetching settings for agent ${agentId}`);
     
-    // Build the URL from config with fallback
+    // Build the URL and get auth credentials from config with fallbacks
     const config = window.wonderwaveConfig || defaultConfig;
     const baseUrl = config.supabaseUrl || 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
+    const supabaseKey = config.supabaseKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk';
     const url = `${baseUrl}/functions/v1/chat-settings?agentId=${agentId}&_t=${now}`;
     
     log(`Making request to: ${url}`);
     
     const response = await fetch(url, {
       headers: {
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`
       }
     });
     
