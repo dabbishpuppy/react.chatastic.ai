@@ -26,7 +26,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
         `agentId: "${agentId}"`,
       ];
       
-      // Improved script with more robust initialization and error handling
+      // Updated script with absolute URL loading to fix 404 errors on external websites
       return `<script>
 (function(){
   // Define the config first - this is crucial
@@ -58,7 +58,7 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
   // Set up wonderwave with the proxy pattern
   window.wonderwave = createWonderwaveProxy();
   
-  // Load the script
+  // Load the script with absolute URL to prevent 404 errors
   function loadScript() {
     const script = document.createElement("script");
     script.src = "https://query-spark-start.lovable.app/wonderwave.js";
