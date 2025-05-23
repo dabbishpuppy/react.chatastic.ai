@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export const useEmbeddedMode = (
   isEmbedded: boolean,
@@ -9,6 +9,9 @@ export const useEmbeddedMode = (
   setTimeUntilReset: (time: number | null) => void,
   proceedWithMessage: (message: string) => void
 ) => {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingMessageRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (isEmbedded && window.self !== window.top) {
       const handleMessage = (event: MessageEvent) => {
@@ -16,14 +19,30 @@ export const useEmbeddedMode = (
         
         if (event.data?.type === 'message-allowed') {
           console.log('Message allowed by parent');
+          
+          // Clear timeout since parent responded
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          
           setIsWaitingForRateLimit(false);
           setRateLimitError(null);
-          proceedWithMessage(event.data.originalMessage?.content || message);
+          proceedWithMessage(event.data.originalMessage?.content || pendingMessageRef.current || message);
+          pendingMessageRef.current = null;
         } else if (event.data?.type === 'rate-limit-error') {
           console.log('Rate limit error from parent:', event.data);
+          
+          // Clear timeout since parent responded
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          
           setIsWaitingForRateLimit(false);
           setRateLimitError(event.data.message || 'Too many messages. Please wait.');
           setTimeUntilReset(event.data.timeUntilReset || null);
+          pendingMessageRef.current = null;
           
           if (event.data.timeUntilReset) {
             let currentTime = event.data.timeUntilReset;
@@ -38,11 +57,38 @@ export const useEmbeddedMode = (
               }
             }, 1000);
           }
+        } else if (event.data?.type === 'send-message') {
+          // Store the message being sent for timeout fallback
+          pendingMessageRef.current = event.data.content;
+          
+          // Set up timeout fallback - if parent doesn't respond in 3 seconds, proceed anyway
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+          
+          timeoutRef.current = setTimeout(() => {
+            console.log('Parent window did not respond to rate limit check, proceeding with message');
+            setIsWaitingForRateLimit(false);
+            setRateLimitError(null);
+            if (pendingMessageRef.current) {
+              proceedWithMessage(pendingMessageRef.current);
+              pendingMessageRef.current = null;
+            }
+            timeoutRef.current = null;
+          }, 3000);
         }
       };
 
       window.addEventListener('message', handleMessage);
-      return () => window.removeEventListener('message', handleMessage);
+      
+      return () => {
+        window.removeEventListener('message', handleMessage);
+        // Clean up timeout on unmount
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      };
     }
   }, [isEmbedded, message, setIsWaitingForRateLimit, setRateLimitError, setTimeUntilReset, proceedWithMessage]);
 };
