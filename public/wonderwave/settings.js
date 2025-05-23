@@ -1,4 +1,3 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { updateBubbleAppearance } from './bubble.js';
 
@@ -24,74 +23,62 @@ export async function fetchColorSettingsAndVisibility(agentId) {
   try {
     log(`Fetching settings for agent ${agentId}`);
     
-    // Build the URL to the edge function with cache busting
-    const timestamp = now;
+    // Build the URL from config with fallback
     const config = window.wonderwaveConfig || defaultConfig;
     const baseUrl = config.supabaseUrl || 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
-    const url = `${baseUrl}/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`;
+    const url = `${baseUrl}/functions/v1/chat-settings?agentId=${agentId}&_t=${now}`;
     
-    try {
-      log(`Making request to: ${url}`);
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      
-      log(`Response status: ${response.status}`);
-      
-      // If response is not 200 OK, hide widget for security
-      if (!response.ok) {
-        log(`Response not OK (${response.status}), hiding widget for security`);
-        hideWidget();
-        return null;
+    log(`Making request to: ${url}`);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
       }
-      
-      // Try to parse the response data
-      let data;
-      try {
-        data = await response.json();
-        log('Response data:', data);
-      } catch (parseError) {
-        logError('Error parsing response:', parseError);
-        // Default to private on parsing errors for security
-        hideWidget();
-        return null;
-      }
-      
-      // Always check for visibility in the response
-      if (data && data.visibility === 'private') {
-        log('Agent is PRIVATE, hiding widget');
-        hideWidget();
-        return null;
-      }
-      
-      // If we get here and we previously thought the agent was private, show it
-      if (isPrivate) {
-        log('Agent is now PUBLIC, showing widget');
-        showWidget();
-      }
-      
-      // Store the settings
-      colorSettings = data;
-      
-      // Update any existing bubble with new settings
-      updateBubbleAppearance();
-      
-      return data;
-    } catch (error) {
-      logError('Error fetching settings:', error);
-      // On network errors, default to private for security
+    });
+    
+    log(`Response status: ${response.status}`);
+    
+    // If response is not 200 OK, hide widget for security
+    if (!response.ok) {
+      log(`Response not OK (${response.status}), hiding widget for security`);
       hideWidget();
       return null;
     }
+    
+    // Try to parse the response data
+    let data;
+    try {
+      data = await response.json();
+      log('Response data:', data);
+    } catch (parseError) {
+      logError('Error parsing response:', parseError);
+      hideWidget();
+      return null;
+    }
+    
+    // Check for visibility in the response
+    if (data && data.visibility === 'private') {
+      log('Agent is PRIVATE, hiding widget');
+      hideWidget();
+      return null;
+    }
+    
+    // If we get here and we previously thought the agent was private, show it
+    if (isPrivate) {
+      log('Agent is now PUBLIC, showing widget');
+      showWidget();
+    }
+    
+    // Store the settings
+    colorSettings = data;
+    
+    // Update any existing bubble with new settings
+    updateBubbleAppearance();
+    
+    return data;
   } catch (error) {
-    logError('Error in fetchColorSettingsAndVisibility:', error);
-    // On errors, default to private for security
+    logError('Error fetching settings:', error);
     hideWidget();
     return null;
   }
