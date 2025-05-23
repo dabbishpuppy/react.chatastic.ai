@@ -28,7 +28,11 @@ export const useEmbeddedMode = (
           
           setIsWaitingForRateLimit(false);
           setRateLimitError(null);
-          proceedWithMessage(event.data.originalMessage?.content || pendingMessageRef.current || message);
+          
+          const messageToProcess = event.data.originalMessage?.content || pendingMessageRef.current;
+          if (messageToProcess) {
+            proceedWithMessage(messageToProcess);
+          }
           pendingMessageRef.current = null;
         } else if (event.data?.type === 'rate-limit-error') {
           console.log('Rate limit error from parent:', event.data);
@@ -71,12 +75,15 @@ export const useEmbeddedMode = (
         }
       };
     }
-  }, [isEmbedded, message, setIsWaitingForRateLimit, setRateLimitError, setTimeUntilReset, proceedWithMessage]);
+  }, [isEmbedded, setIsWaitingForRateLimit, setRateLimitError, setTimeUntilReset, proceedWithMessage]);
 
   // Function to send message to parent and set up timeout
   const sendMessageToParent = (messageContent: string) => {
+    console.log('sendMessageToParent called with:', messageContent);
+    
     if (!isEmbedded || window.self === window.top) {
       // Not in iframe, proceed directly
+      console.log('Not in iframe, proceeding directly');
       proceedWithMessage(messageContent);
       return;
     }
@@ -103,9 +110,10 @@ export const useEmbeddedMode = (
     }
     
     timeoutRef.current = setTimeout(() => {
-      console.log('Parent window did not respond to rate limit check, proceeding with message');
+      console.log('Parent window did not respond to rate limit check within 3 seconds, proceeding with message');
       setIsWaitingForRateLimit(false);
       setRateLimitError(null);
+      
       if (pendingMessageRef.current) {
         proceedWithMessage(pendingMessageRef.current);
         pendingMessageRef.current = null;

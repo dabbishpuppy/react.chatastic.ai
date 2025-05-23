@@ -40,7 +40,6 @@ export const useMessageHandling = (
       timestamp: new Date().toISOString()
     }]);
     
-    setMessage("");
     setUserHasMessaged(true);
     setIsTyping(true);
     
@@ -76,6 +75,9 @@ export const useMessageHandling = (
   const submitMessage = (text: string, sendMessageToParent?: (message: string) => void) => {
     console.log('Submitting message:', text, 'isEmbedded:', isEmbedded);
     
+    // CRITICAL FIX: Clear the message immediately regardless of embedded mode
+    setMessage("");
+    
     if (isEmbedded && window.self !== window.top && sendMessageToParent) {
       console.log('Using sendMessageToParent function');
       sendMessageToParent(text);
@@ -89,7 +91,8 @@ export const useMessageHandling = (
     e.preventDefault();
     if (!message.trim() || isWaitingForRateLimit) return;
 
-    submitMessage(message, sendMessageToParent);
+    const messageToSend = message.trim();
+    submitMessage(messageToSend, sendMessageToParent);
     
     if (isEmbedded) {
       e.stopPropagation();
