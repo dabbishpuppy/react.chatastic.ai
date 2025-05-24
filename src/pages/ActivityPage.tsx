@@ -4,7 +4,9 @@ import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
 import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
+import { getChatSettings } from "@/services/chatSettingsService";
 import { Conversation as UIConversation } from "@/components/activity/ConversationData";
+import { ChatInterfaceSettings } from "@/types/chatInterface";
 import { useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "@/hooks/use-toast";
@@ -14,10 +16,12 @@ const ActivityPage: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<UIConversation | null>(null);
   const [hasAnyConversations, setHasAnyConversations] = useState<boolean>(true);
   const [conversations, setConversations] = useState<DBConversation[]>([]);
+  const [chatSettings, setChatSettings] = useState<ChatInterfaceSettings | null>(null);
 
   useEffect(() => {
     if (agentId) {
       loadConversations();
+      loadChatSettings();
     }
   }, [agentId]);
 
@@ -31,6 +35,17 @@ const ActivityPage: React.FC = () => {
     } catch (error) {
       console.error('Error loading conversations:', error);
       setHasAnyConversations(false);
+    }
+  };
+
+  const loadChatSettings = async () => {
+    if (!agentId) return;
+    
+    try {
+      const settings = await getChatSettings(agentId);
+      setChatSettings(settings);
+    } catch (error) {
+      console.error('Error loading chat settings:', error);
     }
   };
 
@@ -145,7 +160,11 @@ const ActivityPage: React.FC = () => {
               <div className="w-1/3 min-w-[320px]">
                 <ConversationView 
                   conversation={selectedConversation} 
-                  onClose={handleCloseConversation} 
+                  onClose={handleCloseConversation}
+                  theme={chatSettings?.theme || 'light'}
+                  profilePicture={chatSettings?.profile_picture}
+                  displayName={chatSettings?.display_name}
+                  userMessageColor={chatSettings?.user_message_color}
                 />
               </div>
             )}

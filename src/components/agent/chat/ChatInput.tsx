@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { SendIcon, Smile } from "lucide-react";
+import { SendIcon, Smile, Plus } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -22,6 +22,8 @@ interface ChatInputProps {
   iconButtonClass: string;
   textClass: string;
   onEmojiInsert: (emoji: string) => void;
+  isConversationEnded?: boolean;
+  onStartNewChat?: () => void;
 }
 
 // Emoji list for the emoji picker
@@ -43,7 +45,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   inputTextClass,
   iconButtonClass,
   textClass,
-  onEmojiInsert
+  onEmojiInsert,
+  isConversationEnded = false,
+  onStartNewChat
 }) => {
   // Handle input change to ensure spaces work properly
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +62,48 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
     // Allow all other keys including space to work normally
   };
+
+  // If conversation is ended, show different UI
+  if (isConversationEnded) {
+    return (
+      <div className="border-t p-4">
+        <div className="flex items-center w-full gap-2">
+          <input
+            type="text"
+            value=""
+            placeholder="Your conversation has ended"
+            className={`flex-1 border rounded-full px-4 py-3 focus:outline-none focus:ring-1 focus:ring-primary ${inputBackgroundClass} ${inputTextClass}`}
+            disabled={true}
+            readOnly
+          />
+          <Button 
+            onClick={onStartNewChat}
+            className={`flex items-center gap-2 px-4 py-3 rounded-full bg-black hover:bg-gray-800 text-white ${iconButtonClass}`}
+          >
+            <Plus size={16} />
+            Start new chat
+          </Button>
+        </div>
+        
+        {/* Chat Icon - Only show when not in embedded mode */}
+        {chatIcon && !isEmbedded && (
+          <div className="flex justify-end mt-3">
+            <Avatar className="h-10 w-10 border-0">
+              <AvatarImage src={chatIcon} alt="Chat Icon" />
+              <AvatarFallback>💬</AvatarFallback>
+            </Avatar>
+          </div>
+        )}
+        
+        {/* Footer */}
+        {footer && (
+          <div className={`mt-3 text-xs text-center ${textClass} ${footerClassName}`}>
+            {footer}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="border-t p-4">

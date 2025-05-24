@@ -25,6 +25,8 @@ interface ChatFooterProps {
   footer?: string;
   footerClassName: string;
   onEmojiInsert: (emoji: string) => void;
+  isConversationEnded?: boolean;
+  onStartNewChat?: () => void;
 }
 
 const ChatFooter: React.FC<ChatFooterProps> = ({
@@ -46,7 +48,9 @@ const ChatFooter: React.FC<ChatFooterProps> = ({
   isEmbedded,
   footer,
   footerClassName,
-  onEmojiInsert
+  onEmojiInsert,
+  isConversationEnded = false,
+  onStartNewChat
 }) => (
   <div className={`flex-shrink-0 ${themeClasses.background}`}>
     {/* Rate limit error message with live countdown */}
@@ -59,7 +63,7 @@ const ChatFooter: React.FC<ChatFooterProps> = ({
     )}
 
     {/* Suggested Messages */}
-    {shouldShowSuggestions && suggestedMessages.length > 0 && (
+    {shouldShowSuggestions && suggestedMessages.length > 0 && !isConversationEnded && (
       <SuggestedMessages
         messages={suggestedMessages}
         onMessageClick={handleSuggestedMessageClick}
@@ -87,6 +91,8 @@ const ChatFooter: React.FC<ChatFooterProps> = ({
       iconButtonClass={themeClasses.iconButton}
       textClass={themeClasses.text}
       onEmojiInsert={onEmojiInsert}
+      isConversationEnded={isConversationEnded}
+      onStartNewChat={onStartNewChat}
     />
   </div>
 );

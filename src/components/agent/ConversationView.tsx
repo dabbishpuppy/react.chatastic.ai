@@ -9,12 +9,18 @@ interface ConversationViewProps {
   conversation: Conversation;
   onClose: () => void;
   theme?: 'light' | 'dark';
+  profilePicture?: string | null;
+  displayName?: string;
+  userMessageColor?: string;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({ 
   conversation, 
   onClose, 
-  theme = 'light' 
+  theme = 'light',
+  profilePicture,
+  displayName = 'Assistant',
+  userMessageColor = '#3B82F6'
 }) => {
   // Instead of using startedAt which doesn't exist, let's use the first message timestamp
   const startTime = conversation.messages.length > 0 
@@ -30,7 +36,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     container: theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-white',
     header: theme === 'dark' ? 'border-gray-800' : 'border-b',
     agentBubble: theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-gray-200',
-    userBubble: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-blue-600 text-white',
     userText: theme === 'dark' ? 'text-gray-300' : 'text-gray-700',
     timestamp: theme === 'dark' ? 'opacity-50' : 'opacity-70',
     closeButton: theme === 'dark' ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-800',
@@ -43,14 +48,18 @@ const ConversationView: React.FC<ConversationViewProps> = ({
       <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
         {!isUser && (
           <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
-            <AvatarFallback>AI</AvatarFallback>
-            <AvatarImage src="/placeholder.svg" alt="Assistant" />
+            <AvatarFallback>{displayName.charAt(0).toUpperCase()}</AvatarFallback>
+            {profilePicture && <AvatarImage src={profilePicture} alt={displayName} />}
           </Avatar>
         )}
         
-        <div className={`max-w-[80%] p-3 rounded-lg ${isUser ? themeClasses.userBubble : themeClasses.agentBubble}`}>
+        <div className={`max-w-[80%] p-3 rounded-lg ${
+          isUser 
+            ? 'text-white' 
+            : themeClasses.agentBubble
+        }`} style={isUser ? { backgroundColor: userMessageColor } : {}}>
           <div className="flex items-center mb-1">
-            <span className="font-medium">{isUser ? 'You' : 'Assistant'}</span>
+            <span className="font-medium">{isUser ? 'You' : displayName}</span>
             <span className={`text-xs ml-2 ${themeClasses.timestamp}`}>
               {new Date(message.timestamp).toLocaleTimeString([], { 
                 hour: '2-digit', 

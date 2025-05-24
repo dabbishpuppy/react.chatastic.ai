@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Filter, Download, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
 import { conversationService, Conversation } from "@/services/conversationService";
@@ -161,7 +160,7 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
         )}
 
         <div className="bg-white rounded-lg border">
-          <ScrollArea className="h-[calc(100vh-240px)]">
+          <div className="h-[calc(100vh-240px)] overflow-y-auto scrollbar-none">
             {loading ? (
               <div className="flex items-center justify-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
@@ -216,7 +215,7 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
                 </TableBody>
               </Table>
             )}
-          </ScrollArea>
+          </div>
         </div>
       </div>
 
