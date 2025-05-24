@@ -19,6 +19,11 @@ export const useEmbeddedMode = (
     return `wonderwave_rate_limit_${agentId}_timestamps`;
   };
 
+  // Get rate limit start time key
+  const getRateLimitStartTimeKey = (agentId: string) => {
+    return `wonderwave_rate_limit_${agentId}_start_time`;
+  };
+
   const getMessageTimestamps = (agentId: string) => {
     try {
       const key = getRateLimitKey(agentId);
@@ -39,6 +44,38 @@ export const useEmbeddedMode = (
       localStorage.setItem(key, JSON.stringify(timestamps));
     } catch (error) {
       console.error('Error saving rate limit timestamps:', error);
+    }
+  };
+
+  // Get rate limit start time from localStorage
+  const getRateLimitStartTime = (agentId: string) => {
+    try {
+      const key = getRateLimitStartTimeKey(agentId);
+      const stored = localStorage.getItem(key);
+      return stored ? parseInt(stored) : null;
+    } catch (error) {
+      console.error('Error reading rate limit start time:', error);
+      return null;
+    }
+  };
+
+  // Save rate limit start time to localStorage
+  const saveRateLimitStartTime = (agentId: string, startTime: number) => {
+    try {
+      const key = getRateLimitStartTimeKey(agentId);
+      localStorage.setItem(key, startTime.toString());
+    } catch (error) {
+      console.error('Error saving rate limit start time:', error);
+    }
+  };
+
+  // Clear rate limit start time from localStorage
+  const clearRateLimitStartTime = (agentId: string) => {
+    try {
+      const key = getRateLimitStartTimeKey(agentId);
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.error('Error clearing rate limit start time:', error);
     }
   };
 
@@ -95,17 +132,40 @@ export const useEmbeddedMode = (
       // Calculate reset time and timeUntilReset
       let resetTime = null;
       let timeUntilReset = null;
+      
       if (exceeded) {
-        // When rate limit is exceeded, show the full time window
-        timeUntilReset = rate_limit_time_window;
-        resetTime = new Date(Date.now() + (rate_limit_time_window * 1000));
+        // Check if we already have a start time
+        const existingStartTime = getRateLimitStartTime(agentId);
+        const now = Date.now();
+        
+        if (existingStartTime) {
+          // Calculate remaining time from existing start time
+          const elapsedSeconds = Math.floor((now - existingStartTime) / 1000);
+          timeUntilReset = Math.max(0, rate_limit_time_window - elapsedSeconds);
+          
+          if (timeUntilReset <= 0) {
+            // Time window has expired, clear start time
+            clearRateLimitStartTime(agentId);
+            timeUntilReset = null;
+          } else {
+            resetTime = new Date(existingStartTime + (rate_limit_time_window * 1000));
+          }
+        } else {
+          // First time hitting rate limit, set start time
+          saveRateLimitStartTime(agentId, now);
+          timeUntilReset = rate_limit_time_window;
+          resetTime = new Date(now + (rate_limit_time_window * 1000));
+        }
+      } else {
+        // Not exceeded, clear any existing start time
+        clearRateLimitStartTime(agentId);
       }
       
       // Save cleaned timestamps
       saveMessageTimestamps(agentId, timestamps);
       
       return {
-        exceeded,
+        exceeded: timeUntilReset && timeUntilReset > 0,
         resetTime,
         timeUntilReset,
         message: rate_limit_message || 'Too many messages in a row',

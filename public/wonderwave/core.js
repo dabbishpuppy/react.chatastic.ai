@@ -1,3 +1,4 @@
+
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate, shouldCheckVisibility } from './settings.js';
 import { createBubbleButton, showPopups, setBubbleButton } from './ui.js';
@@ -12,10 +13,15 @@ let rateLimitCountdownInterval = null;
 // Rate limiting storage keys
 const RATE_LIMIT_PREFIX = 'wonderwave_rate_limit_';
 const MESSAGE_TIMESTAMPS_SUFFIX = '_timestamps';
+const START_TIME_SUFFIX = '_start_time';
 
 // Rate limiting functions
 function getRateLimitKey(agentId) {
   return RATE_LIMIT_PREFIX + agentId + MESSAGE_TIMESTAMPS_SUFFIX;
+}
+
+function getRateLimitStartTimeKey(agentId) {
+  return RATE_LIMIT_PREFIX + agentId + START_TIME_SUFFIX;
 }
 
 function getMessageTimestamps(agentId) {
@@ -38,6 +44,35 @@ function saveMessageTimestamps(agentId, timestamps) {
     localStorage.setItem(key, JSON.stringify(timestamps));
   } catch (error) {
     logError('Error saving rate limit timestamps:', error);
+  }
+}
+
+function getRateLimitStartTime(agentId) {
+  try {
+    const key = getRateLimitStartTimeKey(agentId);
+    const stored = localStorage.getItem(key);
+    return stored ? parseInt(stored) : null;
+  } catch (error) {
+    logError('Error reading rate limit start time:', error);
+    return null;
+  }
+}
+
+function saveRateLimitStartTime(agentId, startTime) {
+  try {
+    const key = getRateLimitStartTimeKey(agentId);
+    localStorage.setItem(key, startTime.toString());
+  } catch (error) {
+    logError('Error saving rate limit start time:', error);
+  }
+}
+
+function clearRateLimitStartTime(agentId) {
+  try {
+    const key = getRateLimitStartTimeKey(agentId);
+    localStorage.removeItem(key);
+  } catch (error) {
+    logError('Error clearing rate limit start time:', error);
   }
 }
 
@@ -137,10 +172,33 @@ async function checkRateLimit(agentId) {
     // Calculate reset time and timeUntilReset
     let resetTime = null;
     let timeUntilReset = null;
+    
     if (exceeded) {
-      // When rate limit is exceeded, show the full time window
-      timeUntilReset = rate_limit_time_window;
-      resetTime = new Date(Date.now() + (rate_limit_time_window * 1000));
+      // Check if we already have a start time
+      const existingStartTime = getRateLimitStartTime(agentId);
+      const now = Date.now();
+      
+      if (existingStartTime) {
+        // Calculate remaining time from existing start time
+        const elapsedSeconds = Math.floor((now - existingStartTime) / 1000);
+        timeUntilReset = Math.max(0, rate_limit_time_window - elapsedSeconds);
+        
+        if (timeUntilReset <= 0) {
+          // Time window has expired, clear start time
+          clearRateLimitStartTime(agentId);
+          timeUntilReset = null;
+        } else {
+          resetTime = new Date(existingStartTime + (rate_limit_time_window * 1000));
+        }
+      } else {
+        // First time hitting rate limit, set start time
+        saveRateLimitStartTime(agentId, now);
+        timeUntilReset = rate_limit_time_window;
+        resetTime = new Date(now + (rate_limit_time_window * 1000));
+      }
+    } else {
+      // Not exceeded, clear any existing start time
+      clearRateLimitStartTime(agentId);
     }
     
     // Save cleaned timestamps
@@ -149,12 +207,12 @@ async function checkRateLimit(agentId) {
     log(`Rate limit check for ${agentId}: ${timestamps.length}/${rate_limit_messages} messages in ${rate_limit_time_window}s window`);
     
     // Start countdown if rate limit exceeded
-    if (exceeded && timeUntilReset > 0) {
+    if (timeUntilReset && timeUntilReset > 0) {
       startRateLimitCountdown(timeUntilReset, rate_limit_message);
     }
     
     return {
-      exceeded,
+      exceeded: timeUntilReset && timeUntilReset > 0,
       resetTime,
       timeUntilReset,
       message: rate_limit_message,
