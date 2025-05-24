@@ -100,9 +100,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     const messageText = message.trim();
     
     // Save user message
-    await saveMessage(messageText, false);
+    if (currentConversation) {
+      await saveMessage(messageText, false);
+    }
     
-    // Handle the submission
+    // Handle the submission - simplified for embedded mode
     await handleSubmitWithAgentId(e);
     
     // Save agent response (this would be called after the agent responds)
@@ -163,8 +165,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Check if input should be disabled
-  const isInputDisabled = isTyping || !!rateLimitError || isWaitingForRateLimit || conversationEnded;
+  // Check if input should be disabled - simplified for embedded
+  const isInputDisabled = isTyping || !!rateLimitError || conversationEnded;
 
   return (
     <ChatContainer

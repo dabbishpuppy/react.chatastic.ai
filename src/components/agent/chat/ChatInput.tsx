@@ -44,75 +44,94 @@ const ChatInput: React.FC<ChatInputProps> = ({
   iconButtonClass,
   textClass,
   onEmojiInsert
-}) => (
-  <div className="border-t p-4">
-    <form onSubmit={onSubmit} className="flex items-center w-full relative">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon"
-            className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 z-10 ${iconButtonClass}`}
-            disabled={isWaitingForRateLimit}
-            type="button"
-          >
-            <Smile size={18} />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
-          <div className="grid grid-cols-5 gap-2">
-            {emojis.map((emoji, index) => (
-              <Button
-                key={index}
-                variant="ghost"
-                className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                onClick={() => onEmojiInsert(emoji)}
-                disabled={isWaitingForRateLimit}
-                type="button"
-              >
-                {emoji}
-              </Button>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-      <input
-        ref={inputRef}
-        type="text"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
-        className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${inputBackgroundClass} ${inputTextClass}`}
-        disabled={isWaitingForRateLimit}
-      />
-      <Button 
-        type="submit" 
-        size="sm" 
-        variant="ghost"
-        className={`absolute right-1 rounded-full h-8 w-8 ${iconButtonClass}`}
-        disabled={!message.trim() || isWaitingForRateLimit}
-      >
-        <SendIcon size={16} />
-      </Button>
-    </form>
-    
-    {/* Chat Icon - Only show when not in embedded mode */}
-    {chatIcon && !isEmbedded && (
-      <div className="flex justify-end mt-3">
-        <Avatar className="h-10 w-10 border-0">
-          <AvatarImage src={chatIcon} alt="Chat Icon" />
-          <AvatarFallback>💬</AvatarFallback>
-        </Avatar>
-      </div>
-    )}
-    
-    {/* Footer */}
-    {footer && (
-      <div className={`mt-3 text-xs text-center ${textClass} ${footerClassName}`}>
-        {footer}
-      </div>
-    )}
-  </div>
-);
+}) => {
+  // Handle input change to ensure spaces work properly
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMessage(e.target.value);
+  };
+
+  // Handle key press to ensure proper behavior
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Allow all normal key behavior including spaces
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      onSubmit(e as any);
+    }
+  };
+
+  return (
+    <div className="border-t p-4">
+      <form onSubmit={onSubmit} className="flex items-center w-full relative">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 z-10 ${iconButtonClass}`}
+              disabled={isWaitingForRateLimit}
+              type="button"
+            >
+              <Smile size={18} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
+            <div className="grid grid-cols-5 gap-2">
+              {emojis.map((emoji, index) => (
+                <Button
+                  key={index}
+                  variant="ghost"
+                  className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  onClick={() => onEmojiInsert(emoji)}
+                  disabled={isWaitingForRateLimit}
+                  type="button"
+                >
+                  {emoji}
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <input
+          ref={inputRef}
+          type="text"
+          value={message}
+          onChange={handleInputChange}
+          onKeyPress={handleKeyPress}
+          placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
+          className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${inputBackgroundClass} ${inputTextClass}`}
+          disabled={isWaitingForRateLimit}
+          autoComplete="off"
+          spellCheck="false"
+        />
+        <Button 
+          type="submit" 
+          size="sm" 
+          variant="ghost"
+          className={`absolute right-1 rounded-full h-8 w-8 ${iconButtonClass}`}
+          disabled={!message.trim() || isWaitingForRateLimit}
+        >
+          <SendIcon size={16} />
+        </Button>
+      </form>
+      
+      {/* Chat Icon - Only show when not in embedded mode */}
+      {chatIcon && !isEmbedded && (
+        <div className="flex justify-end mt-3">
+          <Avatar className="h-10 w-10 border-0">
+            <AvatarImage src={chatIcon} alt="Chat Icon" />
+            <AvatarFallback>💬</AvatarFallback>
+          </Avatar>
+        </div>
+      )}
+      
+      {/* Footer */}
+      {footer && (
+        <div className={`mt-3 text-xs text-center ${textClass} ${footerClassName}`}>
+          {footer}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default ChatInput;
