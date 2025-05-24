@@ -198,6 +198,7 @@ const ActivityPage: React.FC = () => {
                   displayName={chatSettings?.display_name}
                   userMessageColor={chatSettings?.user_message_color}
                   showDeleteButton={true}
+                  initialMessage={chatSettings?.initial_message}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full bg-white rounded-lg border">

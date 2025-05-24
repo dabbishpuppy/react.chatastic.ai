@@ -1,8 +1,9 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Conversation } from "@/components/activity/ConversationData";
 
 interface ConversationViewProps {
@@ -14,6 +15,7 @@ interface ConversationViewProps {
   displayName?: string;
   userMessageColor?: string;
   showDeleteButton?: boolean;
+  initialMessage?: string;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
@@ -24,8 +26,10 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   profilePicture,
   displayName = "AI Assistant",
   userMessageColor,
-  showDeleteButton = false
+  showDeleteButton = false,
+  initialMessage
 }) => {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const isDark = theme === 'dark';
   
   const getContrastColor = (backgroundColor: string): string => {
@@ -46,6 +50,30 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   // Determine status based on conversation data
   const status = conversation.snippet.includes('Active') ? 'active' : 'ended';
 
+  const handleDeleteConfirm = () => {
+    if (onDelete) {
+      onDelete();
+    }
+    setIsDeleteDialogOpen(false);
+  };
+
+  // Create messages array with initial message if provided
+  const allMessages = React.useMemo(() => {
+    const messages = [...conversation.messages];
+    
+    // Add initial message at the beginning if it exists and isn't already there
+    if (initialMessage && (messages.length === 0 || messages[0].content !== initialMessage)) {
+      messages.unshift({
+        id: 'initial-message',
+        role: 'assistant',
+        content: initialMessage,
+        timestamp: conversation.messages[0]?.timestamp || new Date().toISOString()
+      });
+    }
+    
+    return messages;
+  }, [conversation.messages, initialMessage]);
+
   return (
     <div className={`border rounded-lg h-[calc(100vh-240px)] flex flex-col ${
       isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
@@ -55,9 +83,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         isDark ? 'border-gray-700' : 'border-gray-200'
       }`}>
         <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-6 w-6">
             <AvatarImage src={profilePicture} alt={displayName} />
-            <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
+            <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
           </Avatar>
           <div>
             <h3 className={`font-medium text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
@@ -78,14 +106,34 @@ const ConversationView: React.FC<ConversationViewProps> = ({
           </div>
         </div>
         {showDeleteButton && onDelete ? (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onDelete}
-            className={`${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-500 hover:text-red-600'}`}
-          >
-            <Trash2 size={16} />
-          </Button>
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-500 hover:text-red-600'}`}
+              >
+                <Trash2 size={16} />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete this conversation? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDeleteConfirm}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         ) : (
           <Button 
             variant="ghost" 
@@ -102,7 +150,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
       <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${
         isDark ? 'bg-gray-900' : 'bg-white'
       }`} style={{ scrollbarWidth: 'thin' }}>
-        {conversation.messages.map((message) => (
+        {allMessages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}

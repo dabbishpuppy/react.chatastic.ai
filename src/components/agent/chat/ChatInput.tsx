@@ -49,7 +49,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   isConversationEnded = false,
   onStartNewChat
 }) => {
-  // Handle input change - simplified to just use the event value
+  // Handle input change - properly handle space and other characters
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
   };
@@ -58,7 +58,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSubmit(e as any);
+      if (message.trim() && !isWaitingForRateLimit) {
+        onSubmit(e as any);
+      }
+    }
+    // Allow space and other keys to work normally - don't prevent default
+  };
+
+  // Handle send button click
+  const handleSendClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (message.trim() && !isWaitingForRateLimit) {
+      const syntheticEvent = {
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      } as React.FormEvent;
+      onSubmit(syntheticEvent);
     }
   };
 
@@ -160,11 +175,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
           spellCheck="false"
         />
         <Button 
-          type="submit" 
+          type="button" 
           size="sm" 
           variant="ghost"
           className={`absolute right-1 rounded-full h-8 w-8 ${iconButtonClass}`}
           disabled={!message.trim() || isWaitingForRateLimit}
+          onClick={handleSendClick}
         >
           <SendIcon size={16} />
         </Button>

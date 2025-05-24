@@ -56,11 +56,13 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
   const [chatLogs, setChatLogs] = useState<Conversation[]>(conversations);
   const [isEmpty, setIsEmpty] = useState(conversations.length === 0);
   const [loading, setLoading] = useState(false);
+  const [snippets, setSnippets] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (conversations.length > 0) {
       setChatLogs(conversations);
       setIsEmpty(false);
+      loadSnippets();
     } else if (agentId && conversations.length === 0) {
       loadConversations();
     }
@@ -74,12 +76,37 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
       const recentConversations = await conversationService.getRecentConversations(agentId, 50);
       setChatLogs(recentConversations);
       setIsEmpty(recentConversations.length === 0);
+      await loadSnippets(recentConversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
       setIsEmpty(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSnippets = async (conversationsToLoad = chatLogs) => {
+    const newSnippets: Record<string, string> = {};
+    
+    await Promise.all(
+      conversationsToLoad.map(async (conversation) => {
+        try {
+          const messages = await conversationService.getMessages(conversation.id);
+          if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            const content = lastMessage.content;
+            newSnippets[conversation.id] = content.length > 60 ? content.substring(0, 60) + '...' : content;
+          } else {
+            newSnippets[conversation.id] = 'No messages';
+          }
+        } catch (error) {
+          console.error('Error fetching messages for snippet:', error);
+          newSnippets[conversation.id] = 'No messages';
+        }
+      })
+    );
+    
+    setSnippets(newSnippets);
   };
 
   const handleRefresh = () => {
@@ -92,49 +119,6 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
 
   const getConversationTitle = (conversation: Conversation) => {
     return conversation.title || `Chat from ${formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}`;
-  };
-
-  const getConversationSnippet = async (conversation: Conversation) => {
-    try {
-      const messages = await conversationService.getMessages(conversation.id);
-      if (messages.length > 0) {
-        const lastMessage = messages[messages.length - 1];
-        const content = lastMessage.content;
-        return content.length > 60 ? content.substring(0, 60) + '...' : content;
-      }
-      return 'No messages';
-    } catch (error) {
-      console.error('Error fetching messages for snippet:', error);
-      return 'No messages';
-    }
-  };
-
-  // Enhanced component with snippet fetching
-  const ConversationRow: React.FC<{ log: Conversation }> = ({ log }) => {
-    const [snippet, setSnippet] = useState('Loading...');
-
-    useEffect(() => {
-      getConversationSnippet(log).then(setSnippet);
-    }, [log]);
-
-    const isSelected = selectedConversationId === log.id;
-
-    return (
-      <TableRow 
-        className={`cursor-pointer transition-colors ${
-          isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-        }`}
-        onClick={() => onConversationClick(log.id)}
-      >
-        <TableCell className="py-4">
-          <div className="font-medium">{getConversationTitle(log)}</div>
-          <div className="text-sm text-gray-500 mt-1">{snippet}</div>
-          <div className="text-xs text-gray-400 mt-1">
-            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })} • {log.status}
-          </div>
-        </TableCell>
-      </TableRow>
-    );
   };
 
   return (
@@ -183,9 +167,32 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {chatLogs.map((log) => (
-                  <ConversationRow key={log.id} log={log} />
-                ))}
+                {chatLogs.map((log) => {
+                  const isSelected = selectedConversationId === log.id;
+                  const snippet = snippets[log.id] || 'Loading...';
+                  
+                  return (
+                    <TableRow 
+                      key={log.id}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => onConversationClick(log.id)}
+                    >
+                      <TableCell className="py-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="font-medium">{getConversationTitle(log)}</div>
+                            <div className="text-sm text-gray-500 mt-1">{snippet}</div>
+                          </div>
+                          <div className="text-xs text-gray-400 ml-4 flex-shrink-0">
+                            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
