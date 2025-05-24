@@ -3,20 +3,39 @@ import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
-import { Conversation, getConversationById, hasConversations } from "@/components/activity/ConversationData";
+import { conversationService, Conversation } from "@/services/conversationService";
+import { useParams } from "react-router-dom";
 
 const ActivityPage: React.FC = () => {
+  const { agentId } = useParams<{ agentId: string }>();
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [hasAnyConversations, setHasAnyConversations] = useState<boolean>(true);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
-    // Check if there are any conversations
-    setHasAnyConversations(hasConversations());
-  }, []);
+    if (agentId) {
+      loadConversations();
+    }
+  }, [agentId]);
+
+  const loadConversations = async () => {
+    if (!agentId) return;
+    
+    try {
+      const recentConversations = await conversationService.getRecentConversations(agentId, 50);
+      setConversations(recentConversations);
+      setHasAnyConversations(recentConversations.length > 0);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setHasAnyConversations(false);
+    }
+  };
 
   const handleConversationClick = (conversationId: string) => {
-    const conversation = getConversationById(conversationId);
-    setSelectedConversation(conversation);
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      setSelectedConversation(conversation);
+    }
   };
 
   const handleCloseConversation = () => {
@@ -55,7 +74,12 @@ const ActivityPage: React.FC = () => {
         ) : (
           <div className={`flex flex-1 ${selectedConversation ? "pr-4" : ""} overflow-hidden`}>
             <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
-              <ChatLogsTab onConversationClick={handleConversationClick} hideTitle />
+              <ChatLogsTab 
+                onConversationClick={handleConversationClick} 
+                hideTitle
+                conversations={conversations}
+                onRefresh={loadConversations}
+              />
             </div>
             {selectedConversation && (
               <div className="w-1/3 min-w-[320px]">

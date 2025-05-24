@@ -1,8 +1,11 @@
 
-import React from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Settings } from "lucide-react";
+import { RotateCcw } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getContrastColor } from "./ThemeConfig";
+import ChatMenuDropdown from "./ChatMenuDropdown";
+import RecentChatsOverlay from "./RecentChatsOverlay";
 
 interface ChatHeaderProps {
   agentName: string;
@@ -13,24 +16,13 @@ interface ChatHeaderProps {
   headerColor?: string | null;
   backgroundColor: string;
   iconButtonClass: string;
-}
-
-// Helper function to determine contrasting text color for a background
-function getContrastColor(hex: string): string {
-  let r = 0, g = 0, b = 0;
-  
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    r = parseInt(hex.substring(1, 3), 16);
-    g = parseInt(hex.substring(3, 5), 16);
-    b = parseInt(hex.substring(5, 7), 16);
-  }
-  
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+  // New props for conversation management
+  onStartNewChat?: () => void;
+  onEndChat?: () => void;
+  onLoadConversation?: (conversationId: string) => void;
+  agentId?: string;
+  isConversationEnded?: boolean;
+  isEmbedded?: boolean;
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -41,47 +33,100 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   onRegenerate,
   headerColor,
   backgroundColor,
-  iconButtonClass
-}) => (
-  <div 
-    className={`p-4 border-b flex items-center justify-between flex-shrink-0 ${backgroundColor}`}
-    style={headerColor ? { backgroundColor: headerColor, color: getContrastColor(headerColor) } : {}}
-  >
-    <div className="flex items-center gap-2">
-      <Avatar className="h-10 w-10 border-0">
-        {profilePicture ? (
-          <AvatarImage src={profilePicture} alt={agentName} />
-        ) : (
-          <AvatarFallback className="bg-gray-200 text-gray-600">
-            {agentName.charAt(0)}
-          </AvatarFallback>
-        )}
-      </Avatar>
-      <span className={headerColor ? "" : `font-medium text-gray-800`}>{agentName}</span>
-    </div>
-    <div className="flex items-center gap-2">
-      {allowRegenerate && (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={headerColor ? "text-inherit hover:bg-white/20" : `h-9 w-9 ${iconButtonClass}`} 
-          onClick={onRegenerate}
-        >
-          <RefreshCw className="h-5 w-5" />
-        </Button>
+  iconButtonClass,
+  onStartNewChat,
+  onEndChat,
+  onLoadConversation,
+  agentId,
+  isConversationEnded = false,
+  isEmbedded = false
+}) => {
+  const [showRecentChats, setShowRecentChats] = useState(false);
+
+  // Determine header background and text color
+  const hasCustomHeader = headerColor && headerColor !== backgroundColor;
+  const headerStyle = hasCustomHeader ? {
+    backgroundColor: headerColor,
+    color: getContrastColor(headerColor)
+  } : {};
+
+  const handleViewRecentChats = () => {
+    setShowRecentChats(true);
+  };
+
+  const handleSelectConversation = (conversationId: string) => {
+    if (onLoadConversation) {
+      onLoadConversation(conversationId);
+    }
+  };
+
+  // Show conversation ended message if conversation is ended
+  const showEndedMessage = isConversationEnded && !isEmbedded;
+
+  return (
+    <>
+      <div 
+        className={`p-4 border-b ${hasCustomHeader ? '' : backgroundColor}`}
+        style={headerStyle}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Avatar className="h-8 w-8 border-0">
+              {profilePicture ? (
+                <AvatarImage src={profilePicture} alt={agentName} />
+              ) : (
+                <AvatarFallback className="bg-gray-200 text-gray-600">
+                  {agentName.charAt(0)}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            <div>
+              <h3 className="font-medium">{agentName}</h3>
+              {showEndedMessage && (
+                <p className="text-xs text-gray-500">This conversation has ended</p>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-1">
+            {/* Regenerate button */}
+            {allowRegenerate && !isEmbedded && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onRegenerate}
+                className={iconButtonClass}
+              >
+                <RotateCcw size={18} />
+              </Button>
+            )}
+            
+            {/* Three-dot menu */}
+            {(onStartNewChat || onEndChat || (onLoadConversation && agentId)) && (
+              <ChatMenuDropdown
+                onStartNewChat={onStartNewChat || (() => {})}
+                onEndChat={onEndChat || (() => {})}
+                onViewRecentChats={handleViewRecentChats}
+                isConversationEnded={isConversationEnded}
+                isEmbedded={isEmbedded}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Chats Overlay */}
+      {agentId && (
+        <RecentChatsOverlay
+          isOpen={showRecentChats}
+          onClose={() => setShowRecentChats(false)}
+          agentId={agentId}
+          onSelectConversation={handleSelectConversation}
+          isEmbedded={isEmbedded}
+        />
       )}
-      {toggleSettings && (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={headerColor ? "text-inherit hover:bg-white/20" : `h-9 w-9 ${iconButtonClass}`}
-          onClick={toggleSettings}
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
-      )}
-    </div>
-  </div>
-);
+    </>
+  );
+};
 
 export default ChatHeader;

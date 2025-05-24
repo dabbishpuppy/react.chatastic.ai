@@ -6,11 +6,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
-import { getAllConversations, deleteAllConversations } from "./ConversationData";
+import { conversationService, Conversation } from "@/services/conversationService";
+import { formatDistanceToNow } from "date-fns";
 
 interface ChatLogsTabProps {
   onConversationClick: (conversationId: string) => void;
   hideTitle?: boolean;
+  conversations?: Conversation[];
+  onRefresh?: () => void;
 }
 
 const handleExport = () => {
@@ -42,36 +45,70 @@ const ActionButtons = () => {
 
 const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionButtons } = ({ 
   onConversationClick, 
-  hideTitle = false 
+  hideTitle = false,
+  conversations = [],
+  onRefresh
 }) => {
   const { agentId } = useParams<{ agentId: string }>();
-  const [chatLogs, setChatLogs] = useState(getAllConversations());
-  const [isEmpty, setIsEmpty] = useState(chatLogs.length === 0);
+  const [chatLogs, setChatLogs] = useState<Conversation[]>(conversations);
+  const [isEmpty, setIsEmpty] = useState(conversations.length === 0);
+  const [loading, setLoading] = useState(false);
 
-  // In a real app, this would fetch conversations from an API or database
   useEffect(() => {
-    // Here's where real data fetching would occur
-    setChatLogs(getAllConversations());
-    
-    // Check if the list is empty
-    setIsEmpty(getAllConversations().length === 0);
-  }, [agentId]);
+    if (conversations.length > 0) {
+      setChatLogs(conversations);
+      setIsEmpty(false);
+    } else if (agentId && conversations.length === 0) {
+      loadConversations();
+    }
+  }, [conversations, agentId]);
 
-  const handleDelete = (id: string) => {
-    // Remove the conversation from the list
+  const loadConversations = async () => {
+    if (!agentId) return;
+    
+    setLoading(true);
+    try {
+      const recentConversations = await conversationService.getRecentConversations(agentId, 50);
+      setChatLogs(recentConversations);
+      setIsEmpty(recentConversations.length === 0);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setIsEmpty(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    // In a real implementation, you would delete from the database
+    // For now, we'll just remove it from the local state
     const updatedLogs = chatLogs.filter(log => log.id !== id);
     setChatLogs(updatedLogs);
     
-    // Also update our in-memory storage
-    // In a real app, this would be an API call
-    // For now we'll just simulate it
-    
     toast({
-      title: "Log deleted",
-      description: `Log ${id} has been deleted`,
+      title: "Conversation deleted",
+      description: `Conversation has been deleted`,
     });
     
     setIsEmpty(updatedLogs.length === 0);
+  };
+
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+    } else {
+      loadConversations();
+    }
+  };
+
+  const getConversationTitle = (conversation: Conversation) => {
+    return conversation.title || `Chat from ${formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}`;
+  };
+
+  const getConversationSnippet = (conversation: Conversation) => {
+    const timeAgo = formatDistanceToNow(new Date(conversation.updated_at), { addSuffix: true });
+    const status = conversation.status === 'active' ? 'Active' : 'Ended';
+    return `${status} • ${timeAgo}`;
   };
 
   return (
@@ -80,14 +117,29 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold">Chat logs</h2>
           <div className="flex gap-2">
-            <ActionButtons />
+            <Button variant="outline" className="flex gap-1" onClick={handleRefresh}>
+              <RefreshCcw size={18} />
+              Refresh
+            </Button>
+            <Button variant="outline" className="flex gap-1">
+              <Filter size={18} />
+              Filter
+            </Button>
+            <Button onClick={handleExport} className="bg-black hover:bg-gray-800 flex gap-1">
+              Export
+              <Download size={18} />
+            </Button>
           </div>
         </div>
       )}
 
       <div className="bg-white rounded-lg border">
         <ScrollArea className="h-[calc(100vh-240px)]">
-          {isEmpty ? (
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+            </div>
+          ) : isEmpty ? (
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <div className="rounded-full bg-gray-100 p-3 mb-4">
                 <Trash2 size={24} className="text-gray-400" />
@@ -115,11 +167,13 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
                     onClick={() => onConversationClick(log.id)}
                   >
                     <TableCell className="py-4">
-                      <div className="font-medium">{log.title}</div>
-                      <div className="text-sm text-gray-500">{log.snippet}</div>
+                      <div className="font-medium">{getConversationTitle(log)}</div>
+                      <div className="text-sm text-gray-500">{getConversationSnippet(log)}</div>
                     </TableCell>
-                    <TableCell className="text-gray-500">{log.daysAgo}</TableCell>
-                    <TableCell className="text-gray-500">{log.source}</TableCell>
+                    <TableCell className="text-gray-500">
+                      {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                    </TableCell>
+                    <TableCell className="text-gray-500 capitalize">{log.source}</TableCell>
                     <TableCell>
                       <Button 
                         variant="ghost" 

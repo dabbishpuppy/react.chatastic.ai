@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
 import ChatMainContent from "./chat/ChatMainContent";
@@ -9,6 +9,7 @@ import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { useChatHandlers } from "@/hooks/useChatHandlers";
 import { getThemeClasses, getContrastColor } from "./chat/ThemeConfig";
+import { useConversationManager } from "@/hooks/useConversationManager";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -49,6 +50,20 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
 }) => {
+  const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>(initialMessages);
+  
+  // Conversation management
+  const {
+    currentConversation,
+    conversationEnded,
+    agentId,
+    startNewConversation,
+    endCurrentConversation,
+    loadConversation,
+    saveMessage,
+    getConversationMessages
+  } = useConversationManager(isEmbedded ? 'iframe' : 'bubble');
+
   const {
     message,
     setMessage,
@@ -68,7 +83,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     insertEmoji,
     handleCountdownFinished,
     cleanup
-  } = useMessageHandling(initialMessages, isEmbedded);
+  } = useMessageHandling(displayMessages, isEmbedded);
 
   const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
 
@@ -77,6 +92,49 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleSuggestedMessageClickWithAgentId,
     handleRegenerateWithAgentId
   } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
+
+  // Enhanced message submission with conversation saving
+  const handleSubmitWithConversation = async (e: React.FormEvent) => {
+    if (!message.trim() || isTyping || rateLimitError) return;
+    
+    const messageText = message.trim();
+    
+    // Save user message
+    await saveMessage(messageText, false);
+    
+    // Handle the submission
+    await handleSubmitWithAgentId(e);
+    
+    // Save agent response (this would be called after the agent responds)
+    // For now, we'll save a placeholder response
+    setTimeout(async () => {
+      if (currentConversation) {
+        await saveMessage("Agent response placeholder", true);
+      }
+    }, 1000);
+  };
+
+  const handleStartNewChat = async () => {
+    await startNewConversation();
+    setChatHistory([{
+      isAgent: true,
+      content: initialMessages[0]?.content || "Hi! I'm Wonder AI. How can I help you today?",
+      timestamp: new Date().toISOString()
+    }]);
+  };
+
+  const handleEndChat = async () => {
+    await endCurrentConversation();
+  };
+
+  const handleLoadConversation = async (conversationId: string) => {
+    await loadConversation(conversationId);
+    const messages = await getConversationMessages(conversationId);
+    if (messages.length > 0) {
+      setChatHistory(messages);
+      setDisplayMessages(messages);
+    }
+  };
 
   // Cleanup on unmount
   useEffect(() => {
@@ -87,10 +145,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   // Update chat when initialMessages prop changes
   useEffect(() => {
-    if (initialMessages.length > 0) {
+    if (initialMessages.length > 0 && !currentConversation) {
+      setDisplayMessages(initialMessages);
       setChatHistory(initialMessages);
     }
-  }, [initialMessages, setChatHistory]);
+  }, [initialMessages, currentConversation, setChatHistory]);
 
   // Apply theme based on settings
   const themeClasses = getThemeClasses(theme);
@@ -105,7 +164,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   } : {};
 
   // Check if input should be disabled
-  const isInputDisabled = isTyping || !!rateLimitError || isWaitingForRateLimit;
+  const isInputDisabled = isTyping || !!rateLimitError || isWaitingForRateLimit || conversationEnded;
 
   return (
     <ChatContainer
@@ -123,6 +182,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         headerColor={headerColor}
         backgroundColor={themeClasses.background}
         iconButtonClass={themeClasses.iconButton}
+        onStartNewChat={handleStartNewChat}
+        onEndChat={handleEndChat}
+        onLoadConversation={handleLoadConversation}
+        agentId={agentId}
+        isConversationEnded={conversationEnded}
+        isEmbedded={isEmbedded}
       />
 
       {/* Chat Messages - Scrollable area */}
@@ -140,7 +205,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         messagesEndRef={messagesEndRef}
       />
 
-      {/* Fixed footer section with rate limit error, suggestions, and input */}
+      {/* Fixed footer section */}
       <ChatFooter
         rateLimitError={rateLimitError}
         timeUntilReset={timeUntilReset}
@@ -153,8 +218,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         themeClasses={themeClasses}
         message={message}
         setMessage={setMessage}
-        onSubmit={handleSubmitWithAgentId}
-        placeholder={placeholder}
+        onSubmit={handleSubmitWithConversation}
+        placeholder={conversationEnded ? "This conversation has ended. Start a new chat to continue." : placeholder}
         inputRef={inputRef}
         chatIcon={chatIcon}
         isEmbedded={isEmbedded}
