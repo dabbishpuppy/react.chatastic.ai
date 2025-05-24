@@ -9,15 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ChatMenuDropdownProps {
   onStartNewChat: () => void;
@@ -46,7 +44,6 @@ const ChatMenuDropdown: React.FC<ChatMenuDropdownProps> = ({
   };
 
   const iconSize = isEmbedded ? 16 : 18;
-  const buttonSize = isEmbedded ? "sm" : "default";
 
   return (
     <>
@@ -90,25 +87,36 @@ const ChatMenuDropdown: React.FC<ChatMenuDropdownProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog open={showEndChatDialog} onOpenChange={setShowEndChatDialog}>
-        <AlertDialogContent className="bg-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>End this chat?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will end the current conversation. You can start a new chat anytime or view this conversation in your chat history.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+      <Dialog open={showEndChatDialog} onOpenChange={setShowEndChatDialog}>
+        <DialogContent className="bg-white max-w-sm mx-auto">
+          <DialogHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                <X size={24} className="text-gray-600" />
+              </div>
+            </div>
+            <DialogTitle className="text-lg font-semibold">End chat</DialogTitle>
+            <DialogDescription className="text-gray-600 mt-2">
+              Do you want to end this chat?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 mt-6">
+            <Button 
               onClick={handleConfirmEndChat}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-black hover:bg-gray-800 text-white w-full"
             >
-              End chat
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              Yes, end chat
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => setShowEndChatDialog(false)}
+              className="w-full"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };

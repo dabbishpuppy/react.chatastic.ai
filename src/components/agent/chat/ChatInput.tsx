@@ -50,13 +50,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMessage(e.target.value);
   };
 
-  // Handle key press to ensure proper behavior
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Allow all normal key behavior including spaces
+  // Handle key press to ensure proper behavior including spaces
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e as any);
     }
+    // Allow all other keys including space to work normally
   };
 
   return (
@@ -96,7 +96,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           type="text"
           value={message}
           onChange={handleInputChange}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
           className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${inputBackgroundClass} ${inputTextClass}`}
           disabled={isWaitingForRateLimit}

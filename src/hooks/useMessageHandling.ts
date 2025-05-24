@@ -56,15 +56,15 @@ export const useMessageHandling = (
     );
   };
 
-  // Simplified message submission - no complex embedded handling
+  // Enhanced message submission with rate limiting
   const submitMessage = async (text: string, agentId?: string) => {
     console.log('Submitting message:', text);
     
     // Clear input immediately
     setMessage("");
     
-    // For embedded mode, still do rate limiting but don't overcomplicate
-    if (agentId && !isEmbedded) {
+    // Check rate limit if agentId is provided
+    if (agentId) {
       const rateLimitStatus = await checkRateLimit(agentId);
       
       if (rateLimitStatus.exceeded) {

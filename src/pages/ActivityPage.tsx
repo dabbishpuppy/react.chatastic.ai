@@ -7,6 +7,7 @@ import { conversationService, Conversation as DBConversation } from "@/services/
 import { Conversation as UIConversation } from "@/components/activity/ConversationData";
 import { useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "@/hooks/use-toast";
 
 const ActivityPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -30,6 +31,33 @@ const ActivityPage: React.FC = () => {
     } catch (error) {
       console.error('Error loading conversations:', error);
       setHasAnyConversations(false);
+    }
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      // In a real implementation, you would call a delete API
+      // For now, we'll just remove from local state and show success
+      const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
+      setConversations(updatedConversations);
+      setHasAnyConversations(updatedConversations.length > 0);
+      
+      // Close conversation view if the deleted conversation was selected
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+      }
+      
+      toast({
+        title: "Conversation deleted",
+        description: "The conversation has been successfully deleted.",
+      });
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the conversation. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -107,6 +135,7 @@ const ActivityPage: React.FC = () => {
             <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
               <ChatLogsTab 
                 onConversationClick={handleConversationClick} 
+                onConversationDelete={deleteConversation}
                 hideTitle
                 conversations={conversations}
                 onRefresh={loadConversations}
