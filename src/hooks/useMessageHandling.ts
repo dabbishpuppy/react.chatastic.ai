@@ -1,213 +1,38 @@
 
-import { useState, useRef } from "react";
+import { useEffect } from "react";
 import { ChatMessage } from "@/types/chatInterface";
-import { getAgentSecuritySettings } from "@/services/agentSecurityService";
+import { useChatState } from "./useChatState";
+import { checkRateLimit, recordMessage } from "@/utils/rateLimitUtils";
+import { 
+  proceedWithMessage, 
+  copyMessageToClipboard, 
+  handleFeedback, 
+  regenerateResponse, 
+  insertEmoji 
+} from "@/utils/messageUtils";
 
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
   isEmbedded: boolean = false
 ) => {
-  const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
-    if (initialMessages.length) {
-      return initialMessages;
-    }
-    
-    return [
-      {
-        isAgent: true,
-        content: "Hi! I'm Wonder AI. How can I help you today?",
-        timestamp: new Date().toISOString()
-      },
-      {
-        isAgent: false,
-        content: "Hello, World!",
-        timestamp: new Date(Date.now() + 1000).toISOString()
-      }
-    ];
-  });
-  const [isTyping, setIsTyping] = useState(false);
-  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
-  const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null);
-  const [isWaitingForRateLimit, setIsWaitingForRateLimit] = useState(false);
-  const [userHasMessaged, setUserHasMessaged] = useState(true);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Get rate limit storage key for an agent
-  const getRateLimitKey = (agentId: string) => {
-    return `wonderwave_rate_limit_${agentId}_timestamps`;
-  };
-
-  // Get rate limit start time key
-  const getRateLimitStartTimeKey = (agentId: string) => {
-    return `wonderwave_rate_limit_${agentId}_start_time`;
-  };
-
-  // Get message timestamps from localStorage
-  const getMessageTimestamps = (agentId: string) => {
-    try {
-      const key = getRateLimitKey(agentId);
-      const stored = localStorage.getItem(key);
-      if (!stored) return [];
-      
-      const timestamps = JSON.parse(stored);
-      return Array.isArray(timestamps) ? timestamps : [];
-    } catch (error) {
-      console.error('Error reading rate limit timestamps:', error);
-      return [];
-    }
-  };
-
-  // Save message timestamps to localStorage
-  const saveMessageTimestamps = (agentId: string, timestamps: number[]) => {
-    try {
-      const key = getRateLimitKey(agentId);
-      localStorage.setItem(key, JSON.stringify(timestamps));
-    } catch (error) {
-      console.error('Error saving rate limit timestamps:', error);
-    }
-  };
-
-  // Get rate limit start time from localStorage
-  const getRateLimitStartTime = (agentId: string) => {
-    try {
-      const key = getRateLimitStartTimeKey(agentId);
-      const stored = localStorage.getItem(key);
-      return stored ? parseInt(stored) : null;
-    } catch (error) {
-      console.error('Error reading rate limit start time:', error);
-      return null;
-    }
-  };
-
-  // Save rate limit start time to localStorage
-  const saveRateLimitStartTime = (agentId: string, startTime: number) => {
-    try {
-      const key = getRateLimitStartTimeKey(agentId);
-      localStorage.setItem(key, startTime.toString());
-    } catch (error) {
-      console.error('Error saving rate limit start time:', error);
-    }
-  };
-
-  // Clear rate limit start time from localStorage
-  const clearRateLimitStartTime = (agentId: string) => {
-    try {
-      const key = getRateLimitStartTimeKey(agentId);
-      localStorage.removeItem(key);
-    } catch (error) {
-      console.error('Error clearing rate limit start time:', error);
-    }
-  };
-
-  // Clean old timestamps outside the time window
-  const cleanOldTimestamps = (timestamps: number[], timeWindowSeconds: number) => {
-    const now = Date.now();
-    const timeWindowMs = timeWindowSeconds * 1000;
-    
-    return timestamps.filter(timestamp => {
-      return (now - timestamp) < timeWindowMs;
-    });
-  };
-
-  // Check if rate limit is exceeded
-  const checkRateLimit = async (agentId: string) => {
-    try {
-      const settings = await getAgentSecuritySettings(agentId);
-      
-      if (!settings || !settings.rate_limit_enabled) {
-        return { exceeded: false, remaining: null, resetTime: null };
-      }
-
-      const { rate_limit_messages, rate_limit_time_window, rate_limit_message } = settings;
-      
-      // Get current timestamps
-      let timestamps = getMessageTimestamps(agentId);
-      
-      // Clean old timestamps
-      timestamps = cleanOldTimestamps(timestamps, rate_limit_time_window);
-      
-      // Check if limit is exceeded
-      const exceeded = timestamps.length >= rate_limit_messages;
-      
-      // Calculate reset time and timeUntilReset
-      let resetTime = null;
-      let timeUntilReset = null;
-      
-      if (exceeded) {
-        // Check if we already have a start time
-        const existingStartTime = getRateLimitStartTime(agentId);
-        const now = Date.now();
-        
-        if (existingStartTime) {
-          // Calculate remaining time from existing start time
-          const elapsedSeconds = Math.floor((now - existingStartTime) / 1000);
-          timeUntilReset = Math.max(0, rate_limit_time_window - elapsedSeconds);
-          
-          if (timeUntilReset <= 0) {
-            // Time window has expired, clear start time
-            clearRateLimitStartTime(agentId);
-            timeUntilReset = null;
-          } else {
-            resetTime = new Date(existingStartTime + (rate_limit_time_window * 1000));
-          }
-        } else {
-          // First time hitting rate limit, set start time
-          saveRateLimitStartTime(agentId, now);
-          timeUntilReset = rate_limit_time_window;
-          resetTime = new Date(now + (rate_limit_time_window * 1000));
-        }
-      } else {
-        // Not exceeded, clear any existing start time
-        clearRateLimitStartTime(agentId);
-      }
-      
-      // Save cleaned timestamps
-      saveMessageTimestamps(agentId, timestamps);
-      
-      return {
-        exceeded: timeUntilReset && timeUntilReset > 0,
-        resetTime,
-        timeUntilReset,
-        message: rate_limit_message || 'Too many messages in a row',
-        current: timestamps.length,
-        limit: rate_limit_messages,
-        timeWindow: rate_limit_time_window
-      };
-      
-    } catch (error) {
-      console.error('Error checking rate limit:', error);
-      // On error, allow the message (fail open)
-      return { exceeded: false, remaining: null, resetTime: null };
-    }
-  };
-
-  // Record a new message timestamp
-  const recordMessage = async (agentId: string) => {
-    try {
-      const settings = await getAgentSecuritySettings(agentId);
-      
-      if (!settings || !settings.rate_limit_enabled) {
-        return;
-      }
-      
-      // Get current timestamps
-      let timestamps = getMessageTimestamps(agentId);
-      
-      // Clean old timestamps
-      timestamps = cleanOldTimestamps(timestamps, settings.rate_limit_time_window);
-      
-      // Add new timestamp
-      timestamps.push(Date.now());
-      
-      // Save updated timestamps
-      saveMessageTimestamps(agentId, timestamps);
-      
-    } catch (error) {
-      console.error('Error recording message timestamp:', error);
-    }
-  };
+  const {
+    message,
+    setMessage,
+    chatHistory,
+    setChatHistory,
+    isTyping,
+    setIsTyping,
+    rateLimitError,
+    setRateLimitError,
+    timeUntilReset,
+    setTimeUntilReset,
+    isWaitingForRateLimit,
+    setIsWaitingForRateLimit,
+    userHasMessaged,
+    setUserHasMessaged,
+    inputRef,
+    countdownIntervalRef
+  } = useChatState(initialMessages, isEmbedded);
 
   // Handle countdown finish - clear rate limit error
   const handleCountdownFinished = () => {
@@ -220,42 +45,15 @@ export const useMessageHandling = (
     }, 10);
   };
 
-  const proceedWithMessage = (text: string) => {
-    console.log('Proceeding with message:', text);
-    
-    setChatHistory(prev => [...prev, {
-      isAgent: false,
-      content: text,
-      timestamp: new Date().toISOString()
-    }]);
-    
-    setUserHasMessaged(true);
-    setIsTyping(true);
-    
-    // Focus input field after clearing message
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 10);
-    
-    setTimeout(() => {
-      setIsTyping(false);
-      setChatHistory(prev => [...prev, {
-        isAgent: true,
-        content: "I'm here to help you with any questions or tasks!",
-        timestamp: new Date().toISOString()
-      }]);
-      
-      // Focus input field again after agent response
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 10);
-      
-      if (isEmbedded && window.self !== window.top) {
-        setTimeout(() => {
-          window.parent.postMessage({ type: 'message-sent' }, '*');
-        }, 100);
-      }
-    }, 1500);
+  const proceedWithMessageWrapper = (text: string) => {
+    proceedWithMessage(
+      text,
+      setChatHistory,
+      setUserHasMessaged,
+      setIsTyping,
+      inputRef,
+      isEmbedded
+    );
   };
 
   // Enhanced message submission with rate limiting
@@ -283,7 +81,7 @@ export const useMessageHandling = (
     }
     
     // Add message to chat and proceed
-    proceedWithMessage(text);
+    proceedWithMessageWrapper(text);
   };
 
   const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
@@ -309,55 +107,23 @@ export const useMessageHandling = (
     }, 10);
   };
 
-  const copyMessageToClipboard = (content: string) => {
-    navigator.clipboard.writeText(content);
+  const handleFeedbackWrapper = (timestamp: string, type: "like" | "dislike") => {
+    handleFeedback(timestamp, type, setChatHistory);
   };
 
-  const handleFeedback = (timestamp: string, type: "like" | "dislike") => {
-    setChatHistory(prev => 
-      prev.map(msg => 
-        msg.timestamp === timestamp 
-          ? { ...msg, feedback: type } 
-          : msg
-      )
+  const regenerateResponseWrapper = (allowRegenerate: boolean) => {
+    regenerateResponse(
+      allowRegenerate,
+      chatHistory,
+      isTyping,
+      setChatHistory,
+      setIsTyping,
+      inputRef
     );
   };
 
-  const regenerateResponse = (allowRegenerate: boolean) => {
-    if (!allowRegenerate || isTyping) return;
-    
-    const lastUserMessageIndex = [...chatHistory].reverse().findIndex(msg => !msg.isAgent);
-    if (lastUserMessageIndex === -1) return;
-    
-    const messagesToKeep = chatHistory.slice(0, chatHistory.length - lastUserMessageIndex);
-    setChatHistory(messagesToKeep);
-    
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      setIsTyping(false);
-      setChatHistory(prev => [...prev, {
-        isAgent: true,
-        content: "Here's an alternative response to your question.",
-        timestamp: new Date().toISOString()
-      }]);
-      
-      // Focus input field after regenerate
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 10);
-    }, 1500);
-  };
-
-  const insertEmoji = (emoji: string) => {
-    if (isTyping || rateLimitError) return;
-    
-    setMessage(prev => prev + emoji);
-    
-    // Focus input field after emoji insertion
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 10);
+  const insertEmojiWrapper = (emoji: string) => {
+    insertEmoji(emoji, isTyping, rateLimitError, setMessage, inputRef);
   };
 
   // Cleanup countdown on unmount
@@ -385,10 +151,10 @@ export const useMessageHandling = (
     handleSubmit,
     handleSuggestedMessageClick,
     copyMessageToClipboard,
-    handleFeedback,
-    regenerateResponse,
-    insertEmoji,
-    proceedWithMessage,
+    handleFeedback: handleFeedbackWrapper,
+    regenerateResponse: regenerateResponseWrapper,
+    insertEmoji: insertEmojiWrapper,
+    proceedWithMessage: proceedWithMessageWrapper,
     submitMessage,
     handleCountdownFinished,
     cleanup
