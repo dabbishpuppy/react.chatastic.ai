@@ -9,6 +9,7 @@ import ChatMessages from "./chat/ChatMessages";
 import ChatContainer from "./chat/ChatContainer";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
+import { useParams } from "react-router-dom";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -67,6 +68,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
 }) => {
+  const { agentId } = useParams();
+  
   const {
     message,
     setMessage,
@@ -86,10 +89,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     copyMessageToClipboard,
     handleFeedback,
     regenerateResponse,
-    insertEmoji
+    insertEmoji,
+    cleanup
   } = useMessageHandling(initialMessages, isEmbedded);
 
   const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   // Update chat when initialMessages prop changes
   useEffect(() => {
@@ -118,6 +129,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     backgroundColor: userMessageColor,
     color: getContrastColor(userMessageColor)
   } : {};
+
+  // Enhanced handlers with agentId
+  const handleSubmitWithAgentId = (e: React.FormEvent) => {
+    handleSubmit(e, agentId);
+  };
+
+  const handleSuggestedMessageClickWithAgentId = (text: string) => {
+    handleSuggestedMessageClick(text, agentId);
+  };
 
   return (
     <ChatContainer
@@ -169,8 +189,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         {shouldShowSuggestions && suggestedMessages.length > 0 && (
           <SuggestedMessages
             messages={suggestedMessages}
-            onMessageClick={handleSuggestedMessageClick}
-            isWaitingForRateLimit={isWaitingForRateLimit}
+            onMessageClick={handleSuggestedMessageClickWithAgentId}
+            isWaitingForRateLimit={!!rateLimitError || isWaitingForRateLimit}
             theme={theme}
             backgroundColor={themeClasses.background}
           />
@@ -180,8 +200,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         <ChatInput
           message={message}
           setMessage={setMessage}
-          onSubmit={handleSubmit}
-          isWaitingForRateLimit={isWaitingForRateLimit}
+          onSubmit={handleSubmitWithAgentId}
+          isWaitingForRateLimit={!!rateLimitError || isWaitingForRateLimit}
           placeholder={placeholder}
           inputRef={inputRef}
           chatIcon={chatIcon}

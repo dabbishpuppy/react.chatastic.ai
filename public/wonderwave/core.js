@@ -7,6 +7,140 @@ import { openChat, closeChat, toggleChat, destroy as destroyChat, setIframe } fr
 let initialized = false;
 let visibilityCheckInterval = null;
 
+// Rate limiting storage keys
+const RATE_LIMIT_PREFIX = 'wonderwave_rate_limit_';
+const MESSAGE_TIMESTAMPS_SUFFIX = '_timestamps';
+
+// Rate limiting functions
+function getRateLimitKey(agentId) {
+  return RATE_LIMIT_PREFIX + agentId + MESSAGE_TIMESTAMPS_SUFFIX;
+}
+
+function getMessageTimestamps(agentId) {
+  try {
+    const key = getRateLimitKey(agentId);
+    const stored = localStorage.getItem(key);
+    if (!stored) return [];
+    
+    const timestamps = JSON.parse(stored);
+    return Array.isArray(timestamps) ? timestamps : [];
+  } catch (error) {
+    logError('Error reading rate limit timestamps:', error);
+    return [];
+  }
+}
+
+function saveMessageTimestamps(agentId, timestamps) {
+  try {
+    const key = getRateLimitKey(agentId);
+    localStorage.setItem(key, JSON.stringify(timestamps));
+  } catch (error) {
+    logError('Error saving rate limit timestamps:', error);
+  }
+}
+
+function cleanOldTimestamps(timestamps, timeWindowSeconds) {
+  const now = Date.now();
+  const timeWindowMs = timeWindowSeconds * 1000;
+  
+  return timestamps.filter(timestamp => {
+    return (now - timestamp) < timeWindowMs;
+  });
+}
+
+async function fetchRateLimitSettings(agentId) {
+  try {
+    const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}`);
+    const data = await response.json();
+    
+    return {
+      rate_limit_enabled: data.rate_limit_enabled || false,
+      rate_limit_messages: data.rate_limit_messages || 20,
+      rate_limit_time_window: data.rate_limit_time_window || 240,
+      rate_limit_message: data.rate_limit_message || 'Too many messages in a row'
+    };
+  } catch (error) {
+    logError('Error fetching rate limit settings:', error);
+    return {
+      rate_limit_enabled: false,
+      rate_limit_messages: 20,
+      rate_limit_time_window: 240,
+      rate_limit_message: 'Too many messages in a row'
+    };
+  }
+}
+
+async function checkRateLimit(agentId) {
+  try {
+    const settings = await fetchRateLimitSettings(agentId);
+    
+    if (!settings.rate_limit_enabled) {
+      return { exceeded: false, remaining: null, resetTime: null };
+    }
+
+    const { rate_limit_messages, rate_limit_time_window, rate_limit_message } = settings;
+    
+    // Get current timestamps
+    let timestamps = getMessageTimestamps(agentId);
+    
+    // Clean old timestamps
+    timestamps = cleanOldTimestamps(timestamps, rate_limit_time_window);
+    
+    // Check if limit is exceeded
+    const exceeded = timestamps.length >= rate_limit_messages;
+    
+    // Calculate reset time (when the oldest message will expire)
+    let resetTime = null;
+    let timeUntilReset = null;
+    if (timestamps.length > 0) {
+      const oldestTimestamp = Math.min(...timestamps);
+      resetTime = new Date(oldestTimestamp + (rate_limit_time_window * 1000));
+      timeUntilReset = Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000));
+    }
+    
+    // Save cleaned timestamps
+    saveMessageTimestamps(agentId, timestamps);
+    
+    log(`Rate limit check for ${agentId}: ${timestamps.length}/${rate_limit_messages} messages in ${rate_limit_time_window}s window`);
+    
+    return {
+      exceeded,
+      resetTime,
+      timeUntilReset,
+      message: rate_limit_message,
+      current: timestamps.length,
+      limit: rate_limit_messages,
+      timeWindow: rate_limit_time_window
+    };
+    
+  } catch (error) {
+    logError('Error checking rate limit:', error);
+    // On error, allow the message (fail open)
+    return { exceeded: false, remaining: null, resetTime: null };
+  }
+}
+
+function recordMessage(agentId) {
+  try {
+    // Get current timestamps
+    let timestamps = getMessageTimestamps(agentId);
+    
+    // Add new timestamp
+    timestamps.push(Date.now());
+    
+    // Save updated timestamps
+    saveMessageTimestamps(agentId, timestamps);
+    
+    log(`Recorded new message for ${agentId}. Total: ${timestamps.length}`);
+    
+  } catch (error) {
+    logError('Error recording message timestamp:', error);
+  }
+}
+
+// Export rate limiting functions for use in other modules
+export { checkRateLimit, recordMessage };
+
 /**
  * Process any commands that were queued before script loaded
  */

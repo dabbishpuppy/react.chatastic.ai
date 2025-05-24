@@ -1,6 +1,7 @@
 
 import { useState, useRef } from "react";
 import { ChatMessage } from "@/types/chatInterface";
+import { getAgentSecuritySettings } from "@/services/agentSecurityService";
 
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
@@ -31,6 +32,145 @@ export const useMessageHandling = (
   const [isWaitingForRateLimit, setIsWaitingForRateLimit] = useState(false);
   const [userHasMessaged, setUserHasMessaged] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get rate limit storage key for an agent
+  const getRateLimitKey = (agentId: string) => {
+    return `wonderwave_rate_limit_${agentId}_timestamps`;
+  };
+
+  // Get message timestamps from localStorage
+  const getMessageTimestamps = (agentId: string) => {
+    try {
+      const key = getRateLimitKey(agentId);
+      const stored = localStorage.getItem(key);
+      if (!stored) return [];
+      
+      const timestamps = JSON.parse(stored);
+      return Array.isArray(timestamps) ? timestamps : [];
+    } catch (error) {
+      console.error('Error reading rate limit timestamps:', error);
+      return [];
+    }
+  };
+
+  // Save message timestamps to localStorage
+  const saveMessageTimestamps = (agentId: string, timestamps: number[]) => {
+    try {
+      const key = getRateLimitKey(agentId);
+      localStorage.setItem(key, JSON.stringify(timestamps));
+    } catch (error) {
+      console.error('Error saving rate limit timestamps:', error);
+    }
+  };
+
+  // Clean old timestamps outside the time window
+  const cleanOldTimestamps = (timestamps: number[], timeWindowSeconds: number) => {
+    const now = Date.now();
+    const timeWindowMs = timeWindowSeconds * 1000;
+    
+    return timestamps.filter(timestamp => {
+      return (now - timestamp) < timeWindowMs;
+    });
+  };
+
+  // Check if rate limit is exceeded
+  const checkRateLimit = async (agentId: string) => {
+    try {
+      const settings = await getAgentSecuritySettings(agentId);
+      
+      if (!settings || !settings.rate_limit_enabled) {
+        return { exceeded: false, remaining: null, resetTime: null };
+      }
+
+      const { rate_limit_messages, rate_limit_time_window, rate_limit_message } = settings;
+      
+      // Get current timestamps
+      let timestamps = getMessageTimestamps(agentId);
+      
+      // Clean old timestamps
+      timestamps = cleanOldTimestamps(timestamps, rate_limit_time_window);
+      
+      // Check if limit is exceeded
+      const exceeded = timestamps.length >= rate_limit_messages;
+      
+      // Calculate reset time (when the oldest message will expire)
+      let resetTime = null;
+      let timeUntilReset = null;
+      if (timestamps.length > 0) {
+        const oldestTimestamp = Math.min(...timestamps);
+        resetTime = new Date(oldestTimestamp + (rate_limit_time_window * 1000));
+        timeUntilReset = Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000));
+      }
+      
+      // Save cleaned timestamps
+      saveMessageTimestamps(agentId, timestamps);
+      
+      return {
+        exceeded,
+        resetTime,
+        timeUntilReset,
+        message: rate_limit_message || 'Too many messages in a row',
+        current: timestamps.length,
+        limit: rate_limit_messages,
+        timeWindow: rate_limit_time_window
+      };
+      
+    } catch (error) {
+      console.error('Error checking rate limit:', error);
+      // On error, allow the message (fail open)
+      return { exceeded: false, remaining: null, resetTime: null };
+    }
+  };
+
+  // Record a new message timestamp
+  const recordMessage = async (agentId: string) => {
+    try {
+      const settings = await getAgentSecuritySettings(agentId);
+      
+      if (!settings || !settings.rate_limit_enabled) {
+        return;
+      }
+      
+      // Get current timestamps
+      let timestamps = getMessageTimestamps(agentId);
+      
+      // Clean old timestamps
+      timestamps = cleanOldTimestamps(timestamps, settings.rate_limit_time_window);
+      
+      // Add new timestamp
+      timestamps.push(Date.now());
+      
+      // Save updated timestamps
+      saveMessageTimestamps(agentId, timestamps);
+      
+    } catch (error) {
+      console.error('Error recording message timestamp:', error);
+    }
+  };
+
+  // Start countdown timer
+  const startCountdown = (initialTime: number) => {
+    // Clear any existing countdown
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+
+    let currentTime = initialTime;
+    setTimeUntilReset(currentTime);
+
+    countdownIntervalRef.current = setInterval(() => {
+      currentTime = currentTime - 1;
+      if (currentTime <= 0) {
+        clearInterval(countdownIntervalRef.current!);
+        setRateLimitError(null);
+        setTimeUntilReset(null);
+        countdownIntervalRef.current = null;
+      } else {
+        setTimeUntilReset(currentTime);
+      }
+    }, 1000);
+  };
 
   const proceedWithMessage = (text: string) => {
     console.log('Proceeding with message:', text);
@@ -70,31 +210,48 @@ export const useMessageHandling = (
     }, 1500);
   };
 
-  // Simple message submission - same logic as chat bubble
-  const submitMessage = (text: string) => {
+  // Enhanced message submission with rate limiting
+  const submitMessage = async (text: string, agentId?: string) => {
     console.log('Submitting message:', text);
     
-    // Clear input immediately - same as chat bubble
+    // Clear input immediately
     setMessage("");
     
-    // Add message to chat immediately - same as chat bubble
+    // Check rate limit if agentId is provided
+    if (agentId) {
+      const rateLimitStatus = await checkRateLimit(agentId);
+      
+      if (rateLimitStatus.exceeded) {
+        console.log('Rate limit exceeded');
+        setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
+        if (rateLimitStatus.timeUntilReset) {
+          startCountdown(rateLimitStatus.timeUntilReset);
+        }
+        return;
+      }
+      
+      // Record the message
+      await recordMessage(agentId);
+    }
+    
+    // Add message to chat and proceed
     proceedWithMessage(text);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
     e.preventDefault();
     if (!message.trim()) return;
 
     const messageToSend = message.trim();
-    submitMessage(messageToSend);
+    await submitMessage(messageToSend, agentId);
     
     if (isEmbedded) {
       e.stopPropagation();
     }
   };
 
-  const handleSuggestedMessageClick = (text: string) => {
-    submitMessage(text);
+  const handleSuggestedMessageClick = async (text: string, agentId?: string) => {
+    await submitMessage(text, agentId);
     
     // Focus input field after suggested message click
     setTimeout(() => {
@@ -151,6 +308,14 @@ export const useMessageHandling = (
     }, 10);
   };
 
+  // Cleanup countdown on unmount
+  const cleanup = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  };
+
   return {
     message,
     setMessage,
@@ -171,6 +336,8 @@ export const useMessageHandling = (
     handleFeedback,
     regenerateResponse,
     insertEmoji,
-    proceedWithMessage
+    proceedWithMessage,
+    submitMessage,
+    cleanup
   };
 };

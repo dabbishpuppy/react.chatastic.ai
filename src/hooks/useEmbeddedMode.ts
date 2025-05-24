@@ -1,5 +1,6 @@
 
 import { useEffect, useRef } from "react";
+import { getAgentSecuritySettings } from "@/services/agentSecurityService";
 
 export const useEmbeddedMode = (
   isEmbedded: boolean,
@@ -11,6 +12,116 @@ export const useEmbeddedMode = (
 ) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingMessageRef = useRef<string | null>(null);
+
+  // Rate limiting functions (duplicated from useMessageHandling for iframe context)
+  const getRateLimitKey = (agentId: string) => {
+    return `wonderwave_rate_limit_${agentId}_timestamps`;
+  };
+
+  const getMessageTimestamps = (agentId: string) => {
+    try {
+      const key = getRateLimitKey(agentId);
+      const stored = localStorage.getItem(key);
+      if (!stored) return [];
+      
+      const timestamps = JSON.parse(stored);
+      return Array.isArray(timestamps) ? timestamps : [];
+    } catch (error) {
+      console.error('Error reading rate limit timestamps:', error);
+      return [];
+    }
+  };
+
+  const saveMessageTimestamps = (agentId: string, timestamps: number[]) => {
+    try {
+      const key = getRateLimitKey(agentId);
+      localStorage.setItem(key, JSON.stringify(timestamps));
+    } catch (error) {
+      console.error('Error saving rate limit timestamps:', error);
+    }
+  };
+
+  const cleanOldTimestamps = (timestamps: number[], timeWindowSeconds: number) => {
+    const now = Date.now();
+    const timeWindowMs = timeWindowSeconds * 1000;
+    
+    return timestamps.filter(timestamp => {
+      return (now - timestamp) < timeWindowMs;
+    });
+  };
+
+  const checkRateLimit = async (agentId: string) => {
+    try {
+      const settings = await getAgentSecuritySettings(agentId);
+      
+      if (!settings || !settings.rate_limit_enabled) {
+        return { exceeded: false, remaining: null, resetTime: null };
+      }
+
+      const { rate_limit_messages, rate_limit_time_window, rate_limit_message } = settings;
+      
+      // Get current timestamps
+      let timestamps = getMessageTimestamps(agentId);
+      
+      // Clean old timestamps
+      timestamps = cleanOldTimestamps(timestamps, rate_limit_time_window);
+      
+      // Check if limit is exceeded
+      const exceeded = timestamps.length >= rate_limit_messages;
+      
+      // Calculate reset time (when the oldest message will expire)
+      let resetTime = null;
+      let timeUntilReset = null;
+      if (timestamps.length > 0) {
+        const oldestTimestamp = Math.min(...timestamps);
+        resetTime = new Date(oldestTimestamp + (rate_limit_time_window * 1000));
+        timeUntilReset = Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000));
+      }
+      
+      // Save cleaned timestamps
+      saveMessageTimestamps(agentId, timestamps);
+      
+      return {
+        exceeded,
+        resetTime,
+        timeUntilReset,
+        message: rate_limit_message || 'Too many messages in a row',
+        current: timestamps.length,
+        limit: rate_limit_messages,
+        timeWindow: rate_limit_time_window
+      };
+      
+    } catch (error) {
+      console.error('Error checking rate limit:', error);
+      // On error, allow the message (fail open)
+      return { exceeded: false, remaining: null, resetTime: null };
+    }
+  };
+
+  const recordMessage = async (agentId: string) => {
+    try {
+      const settings = await getAgentSecuritySettings(agentId);
+      
+      if (!settings || !settings.rate_limit_enabled) {
+        return;
+      }
+      
+      // Get current timestamps
+      let timestamps = getMessageTimestamps(agentId);
+      
+      // Clean old timestamps
+      timestamps = cleanOldTimestamps(timestamps, settings.rate_limit_time_window);
+      
+      // Add new timestamp
+      timestamps.push(Date.now());
+      
+      // Save updated timestamps
+      saveMessageTimestamps(agentId, timestamps);
+      
+    } catch (error) {
+      console.error('Error recording message timestamp:', error);
+    }
+  };
 
   useEffect(() => {
     if (isEmbedded && window.self !== window.top) {
@@ -77,13 +188,42 @@ export const useEmbeddedMode = (
     }
   }, [isEmbedded, setIsWaitingForRateLimit, setRateLimitError, setTimeUntilReset, proceedWithMessage]);
 
-  // Function to send message to parent and set up timeout
-  const sendMessageToParent = (messageContent: string) => {
+  // Function to send message to parent and set up timeout with local rate limiting
+  const sendMessageToParent = async (messageContent: string, agentId?: string) => {
     console.log('sendMessageToParent called with:', messageContent);
     
     if (!isEmbedded || window.self === window.top) {
-      // Not in iframe, proceed directly
-      console.log('Not in iframe, proceeding directly');
+      // Not in iframe, check rate limit locally and proceed
+      console.log('Not in iframe, checking rate limit locally');
+      
+      if (agentId) {
+        const rateLimitStatus = await checkRateLimit(agentId);
+        
+        if (rateLimitStatus.exceeded) {
+          console.log('Rate limit exceeded locally');
+          setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
+          if (rateLimitStatus.timeUntilReset) {
+            setTimeUntilReset(rateLimitStatus.timeUntilReset);
+            // Start countdown
+            let currentTime = rateLimitStatus.timeUntilReset;
+            const interval = setInterval(() => {
+              currentTime = currentTime - 1;
+              if (currentTime <= 0) {
+                clearInterval(interval);
+                setRateLimitError(null);
+                setTimeUntilReset(null);
+              } else {
+                setTimeUntilReset(currentTime);
+              }
+            }, 1000);
+          }
+          return;
+        }
+        
+        // Record the message
+        await recordMessage(agentId);
+      }
+      
       proceedWithMessage(messageContent);
       return;
     }
