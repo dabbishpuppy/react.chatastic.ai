@@ -56,6 +56,7 @@ const ActivityPage: React.FC = () => {
       title,
       snippet,
       daysAgo,
+      source: dbConversation.source === 'bubble' ? 'Widget or Iframe' : 'Widget or Iframe',
       messages: uiMessages
     };
   };
