@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { X, MessageSquare, Clock } from "lucide-react";
+import { X, MessageSquare, Clock, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { conversationService, Conversation } from "@/services/conversationService";

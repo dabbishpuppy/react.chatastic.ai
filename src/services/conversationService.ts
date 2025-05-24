@@ -42,7 +42,7 @@ export const conversationService = {
       return null;
     }
 
-    return data;
+    return data as Conversation;
   },
 
   // End a conversation
@@ -77,7 +77,7 @@ export const conversationService = {
       return [];
     }
 
-    return data || [];
+    return (data || []) as Conversation[];
   },
 
   // Get conversation by ID
@@ -93,7 +93,7 @@ export const conversationService = {
       return null;
     }
 
-    return data;
+    return data as Conversation;
   },
 
   // Add message to conversation

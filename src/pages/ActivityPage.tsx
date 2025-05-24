@@ -3,14 +3,16 @@ import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
-import { conversationService, Conversation } from "@/services/conversationService";
+import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
+import { Conversation as UIConversation } from "@/components/activity/ConversationData";
 import { useParams } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
 
 const ActivityPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<UIConversation | null>(null);
   const [hasAnyConversations, setHasAnyConversations] = useState<boolean>(true);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<DBConversation[]>([]);
 
   useEffect(() => {
     if (agentId) {
@@ -31,10 +33,38 @@ const ActivityPage: React.FC = () => {
     }
   };
 
-  const handleConversationClick = (conversationId: string) => {
-    const conversation = conversations.find(c => c.id === conversationId);
-    if (conversation) {
-      setSelectedConversation(conversation);
+  const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation> => {
+    // Get messages for this conversation
+    const messages = await conversationService.getMessages(dbConversation.id);
+    
+    // Convert messages to UI format
+    const uiMessages = messages.map(msg => ({
+      id: msg.id,
+      role: msg.is_agent ? 'assistant' : 'user' as 'assistant' | 'user',
+      content: msg.content,
+      timestamp: msg.timestamp
+    }));
+
+    const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
+    const title = dbConversation.title || `Chat from ${daysAgo}`;
+    const snippet = messages.length > 0 ? 
+      `${messages.length} message${messages.length !== 1 ? 's' : ''} • ${dbConversation.status}` : 
+      'No messages';
+
+    return {
+      id: dbConversation.id,
+      title,
+      snippet,
+      daysAgo,
+      messages: uiMessages
+    };
+  };
+
+  const handleConversationClick = async (conversationId: string) => {
+    const dbConversation = conversations.find(c => c.id === conversationId);
+    if (dbConversation) {
+      const uiConversation = await convertDBConversationToUI(dbConversation);
+      setSelectedConversation(uiConversation);
     }
   };
 
