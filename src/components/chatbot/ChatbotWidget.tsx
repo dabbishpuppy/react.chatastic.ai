@@ -4,8 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useSharedChatLogic } from "@/hooks/useSharedChatLogic";
-import { useParams } from "react-router-dom";
 
 // Types for our chat messages
 interface ChatMessage {
@@ -39,7 +37,7 @@ interface ChatbotWidgetProps {
   profilePicture?: string | null;
   userMessageColor?: string | null;
   bubbleColor?: string | null;
-  hideUserAvatar?: boolean;
+  hideUserAvatar?: boolean; // Added prop to hide user avatar
 }
 
 // Emoji list for the emoji picker
@@ -47,7 +45,7 @@ const emojis = ["😊", "👍", "👋", "🙏", "❤️", "🎉", "🔥", "✨",
 
 const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   productName = "Chatbase",
-  botName,
+  botName = "Chatbase AI",
   botAvatar = "/placeholder.svg",
   userAvatar,
   primaryColor = "#000000",
@@ -57,7 +55,7 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   autoShowDelay = 1,
   showFeedback = true,
   allowRegenerate = true,
-  initialMessage,
+  initialMessage = "👋 Hi! I am an AI chatbot, ask me anything!",
   suggestedMessages = [],
   showSuggestions = true,
   messagePlaceholder = "Message...",
@@ -66,53 +64,40 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   profilePicture,
   userMessageColor,
   bubbleColor,
-  hideUserAvatar = false,
+  hideUserAvatar = false, // Default value for hideUserAvatar
 }) => {
-  const { agentId } = useParams();
-  const { settings, inputRef, handleMessageSubmission, generateAgentResponse, focusInput } = useSharedChatLogic(agentId);
-  
-  // Use real settings if available, otherwise fall back to props
-  const displayName = settings?.display_name || botName || "Chatbase AI";
-  const realInitialMessage = settings?.initial_message || initialMessage || "👋 Hi! I am an AI chatbot, ask me anything!";
-  const realSuggestedMessages = settings?.suggested_messages?.map(msg => msg.text) || suggestedMessages;
-  const realShowSuggestions = settings?.show_suggestions_after_chat ?? showSuggestions;
-  const realPlaceholder = settings?.message_placeholder || messagePlaceholder;
-  const realShowFeedback = settings?.show_feedback ?? showFeedback;
-  const realAllowRegenerate = settings?.allow_regenerate ?? allowRegenerate;
-  const realTheme = settings?.theme || theme;
-  const realProfilePicture = settings?.profile_picture || profilePicture;
-  const realFooter = settings?.footer || footer;
-  const realChatIcon = settings?.chat_icon || chatIcon;
-  const realUserMessageColor = settings?.user_message_color || userMessageColor;
-  const realBubbleColor = settings?.bubble_color || bubbleColor;
-  const realBubblePosition = settings?.bubble_position || bubblePosition;
-  const realAutoShowDelay = settings?.auto_show_delay ?? autoShowDelay;
-
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
-  const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Initial message popups state
-  const [popupMessages] = useState<string[]>(realInitialMessage.split('\n').filter(Boolean));
+  const [popupMessages] = useState<string[]>(initialMessage.split('\n').filter(Boolean));
   const [visiblePopups, setVisiblePopups] = useState<number[]>([]);
   
   // Set initial welcome messages when component mounts
   useEffect(() => {
+    // Only set initial messages once
     if (messages.length === 0) {
-      const initialMessages = realInitialMessage.split('\n').filter(Boolean).map((content, index) => ({
+      const initialMessages = initialMessage.split('\n').filter(Boolean).map((content, index) => ({
         id: `welcome-${index}`,
         content,
         sender: "bot" as const,
         timestamp: new Date(Date.now() + index * 1000),
       }));
       
-      setMessages(initialMessages);
+      // Add a user message "Hello, World!"
+      const userMessage = {
+        id: `user-hello`,
+        content: "Hello, World!",
+        sender: "user" as const,
+        timestamp: new Date(Date.now() + (initialMessages.length + 1) * 1000),
+      };
+      
+      setMessages([...initialMessages, userMessage]);
     }
-  }, [realInitialMessage]);
+  }, [initialMessage]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -122,115 +107,100 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   // Show popups when chat is closed
   useEffect(() => {
     if (!isOpen && showPopups) {
-      if (realAutoShowDelay <= 0) return;
+      // Only show popups if autoShowDelay is positive
+      if (autoShowDelay <= 0) return;
       
+      // Reset visible popups when chat closes
       setVisiblePopups([]);
       
+      // Get message list for popups
       const popupList = popupMessages.length > 0 ? popupMessages : ["👋 Hi! I am an AI assistant!"];
       
+      // Show first popup after configured delay
       const firstPopupTimeout = setTimeout(() => {
         setVisiblePopups([0]);
         
+        // Show additional popups with sequential delays if available
         if (popupList.length > 1) {
           const subsequentTimeouts: NodeJS.Timeout[] = [];
           
           for (let i = 1; i < popupList.length; i++) {
             const timeout = setTimeout(() => {
               setVisiblePopups(prev => [...prev, i]);
-            }, i * 2000);
+            }, i * 2000); // Show each subsequent popup after 2 seconds
             
             subsequentTimeouts.push(timeout);
           }
           
           return () => subsequentTimeouts.forEach(timeout => clearTimeout(timeout));
         }
-      }, realAutoShowDelay * 1000);
+      }, autoShowDelay * 1000); // Convert to milliseconds
       
       return () => clearTimeout(firstPopupTimeout);
     } else {
+      // Hide popups when chat is open
       setVisiblePopups([]);
     }
-  }, [isOpen, showPopups, realAutoShowDelay, popupMessages]);
+  }, [isOpen, showPopups, autoShowDelay, popupMessages]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || isTyping || rateLimitError) return;
+    if (!message.trim()) return;
 
-    const messageToSend = message.trim();
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      content: message,
+      sender: "user",
+      timestamp: new Date(),
+    };
+
+    setMessages([...messages, userMessage]);
     setMessage("");
+    
+    // Show typing indicator
+    setIsTyping(true);
 
-    await handleMessageSubmission(
-      messageToSend,
-      (userMessage) => {
-        // Convert to widget format
-        const widgetMessage: ChatMessage = {
-          id: Date.now().toString(),
-          content: userMessage.content,
-          sender: "user",
-          timestamp: new Date(),
-        };
-
-        setMessages(prev => [...prev, widgetMessage]);
-        setIsTyping(true);
-
-        // Generate bot response
-        setTimeout(() => {
-          setIsTyping(false);
-          const botResponse = generateAgentResponse(messageToSend);
-          const widgetBotMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            content: botResponse.content,
-            sender: "bot",
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, widgetBotMessage]);
-          focusInput();
-        }, 1500);
-      },
-      (error, timeUntilReset) => {
-        setRateLimitError(error);
-        if (timeUntilReset) {
-          setTimeUntilReset(timeUntilReset);
-          
-          // Start countdown
-          const countdown = setInterval(() => {
-            setTimeUntilReset(prev => {
-              if (prev && prev <= 1) {
-                clearInterval(countdown);
-                setRateLimitError(null);
-                setTimeUntilReset(null);
-                focusInput();
-                return null;
-              }
-              return prev ? prev - 1 : null;
-            });
-          }, 1000);
-        }
-      }
-    );
-
-    focusInput();
+    // Simulate bot response after a delay
+    setTimeout(() => {
+      setIsTyping(false);
+      
+      const botResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: "I'm a demo chatbot. This is a static reply to your message. In a real implementation, this would be connected to an LLM API.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botResponse]);
+    }, 2000);
   };
 
   const copyMessageToClipboard = (content: string) => {
     navigator.clipboard.writeText(content);
+    // You could add a toast notification here
   };
 
   const retryLastMessage = () => {
-    if (!realAllowRegenerate) return;
+    if (!allowRegenerate) return;
     
+    // Find the last user message
     const lastUserMessageIndex = [...messages].reverse().findIndex(msg => msg.sender === "user");
     if (lastUserMessageIndex === -1) return;
     
+    const lastUserMessage = [...messages].reverse()[lastUserMessageIndex];
+    
+    // Remove messages after the last user message
     const messagesToKeep = messages.slice(0, messages.length - lastUserMessageIndex);
     setMessages(messagesToKeep);
     
+    // Show typing indicator
     setIsTyping(true);
     
+    // Simulate bot response
     setTimeout(() => {
       setIsTyping(false);
       const botResponse: ChatMessage = {
@@ -251,67 +221,56 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
           : msg
       )
     );
+    // In a real implementation, you would send this feedback to your backend
   };
 
   const insertEmoji = (emoji: string) => {
     setMessage(prev => prev + emoji);
   };
 
-  const handleSuggestedMessageClick = async (text: string) => {
-    if (isTyping || rateLimitError) return;
+  const handleSuggestedMessageClick = (text: string) => {
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      content: text,
+      sender: "user",
+      timestamp: new Date(),
+    };
+
+    setMessages([...messages, userMessage]);
     
-    await handleMessageSubmission(
-      text,
-      (userMessage) => {
-        const widgetMessage: ChatMessage = {
-          id: Date.now().toString(),
-          content: userMessage.content,
-          sender: "user",
-          timestamp: new Date(),
-        };
+    // Show typing indicator
+    setIsTyping(true);
 
-        setMessages(prev => [...prev, widgetMessage]);
-        setIsTyping(true);
-
-        setTimeout(() => {
-          setIsTyping(false);
-          const botResponse = generateAgentResponse(text);
-          const widgetBotMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
-            content: botResponse.content,
-            sender: "bot",
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, widgetBotMessage]);
-          focusInput();
-        }, 1500);
-      },
-      (error, timeUntilReset) => {
-        setRateLimitError(error);
-        if (timeUntilReset) {
-          setTimeUntilReset(timeUntilReset);
-        }
-      }
-    );
-
-    focusInput();
+    // Simulate bot response after a delay
+    setTimeout(() => {
+      setIsTyping(false);
+      
+      const botResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        content: "This is a response to your suggested message selection. In a real implementation, this would be connected to an LLM API.",
+        sender: "bot",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, botResponse]);
+    }, 2000);
   };
 
   // Apply theme based on settings
   const themeClasses = {
-    background: realTheme === 'dark' ? 'bg-gray-900' : 'bg-white',
-    header: realTheme === 'dark' ? 'bg-gray-800 text-white' : '',
-    text: realTheme === 'dark' ? 'text-white' : 'text-gray-800',
-    inputBg: realTheme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
-    botBubble: realTheme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border border-gray-200',
-    userBubble: realTheme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
-    popup: realTheme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border border-gray-200',
+    background: theme === 'dark' ? 'bg-gray-900' : 'bg-white',
+    header: theme === 'dark' ? 'bg-gray-800 text-white' : '',
+    text: theme === 'dark' ? 'text-white' : 'text-gray-800',
+    inputBg: theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
+    botBubble: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border border-gray-200',
+    userBubble: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
+    popup: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-100' : 'bg-white border border-gray-200',
   };
 
   // Position of the chat widget
   const positionClasses = {
-    container: realBubblePosition === 'left' ? 'left-6 items-start' : 'right-6 items-end',
-    popup: realBubblePosition === 'left' ? 'ml-16' : 'mr-16',
+    container: bubblePosition === 'left' ? 'left-6 items-start' : 'right-6 items-end',
+    popup: bubblePosition === 'left' ? 'ml-16' : 'mr-16',
   };
 
   // Loading animation dots
@@ -324,313 +283,322 @@ const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   );
 
   // Display the proper avatar based on availability
-  const displayBotAvatar = realProfilePicture || botAvatar;
+  const displayBotAvatar = profilePicture || botAvatar;
 
   // User message style with custom color
-  const userMessageStyle = realUserMessageColor ? {
-    backgroundColor: realUserMessageColor,
-    color: '#FFFFFF'
+  const userMessageStyle = userMessageColor ? {
+    backgroundColor: userMessageColor,
+    color: getContrastColor(userMessageColor)
   } : {};
 
-  // Chat bubble style with custom color
-  const chatBubbleStyle = realBubbleColor ? {
-    backgroundColor: realBubbleColor
-  } : { backgroundColor: primaryColor };
+  // Use the provided bubble color or fallback to primaryColor
+  const bubbleBackgroundColor = bubbleColor || primaryColor;
 
   return (
-    <>
-      {/* Chat Widget Container */}
-      <div className={`fixed bottom-6 ${positionClasses.container} z-50 flex flex-col max-w-sm`}>
-        {/* Message Popups */}
-        {visiblePopups.map((index) => (
-          <div
-            key={index}
-            className={`mb-4 p-3 rounded-lg shadow-lg max-w-xs ${positionClasses.popup} ${themeClasses.popup} animate-in slide-in-from-bottom duration-300`}
-          >
-            <div className="flex items-start space-x-2">
-              <Avatar className="h-6 w-6 flex-shrink-0">
-                <AvatarImage src={displayBotAvatar} alt={displayName} />
-                <AvatarFallback className="text-xs">
-                  {displayName?.charAt(0) || "A"}
-                </AvatarFallback>
-              </Avatar>
-              <p className="text-sm">{popupMessages[index]}</p>
-            </div>
-          </div>
-        ))}
-
-        {/* Chat Interface */}
-        {isOpen && (
-          <div className={`mb-4 w-96 h-[500px] rounded-lg shadow-xl ${themeClasses.background} border border-gray-200 flex flex-col animate-in slide-in-from-bottom duration-300`}>
-            {/* Header */}
-            <div className={`p-4 border-b border-gray-200 flex items-center justify-between ${themeClasses.header || 'bg-white'}`}>
-              <div className="flex items-center space-x-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={displayBotAvatar} alt={displayName} />
-                  <AvatarFallback>
-                    {displayName?.charAt(0) || "A"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className={`font-semibold ${themeClasses.text}`}>{displayName}</h3>
-                  <p className={`text-xs ${themeClasses.text} opacity-70`}>Online</p>
+    <div className={`fixed bottom-0 ${positionClasses.container} z-50 flex flex-col`}>
+      {/* Initial message popups - only show when chat is closed */}
+      {!isOpen && showPopups && visiblePopups.length > 0 && (
+        <div className={`mb-4 ${positionClasses.popup} flex flex-col gap-2`}>
+          {visiblePopups.map((index) => {
+            if (index >= popupMessages.length) return null;
+            
+            return (
+              <div 
+                key={index}
+                className={`rounded-lg shadow-lg p-4 max-w-[280px] transition-opacity duration-500 opacity-100 animate-fade-in ${themeClasses.popup}`}
+                style={{ borderColor: primaryColor }}
+              >
+                <div className="flex">
+                  <Avatar className="h-6 w-6 mr-2 flex-shrink-0">
+                    {displayBotAvatar ? (
+                      <AvatarImage src={displayBotAvatar} alt={botName} />
+                    ) : (
+                      <AvatarFallback className="bg-gray-200 text-gray-600">{botName.charAt(0)}</AvatarFallback>
+                    )}
+                  </Avatar>
+                  <p>{popupMessages[index]}</p>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Chat window */}
+      {isOpen && (
+        <div className={`mb-4 w-[350px] sm:w-[400px] flex flex-col rounded-lg shadow-lg h-[calc(100vh-120px)] ${themeClasses.background}`}>
+          {/* Chat header */}
+          <div 
+            className={`p-4 flex items-center justify-between border-b ${themeClasses.header}`} 
+            style={{ backgroundColor: bubbleBackgroundColor, color: getContrastColor(bubbleBackgroundColor) }}
+          >
+            <div className="flex items-center gap-2">
+              <Avatar className="h-8 w-8 bg-white">
+                {displayBotAvatar ? (
+                  <AvatarImage src={displayBotAvatar} alt={botName} />
+                ) : (
+                  <AvatarFallback className="bg-gray-200 text-gray-600">{botName.charAt(0)}</AvatarFallback>
+                )}
+              </Avatar>
+              <span className="font-medium">{botName}</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleChat}
+              className="text-white hover:bg-white/20"
+            >
+              <X size={18} />
+            </Button>
+          </div>
+
+          {/* Chat messages */}
+          <div className={`flex-1 overflow-y-auto p-4 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex mb-4 ${
+                  msg.sender === "user" ? "justify-end" : ""
+                }`}
+              >
+                {msg.sender === "bot" && (
+                  <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
+                    {displayBotAvatar ? (
+                      <AvatarImage src={displayBotAvatar} alt={botName} />
+                    ) : (
+                      <AvatarFallback className="bg-gray-200 text-gray-600">{botName.charAt(0)}</AvatarFallback>
+                    )}
+                  </Avatar>
+                )}
+                
+                <div className="flex flex-col max-w-[80%]">
+                  <div
+                    className={`rounded-lg p-3 text-[0.875rem] ${
+                      msg.sender === "bot"
+                        ? themeClasses.botBubble
+                        : themeClasses.userBubble
+                    }`}
+                    style={msg.sender === "user" ? userMessageStyle : {}}
+                  >
+                    {msg.content}
+                  </div>
+                  
+                  {/* Message actions for bot messages */}
+                  {msg.sender === "bot" && showFeedback && (
+                    <div className="flex mt-1 space-x-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => handleFeedback(msg.id, "like")}
+                              variant="ghost"
+                              size="icon"
+                              className={`h-6 w-6 rounded-full ${msg.feedback === "like" ? "bg-green-100" : ""}`}
+                            >
+                              <ThumbsUp size={14} className={msg.feedback === "like" ? "text-green-600" : "text-gray-500"} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Like</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => handleFeedback(msg.id, "dislike")}
+                              variant="ghost"
+                              size="icon"
+                              className={`h-6 w-6 rounded-full ${msg.feedback === "dislike" ? "bg-red-100" : ""}`}
+                            >
+                              <ThumbsDown size={14} className={msg.feedback === "dislike" ? "text-red-600" : "text-gray-500"} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Dislike</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => copyMessageToClipboard(msg.content)}
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 rounded-full"
+                            >
+                              <Copy size={14} className="text-gray-500" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Copy</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        {allowRegenerate && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={retryLastMessage}
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded-full"
+                              >
+                                <RefreshCw size={14} className="text-gray-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Regenerate</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </TooltipProvider>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            
+            {/* Loading indicator */}
+            {isTyping && (
+              <div className="flex mb-4">
+                <Avatar className="h-8 w-8 mr-2 mt-1 flex-shrink-0">
+                  <AvatarImage src={displayBotAvatar} alt={botName} />
+                  <AvatarFallback>CB</AvatarFallback>
+                </Avatar>
+                <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.botBubble}`}>
+                  <LoadingDots />
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Suggested messages */}
+          {showSuggestions && suggestedMessages.length > 0 && (
+            <div className={`p-3 border-t ${themeClasses.background}`}>
+              <div className="flex flex-wrap gap-2">
+                {suggestedMessages.map((suggestion, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    size="sm"
+                    className={`rounded-full text-sm ${theme === 'dark' ? 'border-gray-700 text-gray-300' : ''}`}
+                    onClick={() => handleSuggestedMessageClick(suggestion)}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Input area */}
+          <div className={`border-t p-3 ${themeClasses.background}`}>
+            <form onSubmit={handleSendMessage} className="flex relative">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    className="absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  >
+                    <Smile size={18} className="text-gray-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className={`w-64 p-2 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : ''}`}>
+                  <div className="grid grid-cols-5 gap-2">
+                    {emojis.map((emoji, index) => (
+                      <Button
+                        key={index}
+                        variant="ghost"
+                        className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                        onClick={() => insertEmoji(emoji)}
+                      >
+                        {emoji}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder={messagePlaceholder}
+                className={`w-full border rounded-lg pr-10 pl-10 py-2 focus:outline-none focus:ring-1 focus:ring-primary ${themeClasses.inputBg} ${themeClasses.text}`}
+              />
               <Button
+                type="submit"
                 variant="ghost"
                 size="icon"
-                onClick={toggleChat}
-                className={`h-6 w-6 ${themeClasses.text} hover:bg-gray-100`}
+                className="absolute right-1 top-1/2 -translate-y-1/2"
+                disabled={!message.trim()}
               >
-                <ChevronDown className="h-4 w-4" />
+                <Send size={18} className="text-gray-500" />
               </Button>
-            </div>
-
-            {/* Rate Limit Error */}
-            {rateLimitError && (
-              <div className="p-3 bg-red-50 border-b border-red-200">
-                <p className="text-sm text-red-600">{rateLimitError}</p>
-                {timeUntilReset && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Try again in {timeUntilReset} seconds
-                  </p>
-                )}
+            </form>
+            {footer && (
+              <div className="text-xs text-center mt-2 text-gray-500">
+                {footer}
               </div>
             )}
-
-            {/* Messages */}
-            <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${themeClasses.background}`}>
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div className={`flex items-start space-x-2 max-w-xs ${msg.sender === "user" ? "flex-row-reverse space-x-reverse" : ""}`}>
-                    {msg.sender === "bot" && (
-                      <Avatar className="h-6 w-6 flex-shrink-0">
-                        <AvatarImage src={displayBotAvatar} alt={displayName} />
-                        <AvatarFallback className="text-xs">
-                          {displayName?.charAt(0) || "A"}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                    {msg.sender === "user" && !hideUserAvatar && (
-                      <Avatar className="h-6 w-6 flex-shrink-0">
-                        <AvatarImage src={userAvatar} alt="You" />
-                        <AvatarFallback className="text-xs">You</AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div
-                      className={`p-3 rounded-lg ${
-                        msg.sender === "bot"
-                          ? themeClasses.botBubble
-                          : themeClasses.userBubble
-                      }`}
-                      style={msg.sender === "user" ? userMessageStyle : {}}
-                    >
-                      <p className="text-sm">{msg.content}</p>
-                      
-                      {/* Bot message actions */}
-                      {msg.sender === "bot" && (
-                        <div className="flex items-center space-x-2 mt-2">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => copyMessageToClipboard(msg.content)}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Copy message</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-
-                          {realShowFeedback && (
-                            <>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className={`h-6 w-6 ${msg.feedback === "like" ? "text-green-600" : ""}`}
-                                      onClick={() => handleFeedback(msg.id, "like")}
-                                    >
-                                      <ThumbsUp className="h-3 w-3" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Like</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className={`h-6 w-6 ${msg.feedback === "dislike" ? "text-red-600" : ""}`}
-                                      onClick={() => handleFeedback(msg.id, "dislike")}
-                                    >
-                                      <ThumbsDown className="h-3 w-3" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Dislike</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </>
-                          )}
-
-                          {realAllowRegenerate && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={retryLastMessage}
-                                    disabled={isTyping}
-                                  >
-                                    <RefreshCw className="h-3 w-3" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Regenerate</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Typing indicator */}
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="flex items-start space-x-2">
-                    <Avatar className="h-6 w-6 flex-shrink-0">
-                      <AvatarImage src={displayBotAvatar} alt={displayName} />
-                      <AvatarFallback className="text-xs">
-                        {displayName?.charAt(0) || "A"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className={`p-3 rounded-lg ${themeClasses.botBubble}`}>
-                      <LoadingDots />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Suggested Messages */}
-            {realShowSuggestions && realSuggestedMessages.length > 0 && (
-              <div className="p-3 border-t border-gray-200">
-                <div className="flex flex-wrap gap-2">
-                  {realSuggestedMessages.map((suggestion, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => handleSuggestedMessageClick(suggestion)}
-                      disabled={isTyping || !!rateLimitError}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Input Area */}
-            <div className="p-4 border-t border-gray-200">
-              <form onSubmit={handleSendMessage} className="flex items-end space-x-2">
-                <div className="flex-1 relative">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder={realPlaceholder}
-                    disabled={isTyping || !!rateLimitError}
-                    className={`w-full p-2 pr-10 border rounded-lg resize-none ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  />
-                  
-                  {/* Emoji picker */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6"
-                        disabled={isTyping || !!rateLimitError}
-                      >
-                        <Smile className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-64 p-2">
-                      <div className="grid grid-cols-8 gap-1">
-                        {emojis.map((emoji, index) => (
-                          <Button
-                            key={index}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-lg hover:bg-gray-100"
-                            onClick={() => insertEmoji(emoji)}
-                          >
-                            {emoji}
-                          </Button>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!message.trim() || isTyping || !!rateLimitError}
-                  style={chatBubbleStyle}
-                  className="text-white hover:opacity-90"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-
-              {/* Footer */}
-              {realFooter && (
-                <p className="text-xs text-gray-500 mt-2 text-center">{realFooter}</p>
-              )}
-            </div>
           </div>
+        </div>
+      )}
+      
+      {/* Floating button */}
+      <Button
+        onClick={toggleChat}
+        className="rounded-full h-16 w-16 shadow-lg flex items-center justify-center p-0 mb-6 overflow-hidden"
+      >
+        {isOpen ? (
+          <ChevronDown size={24} className="text-white" style={{ backgroundColor: bubbleBackgroundColor }} />
+        ) : (
+          <>
+            {chatIcon ? (
+              <div className="h-full w-full flex items-center justify-center overflow-hidden">
+                <img 
+                  src={chatIcon} 
+                  alt="Chat" 
+                  className="h-full w-full object-cover" 
+                />
+              </div>
+            ) : (
+              <div className="h-full w-full flex items-center justify-center" style={{ backgroundColor: bubbleBackgroundColor }}>
+                <MessageCircle size={24} className="text-white" />
+              </div>
+            )}
+          </>
         )}
-
-        {/* Chat Bubble Button */}
-        <Button
-          onClick={toggleChat}
-          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
-          style={chatBubbleStyle}
-        >
-          {isOpen ? (
-            <X className="h-6 w-6 text-white" />
-          ) : realChatIcon ? (
-            <img src={realChatIcon} alt="Chat" className="h-8 w-8 rounded-full object-cover" />
-          ) : (
-            <MessageCircle className="h-6 w-6 text-white" />
-          )}
-        </Button>
-      </div>
-    </>
+      </Button>
+    </div>
   );
 };
+
+// Helper function to determine contrasting text color for a background
+function getContrastColor(hex: string): string {
+  // Convert hex to RGB
+  let r = 0, g = 0, b = 0;
+  
+  if (hex.length === 4) {
+    // #RGB format
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    // #RRGGBB format
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  
+  // Return white or black based on luminance
+  return luminance > 0.5 ? '#000000' : '#FFFFFF';
+}
 
 export default ChatbotWidget;

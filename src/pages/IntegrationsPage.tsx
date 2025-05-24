@@ -61,17 +61,10 @@ const IntegrationsPage: React.FC = () => {
       navigate(`/agent/${agentId}/integrations?tab=embed`, { replace: true });
     }
     
-    // Hide any existing chat widget on this page - improved hiding logic
+    // Hide any existing chat widget on this page
     const existingBubble = document.getElementById('wonderwave-bubble');
     if (existingBubble) {
       existingBubble.style.display = 'none';
-      existingBubble.style.visibility = 'hidden';
-    }
-    
-    // Also hide any other wonderwave elements
-    const wonderwaveContainer = document.getElementById('wonderwave-container');
-    if (wonderwaveContainer) {
-      wonderwaveContainer.style.display = 'none';
     }
     
     // Cleanup when leaving the page
@@ -79,15 +72,9 @@ const IntegrationsPage: React.FC = () => {
       const bubble = document.getElementById('wonderwave-bubble');
       if (bubble) {
         bubble.style.display = 'flex';
-        bubble.style.visibility = 'visible';
-      }
-      
-      const container = document.getElementById('wonderwave-container');
-      if (container) {
-        container.style.display = 'flex';
       }
     };
-  }, [agentId, navigate, searchParams]);
+  }, []);
 
   // Get the current tab title
   const getTabTitle = () => {
