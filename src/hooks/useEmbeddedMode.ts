@@ -12,6 +12,7 @@ export const useEmbeddedMode = (
 ) => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingMessageRef = useRef<string | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Rate limiting functions (duplicated from useMessageHandling for iframe context)
   const getRateLimitKey = (agentId: string) => {
@@ -48,6 +49,28 @@ export const useEmbeddedMode = (
     return timestamps.filter(timestamp => {
       return (now - timestamp) < timeWindowMs;
     });
+  };
+
+  const startCountdown = (initialTime: number) => {
+    // Clear any existing countdown
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+
+    let currentTime = initialTime;
+    setTimeUntilReset(currentTime);
+
+    countdownIntervalRef.current = setInterval(() => {
+      currentTime = currentTime - 1;
+      if (currentTime <= 0) {
+        clearInterval(countdownIntervalRef.current!);
+        setRateLimitError(null);
+        setTimeUntilReset(null);
+        countdownIntervalRef.current = null;
+      } else {
+        setTimeUntilReset(currentTime);
+      }
+    }, 1000);
   };
 
   const checkRateLimit = async (agentId: string) => {
@@ -156,22 +179,12 @@ export const useEmbeddedMode = (
           
           setIsWaitingForRateLimit(false);
           setRateLimitError(event.data.message || 'Too many messages. Please wait.');
-          setTimeUntilReset(event.data.timeUntilReset || null);
-          pendingMessageRef.current = null;
           
           if (event.data.timeUntilReset) {
-            let currentTime = event.data.timeUntilReset;
-            const interval = setInterval(() => {
-              currentTime = currentTime - 1;
-              if (currentTime <= 0) {
-                clearInterval(interval);
-                setRateLimitError(null);
-                setTimeUntilReset(null);
-              } else {
-                setTimeUntilReset(currentTime);
-              }
-            }, 1000);
+            startCountdown(event.data.timeUntilReset);
           }
+          
+          pendingMessageRef.current = null;
         }
       };
 
@@ -183,6 +196,11 @@ export const useEmbeddedMode = (
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
           timeoutRef.current = null;
+        }
+        // Clean up countdown on unmount
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
         }
       };
     }
@@ -203,19 +221,7 @@ export const useEmbeddedMode = (
           console.log('Rate limit exceeded locally');
           setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
           if (rateLimitStatus.timeUntilReset) {
-            setTimeUntilReset(rateLimitStatus.timeUntilReset);
-            // Start countdown
-            let currentTime = rateLimitStatus.timeUntilReset;
-            const interval = setInterval(() => {
-              currentTime = currentTime - 1;
-              if (currentTime <= 0) {
-                clearInterval(interval);
-                setRateLimitError(null);
-                setTimeUntilReset(null);
-              } else {
-                setTimeUntilReset(currentTime);
-              }
-            }, 1000);
+            startCountdown(rateLimitStatus.timeUntilReset);
           }
           return;
         }

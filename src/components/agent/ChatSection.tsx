@@ -90,6 +90,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleFeedback,
     regenerateResponse,
     insertEmoji,
+    handleCountdownFinished,
     cleanup
   } = useMessageHandling(initialMessages, isEmbedded);
 
@@ -139,6 +140,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleSuggestedMessageClick(text, agentId);
   };
 
+  // Check if input should be disabled
+  const isInputDisabled = isTyping || !!rateLimitError || isWaitingForRateLimit;
+
   return (
     <ChatContainer
       isEmbedded={isEmbedded}
@@ -177,11 +181,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
       {/* Fixed footer section with rate limit error, suggestions, and input */}
       <div className={`flex-shrink-0 ${themeClasses.background}`}>
-        {/* Rate limit error message */}
+        {/* Rate limit error message with live countdown */}
         {rateLimitError && (
           <RateLimitError 
             message={rateLimitError} 
             timeUntilReset={timeUntilReset} 
+            onCountdownFinished={handleCountdownFinished}
           />
         )}
 
@@ -190,7 +195,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           <SuggestedMessages
             messages={suggestedMessages}
             onMessageClick={handleSuggestedMessageClickWithAgentId}
-            isWaitingForRateLimit={!!rateLimitError || isWaitingForRateLimit}
+            isWaitingForRateLimit={isInputDisabled}
             theme={theme}
             backgroundColor={themeClasses.background}
           />
@@ -201,7 +206,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           message={message}
           setMessage={setMessage}
           onSubmit={handleSubmitWithAgentId}
-          isWaitingForRateLimit={!!rateLimitError || isWaitingForRateLimit}
+          isWaitingForRateLimit={isInputDisabled}
           placeholder={placeholder}
           inputRef={inputRef}
           chatIcon={chatIcon}

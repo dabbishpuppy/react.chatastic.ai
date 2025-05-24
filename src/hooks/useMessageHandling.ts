@@ -149,27 +149,15 @@ export const useMessageHandling = (
     }
   };
 
-  // Start countdown timer
-  const startCountdown = (initialTime: number) => {
-    // Clear any existing countdown
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-    }
-
-    let currentTime = initialTime;
-    setTimeUntilReset(currentTime);
-
-    countdownIntervalRef.current = setInterval(() => {
-      currentTime = currentTime - 1;
-      if (currentTime <= 0) {
-        clearInterval(countdownIntervalRef.current!);
-        setRateLimitError(null);
-        setTimeUntilReset(null);
-        countdownIntervalRef.current = null;
-      } else {
-        setTimeUntilReset(currentTime);
-      }
-    }, 1000);
+  // Handle countdown finish - clear rate limit error
+  const handleCountdownFinished = () => {
+    setRateLimitError(null);
+    setTimeUntilReset(null);
+    
+    // Focus input field when rate limit is cleared
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
   };
 
   const proceedWithMessage = (text: string) => {
@@ -225,7 +213,7 @@ export const useMessageHandling = (
         console.log('Rate limit exceeded');
         setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
         if (rateLimitStatus.timeUntilReset) {
-          startCountdown(rateLimitStatus.timeUntilReset);
+          setTimeUntilReset(rateLimitStatus.timeUntilReset);
         }
         return;
       }
@@ -240,7 +228,7 @@ export const useMessageHandling = (
 
   const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || isTyping || rateLimitError) return;
 
     const messageToSend = message.trim();
     await submitMessage(messageToSend, agentId);
@@ -251,6 +239,8 @@ export const useMessageHandling = (
   };
 
   const handleSuggestedMessageClick = async (text: string, agentId?: string) => {
+    if (isTyping || rateLimitError) return;
+    
     await submitMessage(text, agentId);
     
     // Focus input field after suggested message click
@@ -274,7 +264,7 @@ export const useMessageHandling = (
   };
 
   const regenerateResponse = (allowRegenerate: boolean) => {
-    if (!allowRegenerate) return;
+    if (!allowRegenerate || isTyping) return;
     
     const lastUserMessageIndex = [...chatHistory].reverse().findIndex(msg => !msg.isAgent);
     if (lastUserMessageIndex === -1) return;
@@ -300,6 +290,8 @@ export const useMessageHandling = (
   };
 
   const insertEmoji = (emoji: string) => {
+    if (isTyping || rateLimitError) return;
+    
     setMessage(prev => prev + emoji);
     
     // Focus input field after emoji insertion
@@ -338,6 +330,7 @@ export const useMessageHandling = (
     insertEmoji,
     proceedWithMessage,
     submitMessage,
+    handleCountdownFinished,
     cleanup
   };
 };
