@@ -116,6 +116,15 @@ const ActivityPage: React.FC = () => {
     setSelectedConversation(null);
   };
 
+  // Helper function to convert 'system' theme to 'light' or 'dark'
+  const getConversationTheme = (theme: 'light' | 'dark' | 'system'): 'light' | 'dark' => {
+    if (theme === 'system') {
+      // Check if user prefers dark mode
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return theme;
+  };
+
   const EmptyState = () => (
     <div className="flex flex-col items-center justify-center p-8 text-center h-64">
       <div className="bg-gray-100 p-4 rounded-full mb-4">
@@ -161,7 +170,7 @@ const ActivityPage: React.FC = () => {
                 <ConversationView 
                   conversation={selectedConversation} 
                   onClose={handleCloseConversation}
-                  theme={chatSettings?.theme || 'light'}
+                  theme={getConversationTheme(chatSettings?.theme || 'light')}
                   profilePicture={chatSettings?.profile_picture}
                   displayName={chatSettings?.display_name}
                   userMessageColor={chatSettings?.user_message_color}
