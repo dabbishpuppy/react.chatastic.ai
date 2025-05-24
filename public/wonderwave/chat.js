@@ -1,8 +1,7 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { getBubbleButton } from './ui.js';
-import { isRateLimitExceeded, recordMessage, getRateLimitStatus } from './rateLimit.js';
+import { checkRateLimit, recordMessage } from './rateLimit.js';
 
 // Reference to iframe
 let iframe = null;
@@ -20,25 +19,29 @@ export function setRateLimitSettings(settings) {
 /**
  * Check if a message can be sent (rate limit check)
  */
-function canSendMessage() {
+async function canSendMessage() {
   const config = window.wonderwaveConfig;
-  if (!config || !config.agentId || !currentRateLimitSettings) {
+  if (!config || !config.agentId) {
     return { allowed: true };
   }
   
-  const rateLimitCheck = isRateLimitExceeded(config.agentId, currentRateLimitSettings);
-  
-  if (rateLimitCheck.exceeded) {
-    const status = getRateLimitStatus(config.agentId, currentRateLimitSettings);
-    return {
-      allowed: false,
-      message: status.message,
-      resetTime: status.resetTime,
-      timeUntilReset: status.timeUntilReset
-    };
+  try {
+    const rateLimitResult = await checkRateLimit(config.agentId);
+    
+    if (rateLimitResult.exceeded) {
+      return {
+        allowed: false,
+        message: rateLimitResult.message,
+        resetTime: rateLimitResult.resetTime,
+        timeUntilReset: rateLimitResult.timeUntilReset
+      };
+    }
+    
+    return { allowed: true, remaining: rateLimitResult.current };
+  } catch (error) {
+    logError('Error checking rate limit:', error);
+    return { allowed: true }; // Fail open
   }
-  
-  return { allowed: true, remaining: rateLimitCheck.remaining };
 }
 
 /**
@@ -182,7 +185,7 @@ export function handleIframeMessage(event) {
 /**
  * Handle message sending with rate limiting
  */
-function handleMessageSend(messageData) {
+async function handleMessageSend(messageData) {
   const config = window.wonderwaveConfig;
   if (!config || !config.agentId) {
     log('No config or agentId available for rate limiting');
@@ -192,7 +195,7 @@ function handleMessageSend(messageData) {
   log('Checking rate limit for message:', messageData);
   
   // Check rate limit
-  const rateLimitResult = canSendMessage();
+  const rateLimitResult = await canSendMessage();
   log('Rate limit check result:', rateLimitResult);
   
   if (!rateLimitResult.allowed) {
@@ -203,9 +206,11 @@ function handleMessageSend(messageData) {
   }
   
   // Record the message timestamp
-  if (currentRateLimitSettings) {
+  try {
     log('Recording message for rate limiting');
-    recordMessage(config.agentId, currentRateLimitSettings);
+    await recordMessage(config.agentId);
+  } catch (error) {
+    logError('Error recording message:', error);
   }
   
   // Allow the message to be sent immediately
