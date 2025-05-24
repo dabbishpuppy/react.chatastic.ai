@@ -10,8 +10,8 @@ export const proceedWithMessage = (
   isEmbedded: boolean = false
 ) => {
   const userMessage: ChatMessage = {
-    text: text,
-    isUser: true,
+    content: text,
+    isAgent: false,
     timestamp: new Date().toISOString(),
   };
 
@@ -22,8 +22,8 @@ export const proceedWithMessage = (
   // Simulate AI response after a delay
   setTimeout(() => {
     const aiMessage: ChatMessage = {
-      text: "Thank you for your message! This is a simulated response.",
-      isUser: false,
+      content: "Thank you for your message! This is a simulated response.",
+      isAgent: true,
       timestamp: new Date().toISOString(),
     };
 
@@ -70,8 +70,15 @@ export const regenerateResponse = (
 ) => {
   if (!allowRegenerate || isTyping || chatHistory.length === 0) return;
 
-  // Find the last AI message
-  const lastAiMessageIndex = chatHistory.findLastIndex(msg => !msg.isUser);
+  // Find the last AI message using reverse iteration
+  let lastAiMessageIndex = -1;
+  for (let i = chatHistory.length - 1; i >= 0; i--) {
+    if (chatHistory[i].isAgent) {
+      lastAiMessageIndex = i;
+      break;
+    }
+  }
+  
   if (lastAiMessageIndex === -1) return;
 
   // Remove the last AI message
@@ -81,8 +88,8 @@ export const regenerateResponse = (
   // Generate a new response
   setTimeout(() => {
     const newAiMessage: ChatMessage = {
-      text: "This is a regenerated response with different content.",
-      isUser: false,
+      content: "This is a regenerated response with different content.",
+      isAgent: true,
       timestamp: new Date().toISOString(),
     };
 
