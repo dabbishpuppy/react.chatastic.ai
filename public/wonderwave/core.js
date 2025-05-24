@@ -134,13 +134,13 @@ async function checkRateLimit(agentId) {
     // Check if limit is exceeded
     const exceeded = timestamps.length >= rate_limit_messages;
     
-    // Calculate reset time (when the oldest message will expire)
+    // Calculate reset time and timeUntilReset
     let resetTime = null;
     let timeUntilReset = null;
-    if (timestamps.length > 0) {
-      const oldestTimestamp = Math.min(...timestamps);
-      resetTime = new Date(oldestTimestamp + (rate_limit_time_window * 1000));
-      timeUntilReset = Math.max(0, Math.ceil((resetTime.getTime() - Date.now()) / 1000));
+    if (exceeded) {
+      // When rate limit is exceeded, show the full time window
+      timeUntilReset = rate_limit_time_window;
+      resetTime = new Date(Date.now() + (rate_limit_time_window * 1000));
     }
     
     // Save cleaned timestamps
