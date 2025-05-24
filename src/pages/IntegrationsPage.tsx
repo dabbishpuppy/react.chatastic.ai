@@ -5,7 +5,6 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import { getAgentVisibility } from "@/services/agentVisibilityService";
 import { IntegrationsContent } from "@/components/connect/integrations/IntegrationsContent";
-import { TabNavigation } from "@/components/connect/integrations/TabNavigation";
 
 const IntegrationsPage: React.FC = () => {
   const { agentId } = useParams();
@@ -54,13 +53,13 @@ const IntegrationsPage: React.FC = () => {
     fetchAgentVisibility();
   }, [agentId]);
   
-  // Set the URL parameter when the component mounts if it doesn't exist
+  // Set the URL parameter when the component mounts if it doesn't exist and hide chat bubble
   useEffect(() => {
     if (!searchParams.has("tab")) {
       navigate(`/agent/${agentId}/integrations?tab=embed`, { replace: true });
     }
     
-    // Hide any existing chat widget on this page
+    // Always hide any existing chat widget on this page (including embed page)
     const existingBubble = document.getElementById('wonderwave-bubble');
     if (existingBubble) {
       existingBubble.style.display = 'none';
@@ -116,8 +115,6 @@ const IntegrationsPage: React.FC = () => {
     <AgentPageLayout defaultActiveTab="connect" defaultPageTitle={getTabTitle()} showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] overflow-hidden min-h-screen">
         <h1 className="text-3xl font-bold mb-6">{getTabTitle()}</h1>
-        
-        <TabNavigation activeTab={tab} />
         
         <div className="bg-white rounded-lg p-6">
           <IntegrationsContent

@@ -88,13 +88,11 @@ export const IntegrationsContent: React.FC<IntegrationsContentProps> = ({
     return renderVisibilityWarning();
   }
   
-  // Render the appropriate tab content based on the URL parameter
-  switch (tab) {
-    case "embed":
-      return <EmbedTab embedCode={getEmbedCode()} agentId={agentId} />;
-    case "share":
+  // Always render the EmbedTab since we removed the tabs - no matter what tab is requested
+  if (tab === "embed" || tab === "share" || tab === "integrations") {
+    if (tab === "share") {
       return <ShareTab />;
-    case "integrations":
+    } else if (tab === "integrations") {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {integrations.map((integration) => (
@@ -113,7 +111,12 @@ export const IntegrationsContent: React.FC<IntegrationsContentProps> = ({
           ))}
         </div>
       );
-    default:
+    } else {
+      // Default to embed tab
       return <EmbedTab embedCode={getEmbedCode()} agentId={agentId} />;
+    }
   }
+  
+  // Fallback to embed tab
+  return <EmbedTab embedCode={getEmbedCode()} agentId={agentId} />;
 };

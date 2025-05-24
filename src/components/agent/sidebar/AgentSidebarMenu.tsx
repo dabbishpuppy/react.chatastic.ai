@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -18,8 +17,7 @@ import {
   ChevronUp,
   LayoutDashboard,
   MessageSquare,
-  UserRound,
-  MessageCircle
+  UserRound
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
 import SidebarSubmenuItem from "./SidebarSubmenuItem";
@@ -71,7 +69,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     }));
   }, [activeTab, location]);
 
-  // Main menu items
+  // Main menu items - removed the chatbot-demo item
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "playground", label: "Playground", icon: <FileText size={18} /> },
@@ -124,9 +122,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
         { id: "notifications", label: "Notifications", path: "settings/notifications", icon: <Bell size={14} /> },
         { id: "custom-domains", label: "Domains", path: "settings/custom-domains", icon: <Globe size={14} /> }
       ]
-    },
-    // Add Chatbot Demo link
-    { id: "chatbot-demo", label: "Chatbot Demo", icon: <MessageCircle size={18} /> },
+    }
   ];
 
   const handleClick = (tabId: string, tabLabel: string, hasSubmenu?: boolean, e?: React.MouseEvent) => {
@@ -144,12 +140,6 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     // Then handle navigation with replace: true to avoid page jumps
     if (tabId === "dashboard") {
       navigate(`/dashboard`, { replace: true });
-      return;
-    }
-    
-    // Handle the Chatbot Demo navigation
-    if (tabId === "chatbot-demo") {
-      navigate(`/chatbot`, { replace: true });
       return;
     }
     
