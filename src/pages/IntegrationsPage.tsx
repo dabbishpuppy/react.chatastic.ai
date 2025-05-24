@@ -53,63 +53,11 @@ const IntegrationsPage: React.FC = () => {
     fetchAgentVisibility();
   }, [agentId]);
   
-  // Set the URL parameter when the component mounts if it doesn't exist and hide chat bubble
+  // Set the URL parameter when the component mounts if it doesn't exist
   useEffect(() => {
     if (!searchParams.has("tab")) {
       navigate(`/agent/${agentId}/integrations?tab=embed`, { replace: true });
     }
-    
-    // Function to hide the chat bubble
-    const hideChatBubble = () => {
-      const existingBubble = document.getElementById('wonderwave-bubble');
-      if (existingBubble) {
-        existingBubble.style.display = 'none';
-        existingBubble.style.visibility = 'hidden';
-        existingBubble.style.opacity = '0';
-        existingBubble.style.pointerEvents = 'none';
-        console.log('Chat bubble hidden on integrations page');
-      }
-    };
-
-    // Hide immediately if it exists
-    hideChatBubble();
-
-    // Set up MutationObserver to watch for dynamically added chat bubbles
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node as Element;
-            // Check if the added node is the chat bubble or contains it
-            if (element.id === 'wonderwave-bubble' || element.querySelector('#wonderwave-bubble')) {
-              hideChatBubble();
-            }
-          }
-        });
-      });
-    });
-
-    // Start observing
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    // Also set up an interval as a fallback
-    const intervalId = setInterval(hideChatBubble, 500);
-    
-    // Cleanup when leaving the page
-    return () => {
-      observer.disconnect();
-      clearInterval(intervalId);
-      const bubble = document.getElementById('wonderwave-bubble');
-      if (bubble) {
-        bubble.style.display = 'flex';
-        bubble.style.visibility = 'visible';
-        bubble.style.opacity = '1';
-        bubble.style.pointerEvents = 'auto';
-      }
-    };
   }, [agentId, navigate, searchParams]);
 
   // Get the current tab title

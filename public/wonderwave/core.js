@@ -1,3 +1,4 @@
+
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate, shouldCheckVisibility } from './settings.js';
 import { createBubbleButton, showPopups, setBubbleButton } from './ui.js';
@@ -9,6 +10,25 @@ let initialized = false;
 let visibilityCheckInterval = null;
 let rateLimitCountdown = null;
 let rateLimitCountdownInterval = null;
+
+// Check if we're on a page where the widget should not initialize
+function shouldPreventInitialization() {
+  const currentPath = window.location.pathname;
+  const currentSearch = window.location.search;
+  
+  // Don't initialize on integrations, embed, or settings pages
+  if (currentPath.includes('/integrations') || 
+      currentPath.includes('/embed') || 
+      currentPath.includes('/settings') ||
+      currentSearch.includes('tab=embed') ||
+      currentSearch.includes('tab=share') ||
+      currentSearch.includes('tab=integrations')) {
+    log('Preventing widget initialization on admin/config page:', currentPath + currentSearch);
+    return true;
+  }
+  
+  return false;
+}
 
 function startRateLimitCountdown(timeUntilReset, message) {
   // Clear any existing countdown
@@ -76,6 +96,12 @@ export function processQueue() {
 export function handleCommand(command, params) {
   log('Handling command:', command, params);
   
+  // Check if we should prevent initialization before processing any commands
+  if (shouldPreventInitialization() && command !== 'getState' && command !== 'debug' && command !== 'destroy') {
+    log(`Command ${command} blocked - on admin/config page`);
+    return 'blocked-admin-page';
+  }
+  
   // First check if we need to refresh visibility
   if (shouldCheckVisibility()) {
     const agentId = window.wonderwaveConfig?.agentId;
@@ -113,6 +139,9 @@ export function handleCommand(command, params) {
       if (isAgentPrivate()) {
         return 'agent-private';
       }
+      if (shouldPreventInitialization()) {
+        return 'blocked-admin-page';
+      }
       return initialized ? 'initialized' : 'not-initialized';
     case 'refreshSettings':
       fetchColorSettingsAndVisibility(window.wonderwaveConfig?.agentId);
@@ -129,6 +158,12 @@ export function handleCommand(command, params) {
 export async function init(customConfig = {}) {
   if (initialized) {
     log('Already initialized, skipping');
+    return;
+  }
+  
+  // Check if we should prevent initialization
+  if (shouldPreventInitialization()) {
+    log('Skipping initialization on admin/config page');
     return;
   }
   
