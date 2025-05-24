@@ -2,14 +2,13 @@
 import React, { useEffect } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
-import ChatInput from "./chat/ChatInput";
-import RateLimitError from "./chat/RateLimitError";
-import SuggestedMessages from "./chat/SuggestedMessages";
-import ChatMessages from "./chat/ChatMessages";
+import ChatMainContent from "./chat/ChatMainContent";
+import ChatFooter from "./chat/ChatFooter";
 import ChatContainer from "./chat/ChatContainer";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
-import { useParams } from "react-router-dom";
+import { useChatHandlers } from "@/hooks/useChatHandlers";
+import { getThemeClasses, getContrastColor } from "./chat/ThemeConfig";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -31,24 +30,6 @@ interface ChatSectionProps {
   hideUserAvatar?: boolean;
 }
 
-// Helper function to determine contrasting text color for a background
-function getContrastColor(hex: string): string {
-  let r = 0, g = 0, b = 0;
-  
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    r = parseInt(hex.substring(1, 3), 16);
-    g = parseInt(hex.substring(3, 5), 16);
-    b = parseInt(hex.substring(5, 7), 16);
-  }
-  
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#000000' : '#FFFFFF';
-}
-
 const ChatSection: React.FC<ChatSectionProps> = ({ 
   initialMessages = [], 
   toggleSettings,
@@ -68,8 +49,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
 }) => {
-  const { agentId } = useParams();
-  
   const {
     message,
     setMessage,
@@ -77,11 +56,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     setChatHistory,
     isTyping,
     rateLimitError,
-    setRateLimitError,
     timeUntilReset,
-    setTimeUntilReset,
     isWaitingForRateLimit,
-    setIsWaitingForRateLimit,
     userHasMessaged,
     inputRef,
     handleSubmit,
@@ -95,6 +71,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   } = useMessageHandling(initialMessages, isEmbedded);
 
   const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
+
+  const {
+    handleSubmitWithAgentId,
+    handleSuggestedMessageClickWithAgentId,
+    handleRegenerateWithAgentId
+  } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -111,16 +93,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   }, [initialMessages, setChatHistory]);
 
   // Apply theme based on settings
-  const themeClasses = {
-    agentBubble: theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-gray-100',
-    userBubble: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
-    background: theme === 'dark' ? 'bg-gray-900' : 'bg-white',
-    text: theme === 'dark' ? 'text-gray-100' : 'text-gray-800',
-    inputBg: theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
-    inputText: theme === 'dark' ? 'text-gray-100' : 'text-gray-800',
-    iconButton: theme === 'dark' ? 'text-gray-400 hover:text-gray-100' : 'text-gray-500 hover:text-gray-800',
-    footerBg: theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-white border-t text-gray-500',
-  };
+  const themeClasses = getThemeClasses(theme);
 
   // Should we show suggested messages?
   const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
@@ -130,15 +103,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     backgroundColor: userMessageColor,
     color: getContrastColor(userMessageColor)
   } : {};
-
-  // Enhanced handlers with agentId
-  const handleSubmitWithAgentId = (e: React.FormEvent) => {
-    handleSubmit(e, agentId);
-  };
-
-  const handleSuggestedMessageClickWithAgentId = (text: string) => {
-    handleSuggestedMessageClick(text, agentId);
-  };
 
   // Check if input should be disabled
   const isInputDisabled = isTyping || !!rateLimitError || isWaitingForRateLimit;
@@ -155,72 +119,49 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         profilePicture={profilePicture}
         allowRegenerate={allowRegenerate}
         toggleSettings={toggleSettings}
-        onRegenerate={() => regenerateResponse(allowRegenerate)}
+        onRegenerate={() => handleRegenerateWithAgentId(allowRegenerate)}
         headerColor={headerColor}
         backgroundColor={themeClasses.background}
         iconButtonClass={themeClasses.iconButton}
       />
 
       {/* Chat Messages - Scrollable area */}
-      <div className={`flex-1 overflow-y-auto p-6 ${themeClasses.background} scroll-container`}>
-        <ChatMessages
-          chatHistory={chatHistory}
-          isTyping={isTyping}
-          agentName={agentName}
-          profilePicture={profilePicture}
-          showFeedback={showFeedback}
-          hideUserAvatar={hideUserAvatar}
-          onFeedback={handleFeedback}
-          onCopy={copyMessageToClipboard}
-          agentBubbleClass={themeClasses.agentBubble}
-          userBubbleClass={themeClasses.userBubble}
-          userMessageStyle={userMessageStyle}
-          messagesEndRef={messagesEndRef}
-        />
-      </div>
+      <ChatMainContent
+        chatHistory={chatHistory}
+        isTyping={isTyping}
+        agentName={agentName}
+        profilePicture={profilePicture}
+        showFeedback={showFeedback}
+        hideUserAvatar={hideUserAvatar}
+        onFeedback={handleFeedback}
+        onCopy={copyMessageToClipboard}
+        themeClasses={themeClasses}
+        userMessageStyle={userMessageStyle}
+        messagesEndRef={messagesEndRef}
+      />
 
       {/* Fixed footer section with rate limit error, suggestions, and input */}
-      <div className={`flex-shrink-0 ${themeClasses.background}`}>
-        {/* Rate limit error message with live countdown */}
-        {rateLimitError && (
-          <RateLimitError 
-            message={rateLimitError} 
-            timeUntilReset={timeUntilReset} 
-            onCountdownFinished={handleCountdownFinished}
-          />
-        )}
-
-        {/* Suggested Messages */}
-        {shouldShowSuggestions && suggestedMessages.length > 0 && (
-          <SuggestedMessages
-            messages={suggestedMessages}
-            onMessageClick={handleSuggestedMessageClickWithAgentId}
-            isWaitingForRateLimit={isInputDisabled}
-            theme={theme}
-            backgroundColor={themeClasses.background}
-          />
-        )}
-
-        {/* Chat Input */}
-        <ChatInput
-          message={message}
-          setMessage={setMessage}
-          onSubmit={handleSubmitWithAgentId}
-          isWaitingForRateLimit={isInputDisabled}
-          placeholder={placeholder}
-          inputRef={inputRef}
-          chatIcon={chatIcon}
-          isEmbedded={isEmbedded}
-          footer={footer}
-          footerClassName={footerClassName}
-          theme={theme}
-          inputBackgroundClass={themeClasses.inputBg}
-          inputTextClass={themeClasses.inputText}
-          iconButtonClass={themeClasses.iconButton}
-          textClass={themeClasses.text}
-          onEmojiInsert={insertEmoji}
-        />
-      </div>
+      <ChatFooter
+        rateLimitError={rateLimitError}
+        timeUntilReset={timeUntilReset}
+        onCountdownFinished={handleCountdownFinished}
+        shouldShowSuggestions={shouldShowSuggestions}
+        suggestedMessages={suggestedMessages}
+        handleSuggestedMessageClick={handleSuggestedMessageClickWithAgentId}
+        isInputDisabled={isInputDisabled}
+        theme={theme}
+        themeClasses={themeClasses}
+        message={message}
+        setMessage={setMessage}
+        onSubmit={handleSubmitWithAgentId}
+        placeholder={placeholder}
+        inputRef={inputRef}
+        chatIcon={chatIcon}
+        isEmbedded={isEmbedded}
+        footer={footer}
+        footerClassName={footerClassName}
+        onEmojiInsert={insertEmoji}
+      />
     </ChatContainer>
   );
 };

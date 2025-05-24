@@ -78,7 +78,7 @@ export const regenerateResponse = (
   if (lastUserMessageIndex === -1) return;
   
   const messagesToKeep = chatHistory.slice(0, chatHistory.length - lastUserMessageIndex);
-  setChatHistory(messagesToKeep);
+  setChatHistory(() => messagesToKeep);
   
   setIsTyping(true);
   
