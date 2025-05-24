@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -165,8 +164,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Check if input should be disabled - simplified for embedded
-  const isInputDisabled = isTyping || !!rateLimitError || conversationEnded;
+  // Check if input should be disabled - only for rate limit and typing, not conversation ended
+  const isInputDisabled = isTyping || !!rateLimitError;
 
   return (
     <ChatContainer
@@ -221,13 +220,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         message={message}
         setMessage={setMessage}
         onSubmit={handleSubmitWithConversation}
-        placeholder={conversationEnded ? "This conversation has ended. Start a new chat to continue." : placeholder}
+        placeholder={placeholder}
         inputRef={inputRef}
         chatIcon={chatIcon}
         isEmbedded={isEmbedded}
         footer={footer}
         footerClassName={footerClassName}
         onEmojiInsert={insertEmoji}
+        isConversationEnded={conversationEnded}
+        onStartNewChat={handleStartNewChat}
       />
     </ChatContainer>
   );
