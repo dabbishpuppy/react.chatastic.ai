@@ -24,8 +24,7 @@ import SourcesPage from "./pages/SourcesPage";
 import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
-import ChatbotDemo from "./pages/ChatbotDemo";
-import EmbeddedChat from "./pages/EmbeddedChat"; // Add import for the new page
+import EmbeddedChat from "./pages/EmbeddedChat";
 
 const queryClient = new QueryClient();
 
@@ -103,9 +102,6 @@ function App() {
                 <Route path="billing" element={<BillingSettings />} />
                 <Route path="api-keys" element={<ApiKeys />} />
               </Route>
-              
-              {/* Public demo route */}
-              <Route path="/chatbot" element={<ChatbotDemo />} />
               
               {/* Embedded chat route - public, no authentication required */}
               <Route path="/embed/:agentId" element={<EmbeddedChat />} />

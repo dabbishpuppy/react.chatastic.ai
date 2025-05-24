@@ -6,7 +6,6 @@ import { useChatSettings } from "@/hooks/useChatSettings";
 import { getAgentVisibility } from "@/services/agentVisibilityService";
 import { IntegrationsContent } from "@/components/connect/integrations/IntegrationsContent";
 import { TabNavigation } from "@/components/connect/integrations/TabNavigation";
-import { ChatbotPreview } from "@/components/connect/integrations/ChatbotPreview";
 
 const IntegrationsPage: React.FC = () => {
   const { agentId } = useParams();
@@ -130,14 +129,6 @@ const IntegrationsPage: React.FC = () => {
             isLoading={isLoading || visibilityLoading}
           />
         </div>
-        
-        {/* Preview the chatbot widget */}
-        <ChatbotPreview
-          settings={settings}
-          tab={tab}
-          visibility={visibility}
-          visibilityError={visibilityError}
-        />
       </div>
     </AgentPageLayout>
   );
