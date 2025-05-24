@@ -17,6 +17,37 @@ export function setRateLimitSettings(settings) {
 }
 
 /**
+ * Check if current page should hide chat bubble
+ */
+function shouldHideChatBubble() {
+  const hiddenPages = [
+    '/integrations',
+    '/agent/[^/]+/integrations'
+  ];
+  
+  const currentPath = window.location.pathname;
+  return hiddenPages.some(pattern => {
+    const regex = new RegExp(`^${pattern.replace(/\[.*?\]/g, '[^/]+')}(?:/.*)?$`);
+    return regex.test(currentPath);
+  });
+}
+
+/**
+ * Initialize chat visibility based on current page
+ */
+function initializeChatVisibility() {
+  if (shouldHideChatBubble()) {
+    const bubbleButton = getBubbleButton();
+    if (bubbleButton) {
+      bubbleButton.style.display = 'none';
+    }
+    log('Chat bubble hidden on this page');
+    return false; // Don't show chat
+  }
+  return true; // Show chat
+}
+
+/**
  * Check if a message can be sent (rate limit check)
  */
 async function canSendMessage() {
@@ -68,7 +99,7 @@ function showRateLimitError(errorInfo) {
  * Create and open the chat iframe
  */
 export function createChatIframe(config) {
-  if (iframe || isAgentPrivate()) return;
+  if (iframe || isAgentPrivate() || !initializeChatVisibility()) return;
   
   // Create chat container
   const container = document.createElement('div');
@@ -237,6 +268,11 @@ export function openChat() {
   
   if (isAgentPrivate()) {
     logError('Cannot open chat. Agent is private.');
+    return;
+  }
+
+  if (!initializeChatVisibility()) {
+    log('Chat bubble is hidden on this page');
     return;
   }
   
