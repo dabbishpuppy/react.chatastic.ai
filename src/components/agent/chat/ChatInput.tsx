@@ -49,18 +49,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
   isConversationEnded = false,
   onStartNewChat
 }) => {
-  // Handle input change to ensure spaces work properly
+  // Handle input change - simplified to just use the event value
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
   };
 
-  // Handle key press to ensure proper behavior including spaces
+  // Handle key press for form submission
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e as any);
     }
-    // Allow all other keys including space to work normally
   };
 
   // Determine the actual placeholder text to show

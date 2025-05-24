@@ -32,6 +32,12 @@ const ActivityPage: React.FC = () => {
       const recentConversations = await conversationService.getRecentConversations(agentId, 50);
       setConversations(recentConversations);
       setHasAnyConversations(recentConversations.length > 0);
+      
+      // Auto-select first conversation if available
+      if (recentConversations.length > 0 && !selectedConversation) {
+        const firstConversation = await convertDBConversationToUI(recentConversations[0]);
+        setSelectedConversation(firstConversation);
+      }
     } catch (error) {
       console.error('Error loading conversations:', error);
       setHasAnyConversations(false);
@@ -60,7 +66,13 @@ const ActivityPage: React.FC = () => {
         
         // Close conversation view if the deleted conversation was selected
         if (selectedConversation?.id === conversationId) {
-          setSelectedConversation(null);
+          // Auto-select next conversation if available
+          if (updatedConversations.length > 0) {
+            const nextConversation = await convertDBConversationToUI(updatedConversations[0]);
+            setSelectedConversation(nextConversation);
+          } else {
+            setSelectedConversation(null);
+          }
         }
         
         toast({
@@ -94,16 +106,21 @@ const ActivityPage: React.FC = () => {
 
     const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
     const title = dbConversation.title || `Chat from ${daysAgo}`;
-    const snippet = messages.length > 0 ? 
-      `${messages.length} message${messages.length !== 1 ? 's' : ''} • ${dbConversation.status}` : 
-      'No messages';
+    
+    // Get snippet from last message
+    let snippet = 'No messages';
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      const content = lastMessage.content;
+      snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
+    }
 
     return {
       id: dbConversation.id,
       title,
       snippet,
       daysAgo,
-      source: dbConversation.source === 'bubble' ? 'Widget or Iframe' : 'Widget or Iframe',
+      source: dbConversation.source === 'bubble' ? 'Widget' : 'Iframe',
       messages: uiMessages
     };
   };
@@ -116,8 +133,8 @@ const ActivityPage: React.FC = () => {
     }
   };
 
-  const handleCloseConversation = () => {
-    setSelectedConversation(null);
+  const handleDeleteConversation = (conversationId: string) => {
+    deleteConversation(conversationId);
   };
 
   // Helper function to convert 'system' theme to 'light' or 'dark'
@@ -159,28 +176,35 @@ const ActivityPage: React.FC = () => {
         {!hasAnyConversations ? (
           <EmptyState />
         ) : (
-          <div className={`flex flex-1 ${selectedConversation ? "pr-4" : ""} overflow-hidden`}>
-            <div className={`flex-1 transition-all ${selectedConversation ? "pr-4" : ""}`}>
+          <div className="flex flex-1 pr-4 overflow-hidden gap-4">
+            <div className="w-1/2">
               <ChatLogsTab 
                 onConversationClick={handleConversationClick} 
-                onConversationDelete={deleteConversation}
+                onConversationDelete={handleDeleteConversation}
                 hideTitle
                 conversations={conversations}
                 onRefresh={loadConversations}
+                selectedConversationId={selectedConversation?.id}
               />
             </div>
-            {selectedConversation && (
-              <div className="w-1/2 min-w-[400px]">
+            <div className="w-1/2 min-w-[400px]">
+              {selectedConversation ? (
                 <ConversationView 
                   conversation={selectedConversation} 
-                  onClose={handleCloseConversation}
+                  onClose={() => {}}
+                  onDelete={() => handleDeleteConversation(selectedConversation.id)}
                   theme={getConversationTheme(chatSettings?.theme || 'light')}
                   profilePicture={chatSettings?.profile_picture}
                   displayName={chatSettings?.display_name}
                   userMessageColor={chatSettings?.user_message_color}
+                  showDeleteButton={true}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center justify-center h-full bg-white rounded-lg border">
+                  <p className="text-gray-500">Select a conversation to view details</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

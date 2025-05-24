@@ -1,6 +1,6 @@
 
 import React from "react";
-import { X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Conversation } from "@/components/activity/ConversationData";
@@ -8,19 +8,23 @@ import { Conversation } from "@/components/activity/ConversationData";
 interface ConversationViewProps {
   conversation: Conversation;
   onClose: () => void;
+  onDelete?: () => void;
   theme?: 'light' | 'dark';
   profilePicture?: string;
   displayName?: string;
   userMessageColor?: string;
+  showDeleteButton?: boolean;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
   conversation,
   onClose,
+  onDelete,
   theme = 'light',
   profilePicture,
   displayName = "AI Assistant",
-  userMessageColor
+  userMessageColor,
+  showDeleteButton = false
 }) => {
   const isDark = theme === 'dark';
   
@@ -39,6 +43,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
+  // Determine status based on conversation data
+  const status = conversation.snippet.includes('Active') ? 'active' : 'ended';
+
   return (
     <div className={`border rounded-lg h-[calc(100vh-240px)] flex flex-col ${
       isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
@@ -56,19 +63,39 @@ const ConversationView: React.FC<ConversationViewProps> = ({
             <h3 className={`font-medium text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {conversation.title}
             </h3>
-            <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              {conversation.snippet}
-            </p>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`px-2 py-1 rounded ${
+                status === 'active' 
+                  ? 'bg-green-100 text-green-700' 
+                  : 'bg-gray-100 text-gray-700'
+              }`}>
+                {status}
+              </span>
+              <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
+                • {conversation.source}
+              </span>
+            </div>
           </div>
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={onClose}
-          className={isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
-        >
-          <X size={16} />
-        </Button>
+        {showDeleteButton && onDelete ? (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onDelete}
+            className={`${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-500 hover:text-red-600'}`}
+          >
+            <Trash2 size={16} />
+          </Button>
+        ) : (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onClose}
+            className={isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
+          >
+            ×
+          </Button>
+        )}
       </div>
 
       {/* Messages */}

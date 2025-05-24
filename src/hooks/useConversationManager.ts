@@ -9,16 +9,36 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [conversationEnded, setConversationEnded] = useState(false);
   const sessionIdRef = useRef<string>(generateSessionId());
-
-  useEffect(() => {
-    if (agentId) {
-      startNewConversation();
-    }
-  }, [agentId]);
+  const [conversationCreated, setConversationCreated] = useState(false);
 
   function generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
+
+  const createConversationOnFirstMessage = async () => {
+    if (!agentId || conversationCreated) return null;
+
+    const newSessionId = generateSessionId();
+    sessionIdRef.current = newSessionId;
+
+    try {
+      const conversation = await conversationService.createConversation(
+        agentId,
+        newSessionId,
+        source
+      );
+      
+      if (conversation) {
+        setCurrentConversation(conversation);
+        setConversationEnded(false);
+        setConversationCreated(true);
+        return conversation;
+      }
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+    }
+    return null;
+  };
 
   const startNewConversation = async () => {
     if (!agentId) return;
@@ -36,6 +56,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       if (conversation) {
         setCurrentConversation(conversation);
         setConversationEnded(false);
+        setConversationCreated(true);
       }
     } catch (error) {
       console.error('Error starting new conversation:', error);
@@ -62,6 +83,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       if (conversation) {
         setCurrentConversation(conversation);
         setConversationEnded(conversation.status === 'ended');
+        setConversationCreated(true);
         sessionIdRef.current = conversation.session_id;
       }
     } catch (error) {
@@ -70,15 +92,22 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
   };
 
   const saveMessage = async (content: string, isAgent: boolean) => {
-    if (!currentConversation) return;
+    // Create conversation on first user message if it doesn't exist
+    let conversation = currentConversation;
+    if (!conversation && !isAgent) {
+      conversation = await createConversationOnFirstMessage();
+      if (!conversation) return;
+    }
+
+    if (!conversation) return;
 
     try {
-      await conversationService.addMessage(currentConversation.id, content, isAgent);
+      await conversationService.addMessage(conversation.id, content, isAgent);
       
       // Update conversation title with first user message
-      if (!isAgent && !currentConversation.title) {
+      if (!isAgent && !conversation.title) {
         const title = conversationService.generateConversationTitle(content);
-        await conversationService.updateConversationTitle(currentConversation.id, title);
+        await conversationService.updateConversationTitle(conversation.id, title);
         setCurrentConversation(prev => prev ? { ...prev, title } : null);
       }
     } catch (error) {
