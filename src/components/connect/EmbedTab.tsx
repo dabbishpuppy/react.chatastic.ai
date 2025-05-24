@@ -8,7 +8,6 @@ import { ChatBubbleTab } from "./embed/ChatBubbleTab";
 import { IframeTab } from "./embed/IframeTab";
 import { EmbedCodeDisplay } from "./embed/EmbedCodeDisplay";
 import { HelpSection } from "./embed/HelpSection";
-import { ChatBubblePreview } from "./embed/ChatBubblePreview";
 
 interface EmbedTabProps {
   embedCode?: string;
@@ -123,9 +122,6 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
       </Card>
       
       <HelpSection />
-
-      {/* Preview of chat bubble with icon when available */}
-      {settings.chat_icon && <ChatBubblePreview settings={settings} />}
     </div>
   );
 };
