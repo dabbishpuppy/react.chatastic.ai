@@ -63,6 +63,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
     // Allow all other keys including space to work normally
   };
 
+  // Determine the actual placeholder text to show
+  const getPlaceholderText = () => {
+    if (isConversationEnded) {
+      return "Your conversation has ended";
+    }
+    if (isWaitingForRateLimit) {
+      return "Checking rate limit...";
+    }
+    return placeholder;
+  };
+
   // If conversation is ended, show different UI
   if (isConversationEnded) {
     return (
@@ -143,7 +154,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           value={message}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder={isWaitingForRateLimit ? "Checking rate limit..." : placeholder}
+          placeholder={getPlaceholderText()}
           className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${inputBackgroundClass} ${inputTextClass}`}
           disabled={isWaitingForRateLimit}
           autoComplete="off"
