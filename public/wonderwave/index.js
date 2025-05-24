@@ -15,6 +15,28 @@ import { log, logError } from './utils.js';
 (function() {
   'use strict';
 
+  // Check if we should prevent initialization right away
+  function shouldPreventInitialization() {
+    const currentPath = window.location.pathname;
+    const currentSearch = window.location.search;
+    const currentHost = window.location.hostname;
+    
+    return currentPath.includes('/integrations') || 
+           currentPath.includes('/embed') || 
+           currentPath.includes('/settings') ||
+           currentSearch.includes('tab=embed') ||
+           currentSearch.includes('tab=share') ||
+           currentSearch.includes('tab=integrations') ||
+           currentHost.includes('lovable.app') ||
+           currentHost.includes('localhost');
+  }
+
+  // Don't do anything if we're on an admin page
+  if (shouldPreventInitialization()) {
+    log('WonderWave: Skipping initialization on admin/config page');
+    return;
+  }
+
   // Initialize state
   let initialized = false;
   

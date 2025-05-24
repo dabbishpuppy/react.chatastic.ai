@@ -1,4 +1,5 @@
 
+
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate, shouldCheckVisibility } from './settings.js';
 import { createBubbleButton, showPopups, setBubbleButton } from './ui.js';
@@ -15,6 +16,7 @@ let rateLimitCountdownInterval = null;
 function shouldPreventInitialization() {
   const currentPath = window.location.pathname;
   const currentSearch = window.location.search;
+  const currentHost = window.location.hostname;
   
   // Don't initialize on integrations, embed, or settings pages
   if (currentPath.includes('/integrations') || 
@@ -22,7 +24,9 @@ function shouldPreventInitialization() {
       currentPath.includes('/settings') ||
       currentSearch.includes('tab=embed') ||
       currentSearch.includes('tab=share') ||
-      currentSearch.includes('tab=integrations')) {
+      currentSearch.includes('tab=integrations') ||
+      currentHost.includes('lovable.app') ||
+      currentHost.includes('localhost')) {
     log('Preventing widget initialization on admin/config page:', currentPath + currentSearch);
     return true;
   }
@@ -77,6 +81,12 @@ function hideRateLimitError() {
  * Process any commands that were queued before script loaded
  */
 export function processQueue() {
+  // Don't process queue if we should prevent initialization
+  if (shouldPreventInitialization()) {
+    log('Skipping queue processing on admin/config page');
+    return;
+  }
+  
   const queue = window.wonderwave.q || [];
   log('Processing command queue, length:', queue.length);
   
