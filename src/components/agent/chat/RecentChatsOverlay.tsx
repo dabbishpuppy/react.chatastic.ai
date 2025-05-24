@@ -53,7 +53,7 @@ const RecentChatsOverlay: React.FC<RecentChatsOverlayProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="absolute inset-0 bg-white z-50 flex flex-col">
+    <div className="absolute inset-0 bg-white z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -65,8 +65,18 @@ const RecentChatsOverlay: React.FC<RecentChatsOverlayProps> = ({
         </Button>
       </div>
 
-      {/* Content with native scrolling */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Content with proper scrolling */}
+      <div 
+        className="flex-1 overflow-y-auto overflow-x-hidden" 
+        style={{ 
+          scrollbarWidth: 'thin',
+          WebkitOverflowScrolling: 'touch'
+        }}
+        onWheel={(e) => {
+          // Allow mouse wheel scrolling
+          e.stopPropagation();
+        }}
+      >
         {loading ? (
           <div className="flex items-center justify-center p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>

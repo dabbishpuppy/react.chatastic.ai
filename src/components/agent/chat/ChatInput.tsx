@@ -89,7 +89,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           />
           <Button 
             onClick={onStartNewChat}
-            className={`flex items-center gap-2 px-4 py-3 rounded-full bg-black hover:bg-gray-800 text-white ${iconButtonClass}`}
+            className="flex items-center gap-2 px-4 py-3 rounded-full bg-white hover:bg-gray-100 text-black border border-gray-300"
           >
             <Plus size={16} />
             Start new chat

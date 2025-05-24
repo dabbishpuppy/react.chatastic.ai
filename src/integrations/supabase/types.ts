@@ -277,6 +277,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_conversation: {
+        Args: { conversation_id: string }
+        Returns: boolean
+      }
       get_default_team_id: {
         Args: Record<PropertyKey, never>
         Returns: string

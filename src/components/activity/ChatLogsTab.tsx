@@ -160,7 +160,7 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
         )}
 
         <div className="bg-white rounded-lg border">
-          <div className="h-[calc(100vh-240px)] overflow-y-auto scrollbar-none">
+          <div className="h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
             {loading ? (
               <div className="flex items-center justify-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>

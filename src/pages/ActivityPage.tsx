@@ -51,21 +51,25 @@ const ActivityPage: React.FC = () => {
 
   const deleteConversation = async (conversationId: string) => {
     try {
-      // In a real implementation, you would call a delete API
-      // For now, we'll just remove from local state and show success
-      const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
-      setConversations(updatedConversations);
-      setHasAnyConversations(updatedConversations.length > 0);
+      const success = await conversationService.deleteConversation(conversationId);
       
-      // Close conversation view if the deleted conversation was selected
-      if (selectedConversation?.id === conversationId) {
-        setSelectedConversation(null);
+      if (success) {
+        const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
+        setConversations(updatedConversations);
+        setHasAnyConversations(updatedConversations.length > 0);
+        
+        // Close conversation view if the deleted conversation was selected
+        if (selectedConversation?.id === conversationId) {
+          setSelectedConversation(null);
+        }
+        
+        toast({
+          title: "Conversation deleted",
+          description: "The conversation has been successfully deleted.",
+        });
+      } else {
+        throw new Error('Failed to delete conversation');
       }
-      
-      toast({
-        title: "Conversation deleted",
-        description: "The conversation has been successfully deleted.",
-      });
     } catch (error) {
       console.error('Error deleting conversation:', error);
       toast({
@@ -166,7 +170,7 @@ const ActivityPage: React.FC = () => {
               />
             </div>
             {selectedConversation && (
-              <div className="w-1/3 min-w-[320px]">
+              <div className="w-1/2 min-w-[400px]">
                 <ConversationView 
                   conversation={selectedConversation} 
                   onClose={handleCloseConversation}

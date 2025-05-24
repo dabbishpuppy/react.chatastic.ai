@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -153,5 +152,18 @@ export const conversationService = {
     const words = firstMessage.trim().split(' ');
     if (words.length <= 6) return firstMessage;
     return words.slice(0, 6).join(' ') + '...';
+  },
+
+  // Delete conversation using the database function
+  async deleteConversation(conversationId: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .rpc('delete_conversation', { conversation_id: conversationId });
+
+    if (error) {
+      console.error('Error deleting conversation:', error);
+      return false;
+    }
+
+    return data === true;
   }
 };
