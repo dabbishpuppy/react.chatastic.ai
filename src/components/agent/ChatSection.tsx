@@ -1,14 +1,18 @@
+
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
 import ChatMainContent from "./chat/ChatMainContent";
 import ChatFooter from "./chat/ChatFooter";
 import ChatContainer from "./chat/ChatContainer";
+import LeadFormWidget from "./chat/LeadFormWidget";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { useChatHandlers } from "@/hooks/useChatHandlers";
 import { getThemeClasses, getContrastColor } from "./chat/ThemeConfig";
 import { useConversationManager } from "@/hooks/useConversationManager";
+import { useLeadSettings } from "@/hooks/useLeadSettings";
+import { useParams } from "react-router-dom";
 
 interface ChatSectionProps {
   initialMessages?: ChatMessage[];
@@ -49,13 +53,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
 }) => {
+  const { agentId } = useParams();
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>(initialMessages);
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
+  
+  // Load lead settings
+  const { settings: leadSettings } = useLeadSettings(agentId || '');
   
   // Conversation management
   const {
     currentConversation,
     conversationEnded,
-    agentId,
+    agentId: conversationAgentId,
     startNewConversation,
     endCurrentConversation,
     loadConversation,
@@ -92,6 +102,25 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleRegenerateWithAgentId
   } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
+  // Check if we should show the lead form
+  useEffect(() => {
+    if (
+      isEmbedded && 
+      leadSettings?.enabled && 
+      !hasShownLeadForm && 
+      userHasMessaged &&
+      chatHistory.length >= 2 && // At least one user message and one AI response
+      !isTyping
+    ) {
+      // Small delay to ensure the AI response is fully rendered
+      const timer = setTimeout(() => {
+        setShowLeadForm(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
+
   // Enhanced message submission with conversation saving
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
     if (!message.trim() || isTyping || rateLimitError) return;
@@ -122,6 +151,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       content: initialMessages[0]?.content || "Hi! I'm Wonder AI. How can I help you today?",
       timestamp: new Date().toISOString()
     }]);
+    setHasShownLeadForm(false);
   };
 
   const handleEndChat = async () => {
@@ -135,6 +165,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       setChatHistory(messages);
       setDisplayMessages(messages);
     }
+  };
+
+  const handleLeadFormSubmit = () => {
+    setShowLeadForm(false);
+    setHasShownLeadForm(true);
+  };
+
+  const handleLeadFormClose = () => {
+    setShowLeadForm(false);
+    setHasShownLeadForm(true);
   };
 
   // Cleanup on unmount
@@ -186,7 +226,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         onStartNewChat={handleStartNewChat}
         onEndChat={handleEndChat}
         onLoadConversation={handleLoadConversation}
-        agentId={agentId}
+        agentId={conversationAgentId}
         isConversationEnded={conversationEnded}
         isEmbedded={isEmbedded}
       />
@@ -230,6 +270,24 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         isConversationEnded={conversationEnded}
         onStartNewChat={handleStartNewChat}
       />
+
+      {/* Lead Form Widget */}
+      {showLeadForm && leadSettings && (
+        <LeadFormWidget
+          agentId={agentId || ''}
+          conversationId={currentConversation?.id}
+          title={leadSettings.title}
+          collectName={leadSettings.collect_name}
+          namePlaceholder={leadSettings.name_placeholder}
+          collectEmail={leadSettings.collect_email}
+          emailPlaceholder={leadSettings.email_placeholder}
+          collectPhone={leadSettings.collect_phone}
+          phonePlaceholder={leadSettings.phone_placeholder}
+          onSubmit={handleLeadFormSubmit}
+          onClose={handleLeadFormClose}
+          theme={theme}
+        />
+      )}
     </ChatContainer>
   );
 };

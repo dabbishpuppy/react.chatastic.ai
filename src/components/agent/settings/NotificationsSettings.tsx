@@ -4,50 +4,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "@/components/ui/use-toast";
 import { X } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { useNotificationSettings } from "@/hooks/useNotificationSettings";
 
 const NotificationsSettings: React.FC = () => {
-  const [receiveDailyLeads, setReceiveDailyLeads] = useState(true);
-  const [leadsEmails, setLeadsEmails] = useState(['agora@faros.no']);
+  const { agentId } = useParams();
+  const { settings, isLoading, isSaving, saveSettings } = useNotificationSettings(agentId || '');
   const [newLeadsEmail, setNewLeadsEmail] = useState("");
-  const [receiveConversations, setReceiveConversations] = useState(true);
-  const [conversationsEmails, setConversationsEmails] = useState(['agora@faros.no']);
   const [newConversationEmail, setNewConversationEmail] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+
+  if (isLoading || !settings) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   const handleAddLeadEmail = () => {
-    if (newLeadsEmail && !leadsEmails.includes(newLeadsEmail)) {
-      setLeadsEmails([...leadsEmails, newLeadsEmail]);
+    if (newLeadsEmail && !settings.leads_emails.includes(newLeadsEmail)) {
+      saveSettings({
+        leads_emails: [...settings.leads_emails, newLeadsEmail]
+      });
       setNewLeadsEmail("");
     }
   };
 
   const handleRemoveLeadEmail = (email: string) => {
-    setLeadsEmails(leadsEmails.filter(e => e !== email));
+    saveSettings({
+      leads_emails: settings.leads_emails.filter(e => e !== email)
+    });
   };
 
   const handleAddConversationEmail = () => {
-    if (newConversationEmail && !conversationsEmails.includes(newConversationEmail)) {
-      setConversationsEmails([...conversationsEmails, newConversationEmail]);
+    if (newConversationEmail && !settings.conversations_emails.includes(newConversationEmail)) {
+      saveSettings({
+        conversations_emails: [...settings.conversations_emails, newConversationEmail]
+      });
       setNewConversationEmail("");
     }
   };
 
   const handleRemoveConversationEmail = (email: string) => {
-    setConversationsEmails(conversationsEmails.filter(e => e !== email));
+    saveSettings({
+      conversations_emails: settings.conversations_emails.filter(e => e !== email)
+    });
   };
 
-  const handleSave = () => {
-    setIsSaving(true);
-    
-    setTimeout(() => {
-      setIsSaving(false);
-      toast({
-        title: "Notification settings saved",
-        description: "Your agent's notification settings have been updated successfully."
-      });
-    }, 1000);
+  const updateField = (field: string, value: any) => {
+    saveSettings({ [field]: value });
   };
 
   return (
@@ -67,12 +73,12 @@ const NotificationsSettings: React.FC = () => {
               </div>
               <Switch
                 id="receiveDailyLeads"
-                checked={receiveDailyLeads}
-                onCheckedChange={setReceiveDailyLeads}
+                checked={settings.daily_leads_enabled}
+                onCheckedChange={(checked) => updateField('daily_leads_enabled', checked)}
               />
             </div>
             
-            {receiveDailyLeads && (
+            {settings.daily_leads_enabled && (
               <div className="space-y-4">
                 <div className="flex space-x-2">
                   <Input
@@ -80,6 +86,7 @@ const NotificationsSettings: React.FC = () => {
                     onChange={(e) => setNewLeadsEmail(e.target.value)}
                     placeholder="Enter email address"
                     className="max-w-md"
+                    type="email"
                   />
                   <Button onClick={handleAddLeadEmail}>
                     Add Email
@@ -87,7 +94,7 @@ const NotificationsSettings: React.FC = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  {leadsEmails.map((email) => (
+                  {settings.leads_emails.map((email) => (
                     <div 
                       key={email}
                       className="flex items-center bg-gray-100 px-3 py-1 rounded-md max-w-md"
@@ -115,12 +122,12 @@ const NotificationsSettings: React.FC = () => {
               </div>
               <Switch
                 id="receiveConversations"
-                checked={receiveConversations}
-                onCheckedChange={setReceiveConversations}
+                checked={settings.daily_conversations_enabled}
+                onCheckedChange={(checked) => updateField('daily_conversations_enabled', checked)}
               />
             </div>
             
-            {receiveConversations && (
+            {settings.daily_conversations_enabled && (
               <div className="space-y-4">
                 <div className="flex space-x-2">
                   <Input
@@ -128,6 +135,7 @@ const NotificationsSettings: React.FC = () => {
                     onChange={(e) => setNewConversationEmail(e.target.value)}
                     placeholder="Enter email address"
                     className="max-w-md"
+                    type="email"
                   />
                   <Button onClick={handleAddConversationEmail}>
                     Add Email
@@ -135,7 +143,7 @@ const NotificationsSettings: React.FC = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  {conversationsEmails.map((email) => (
+                  {settings.conversations_emails.map((email) => (
                     <div 
                       key={email}
                       className="flex items-center bg-gray-100 px-3 py-1 rounded-md max-w-md"
@@ -152,12 +160,6 @@ const NotificationsSettings: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-          
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save"}
-            </Button>
           </div>
         </CardContent>
       </Card>

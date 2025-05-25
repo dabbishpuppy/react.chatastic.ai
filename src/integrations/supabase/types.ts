@@ -181,6 +181,92 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_settings: {
+        Row: {
+          agent_id: string
+          collect_email: boolean
+          collect_name: boolean
+          collect_phone: boolean
+          created_at: string
+          email_placeholder: string
+          enabled: boolean
+          id: string
+          name_placeholder: string
+          phone_placeholder: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          collect_email?: boolean
+          collect_name?: boolean
+          collect_phone?: boolean
+          created_at?: string
+          email_placeholder?: string
+          enabled?: boolean
+          id?: string
+          name_placeholder?: string
+          phone_placeholder?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          collect_email?: boolean
+          collect_name?: boolean
+          collect_phone?: boolean
+          created_at?: string
+          email_placeholder?: string
+          enabled?: boolean
+          id?: string
+          name_placeholder?: string
+          phone_placeholder?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          agent_id: string
+          conversation_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string | null
+          phone: string | null
+          submitted_at: string
+        }
+        Insert: {
+          agent_id: string
+          conversation_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          submitted_at?: string
+        }
+        Update: {
+          agent_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          phone?: string | null
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -215,6 +301,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_settings: {
+        Row: {
+          agent_id: string
+          conversations_emails: string[]
+          created_at: string
+          daily_conversations_enabled: boolean
+          daily_leads_enabled: boolean
+          id: string
+          leads_emails: string[]
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          conversations_emails?: string[]
+          created_at?: string
+          daily_conversations_enabled?: boolean
+          daily_leads_enabled?: boolean
+          id?: string
+          leads_emails?: string[]
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          conversations_emails?: string[]
+          created_at?: string
+          daily_conversations_enabled?: boolean
+          daily_leads_enabled?: boolean
+          id?: string
+          leads_emails?: string[]
+          updated_at?: string
+        }
+        Relationships: []
       }
       team_members: {
         Row: {
