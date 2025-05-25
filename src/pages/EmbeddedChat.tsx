@@ -72,8 +72,15 @@ const EmbeddedChat: React.FC = () => {
     document.addEventListener('wheel', preventParentScrolling, { passive: false });
     document.addEventListener('touchmove', preventParentScrolling, { passive: false });
     document.addEventListener('keydown', (e) => {
-      // Prevent scrolling with arrow keys, space, etc.
-      if ([32, 37, 38, 39, 40].includes(e.keyCode)) {
+      // Check if the event target is an input field, textarea, or contenteditable element
+      const target = e.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || 
+                          target.tagName === 'TEXTAREA' || 
+                          target.contentEditable === 'true' ||
+                          target.getAttribute('contenteditable') === 'true';
+      
+      // Only prevent scrolling keys when not in an input field
+      if (!isInputField && [32, 37, 38, 39, 40].includes(e.keyCode)) {
         e.preventDefault();
       }
     });
