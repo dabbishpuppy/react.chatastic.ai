@@ -73,6 +73,22 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     getConversationMessages
   } = useConversationManager(isEmbedded ? 'iframe' : 'bubble');
 
+  // Enhanced message saving callback
+  const handleMessageSaved = async (content: string, isAgent: boolean) => {
+    console.log('Saving message:', { content, isAgent, hasConversation: !!currentConversation });
+    
+    // Create conversation on first user message if it doesn't exist
+    if (!currentConversation && !isAgent) {
+      console.log('Creating new conversation for first message');
+      await startNewConversation();
+      // Wait a bit for conversation to be created
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Save the message
+    await saveMessage(content, isAgent);
+  };
+
   const {
     message,
     setMessage,
@@ -92,7 +108,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     insertEmoji,
     handleCountdownFinished,
     cleanup
-  } = useMessageHandling(displayMessages, isEmbedded);
+  } = useMessageHandling(displayMessages, isEmbedded, handleMessageSaved);
 
   const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
 
@@ -102,8 +118,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleRegenerateWithAgentId
   } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
-  // Check if we should show the lead form
+  // Improved lead form trigger logic
   useEffect(() => {
+    console.log('Lead form check:', {
+      isEmbedded,
+      leadSettingsEnabled: leadSettings?.enabled,
+      hasShownLeadForm,
+      userHasMessaged,
+      chatHistoryLength: chatHistory.length,
+      isTyping,
+      hasConversation: !!currentConversation
+    });
+
     if (
       isEmbedded && 
       leadSettings?.enabled && 
@@ -112,6 +138,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       chatHistory.length >= 2 && // At least one user message and one AI response
       !isTyping
     ) {
+      console.log('Showing lead form');
       // Small delay to ensure the AI response is fully rendered
       const timer = setTimeout(() => {
         setShowLeadForm(true);
@@ -119,29 +146,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
+  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping, currentConversation]);
 
   // Enhanced message submission with conversation saving
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
     if (!message.trim() || isTyping || rateLimitError) return;
     
-    const messageText = message.trim();
-    
-    // Save user message
-    if (currentConversation) {
-      await saveMessage(messageText, false);
-    }
-    
-    // Handle the submission - simplified for embedded mode
+    // Handle the submission - the message saving is now handled in useMessageHandling
     await handleSubmitWithAgentId(e);
-    
-    // Save agent response (this would be called after the agent responds)
-    // For now, we'll save a placeholder response
-    setTimeout(async () => {
-      if (currentConversation) {
-        await saveMessage("Agent response placeholder", true);
-      }
-    }, 1000);
   };
 
   const handleStartNewChat = async () => {

@@ -13,7 +13,8 @@ import {
 
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
-  isEmbedded: boolean = false
+  isEmbedded: boolean = false,
+  onMessageSaved?: (content: string, isAgent: boolean) => Promise<void>
 ) => {
   const {
     message,
@@ -45,7 +46,13 @@ export const useMessageHandling = (
     }, 10);
   };
 
-  const proceedWithMessageWrapper = (text: string) => {
+  const proceedWithMessageWrapper = async (text: string) => {
+    // Save user message first if callback provided
+    if (onMessageSaved) {
+      await onMessageSaved(text, false);
+    }
+
+    // Proceed with the UI updates
     proceedWithMessage(
       text,
       setChatHistory,
@@ -54,6 +61,25 @@ export const useMessageHandling = (
       inputRef,
       isEmbedded
     );
+
+    // Simulate AI response and save it
+    setTimeout(async () => {
+      const aiResponse = "Thank you for your message! How can I help you today?";
+      
+      // Add AI response to chat history
+      setChatHistory(prev => [...prev, {
+        isAgent: true,
+        content: aiResponse,
+        timestamp: new Date().toISOString()
+      }]);
+      
+      // Save AI response if callback provided
+      if (onMessageSaved) {
+        await onMessageSaved(aiResponse, true);
+      }
+      
+      setIsTyping(false);
+    }, 1500);
   };
 
   // Enhanced message submission with rate limiting
@@ -81,7 +107,7 @@ export const useMessageHandling = (
     }
     
     // Add message to chat and proceed
-    proceedWithMessageWrapper(text);
+    await proceedWithMessageWrapper(text);
   };
 
   const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
