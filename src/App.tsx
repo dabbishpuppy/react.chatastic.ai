@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -29,33 +29,35 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen bg-gray-50">
-          <Toaster />
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/embed/:agentId" element={<EmbeddedChat />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/settings/*" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/usage" element={<ProtectedRoute><Usage /></ProtectedRoute>} />
-            
-            {/* Agent Routes */}
-            <Route path="/agent/:agentId" element={<ProtectedRoute><AgentEnvironment /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/activity" element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/activity/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/sources" element={<ProtectedRoute><SourcesPage /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/actions" element={<ProtectedRoute><ActionsPage /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
-            <Route path="/agent/:agentId/settings/*" element={<ProtectedRoute><AgentSettingsPage /></ProtectedRoute>} />
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
-      </QueryClientProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <div className="min-h-screen bg-gray-50">
+            <Toaster />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/embed/:agentId" element={<EmbeddedChat />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/settings/*" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/usage" element={<ProtectedRoute><Usage /></ProtectedRoute>} />
+              
+              {/* Agent Routes */}
+              <Route path="/agent/:agentId" element={<ProtectedRoute><AgentEnvironment /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/activity" element={<ProtectedRoute><ActivityPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/activity/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/sources" element={<ProtectedRoute><SourcesPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/actions" element={<ProtectedRoute><ActionsPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/settings/*" element={<ProtectedRoute><AgentSettingsPage /></ProtectedRoute>} />
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        </QueryClientProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 
