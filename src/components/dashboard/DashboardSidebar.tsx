@@ -47,7 +47,7 @@ const DashboardSidebar = ({
         <Logo size="md" />
       </div>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4">
+        <div className="p-4 bg-white">
           <TeamsList teams={teamsArray} selectedTeam={activeTeam} isExpanded={expandedSections.teams} onToggleExpand={() => toggleSection('teams')} onTeamSelect={team => {
           onTeamSelect(team);
           if (isMobile && setMobileOpen) {
