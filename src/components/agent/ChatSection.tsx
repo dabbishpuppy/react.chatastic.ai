@@ -207,6 +207,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Check if input should be disabled - only for rate limit and typing, not conversation ended
   const isInputDisabled = isTyping || !!rateLimitError;
 
+  // Convert 'system' theme to 'light' or 'dark' for components that don't support 'system'
+  const resolvedTheme: 'light' | 'dark' = theme === 'system' ? 'light' : theme;
+
   return (
     <ChatContainer
       isEmbedded={isEmbedded}
@@ -285,7 +288,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           phonePlaceholder={leadSettings.phone_placeholder}
           onSubmit={handleLeadFormSubmit}
           onClose={handleLeadFormClose}
-          theme={theme}
+          theme={resolvedTheme}
         />
       )}
     </ChatContainer>
