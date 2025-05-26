@@ -15,6 +15,7 @@ import { useLeadSettings } from "@/hooks/useLeadSettings";
 import { useParams } from "react-router-dom";
 
 interface ChatSectionProps {
+  agentId?: string; // Add agentId as optional prop
   initialMessages?: ChatMessage[];
   toggleSettings?: () => void;
   agentName?: string;
@@ -35,6 +36,7 @@ interface ChatSectionProps {
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
+  agentId: propAgentId, // Rename to avoid confusion
   initialMessages = [], 
   toggleSettings,
   agentName = "AI Customer Service",
@@ -53,13 +55,26 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
 }) => {
-  const { agentId } = useParams();
+  const { agentId: paramAgentId } = useParams();
+  // Use prop agentId if provided, otherwise fall back to URL param
+  const agentId = propAgentId || paramAgentId;
+  
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>(initialMessages);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
   
   // Load lead settings
   const { settings: leadSettings } = useLeadSettings(agentId || '');
+  
+  // Add debug logging for lead settings
+  useEffect(() => {
+    console.log('Lead settings loaded:', {
+      agentId,
+      leadSettings,
+      isEmbedded,
+      enabled: leadSettings?.enabled
+    });
+  }, [agentId, leadSettings, isEmbedded]);
   
   // Conversation management
   const {
@@ -102,46 +117,75 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleRegenerateWithAgentId
   } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
-  // Check if we should show the lead form
+  // Enhanced lead form trigger logic with debug logging
   useEffect(() => {
+    console.log('Lead form trigger check:', {
+      isEmbedded,
+      leadSettingsEnabled: leadSettings?.enabled,
+      hasShownLeadForm,
+      userHasMessaged,
+      chatHistoryLength: chatHistory.length,
+      isTyping,
+      shouldTrigger: isEmbedded && 
+        leadSettings?.enabled && 
+        !hasShownLeadForm && 
+        userHasMessaged &&
+        chatHistory.length >= 1 && // Reduced from 2 to 1
+        !isTyping
+    });
+
     if (
       isEmbedded && 
       leadSettings?.enabled && 
       !hasShownLeadForm && 
       userHasMessaged &&
-      chatHistory.length >= 2 && // At least one user message and one AI response
+      chatHistory.length >= 1 && // Reduced requirement to just 1 message (user message)
       !isTyping
     ) {
-      // Small delay to ensure the AI response is fully rendered
+      console.log('Triggering lead form...');
+      // Shorter delay for better UX
       const timer = setTimeout(() => {
         setShowLeadForm(true);
-      }, 1000);
+        console.log('Lead form shown');
+      }, 500); // Reduced from 1000ms
       
       return () => clearTimeout(timer);
     }
   }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
-  // Enhanced message submission with conversation saving
+  // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
     if (!message.trim() || isTyping || rateLimitError) return;
     
     const messageText = message.trim();
+    console.log('Submitting message with conversation:', messageText);
     
-    // Save user message
+    // Create conversation if it doesn't exist (for embedded mode)
+    if (isEmbedded && !currentConversation && agentId) {
+      console.log('Creating conversation for first message in embedded mode');
+      await startNewConversation();
+    }
+    
+    // Save user message to conversation
     if (currentConversation) {
+      console.log('Saving user message to conversation');
       await saveMessage(messageText, false);
     }
     
-    // Handle the submission - simplified for embedded mode
+    // Handle the submission
     await handleSubmitWithAgentId(e);
     
-    // Save agent response (this would be called after the agent responds)
-    // For now, we'll save a placeholder response
+    // After AI response is generated, save it too
+    // This needs to be done after the message utils complete the AI response
     setTimeout(async () => {
-      if (currentConversation) {
-        await saveMessage("Agent response placeholder", true);
+      if (currentConversation && chatHistory.length > 0) {
+        const lastMessage = chatHistory[chatHistory.length - 1];
+        if (lastMessage && lastMessage.isAgent) {
+          console.log('Saving AI response to conversation');
+          await saveMessage(lastMessage.content, true);
+        }
       }
-    }, 1000);
+    }, 2000); // Wait for AI response to be added to chat history
   };
 
   const handleStartNewChat = async () => {
@@ -168,11 +212,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   };
 
   const handleLeadFormSubmit = () => {
+    console.log('Lead form submitted');
     setShowLeadForm(false);
     setHasShownLeadForm(true);
   };
 
   const handleLeadFormClose = () => {
+    console.log('Lead form closed');
     setShowLeadForm(false);
     setHasShownLeadForm(true);
   };
@@ -229,7 +275,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         onStartNewChat={handleStartNewChat}
         onEndChat={handleEndChat}
         onLoadConversation={handleLoadConversation}
-        agentId={conversationAgentId}
+        agentId={agentId || ''}
         isConversationEnded={conversationEnded}
         isEmbedded={isEmbedded}
       />

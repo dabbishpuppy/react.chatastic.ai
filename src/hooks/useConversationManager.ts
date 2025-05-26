@@ -18,6 +18,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
   const createConversationOnFirstMessage = async () => {
     if (!agentId || conversationCreated) return null;
 
+    console.log('Creating conversation on first message for agentId:', agentId);
     const newSessionId = generateSessionId();
     sessionIdRef.current = newSessionId;
 
@@ -29,6 +30,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       );
       
       if (conversation) {
+        console.log('Conversation created successfully:', conversation.id);
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
@@ -41,8 +43,12 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
   };
 
   const startNewConversation = async () => {
-    if (!agentId) return;
+    if (!agentId) {
+      console.warn('Cannot start conversation: agentId is missing');
+      return;
+    }
 
+    console.log('Starting new conversation for agentId:', agentId);
     const newSessionId = generateSessionId();
     sessionIdRef.current = newSessionId;
 
@@ -54,6 +60,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       );
       
       if (conversation) {
+        console.log('New conversation started:', conversation.id);
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
@@ -95,13 +102,21 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
     // Create conversation on first user message if it doesn't exist
     let conversation = currentConversation;
     if (!conversation && !isAgent) {
+      console.log('No conversation exists, creating one for first user message');
       conversation = await createConversationOnFirstMessage();
-      if (!conversation) return;
+      if (!conversation) {
+        console.error('Failed to create conversation for message');
+        return;
+      }
     }
 
-    if (!conversation) return;
+    if (!conversation) {
+      console.warn('No conversation available to save message to');
+      return;
+    }
 
     try {
+      console.log('Saving message to conversation:', conversation.id, 'isAgent:', isAgent);
       await conversationService.addMessage(conversation.id, content, isAgent);
       
       // Update conversation title with first user message

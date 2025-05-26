@@ -209,6 +209,7 @@ const EmbeddedChat: React.FC = () => {
     <div className="w-full h-screen flex flex-col overflow-hidden" ref={containerRef}>
       <ScrollArea className="w-full h-full overflow-hidden">
         <ChatSection 
+          agentId={agentId} // Pass agentId as prop
           initialMessages={[{
             isAgent: true,
             content: settings.initial_message,
