@@ -15,7 +15,7 @@ import { useLeadSettings } from "@/hooks/useLeadSettings";
 import { useParams } from "react-router-dom";
 
 interface ChatSectionProps {
-  agentId?: string; // Add agentId as optional prop
+  agentId?: string;
   initialMessages?: ChatMessage[];
   toggleSettings?: () => void;
   agentName?: string;
@@ -36,7 +36,7 @@ interface ChatSectionProps {
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
-  agentId: propAgentId, // Rename to avoid confusion
+  agentId: propAgentId,
   initialMessages = [], 
   toggleSettings,
   agentName = "AI Customer Service",
@@ -56,7 +56,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   hideUserAvatar = false,
 }) => {
   const { agentId: paramAgentId } = useParams();
-  // Use prop agentId if provided, otherwise fall back to URL param
   const agentId = propAgentId || paramAgentId;
   
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>(initialMessages);
@@ -65,16 +64,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   
   // Load lead settings
   const { settings: leadSettings } = useLeadSettings(agentId || '');
-  
-  // Add debug logging for lead settings
-  useEffect(() => {
-    console.log('Lead settings loaded:', {
-      agentId,
-      leadSettings,
-      isEmbedded,
-      enabled: leadSettings?.enabled
-    });
-  }, [agentId, leadSettings, isEmbedded]);
   
   // Conversation management
   const {
@@ -117,75 +106,70 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleRegenerateWithAgentId
   } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
-  // Enhanced lead form trigger logic with debug logging
+  // Enhanced debug logging for lead form
   useEffect(() => {
-    console.log('Lead form trigger check:', {
+    console.log('🔍 LEAD FORM DEBUG:', {
+      agentId,
       isEmbedded,
+      leadSettingsLoaded: !!leadSettings,
       leadSettingsEnabled: leadSettings?.enabled,
       hasShownLeadForm,
       userHasMessaged,
       chatHistoryLength: chatHistory.length,
       isTyping,
-      shouldTrigger: isEmbedded && 
-        leadSettings?.enabled && 
-        !hasShownLeadForm && 
-        userHasMessaged &&
-        chatHistory.length >= 1 && // Reduced from 2 to 1
-        !isTyping
+      chatHistory: chatHistory.map(msg => ({ isAgent: msg.isAgent, content: msg.content.substring(0, 50) + '...' }))
+    });
+  }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
+
+  // Enhanced lead form trigger logic
+  useEffect(() => {
+    if (!isEmbedded || !leadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
+      return;
+    }
+
+    // Count user messages and AI responses
+    const userMessages = chatHistory.filter(msg => !msg.isAgent);
+    const aiMessages = chatHistory.filter(msg => msg.isAgent);
+    
+    console.log('🚀 LEAD FORM TRIGGER CHECK:', {
+      userMessagesCount: userMessages.length,
+      aiMessagesCount: aiMessages.length,
+      shouldTrigger: userMessages.length >= 1 && aiMessages.length >= 1
     });
 
-    if (
-      isEmbedded && 
-      leadSettings?.enabled && 
-      !hasShownLeadForm && 
-      userHasMessaged &&
-      chatHistory.length >= 1 && // Reduced requirement to just 1 message (user message)
-      !isTyping
-    ) {
-      console.log('Triggering lead form...');
-      // Shorter delay for better UX
+    // Show lead form after first user message AND first AI response
+    if (userMessages.length >= 1 && aiMessages.length >= 1) {
+      console.log('✅ TRIGGERING LEAD FORM NOW');
       const timer = setTimeout(() => {
         setShowLeadForm(true);
-        console.log('Lead form shown');
-      }, 500); // Reduced from 1000ms
+        console.log('📋 LEAD FORM DISPLAYED');
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
+  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory, isTyping]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
     if (!message.trim() || isTyping || rateLimitError) return;
     
     const messageText = message.trim();
-    console.log('Submitting message with conversation:', messageText);
+    console.log('📤 Submitting message:', messageText);
+    
+    // Handle the submission first (this adds user message to chatHistory)
+    await handleSubmitWithAgentId(e);
     
     // Create conversation if it doesn't exist (for embedded mode)
     if (isEmbedded && !currentConversation && agentId) {
-      console.log('Creating conversation for first message in embedded mode');
+      console.log('🆕 Creating conversation for embedded mode');
       await startNewConversation();
     }
     
     // Save user message to conversation
-    if (currentConversation) {
-      console.log('Saving user message to conversation');
+    if (currentConversation || isEmbedded) {
+      console.log('💾 Saving user message to conversation');
       await saveMessage(messageText, false);
     }
-    
-    // Handle the submission
-    await handleSubmitWithAgentId(e);
-    
-    // After AI response is generated, save it too
-    // This needs to be done after the message utils complete the AI response
-    setTimeout(async () => {
-      if (currentConversation && chatHistory.length > 0) {
-        const lastMessage = chatHistory[chatHistory.length - 1];
-        if (lastMessage && lastMessage.isAgent) {
-          console.log('Saving AI response to conversation');
-          await saveMessage(lastMessage.content, true);
-        }
-      }
-    }, 2000); // Wait for AI response to be added to chat history
   };
 
   const handleStartNewChat = async () => {
@@ -212,13 +196,13 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   };
 
   const handleLeadFormSubmit = () => {
-    console.log('Lead form submitted');
+    console.log('📋 Lead form submitted');
     setShowLeadForm(false);
     setHasShownLeadForm(true);
   };
 
   const handleLeadFormClose = () => {
-    console.log('Lead form closed');
+    console.log('❌ Lead form closed');
     setShowLeadForm(false);
     setHasShownLeadForm(true);
   };

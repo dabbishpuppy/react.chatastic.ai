@@ -1,4 +1,3 @@
-
 import { ChatMessage } from "@/types/chatInterface";
 
 export const proceedWithMessage = (
@@ -15,7 +14,11 @@ export const proceedWithMessage = (
     timestamp: new Date().toISOString(),
   };
 
-  setChatHistory(prev => [...prev, userMessage]);
+  // Add user message immediately
+  setChatHistory(prev => {
+    console.log('📝 Adding user message to chat history');
+    return [...prev, userMessage];
+  });
   setUserHasMessaged(true);
   setIsTyping(true);
 
@@ -27,7 +30,10 @@ export const proceedWithMessage = (
       timestamp: new Date().toISOString(),
     };
 
-    setChatHistory(prev => [...prev, aiMessage]);
+    setChatHistory(prev => {
+      console.log('🤖 Adding AI response to chat history');
+      return [...prev, aiMessage];
+    });
     setIsTyping(false);
 
     // Focus input field after response

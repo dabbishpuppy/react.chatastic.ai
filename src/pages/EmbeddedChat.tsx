@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -14,6 +13,8 @@ const EmbeddedChat: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [agentVisibility, setAgentVisibility] = useState<string | null>(null);
   const [visibilityLoading, setVisibilityLoading] = useState(true);
+  
+  console.log('🎯 EmbeddedChat - agentId from params:', agentId);
   
   // Get URL parameters for theme and colors if present
   const themeParam = searchParams.get('theme');
