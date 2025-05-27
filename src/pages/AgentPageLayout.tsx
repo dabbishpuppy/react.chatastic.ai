@@ -34,18 +34,24 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
   // Determine if we're on the chat interface settings page
   const isChatInterfacePage = location.pathname.includes('chat-interface');
 
-  // Apply overscroll behavior to prevent unwanted scrolling
+  // Comprehensive scroll prevention for chat interface page
   useEffect(() => {
-    if (contentRef.current) {
-      if (isChatInterfacePage) {
-        // Apply specific styles for the chat interface settings page
-        contentRef.current.style.overscrollBehavior = 'contain';
-        contentRef.current.style.scrollBehavior = 'auto';
-      } else {
-        // Reset for other pages
-        contentRef.current.style.overscrollBehavior = '';
-        contentRef.current.style.scrollBehavior = '';
+    if (isChatInterfacePage && contentRef.current) {
+      // Prevent all automatic scrolling behaviors
+      contentRef.current.style.overscrollBehavior = 'contain';
+      contentRef.current.style.scrollBehavior = 'auto';
+      contentRef.current.style.scrollSnapType = 'none';
+      
+      // Ensure we start at the top when navigating to this page
+      contentRef.current.scrollTo(0, 0);
+      
+      // Prevent any scroll restoration
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
       }
+      
+      // Add a class for CSS-based scroll prevention
+      contentRef.current.classList.add('chat-interface-no-scroll');
     }
     
     // Cleanup function
@@ -53,9 +59,27 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
       if (contentRef.current) {
         contentRef.current.style.overscrollBehavior = '';
         contentRef.current.style.scrollBehavior = '';
+        contentRef.current.style.scrollSnapType = '';
+        contentRef.current.classList.remove('chat-interface-no-scroll');
+        
+        if ('scrollRestoration' in history) {
+          history.scrollRestoration = 'auto';
+        }
       }
     };
   }, [isChatInterfacePage]);
+
+  // Handle route changes to ensure we start at top for chat interface
+  useEffect(() => {
+    if (isChatInterfacePage && contentRef.current) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTo(0, 0);
+        }
+      }, 0);
+    }
+  }, [location.pathname, isChatInterfacePage]);
 
   const handleTabChange = (tab: string, tabLabel: string) => {
     setActiveTab(tab);
@@ -110,14 +134,41 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
           </div>
         )}
 
-        {/* Main content with its own scroll */}
+        {/* Main content with controlled scrolling */}
         <div 
           ref={contentRef} 
-          className={`flex-1 overflow-auto ${isChatInterfacePage ? 'settings-scroll-container' : ''}`}
+          className={`flex-1 overflow-auto ${isChatInterfacePage ? 'chat-interface-container' : ''}`}
         >
           {children}
         </div>
       </div>
+      
+      {/* Add CSS for chat interface scroll prevention */}
+      {isChatInterfacePage && (
+        <style jsx>{`
+          .chat-interface-container {
+            scroll-behavior: auto !important;
+            overscroll-behavior: contain !important;
+            scroll-snap-type: none !important;
+          }
+          
+          .chat-interface-container * {
+            scroll-behavior: auto !important;
+          }
+          
+          .chat-interface-no-scroll input:focus,
+          .chat-interface-no-scroll textarea:focus {
+            scroll-behavior: auto !important;
+          }
+          
+          .chat-interface-no-scroll input,
+          .chat-interface-no-scroll textarea {
+            scroll-margin: 0 !important;
+            scroll-margin-top: 0 !important;
+            scroll-margin-bottom: 0 !important;
+          }
+        `}</style>
+      )}
     </div>
   );
 };

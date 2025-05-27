@@ -46,29 +46,63 @@ const AgentSettingsPage: React.FC = () => {
     }
   };
 
-  // Prevent unwanted scrolling when textarea/inputs are focused on the chat-interface page
+  // Enhanced scroll prevention for chat-interface page
   useEffect(() => {
     if (activeTab === "chat-interface") {
-      // Ensure the page doesn't scroll when navigating to this tab
-      if (contentRef.current) {
-        contentRef.current.scrollTop = 0;
+      // Prevent any scroll restoration or automatic scrolling
+      if ('scrollRestoration' in history) {
+        const originalScrollRestoration = history.scrollRestoration;
+        history.scrollRestoration = 'manual';
+        
+        // Ensure page starts at top
+        if (contentRef.current) {
+          contentRef.current.scrollTop = 0;
+        }
+        window.scrollTo(0, 0);
+        
+        // Disable various scroll behaviors at document level
+        document.body.style.overscrollBehavior = 'contain';
+        document.body.style.scrollBehavior = 'auto';
+        document.documentElement.style.scrollBehavior = 'auto';
+        
+        return () => {
+          // Cleanup
+          history.scrollRestoration = originalScrollRestoration;
+          document.body.style.overscrollBehavior = '';
+          document.body.style.scrollBehavior = '';
+          document.documentElement.style.scrollBehavior = '';
+        };
       }
-      
-      // Disable auto-scrolling behavior for the page
-      document.body.style.overscrollBehavior = 'contain';
-      
-      return () => {
-        // Reset when navigating away
-        document.body.style.overscrollBehavior = '';
-      };
     }
   }, [activeTab]);
+
+  // Handle route changes specifically for chat-interface
+  useEffect(() => {
+    if (activeTab === "chat-interface") {
+      // Force scroll to top on route change
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = 0;
+        }
+        window.scrollTo(0, 0);
+      }, 0);
+    }
+  }, [location.pathname, activeTab]);
 
   return (
     <AgentPageLayout defaultActiveTab="settings" defaultPageTitle={getPageTitle()} showPageTitle={false}>
       <div 
-        className="flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen settings-scroll-container"
+        className={`flex flex-col p-8 bg-[#f5f5f5] w-full min-h-screen ${
+          activeTab === "chat-interface" ? "no-auto-scroll" : ""
+        }`}
         ref={contentRef}
+        style={{
+          ...(activeTab === "chat-interface" && {
+            scrollBehavior: 'auto',
+            overscrollBehavior: 'contain',
+            scrollSnapType: 'none'
+          })
+        }}
       >
         <h1 className="text-3xl font-bold mb-6">{getPageTitle()}</h1>
         
@@ -86,6 +120,32 @@ const AgentSettingsPage: React.FC = () => {
             <Route path="usage" element={<div>Usage settings</div>} />
           </Routes>
         </div>
+        
+        {/* Additional CSS for chat interface scroll prevention */}
+        {activeTab === "chat-interface" && (
+          <style jsx>{`
+            .no-auto-scroll * {
+              scroll-behavior: auto !important;
+              scroll-margin: 0 !important;
+              scroll-margin-top: 0 !important;
+              scroll-margin-bottom: 0 !important;
+            }
+            
+            .no-auto-scroll input:focus,
+            .no-auto-scroll textarea:focus {
+              scroll-behavior: auto !important;
+            }
+            
+            .no-auto-scroll input,
+            .no-auto-scroll textarea,
+            .no-auto-scroll select,
+            .no-auto-scroll button {
+              scroll-margin: 0 !important;
+              scroll-margin-top: 0 !important;
+              scroll-margin-bottom: 0 !important;
+            }
+          `}</style>
+        )}
       </div>
     </AgentPageLayout>
   );
