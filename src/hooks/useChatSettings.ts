@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -19,8 +18,8 @@ export const useChatSettings = () => {
   const loadSettingsFromEdgeFunction = async (agentId: string, bustCache = false) => {
     try {
       console.log('📡 Loading settings from edge function for agent:', agentId);
-      const timestamp = bustCache ? Date.now() : '';
-      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`, {
+      const timestamp = bustCache ? `&_t=${Date.now()}` : '';
+      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}${timestamp}`, {
         headers: {
           'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
@@ -197,44 +196,67 @@ export const useChatSettings = () => {
   const notifySettingsChange = (settingsToNotify: ChatInterfaceSettings) => {
     console.log('📢 Notifying settings change to embedded components');
     
+    // Create the message payload
+    const messagePayload = {
+      type: 'wonderwave-refresh-settings',
+      agentId: validAgentId,
+      settings: settingsToNotify
+    };
+    
+    console.log('📤 Message payload:', messagePayload);
+    
     // Send message to all iframes on the page
     const iframes = document.querySelectorAll('iframe[src*="/embed/"]');
-    iframes.forEach(iframe => {
+    console.log(`📤 Found ${iframes.length} iframes to notify`);
+    iframes.forEach((iframe, index) => {
       const iframeElement = iframe as HTMLIFrameElement;
       if (iframeElement.contentWindow) {
-        console.log('📤 Sending settings update to iframe');
-        iframeElement.contentWindow.postMessage({
-          type: 'wonderwave-refresh-settings',
-          agentId: validAgentId,
-          settings: settingsToNotify
-        }, '*');
+        console.log(`📤 Sending settings update to iframe ${index + 1}`);
+        try {
+          iframeElement.contentWindow.postMessage(messagePayload, '*');
+          console.log(`✅ Message sent to iframe ${index + 1}`);
+        } catch (error) {
+          console.error(`❌ Failed to send message to iframe ${index + 1}:`, error);
+        }
       }
     });
 
     // Send message to parent window (in case this settings page is embedded)
     if (window.parent !== window) {
       console.log('📤 Sending settings update to parent window');
-      window.parent.postMessage({
-        type: 'wonderwave-refresh-settings',
-        agentId: validAgentId,
-        settings: settingsToNotify
-      }, '*');
+      try {
+        window.parent.postMessage(messagePayload, '*');
+        console.log('✅ Message sent to parent window');
+      } catch (error) {
+        console.error('❌ Failed to send message to parent window:', error);
+      }
     }
 
     // Send message to any wonderwave widgets on external sites
     if (window.opener) {
       console.log('📤 Sending settings update to opener window');
-      window.opener.postMessage({
-        type: 'wonderwave-refresh-settings',
-        agentId: validAgentId,
-        settings: settingsToNotify
-      }, '*');
+      try {
+        window.opener.postMessage(messagePayload, '*');
+        console.log('✅ Message sent to opener window');
+      } catch (error) {
+        console.error('❌ Failed to send message to opener window:', error);
+      }
+    }
+    
+    // Also trigger a refresh of the edge function to update cache
+    if (validAgentId) {
+      console.log('🔄 Triggering edge function cache refresh');
+      loadSettingsFromEdgeFunction(validAgentId, true).then(() => {
+        console.log('✅ Edge function cache refreshed');
+      }).catch(error => {
+        console.error('❌ Failed to refresh edge function cache:', error);
+      });
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    console.log('💾 Saving settings (partial update):', settings);
+    console.log('💾 Saving settings:', settings);
     
     try {
       const updatedSettings = await saveChatSettings({
@@ -247,16 +269,16 @@ export const useChatSettings = () => {
         console.log('✅ Settings saved successfully:', updatedSettings);
         setSettings(updatedSettings);
         
-        // Notify embedded components about the change
-        notifySettingsChange(updatedSettings);
-        
-        // Small delay to ensure the message is sent before showing success
+        // Small delay to ensure database is updated before notifying
         setTimeout(() => {
+          // Notify embedded components about the change
+          notifySettingsChange(updatedSettings);
+          
           toast({
             title: "Settings saved",
             description: "Your chat interface settings have been updated successfully."
           });
-        }, 100);
+        }, 500);
       } else {
         console.error('❌ Failed to save settings - no data returned');
         toast({
@@ -332,6 +354,12 @@ export const useChatSettings = () => {
         } else {
           updateSetting('chat_icon', url);
         }
+        
+        toast({
+          title: "Upload Successful",
+          description: "Image uploaded successfully. Don't forget to save your settings.",
+        });
+        
         return url;
       } else {
         toast({

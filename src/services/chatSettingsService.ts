@@ -3,6 +3,42 @@ import { supabase } from "@/integrations/supabase/client";
 import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { Json } from "@/integrations/supabase/types";
 
+// Helper function to create storage bucket if it doesn't exist
+const ensureStorageBucket = async () => {
+  try {
+    // Try to get the bucket first
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+      return false;
+    }
+    
+    const bucketExists = buckets?.some(bucket => bucket.name === 'chat_interface_assets');
+    
+    if (!bucketExists) {
+      console.log('Creating chat_interface_assets bucket...');
+      const { error: createError } = await supabase.storage.createBucket('chat_interface_assets', {
+        public: true,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        fileSizeLimit: 5242880 // 5MB
+      });
+      
+      if (createError) {
+        console.error('Error creating bucket:', createError);
+        return false;
+      }
+      
+      console.log('✅ Storage bucket created successfully');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error ensuring storage bucket:', error);
+    return false;
+  }
+};
+
 // Helper function to parse suggested messages from JSON
 const parseSuggestedMessages = (data: any): SuggestedMessage[] => {
   if (!data.suggested_messages) return [];
@@ -40,32 +76,49 @@ const validateBubblePosition = (position: string): 'left' | 'right' => {
   return 'right'; // Default to right if invalid
 };
 
+// Helper function to sanitize data for database insertion
+const sanitizeSettingsData = (settings: ChatInterfaceSettings) => {
+  const sanitized = {
+    initial_message: settings.initial_message || '👋 Hi! How can I help you today?',
+    suggested_messages: JSON.stringify(settings.suggested_messages || []),
+    message_placeholder: settings.message_placeholder || 'Write message here...',
+    show_feedback: settings.show_feedback !== undefined ? settings.show_feedback : true,
+    allow_regenerate: settings.allow_regenerate !== undefined ? settings.allow_regenerate : true,
+    theme: validateTheme(settings.theme || 'light'),
+    display_name: settings.display_name || 'AI Assistant',
+    profile_picture: settings.profile_picture || null,
+    chat_icon: settings.chat_icon || null,
+    bubble_position: validateBubblePosition(settings.bubble_position || 'right'),
+    show_suggestions_after_chat: settings.show_suggestions_after_chat !== undefined ? settings.show_suggestions_after_chat : true,
+    auto_show_delay: settings.auto_show_delay !== undefined ? settings.auto_show_delay : 1,
+    footer: settings.footer || null,
+    user_message_color: settings.user_message_color || null,
+    bubble_color: settings.bubble_color || null,
+    sync_colors: settings.sync_colors !== undefined ? settings.sync_colors : false,
+    primary_color: settings.primary_color || null,
+    updated_at: new Date().toISOString(),
+  };
+  
+  console.log('🧹 Sanitized settings data:', sanitized);
+  return sanitized;
+};
+
 // Helper function to merge settings intelligently
 const mergeSettings = (existingSettings: any, newSettings: ChatInterfaceSettings) => {
   console.log('🔄 Merging settings - Existing:', existingSettings);
   console.log('🔄 Merging settings - New:', newSettings);
   
-  // Start with existing settings or defaults
-  const merged = {
-    initial_message: newSettings.initial_message ?? existingSettings?.initial_message ?? '👋 Hi! How can I help you today?',
-    suggested_messages: JSON.stringify(newSettings.suggested_messages ?? parseSuggestedMessages(existingSettings) ?? []),
-    message_placeholder: newSettings.message_placeholder ?? existingSettings?.message_placeholder ?? 'Write message here...',
-    show_feedback: newSettings.show_feedback !== undefined ? newSettings.show_feedback : (existingSettings?.show_feedback ?? true),
-    allow_regenerate: newSettings.allow_regenerate !== undefined ? newSettings.allow_regenerate : (existingSettings?.allow_regenerate ?? true),
-    theme: validateTheme(newSettings.theme ?? existingSettings?.theme ?? 'light'),
-    display_name: newSettings.display_name ?? existingSettings?.display_name ?? 'AI Assistant',
-    profile_picture: newSettings.profile_picture !== undefined ? newSettings.profile_picture : existingSettings?.profile_picture,
-    chat_icon: newSettings.chat_icon !== undefined ? newSettings.chat_icon : existingSettings?.chat_icon,
-    bubble_position: validateBubblePosition(newSettings.bubble_position ?? existingSettings?.bubble_position ?? 'right'),
-    show_suggestions_after_chat: newSettings.show_suggestions_after_chat !== undefined ? newSettings.show_suggestions_after_chat : (existingSettings?.show_suggestions_after_chat ?? true),
-    auto_show_delay: newSettings.auto_show_delay !== undefined ? newSettings.auto_show_delay : (existingSettings?.auto_show_delay ?? 1),
-    footer: newSettings.footer !== undefined ? newSettings.footer : existingSettings?.footer,
-    user_message_color: newSettings.user_message_color !== undefined ? newSettings.user_message_color : (existingSettings?.user_message_color ?? '#3B82F6'),
-    bubble_color: newSettings.bubble_color !== undefined ? newSettings.bubble_color : (existingSettings?.bubble_color ?? '#3B82F6'),
-    sync_colors: newSettings.sync_colors !== undefined ? newSettings.sync_colors : (existingSettings?.sync_colors ?? false),
-    primary_color: newSettings.primary_color !== undefined ? newSettings.primary_color : (existingSettings?.primary_color ?? '#3B82F6'),
-    updated_at: new Date().toISOString(),
-  };
+  // Start with sanitized new settings
+  const merged = sanitizeSettingsData(newSettings);
+  
+  // Merge with existing settings where new values are undefined/null
+  if (existingSettings) {
+    Object.keys(merged).forEach(key => {
+      if (merged[key] === null || merged[key] === undefined) {
+        merged[key] = existingSettings[key];
+      }
+    });
+  }
   
   console.log('✅ Merged settings result:', merged);
   return merged;
@@ -73,7 +126,13 @@ const mergeSettings = (existingSettings: any, newSettings: ChatInterfaceSettings
 
 export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise<ChatInterfaceSettings | null> => {
   try {
-    console.log('💾 Saving chat settings (with merge logic):', settings);
+    console.log('💾 Saving chat settings:', settings);
+    
+    // Validate required data
+    if (!settings) {
+      console.error('❌ No settings provided');
+      return null;
+    }
     
     // Only include agent_id if it exists and is valid
     const agentIdToUse = settings.agent_id && settings.agent_id !== "undefined" ? settings.agent_id : null;
@@ -87,10 +146,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .from("chat_interface_settings")
         .select('*')
         .eq('id', settings.id)
-        .single();
+        .maybeSingle();
         
-      if (fetchError && fetchError.code !== 'PGRST116') {
+      if (fetchError) {
         console.error('❌ Error fetching existing settings:', fetchError);
+        // Don't fail completely, continue with new settings only
       } else if (existing) {
         existingSettings = existing;
         console.log('📖 Found existing settings:', existingSettings);
@@ -102,10 +162,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .from("chat_interface_settings")
         .select('*')
         .eq('agent_id', agentIdToUse)
-        .single();
+        .maybeSingle();
         
-      if (fetchError && fetchError.code !== 'PGRST116') {
+      if (fetchError) {
         console.error('❌ Error fetching existing settings for agent:', fetchError);
+        // Don't fail completely, continue with new settings only
       } else if (existing) {
         existingSettings = existing;
         settings.id = existing.id; // Set the ID so we do an update instead of insert
@@ -129,11 +190,17 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .update(settingsData)
         .eq('id', settings.id)
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error updating settings:', error);
+        console.error('❌ Settings data that failed:', settingsData);
         throw error;
+      }
+      
+      if (!data) {
+        console.error('❌ No data returned from update');
+        return null;
       }
       
       console.log('✅ Settings updated successfully:', data);
@@ -154,11 +221,17 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .from("chat_interface_settings")
         .insert(settingsData)
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error creating settings:', error);
+        console.error('❌ Settings data that failed:', settingsData);
         throw error;
+      }
+      
+      if (!data) {
+        console.error('❌ No data returned from insert');
+        return null;
       }
       
       console.log('✅ Settings created successfully:', data);
@@ -190,9 +263,9 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
       .from("chat_interface_settings")
       .select('*')
       .eq('agent_id', agentId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error fetching chat settings:', error);
       throw error;
     }
@@ -226,13 +299,25 @@ export const uploadChatAsset = async (
       return null;
     }
     
+    // Ensure storage bucket exists
+    const bucketReady = await ensureStorageBucket();
+    if (!bucketReady) {
+      console.error('Storage bucket not ready');
+      return null;
+    }
+    
     const fileExt = file.name.split('.').pop();
     const fileName = `${type}_${Date.now()}${fileExt ? `.${fileExt}` : ''}`;
     const filePath = `${agentId}/${fileName}`;
     
+    console.log('📤 Uploading file:', { fileName, filePath, fileSize: file.size });
+    
     const { error: uploadError } = await supabase.storage
       .from('chat_interface_assets')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
       
     if (uploadError) {
       console.error('Upload error:', uploadError);
@@ -243,6 +328,7 @@ export const uploadChatAsset = async (
       .from('chat_interface_assets')
       .getPublicUrl(filePath);
       
+    console.log('✅ File uploaded successfully:', data.publicUrl);
     return data.publicUrl;
   } catch (error) {
     console.error('Error uploading file:', error);
