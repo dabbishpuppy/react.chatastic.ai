@@ -1,22 +1,24 @@
-import React, { useEffect, useState, useRef } from "react";
+
+import React, { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import ChatSection from "@/components/agent/ChatSection";
-import EditableSuggestedMessage from "./EditableSuggestedMessage";
-import ImageUpload from "./ImageUpload";
 import { useChatSettings } from "@/hooks/useChatSettings";
-import ColorPicker from "./ColorPicker";
 import ImageCropper from "./ImageCropper";
-import { AlertTriangle } from "lucide-react";
+
+// Import the new focused components
+import UnsavedChangesIndicator from "./chat-interface/UnsavedChangesIndicator";
+import BasicChatSettings from "./chat-interface/BasicChatSettings";
+import ChatBehaviorSettings from "./chat-interface/ChatBehaviorSettings";
+import ThemeAndColorSettings from "./chat-interface/ThemeAndColorSettings";
+import ProfileSettings from "./chat-interface/ProfileSettings";
+import BubbleSettings from "./chat-interface/BubbleSettings";
+import ChatPreview from "./chat-interface/ChatPreview";
+import ScrollPrevention from "./chat-interface/ScrollPrevention";
 
 const ChatInterfaceSettings: React.FC = () => {
   const {
-    settings, // Published settings (for embedded widgets)
-    draftSettings, // Draft settings (for form inputs and preview)
+    settings,
+    draftSettings,
     isLoading,
     isSaving,
     hasUnsavedChanges,
@@ -29,8 +31,6 @@ const ChatInterfaceSettings: React.FC = () => {
     uploadImage
   } = useChatSettings();
   
-  const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
-  const [syncColorWithHeader, setSyncColorWithHeader] = React.useState(draftSettings.sync_colors || false);
   const [showCropDialog, setShowCropDialog] = React.useState<{
     visible: boolean;
     type: 'profile' | 'icon';
@@ -38,136 +38,6 @@ const ChatInterfaceSettings: React.FC = () => {
   }>({ visible: false, type: 'profile', imageUrl: '' });
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollPreventionRef = useRef<boolean>(true);
-  
-  // Enhanced scroll prevention for chat interface page
-  useEffect(() => {
-    // Set scroll restoration to manual immediately
-    if ('scrollRestoration' in history) {
-      history.scrollRestoration = 'manual';
-    }
-    
-    // Force scroll to top with multiple attempts
-    const forceScrollToTop = () => {
-      if (containerRef.current) {
-        containerRef.current.scrollTop = 0;
-      }
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    };
-    
-    // Immediate scroll reset
-    forceScrollToTop();
-    
-    // Multiple attempts to ensure scroll stays at top
-    const timeouts = [
-      setTimeout(forceScrollToTop, 0),
-      setTimeout(forceScrollToTop, 10),
-      setTimeout(forceScrollToTop, 50),
-      setTimeout(forceScrollToTop, 100),
-      setTimeout(forceScrollToTop, 200),
-      setTimeout(forceScrollToTop, 500)
-    ];
-    
-    // Disable auto-focus on all form elements
-    const disableAutoFocus = () => {
-      const formElements = document.querySelectorAll('input, textarea, select, button');
-      formElements.forEach((element) => {
-        if (element instanceof HTMLElement) {
-          element.tabIndex = -1;
-          element.style.scrollMargin = '0';
-          element.style.scrollMarginTop = '0';
-          element.style.scrollMarginBottom = '0';
-          
-          // Disable scrollIntoView
-          element.scrollIntoView = () => {};
-        }
-      });
-    };
-    
-    disableAutoFocus();
-    
-    // Add comprehensive scroll prevention
-    const preventScroll = (e: Event) => {
-      if (scrollPreventionRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        forceScrollToTop();
-        return false;
-      }
-    };
-    
-    const preventFocusScroll = (e: FocusEvent) => {
-      if (scrollPreventionRef.current && e.target instanceof HTMLElement) {
-        e.preventDefault();
-        e.target.scrollIntoView = () => {};
-        forceScrollToTop();
-      }
-    };
-    
-    // Add event listeners for scroll prevention
-    document.addEventListener('scroll', preventScroll, { passive: false, capture: true });
-    window.addEventListener('scroll', preventScroll, { passive: false, capture: true });
-    document.addEventListener('focus', preventFocusScroll, { passive: false, capture: true });
-    document.addEventListener('focusin', preventFocusScroll, { passive: false, capture: true });
-    
-    // Override scrollTo methods temporarily
-    const originalScrollTo = window.scrollTo;
-    const originalScrollBy = window.scrollBy;
-    const originalScrollIntoView = Element.prototype.scrollIntoView;
-    
-    window.scrollTo = () => {};
-    window.scrollBy = () => {};
-    Element.prototype.scrollIntoView = () => {};
-    
-    // Re-enable scroll prevention after a delay
-    const enableScrollTimeout = setTimeout(() => {
-      scrollPreventionRef.current = false;
-      
-      // Restore original scroll methods
-      window.scrollTo = originalScrollTo;
-      window.scrollBy = originalScrollBy;
-      Element.prototype.scrollIntoView = originalScrollIntoView;
-      
-      // Remove event listeners
-      document.removeEventListener('scroll', preventScroll, { capture: true });
-      window.removeEventListener('scroll', preventScroll, { capture: true });
-      document.removeEventListener('focus', preventFocusScroll, { capture: true });
-      document.removeEventListener('focusin', preventFocusScroll, { capture: true });
-    }, 1000);
-    
-    // Apply CSS overrides
-    document.body.style.scrollBehavior = 'auto';
-    document.documentElement.style.scrollBehavior = 'auto';
-    document.body.style.overscrollBehavior = 'contain';
-    
-    return () => {
-      // Cleanup
-      timeouts.forEach(clearTimeout);
-      clearTimeout(enableScrollTimeout);
-      
-      // Remove event listeners
-      document.removeEventListener('scroll', preventScroll, { capture: true });
-      window.removeEventListener('scroll', preventScroll, { capture: true });
-      document.removeEventListener('focus', preventFocusScroll, { capture: true });
-      document.removeEventListener('focusin', preventFocusScroll, { capture: true });
-      
-      // Restore original methods
-      window.scrollTo = originalScrollTo;
-      window.scrollBy = originalScrollBy;
-      Element.prototype.scrollIntoView = originalScrollIntoView;
-      
-      // Reset styles
-      document.body.style.scrollBehavior = '';
-      document.documentElement.style.scrollBehavior = '';
-      document.body.style.overscrollBehavior = '';
-      
-      if ('scrollRestoration' in history) {
-        history.scrollRestoration = 'auto';
-      }
-    };
-  }, []);
 
   // Initial preview messages based on draft settings
   const [previewMessages, setPreviewMessages] = React.useState([
@@ -198,39 +68,6 @@ const ChatInterfaceSettings: React.FC = () => {
       }
     ]);
   }, [draftSettings.initial_message]);
-
-  // Update to handle sync_colors property from draft settings
-  useEffect(() => {
-    if (draftSettings.sync_colors !== undefined) {
-      setSyncColorWithHeader(draftSettings.sync_colors);
-    }
-  }, [draftSettings.sync_colors]);
-
-  // Handle color sync with header only when explicitly requested
-  useEffect(() => {
-    if (syncColorWithHeader && draftSettings.bubble_color) {
-      updateSetting("user_message_color", draftSettings.bubble_color);
-    }
-  }, [syncColorWithHeader, draftSettings.bubble_color]);
-  
-  // Handle bubble color change
-  const handleBubbleColorChange = (color: string) => {
-    updateSetting("bubble_color", color);
-    
-    if (syncColorWithHeader) {
-      updateSetting("user_message_color", color);
-    }
-  };
-  
-  // Handle syncing user message color with header
-  const handleSyncChange = (checked: boolean) => {
-    setSyncColorWithHeader(checked);
-    updateSetting("sync_colors", checked);
-    
-    if (checked && draftSettings.bubble_color) {
-      updateSetting("user_message_color", draftSettings.bubble_color);
-    }
-  };
 
   // Handle file selection for image upload with cropping
   const handleFileSelect = (file: File, type: 'profile' | 'icon') => {
@@ -277,44 +114,19 @@ const ChatInterfaceSettings: React.FC = () => {
     );
   }
 
-  // Should we show the chat icon in preview?
-  const showChatIconInPreview = !draftSettings.chat_icon;
-
-  // Determine the header color based on sync settings (using draft settings)
-  const headerColor = syncColorWithHeader ? draftSettings.user_message_color : null;
-
-  // Get the current theme for proper styling (using draft settings)
-  const currentTheme = draftSettings.theme || 'light';
-
   return (
     <div className="flex flex-col md:flex-row border-t no-scroll-page" ref={containerRef}>
+      {/* Scroll Prevention Component */}
+      <ScrollPrevention />
+      
       {/* Left panel - Settings */}
       <div className="w-full md:w-3/5 overflow-y-auto pr-0 md:pr-0">
         <div className="space-y-6 p-6">
           {/* Unsaved changes indicator */}
-          {hasUnsavedChanges && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-yellow-800">
-                    You have unsaved changes
-                  </p>
-                  <p className="text-sm text-yellow-700">
-                    Your changes are visible in the preview but haven't been saved yet.
-                  </p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={discardChanges}
-                  className="ml-2"
-                >
-                  Discard
-                </Button>
-              </div>
-            </div>
-          )}
+          <UnsavedChangesIndicator 
+            hasUnsavedChanges={hasUnsavedChanges}
+            onDiscard={discardChanges}
+          />
 
           <Card>
             <CardHeader>
@@ -322,262 +134,34 @@ const ChatInterfaceSettings: React.FC = () => {
               <CardDescription>Configure how your chat interface looks and behaves</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <label htmlFor="initialMessage" className="block text-sm font-medium">
-                  Initial messages
-                </label>
-                <Textarea
-                  id="initialMessage"
-                  value={draftSettings.initial_message}
-                  onChange={(e) => updateSetting("initial_message", e.target.value)}
-                  className="h-24"
-                  preventFocusScroll={true}
-                />
-                <p className="text-xs text-gray-500">Enter each message in a new line.</p>
-              </div>
+              <BasicChatSettings
+                draftSettings={draftSettings}
+                updateSetting={updateSetting}
+                addSuggestedMessage={addSuggestedMessage}
+                updateSuggestedMessage={updateSuggestedMessage}
+                deleteSuggestedMessage={deleteSuggestedMessage}
+              />
               
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Suggested messages
-                </label>
-                
-                <div className="space-y-2 border rounded-md p-4 bg-gray-50">
-                  {draftSettings.suggested_messages.map((msg) => (
-                    <EditableSuggestedMessage
-                      key={msg.id}
-                      id={msg.id}
-                      text={msg.text}
-                      onUpdate={updateSuggestedMessage}
-                      onDelete={deleteSuggestedMessage}
-                      maxLength={40}
-                    />
-                  ))}
-                  
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      value={newSuggestedMessage}
-                      onChange={(e) => setNewSuggestedMessage(e.target.value)}
-                      maxLength={40}
-                      placeholder="Add a suggested message"
-                      className="flex-1"
-                      preventFocusScroll={true}
-                    />
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        if (newSuggestedMessage.trim()) {
-                          addSuggestedMessage(newSuggestedMessage.trim());
-                          setNewSuggestedMessage("");
-                        }
-                      }}
-                      disabled={!newSuggestedMessage.trim()}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between mt-2">
-                  <div>
-                    <label htmlFor="showSuggestions" className="text-sm font-medium">
-                      Keep showing the suggested messages after the user's first message
-                    </label>
-                  </div>
-                  <Switch
-                    id="showSuggestions"
-                    checked={draftSettings.show_suggestions_after_chat}
-                    onCheckedChange={(value) => updateSetting("show_suggestions_after_chat", value)}
-                  />
-                </div>
-              </div>
+              <ChatBehaviorSettings
+                draftSettings={draftSettings}
+                updateSetting={updateSetting}
+              />
               
-              <div className="space-y-2">
-                <label htmlFor="placeholder" className="block text-sm font-medium">
-                  Message placeholder
-                </label>
-                <Input
-                  id="placeholder"
-                  placeholder="Message..."
-                  value={draftSettings.message_placeholder}
-                  onChange={(e) => updateSetting("message_placeholder", e.target.value)}
-                  className="max-w-md"
-                  preventFocusScroll={true}
-                />
-              </div>
+              <ThemeAndColorSettings
+                draftSettings={draftSettings}
+                updateSetting={updateSetting}
+              />
               
-              <div className="flex items-center justify-between">
-                <div>
-                  <label htmlFor="collectFeedback" className="text-sm font-medium">
-                    Collect user feedback
-                  </label>
-                </div>
-                <Switch
-                  id="collectFeedback"
-                  checked={draftSettings.show_feedback}
-                  onCheckedChange={(value) => updateSetting("show_feedback", value)}
-                />
-              </div>
+              <ProfileSettings
+                draftSettings={draftSettings}
+                updateSetting={updateSetting}
+                onFileSelect={handleFileSelect}
+              />
               
-              <div className="flex items-center justify-between">
-                <div>
-                  <label htmlFor="regenerateMessages" className="text-sm font-medium">
-                    Regenerate messages
-                  </label>
-                </div>
-                <Switch
-                  id="regenerateMessages"
-                  checked={draftSettings.allow_regenerate}
-                  onCheckedChange={(value) => updateSetting("allow_regenerate", value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="footer" className="block text-sm font-medium">
-                  Footer
-                </label>
-                <Textarea
-                  id="footer"
-                  value={draftSettings.footer || ""}
-                  onChange={(e) => updateSetting("footer", e.target.value)}
-                  placeholder="You can use this to add a disclaimer or a link to your privacy policy."
-                  className="h-24"
-                  preventFocusScroll={true}
-                />
-                <p className="text-xs text-gray-500">{(draftSettings.footer || "").length}/200 characters</p>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="theme" className="block text-sm font-medium">
-                  Theme
-                </label>
-                <Select 
-                  value={draftSettings.theme} 
-                  onValueChange={(value) => updateSetting("theme", value as 'light' | 'dark' | 'system')}
-                >
-                  <SelectTrigger className="max-w-md">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  User message color
-                </label>
-                <ColorPicker
-                  color={draftSettings.user_message_color || "#000000"}
-                  onChange={(color) => updateSetting("user_message_color", color)}
-                  onReset={() => updateSetting("user_message_color", "#000000")}
-                />
-                
-                <div className="flex items-center mt-2">
-                  <Switch
-                    id="syncColors"
-                    checked={syncColorWithHeader}
-                    onCheckedChange={handleSyncChange}
-                    className="mr-2"
-                  />
-                  <label htmlFor="syncColors" className="text-sm font-medium">
-                    Sync user message color with agent header
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Chat bubble button color
-                </label>
-                <ColorPicker
-                  color={draftSettings.bubble_color || "#000000"}
-                  onChange={handleBubbleColorChange}
-                  onReset={() => updateSetting("bubble_color", "#000000")}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="displayName" className="block text-sm font-medium">
-                  Display name
-                </label>
-                <Input
-                  id="displayName"
-                  value={draftSettings.display_name}
-                  onChange={(e) => updateSetting("display_name", e.target.value)}
-                  className="max-w-md"
-                  preventFocusScroll={true}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Profile picture
-                </label>
-                <ImageUpload
-                  currentImage={draftSettings.profile_picture || undefined}
-                  onUpload={(file) => handleFileSelect(file, "profile")}
-                  onRemove={() => updateSetting("profile_picture", null)}
-                  shape="circle"
-                  size="md"
-                />
-                <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB. Background will be automatically removed.</p>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Chat icon
-                </label>
-                <ImageUpload
-                  currentImage={draftSettings.chat_icon || undefined}
-                  onUpload={(file) => handleFileSelect(file, "icon")}
-                  onRemove={() => updateSetting("chat_icon", null)}
-                  shape="circle"
-                  size="md"
-                />
-                <p className="text-xs text-gray-500">Supports JPG, PNG, and SVG files up to 1MB. Background will be automatically removed.</p>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="bubbleAlign" className="block text-sm font-medium">
-                  Align chat bubble button
-                </label>
-                <Select 
-                  value={draftSettings.bubble_position} 
-                  onValueChange={(value) => updateSetting("bubble_position", value as 'left' | 'right')}
-                >
-                  <SelectTrigger className="max-w-md">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="left">Left</SelectItem>
-                    <SelectItem value="right">Right</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="autoShowDelay" className="block text-sm font-medium">
-                  Auto show initial messages pop-ups after
-                </label>
-                <div className="flex items-center space-x-2 max-w-md">
-                  <Input
-                    id="autoShowDelay"
-                    type="number"
-                    value={draftSettings.auto_show_delay.toString()}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value);
-                      if (!isNaN(value)) {
-                        updateSetting("auto_show_delay", value);
-                      }
-                    }}
-                    preventFocusScroll={true}
-                  />
-                  <span className="text-sm text-gray-500">seconds (negative to disable)</span>
-                </div>
-              </div>
+              <BubbleSettings
+                draftSettings={draftSettings}
+                updateSetting={updateSetting}
+              />
               
               <div className="flex justify-end space-x-2">
                 {hasUnsavedChanges && (
@@ -602,56 +186,11 @@ const ChatInterfaceSettings: React.FC = () => {
       </div>
       
       {/* Right panel - Chat Preview */}
-      <div className="w-full md:w-2/5 border-l">
-        <div className="p-6 sticky top-0">
-          <div className={`w-full max-w-md mx-auto h-[700px] rounded-lg shadow overflow-hidden flex flex-col ${
-            currentTheme === 'dark' ? 'bg-gray-900' : 'bg-white'
-          }`}>
-            <div className={`text-center py-2 text-sm border-b ${
-              currentTheme === 'dark' ? 'text-gray-400 border-gray-700' : 'text-gray-500 border-gray-200'
-            }`}>
-              Chat Preview {hasUnsavedChanges && <span className="text-yellow-600">(Draft)</span>}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <ChatSection 
-                initialMessages={previewMessages}
-                agentName={draftSettings.display_name}
-                placeholder={draftSettings.message_placeholder}
-                suggestedMessages={draftSettings.suggested_messages.map(msg => msg.text)}
-                showSuggestions={draftSettings.show_suggestions_after_chat}
-                showFeedback={draftSettings.show_feedback}
-                allowRegenerate={draftSettings.allow_regenerate}
-                theme={currentTheme}
-                profilePicture={draftSettings.profile_picture || undefined}
-                footer={draftSettings.footer || undefined}
-                userMessageColor={draftSettings.user_message_color}
-                headerColor={headerColor}
-                hideUserAvatar={true}
-              />
-            </div>
-          </div>
-          
-          {/* Chat bubble preview with black default */}
-          <div className="mt-4 flex justify-end">
-            <div 
-              className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
-              style={{ backgroundColor: draftSettings.bubble_color || "#000000" }}
-            >
-              {draftSettings.chat_icon ? (
-                <img 
-                  src={draftSettings.chat_icon} 
-                  alt="Chat Icon"
-                  className="h-full w-full object-cover" 
-                />
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                </svg>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <ChatPreview
+        draftSettings={draftSettings}
+        hasUnsavedChanges={hasUnsavedChanges}
+        previewMessages={previewMessages}
+      />
 
       {/* Image Crop Dialog */}
       <ImageCropper
@@ -661,36 +200,6 @@ const ChatInterfaceSettings: React.FC = () => {
         onCancel={handleCropCancel}
         isOpen={showCropDialog.visible}
       />
-      
-      {/* Global CSS for scroll prevention */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          .no-scroll-page * {
-            scroll-behavior: auto !important;
-            scroll-margin: 0 !important;
-            scroll-margin-top: 0 !important;
-            scroll-margin-bottom: 0 !important;
-            overscroll-behavior: contain !important;
-          }
-          
-          .no-scroll-page input:focus,
-          .no-scroll-page textarea:focus,
-          .no-scroll-page select:focus,
-          .no-scroll-page button:focus {
-            scroll-behavior: auto !important;
-            scroll-margin: 0 !important;
-          }
-          
-          .no-scroll-page input,
-          .no-scroll-page textarea,
-          .no-scroll-page select,
-          .no-scroll-page button {
-            scroll-margin: 0 !important;
-            scroll-margin-top: 0 !important;
-            scroll-margin-bottom: 0 !important;
-          }
-        `
-      }} />
     </div>
   );
 };
