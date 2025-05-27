@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { conversationService, Conversation, Message } from "@/services/conversationService";
 import { ChatMessage } from "@/types/chatInterface";
@@ -18,7 +17,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
   const createConversationOnFirstMessage = async () => {
     if (!agentId || conversationCreated) return null;
 
-    console.log('Creating conversation on first message for agentId:', agentId, 'with source:', source);
+    console.log('🆕 Creating conversation on first message for agentId:', agentId, 'with source:', source);
     const newSessionId = generateSessionId();
     sessionIdRef.current = newSessionId;
 
@@ -26,18 +25,18 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       const conversation = await conversationService.createConversation(
         agentId,
         newSessionId,
-        source
+        source // Use the source parameter passed to the hook
       );
       
       if (conversation) {
-        console.log('Conversation created successfully:', conversation.id, 'with source:', source);
+        console.log('✅ Conversation created successfully:', conversation.id, 'with source:', conversation.source);
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
         return conversation;
       }
     } catch (error) {
-      console.error('Error creating conversation:', error);
+      console.error('❌ Error creating conversation:', error);
     }
     return null;
   };
@@ -48,7 +47,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       return;
     }
 
-    console.log('Starting new conversation for agentId:', agentId, 'with source:', source);
+    console.log('🚀 Starting new conversation for agentId:', agentId, 'with source:', source);
     const newSessionId = generateSessionId();
     sessionIdRef.current = newSessionId;
 
@@ -56,17 +55,17 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       const conversation = await conversationService.createConversation(
         agentId,
         newSessionId,
-        source
+        source // Use the source parameter passed to the hook
       );
       
       if (conversation) {
-        console.log('New conversation started:', conversation.id, 'with source:', source);
+        console.log('✅ New conversation started:', conversation.id, 'with source:', conversation.source);
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
       }
     } catch (error) {
-      console.error('Error starting new conversation:', error);
+      console.error('❌ Error starting new conversation:', error);
     }
   };
 
@@ -102,21 +101,21 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
     // Create conversation on first user message if it doesn't exist
     let conversation = currentConversation;
     if (!conversation && !isAgent) {
-      console.log('No conversation exists, creating one for first user message with source:', source);
+      console.log('📝 No conversation exists, creating one for first user message with source:', source);
       conversation = await createConversationOnFirstMessage();
       if (!conversation) {
-        console.error('Failed to create conversation for message');
+        console.error('❌ Failed to create conversation for message');
         return;
       }
     }
 
     if (!conversation) {
-      console.warn('No conversation available to save message to');
+      console.warn('⚠️ No conversation available to save message to');
       return;
     }
 
     try {
-      console.log('Saving message to conversation:', conversation.id, 'isAgent:', isAgent, 'source:', source);
+      console.log('💾 Saving message to conversation:', conversation.id, 'isAgent:', isAgent, 'source:', conversation.source);
       await conversationService.addMessage(conversation.id, content, isAgent);
       
       // Update conversation title with first user message

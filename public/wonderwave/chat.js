@@ -1,4 +1,3 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { doesAgentExist } from './agentVisibility.js';
@@ -98,12 +97,14 @@ export function createChatIframe(config) {
   // Create iframe
   iframe = document.createElement('iframe');
   
-  // Build URL with parameters - add source=bubble to identify bubble widget conversations
+  // Build URL with parameters - ALWAYS add source=bubble for bubble widget
   let iframeSrc = `https://${config.cdnDomain}/embed/${config.agentId}`;
   
-  // Always add source=bubble for bubble widget
+  // Always add source=bubble for bubble widget - this is crucial for proper source detection
   const urlParams = new URLSearchParams();
   urlParams.set('source', 'bubble');
+  
+  log('🎯 Setting iframe source parameter to: bubble');
   
   // Append identity hash params if they exist
   if (config.identityHash && config.userId) {
@@ -120,6 +121,8 @@ export function createChatIframe(config) {
   urlParams.set('_t', Date.now().toString());
   
   iframeSrc += '?' + urlParams.toString();
+  
+  log('🔗 Final iframe URL:', iframeSrc);
   
   // Apply iframe styles
   Object.assign(iframe.style, {
