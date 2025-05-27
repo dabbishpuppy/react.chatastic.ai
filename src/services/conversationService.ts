@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -148,7 +147,18 @@ export const conversationService = {
       return null;
     }
 
-    return data;
+    // Apply the same type validation as in getMessages
+    const message: Message = {
+      id: data.id,
+      conversation_id: data.conversation_id,
+      content: data.content,
+      is_agent: data.is_agent,
+      timestamp: data.timestamp,
+      created_at: data.created_at,
+      feedback: validateFeedback(data.feedback)
+    };
+
+    return message;
   },
 
   // Get messages for a conversation
