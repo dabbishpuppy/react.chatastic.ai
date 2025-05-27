@@ -157,15 +157,23 @@ export const conversationService = {
     }
 
     // Type the data properly to ensure feedback is correctly typed
-    return (data || []).map(msg => ({
-      id: msg.id,
-      conversation_id: msg.conversation_id,
-      content: msg.content,
-      is_agent: msg.is_agent,
-      timestamp: msg.timestamp,
-      created_at: msg.created_at,
-      feedback: msg.feedback === 'like' ? 'like' : msg.feedback === 'dislike' ? 'dislike' : null
-    }));
+    return (data || []).map(msg => {
+      // Properly type-guard the feedback field
+      let feedback: 'like' | 'dislike' | null = null;
+      if (msg.feedback === 'like' || msg.feedback === 'dislike') {
+        feedback = msg.feedback;
+      }
+
+      return {
+        id: msg.id,
+        conversation_id: msg.conversation_id,
+        content: msg.content,
+        is_agent: msg.is_agent,
+        timestamp: msg.timestamp,
+        created_at: msg.created_at,
+        feedback: feedback
+      };
+    });
   },
 
   // Update conversation title

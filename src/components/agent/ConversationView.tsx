@@ -118,7 +118,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Create a complete timeline including initial message if it exists
+  // Create a complete timeline starting with initial message
   const fullConversationTimeline = React.useMemo(() => {
     const timeline = [];
     
@@ -128,7 +128,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         id: 'initial-message',
         role: 'assistant' as const,
         content: initialMessage,
-        timestamp: new Date(Date.now() - 1000).toISOString(),
+        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day before to ensure it's first
         feedback: undefined
       });
     }
@@ -136,7 +136,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     // Add all actual conversation messages
     timeline.push(...localMessages);
     
-    // Sort by timestamp to ensure proper order
+    // Sort by timestamp to ensure proper order (initial message should be first)
     return timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [localMessages, initialMessage]);
 
