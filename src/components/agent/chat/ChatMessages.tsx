@@ -3,7 +3,6 @@ import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatMessageComponent from "./ChatMessage";
-import LoadingDots from "./LoadingDots";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -60,23 +59,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
         />
       );
     })}
-    
-    {isTyping && (
-      <div className="flex mb-4">
-        <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-          {profilePicture ? (
-            <AvatarImage src={profilePicture} alt={agentName} />
-          ) : (
-            <AvatarFallback className="bg-gray-200 text-gray-600">
-              {agentName.charAt(0)}
-            </AvatarFallback>
-          )}
-        </Avatar>
-        <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.agentMessage}`}>
-          <LoadingDots />
-        </div>
-      </div>
-    )}
     
     {messagesEndRef && <div ref={messagesEndRef} />}
   </>

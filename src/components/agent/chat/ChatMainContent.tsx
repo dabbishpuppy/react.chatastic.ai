@@ -66,7 +66,7 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
                 console.log('🎨 Rendering lead form widget with key:', leadFormKey);
                 return (
                   <InlineLeadForm
-                    key={`lead-form-${leadFormKey}`}
+                    key={`lead-form-${leadFormKey}-${index}`}
                     agentId={agentId}
                     conversationId={conversationId}
                     title={leadSettings.title || 'Get in touch with us'}

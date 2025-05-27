@@ -18,7 +18,6 @@ interface InlineLeadFormProps {
   phonePlaceholder: string;
   onSubmit: () => void;
   theme?: 'light' | 'dark';
-  key?: number; // Add key prop for force re-rendering
 }
 
 const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
@@ -41,8 +40,14 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form data when field visibility changes
+  // Reset form data and force re-render when field visibility changes
   useEffect(() => {
+    console.log('🔄 InlineLeadForm: Field visibility changed', {
+      collectName,
+      collectEmail,
+      collectPhone
+    });
+    
     setFormData(prev => ({
       name: collectName ? prev.name : '',
       email: collectEmail ? prev.email : '',
@@ -145,11 +150,12 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
     return null;
   }
 
-  console.log('📋 InlineLeadForm: Rendering with fields:', {
+  console.log('📋 InlineLeadForm: Rendering with current settings:', {
     collectName,
     collectEmail,
     collectPhone,
-    title
+    title,
+    hasAnyFields
   });
 
   return (
@@ -157,7 +163,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
       <Card className={`max-w-md mx-auto ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <CardHeader className="pb-3">
           <CardTitle className={`text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
-            {title || 'Get in touch with us'}
+            {title}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -166,7 +172,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
               <div>
                 <Input
                   type="text"
-                  placeholder={namePlaceholder || 'Full name'}
+                  placeholder={namePlaceholder}
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   className={`text-sm ${isDark ? 'bg-gray-700 border-gray-600 text-white' : ''}`}
@@ -178,7 +184,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
               <div>
                 <Input
                   type="email"
-                  placeholder={emailPlaceholder || 'Email'}
+                  placeholder={emailPlaceholder}
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   required
@@ -191,7 +197,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
               <div>
                 <Input
                   type="tel"
-                  placeholder={phonePlaceholder || 'Phone'}
+                  placeholder={phonePlaceholder}
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   className={`text-sm ${isDark ? 'bg-gray-700 border-gray-600 text-white' : ''}`}
