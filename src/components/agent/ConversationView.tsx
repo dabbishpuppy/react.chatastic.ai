@@ -6,6 +6,7 @@ import { Copy, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Conversation } from "@/components/activity/ConversationData";
 import { getContrastColor } from "@/components/agent/chat/ThemeConfig";
+import { analyticsService } from "@/services/analyticsService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +44,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   conversationSource
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isUpdatingFeedback, setIsUpdatingFeedback] = useState<string | null>(null);
 
   const handleCopy = async (content: string) => {
     try {
@@ -58,6 +60,50 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         duration: 2000,
         variant: "destructive"
       });
+    }
+  };
+
+  const handleFeedback = async (messageId: string, type: "like" | "dislike", currentFeedback?: "like" | "dislike") => {
+    if (isUpdatingFeedback === messageId) return;
+
+    setIsUpdatingFeedback(messageId);
+    try {
+      // Toggle feedback: if same type is clicked, remove it
+      const newFeedback = currentFeedback === type ? null : type;
+      
+      const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
+      
+      if (success) {
+        // Update the local state to reflect the change
+        const updatedMessages = conversation.messages.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, feedback: newFeedback as 'like' | 'dislike' | undefined }
+            : msg
+        );
+        
+        // Update the conversation object
+        conversation.messages = updatedMessages;
+        
+        toast({
+          description: newFeedback ? `Message ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
+          duration: 2000,
+        });
+      } else {
+        toast({
+          description: "Failed to update feedback",
+          duration: 2000,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      toast({
+        description: "Failed to update feedback",
+        duration: 2000,
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdatingFeedback(null);
     }
   };
 
@@ -112,7 +158,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages - using the same layout as ChatMessages component */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {conversation.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -120,7 +166,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
           </div>
         ) : (
           conversation.messages.map((message, index) => (
-            <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={message.id || index} className={`flex mb-4 ${message.role === 'user' ? 'justify-end' : ''}`}>
               {message.role === 'assistant' && (
                 <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
                   {profilePicture ? (
@@ -144,31 +190,38 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                   {message.content}
                 </div>
                 
-                {/* Feedback buttons for assistant messages */}
+                {/* Feedback buttons for assistant messages - positioned OUTSIDE the bubble */}
                 {message.role === 'assistant' && (
                   <div className="flex items-center space-x-1 mt-2">
-                    <div
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
+                    {/* Like button */}
+                    <button
+                      onClick={() => message.id && message.id !== 'initial-message' && handleFeedback(message.id, "like", message.feedback)}
+                      disabled={isUpdatingFeedback === message.id || message.id === 'initial-message'}
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
                         message.feedback === "like" 
-                          ? "bg-green-100 text-green-600" 
-                          : "bg-gray-100 text-gray-400"
-                      }`}
-                      title={message.feedback === "like" ? "Liked" : "Like"}
+                          ? "bg-green-100 text-green-600 hover:bg-green-200" 
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                      } disabled:opacity-50`}
+                      title="Like"
                     >
                       <ThumbsUp size={14} />
-                    </div>
+                    </button>
                     
-                    <div
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
+                    {/* Dislike button */}
+                    <button
+                      onClick={() => message.id && message.id !== 'initial-message' && handleFeedback(message.id, "dislike", message.feedback)}
+                      disabled={isUpdatingFeedback === message.id || message.id === 'initial-message'}
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
                         message.feedback === "dislike" 
-                          ? "bg-red-100 text-red-600" 
-                          : "bg-gray-100 text-gray-400"
-                      }`}
-                      title={message.feedback === "dislike" ? "Disliked" : "Dislike"}
+                          ? "bg-red-100 text-red-600 hover:bg-red-200" 
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                      } disabled:opacity-50`}
+                      title="Dislike"
                     >
                       <ThumbsDown size={14} />
-                    </div>
+                    </button>
                     
+                    {/* Copy button */}
                     <button
                       onClick={() => handleCopy(message.content)}
                       className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"

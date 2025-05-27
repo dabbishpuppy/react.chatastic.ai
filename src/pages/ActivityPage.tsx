@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
@@ -10,6 +9,7 @@ import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const ActivityPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -65,6 +65,38 @@ const ActivityPage: React.FC = () => {
     sync_colors: false,
     primary_color: '#000000'
   };
+
+  // Real-time subscription for messages
+  useEffect(() => {
+    if (!agentId) return;
+
+    const channel = supabase
+      .channel('messages-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        async (payload) => {
+          console.log('Real-time message update:', payload);
+          
+          // If we have a selected conversation, refresh it
+          if (selectedConversation) {
+            await handleConversationClick(selectedConversation.id);
+          }
+          
+          // Refresh the conversations list to update snippets
+          await loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [agentId, selectedConversation?.id]);
 
   useEffect(() => {
     if (agentId) {
@@ -158,14 +190,31 @@ const ActivityPage: React.FC = () => {
   const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation> => {
     const messages = await conversationService.getMessages(dbConversation.id);
     
+    // Create the UI messages array starting with the initial message if we have chat settings
+    const uiMessages = [];
+    
+    // Add initial message as the first assistant message (just like in the live chat)
+    if (chatSettings?.initial_message) {
+      uiMessages.push({
+        id: 'initial-message',
+        role: 'assistant' as const,
+        content: chatSettings.initial_message,
+        timestamp: dbConversation.created_at,
+        feedback: undefined
+      });
+    }
+    
     // Convert database messages to UI messages with proper feedback handling
-    const uiMessages = messages.map(msg => ({
+    const dbUIMessages = messages.map(msg => ({
       id: msg.id,
       role: msg.is_agent ? 'assistant' : 'user' as 'assistant' | 'user',
       content: msg.content,
       timestamp: msg.timestamp,
       feedback: msg.feedback as 'like' | 'dislike' | undefined
     }));
+    
+    // Add all the actual conversation messages after the initial message
+    uiMessages.push(...dbUIMessages);
 
     const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
     const title = dbConversation.title || `Chat from ${daysAgo}`;
@@ -174,6 +223,10 @@ const ActivityPage: React.FC = () => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       const content = lastMessage.content;
+      snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
+    } else if (chatSettings?.initial_message) {
+      // If no messages but we have initial message, use that for snippet
+      const content = chatSettings.initial_message;
       snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
     }
 
@@ -220,7 +273,6 @@ const ActivityPage: React.FC = () => {
     deleteConversation(conversationId);
   };
 
-  // Helper function to convert 'system' theme to 'light' or 'dark'
   const getConversationTheme = (theme: 'light' | 'dark' | 'system'): 'light' | 'dark' => {
     if (theme === 'system') {
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
