@@ -22,7 +22,13 @@ export const useLeadSettings = (agentId: string) => {
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchSettings = async () => {
-    if (!agentId) return;
+    // Don't fetch if agentId is empty or undefined
+    if (!agentId || agentId === "undefined") {
+      console.log('🔍 useLeadSettings: No valid agentId provided, keeping loading state');
+      return;
+    }
+
+    console.log('🔍 useLeadSettings: Fetching settings for agentId:', agentId);
 
     try {
       const { data, error } = await supabase
@@ -37,9 +43,11 @@ export const useLeadSettings = (agentId: string) => {
       }
 
       if (data) {
+        console.log('🔍 useLeadSettings: Found existing settings:', data);
         setSettings(data);
       } else {
-        // Create default settings
+        console.log('🔍 useLeadSettings: No settings found, creating default settings');
+        // Create default settings only when we have a valid agentId
         const defaultSettings: Omit<LeadSettings, 'id'> = {
           agent_id: agentId,
           enabled: false,
@@ -61,7 +69,10 @@ export const useLeadSettings = (agentId: string) => {
   };
 
   const saveSettings = async (updatedSettings: Partial<LeadSettings>) => {
-    if (!agentId) return false;
+    if (!agentId || agentId === "undefined") {
+      console.error('Cannot save settings without valid agentId');
+      return false;
+    }
 
     setIsSaving(true);
     
@@ -108,6 +119,16 @@ export const useLeadSettings = (agentId: string) => {
   };
 
   useEffect(() => {
+    // Reset state when agentId changes
+    if (!agentId || agentId === "undefined") {
+      console.log('🔍 useLeadSettings: AgentId is empty, resetting state');
+      setSettings(null);
+      setIsLoading(true);
+      return;
+    }
+
+    console.log('🔍 useLeadSettings: AgentId changed to:', agentId);
+    setIsLoading(true);
     fetchSettings();
   }, [agentId]);
 
