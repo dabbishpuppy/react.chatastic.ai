@@ -94,19 +94,22 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
       console.log('Setting start date, keeping picker open');
       setSelectionMode('end');
       // Do NOT close the picker or apply filter yet
-    } else if (selectionMode === 'end' && range.to) {
-      // Second click: selecting end date - complete the selection
-      console.log('Both dates selected, applying filter and closing picker');
-      setSelectionMode('complete');
-      onDateRangeChange(
-        format(range.from, 'yyyy-MM-dd'),
-        format(range.to, 'yyyy-MM-dd')
-      );
-      setIsOpen(false);
-    } else if (selectionMode === 'end' && !range.to) {
-      // User clicked a new start date while in end mode - restart selection
-      console.log('New start date selected, resetting to end mode');
-      setSelectionMode('end');
+    } else if (selectionMode === 'end') {
+      // Second click: we're in end mode, check if we have a complete range
+      if (range.from && range.to) {
+        // Both dates are present - complete the selection
+        console.log('Both dates selected, applying filter and closing picker');
+        setSelectionMode('complete');
+        onDateRangeChange(
+          format(range.from, 'yyyy-MM-dd'),
+          format(range.to, 'yyyy-MM-dd')
+        );
+        setIsOpen(false);
+      } else if (range.from && !range.to) {
+        // User clicked a new start date while in end mode - restart selection
+        console.log('New start date selected, resetting to end mode');
+        setSelectionMode('end');
+      }
     }
   };
 
