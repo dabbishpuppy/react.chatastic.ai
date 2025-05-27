@@ -173,17 +173,6 @@ export function handleIframeMessage(event) {
   // Handle different message types
   if (event.data && event.data.type) {
     switch (event.data.type) {
-      case 'resize-iframe':
-        // Handle dynamic height adjustments
-        // This is optional - for iframe height auto-adjusting
-        if (event.data.height && event.data.agentId === window.wonderwaveConfig.agentId) {
-          const container = document.getElementById('wonderwave-container');
-          if (container) {
-            container.style.height = `${event.data.height}px`;
-          }
-        }
-        break;
-        
       case 'close-widget':
         // Handle close button click inside iframe
         closeChat();

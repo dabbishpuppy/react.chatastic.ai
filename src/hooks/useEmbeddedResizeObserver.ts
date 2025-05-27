@@ -21,31 +21,6 @@ export const useEmbeddedResizeObserver = (
       }
     };
     
-    // Create a ResizeObserver to detect content changes
-    if (window.ResizeObserver) {
-      const resizeObserver = new ResizeObserver(() => {
-        sendHeightToParent();
-      });
-      
-      if (containerRef.current) {
-        resizeObserver.observe(containerRef.current);
-      }
-      
-      // Also observe the body element for any changes
-      resizeObserver.observe(document.body);
-      
-      return () => {
-        if (containerRef.current) {
-          resizeObserver.unobserve(containerRef.current);
-        }
-        resizeObserver.unobserve(document.body);
-        resizeObserver.disconnect();
-      };
-    }
-    
-    // Fallback for browsers without ResizeObserver
-    const interval = setInterval(sendHeightToParent, 500);
-    
     // Send initial height after render
     setTimeout(sendHeightToParent, 100);
     
@@ -59,7 +34,6 @@ export const useEmbeddedResizeObserver = (
     window.addEventListener('message', handleMessage);
     
     return () => {
-      clearInterval(interval);
       window.removeEventListener('message', handleMessage);
     };
   }, [agentId, containerRef]);

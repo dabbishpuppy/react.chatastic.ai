@@ -14,38 +14,36 @@ export const useEmbeddedStyles = () => {
         padding: 0;
       }
       
-      /* Enhanced embedded chat container that fills available space */
+      /* Embedded chat container */
       .embedded-chat-container {
-        height: 100%;
-        min-height: 100vh;
+        height: 100vh;
         width: 100%;
-        overflow: auto;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
       }
 
-      /* Fix ScrollArea overflow issues with enhanced visibility */
+      /* Fix ScrollArea overflow issues */
       [data-radix-scroll-area-viewport] {
         overflow-y: auto !important;
         overflow-x: hidden !important;
         scroll-behavior: smooth !important;
       }
       
-      /* Enhanced scrollbars for better visibility */
+      /* Custom scrollbars */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+        width: 6px;
+        height: 6px;
       }
       
       ::-webkit-scrollbar-track {
         background: #f1f1f1;
-        border-radius: 10px;
+        border-radius: 3px;
       }
       
       ::-webkit-scrollbar-thumb {
         background: #888;
-        border-radius: 10px;
+        border-radius: 3px;
       }
       
       ::-webkit-scrollbar-thumb:hover {
