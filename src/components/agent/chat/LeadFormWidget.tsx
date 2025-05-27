@@ -86,20 +86,39 @@ const LeadFormWidget: React.FC<LeadFormWidgetProps> = ({
         return;
       }
 
+      console.log('✅ Lead saved successfully:', leadData);
+
       // Send email notification - don't block on this
       try {
         console.log('📧 Triggering lead notification email for agent:', agentId);
-        await supabase.functions.invoke('send-lead-notification', {
+        console.log('📧 Function payload:', {
+          agentId,
+          leadData,
+          conversationId
+        });
+        
+        const { data: functionResult, error: functionError } = await supabase.functions.invoke('send-lead-notification', {
           body: {
             agentId,
             leadData,
             conversationId
           }
         });
-        console.log('📧 Lead notification triggered successfully');
+
+        if (functionError) {
+          console.error('📧 Edge function error:', functionError);
+          throw functionError;
+        }
+
+        console.log('📧 Lead notification triggered successfully:', functionResult);
       } catch (emailError) {
         // Log the error but don't fail the lead submission
-        console.error('Email notification failed (non-blocking):', emailError);
+        console.error('📧 Email notification failed (non-blocking):', emailError);
+        console.error('📧 Error details:', {
+          message: emailError.message,
+          code: emailError.code,
+          details: emailError.details
+        });
       }
 
       toast({
