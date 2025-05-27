@@ -63,45 +63,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     }
   };
 
-  const handleFeedback = async (messageId: string, feedbackType: "like" | "dislike") => {
-    const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
-    if (messageIndex === -1) return;
-
-    const currentMessage = localMessages[messageIndex];
-    const newFeedback = currentMessage.feedback === feedbackType ? null : feedbackType;
-    
-    try {
-      const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
-      
-      if (success) {
-        const updatedMessages = [...localMessages];
-        updatedMessages[messageIndex] = {
-          ...currentMessage,
-          feedback: newFeedback || undefined
-        };
-        setLocalMessages(updatedMessages);
-        
-        toast({
-          description: newFeedback ? `Feedback ${feedbackType === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
-          duration: 2000,
-        });
-      } else {
-        toast({
-          description: "Failed to update feedback",
-          duration: 2000,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Error updating feedback:', error);
-      toast({
-        description: "Failed to update feedback",
-        duration: 2000,
-        variant: "destructive"
-      });
-    }
-  };
-
   const getContrastColor = (backgroundColor: string): string => {
     if (!backgroundColor) return '#000000';
     const hex = backgroundColor.replace('#', '');
@@ -212,36 +173,34 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                   {message.content}
                 </div>
                 
-                {/* Action buttons for assistant messages */}
+                {/* Action buttons for assistant messages - display-only feedback buttons */}
                 {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
                   <div className="flex items-center space-x-1 mt-2">
-                    {/* Like button */}
-                    <button
-                      onClick={() => handleFeedback(message.id, "like")}
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                    {/* Like button - display-only */}
+                    <div
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
                         message.feedback === "like" 
-                          ? "bg-green-100 text-green-600 hover:bg-green-200" 
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                          ? "bg-green-100 text-green-600" 
+                          : "bg-gray-100 text-gray-400"
                       }`}
-                      title="Like"
+                      title={message.feedback === "like" ? "Liked" : "Like"}
                     >
                       <ThumbsUp size={14} />
-                    </button>
+                    </div>
                     
-                    {/* Dislike button */}
-                    <button
-                      onClick={() => handleFeedback(message.id, "dislike")}
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                    {/* Dislike button - display-only */}
+                    <div
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
                         message.feedback === "dislike" 
-                          ? "bg-red-100 text-red-600 hover:bg-red-200" 
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                          ? "bg-red-100 text-red-600" 
+                          : "bg-gray-100 text-gray-400"
                       }`}
-                      title="Dislike"
+                      title={message.feedback === "dislike" ? "Disliked" : "Dislike"}
                     >
                       <ThumbsDown size={14} />
-                    </button>
+                    </div>
                     
-                    {/* Copy button */}
+                    {/* Copy button - still functional */}
                     <button
                       onClick={() => handleCopy(message.content)}
                       className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
