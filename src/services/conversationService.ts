@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -64,33 +65,44 @@ export const conversationService = {
 
   // Get recent conversations for an agent (only those with messages)
   async getRecentConversations(agentId: string, limit: number = 10): Promise<Conversation[]> {
-    const { data, error } = await supabase
+    // First get all conversations for the agent
+    const { data: conversations, error: conversationError } = await supabase
       .from('conversations')
-      .select(`
-        *,
-        message_count:messages(count)
-      `)
+      .select('*')
       .eq('agent_id', agentId)
-      .having('message_count', 'gt', 0)
       .order('updated_at', { ascending: false })
-      .limit(limit);
+      .limit(limit * 2); // Get more than needed to account for filtering
 
-    if (error) {
-      console.error('Error fetching conversations:', error);
+    if (conversationError) {
+      console.error('Error fetching conversations:', conversationError);
       return [];
     }
 
-    // Filter to only return conversations that have at least one message
-    const conversationsWithMessages = data?.filter(conv => {
-      const count = Array.isArray(conv.message_count) ? conv.message_count.length : conv.message_count;
-      return count > 0;
-    }) || [];
+    if (!conversations || conversations.length === 0) {
+      return [];
+    }
+
+    // Filter conversations that have at least one message
+    const conversationsWithMessages: Conversation[] = [];
     
-    // Remove the message_count property from the result
-    return conversationsWithMessages.map(conv => {
-      const { message_count, ...conversation } = conv;
-      return conversation as Conversation;
-    });
+    for (const conversation of conversations) {
+      const { data: messages, error: messageError } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversation.id)
+        .limit(1);
+
+      if (!messageError && messages && messages.length > 0) {
+        conversationsWithMessages.push(conversation as Conversation);
+        
+        // Stop when we have enough conversations
+        if (conversationsWithMessages.length >= limit) {
+          break;
+        }
+      }
+    }
+
+    return conversationsWithMessages;
   },
 
   // Get conversation by ID
