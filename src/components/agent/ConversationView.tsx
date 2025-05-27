@@ -1,12 +1,13 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Copy, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { Conversation } from "@/components/activity/ConversationData";
 import { getContrastColor } from "@/components/agent/chat/ThemeConfig";
-import { analyticsService } from "@/services/analyticsService";
+import { supabase } from "@/integrations/supabase/client";
+import { conversationLoader, ConversationMessage } from "@/services/conversationLoader";
+import SharedChatMessage from "@/components/agent/chat/SharedChatMessage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface ConversationViewProps {
-  conversation: Conversation;
+  conversation: {
+    id: string;
+    title: string;
+    daysAgo: string;
+    source: string;
+    messages?: ConversationMessage[];
+  };
   onClose: () => void;
   onDelete: () => void;
   theme?: 'light' | 'dark';
@@ -29,6 +36,7 @@ interface ConversationViewProps {
   showDeleteButton?: boolean;
   conversationStatus?: string;
   conversationSource?: string;
+  agentId?: string;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
@@ -41,70 +49,134 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   userMessageColor = '#000000',
   showDeleteButton = false,
   conversationStatus,
-  conversationSource
+  conversationSource,
+  agentId
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isUpdatingFeedback, setIsUpdatingFeedback] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ConversationMessage[]>(conversation.messages || []);
+  const [isLoading, setIsLoading] = useState(!conversation.messages);
 
-  const handleCopy = async (content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      toast({
-        description: "Copied to clipboard!",
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-      toast({
-        description: "Failed to copy to clipboard",
-        duration: 2000,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleFeedback = async (messageId: string, type: "like" | "dislike", currentFeedback?: "like" | "dislike") => {
-    if (isUpdatingFeedback === messageId) return;
-
-    setIsUpdatingFeedback(messageId);
-    try {
-      // Toggle feedback: if same type is clicked, remove it
-      const newFeedback = currentFeedback === type ? null : type;
+  // Load conversation messages with greeting if not provided
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (conversation.messages || !conversation.id || !agentId) {
+        if (conversation.messages) {
+          setMessages(conversation.messages);
+        }
+        setIsLoading(false);
+        return;
+      }
       
-      const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
-      
-      if (success) {
-        // Update the local state to reflect the change
-        const updatedMessages = conversation.messages.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, feedback: newFeedback as 'like' | 'dislike' | undefined }
-            : msg
+      setIsLoading(true);
+      try {
+        const loadedMessages = await conversationLoader.loadConversationWithGreeting(
+          conversation.id,
+          agentId
         );
-        
-        // Update the conversation object
-        conversation.messages = updatedMessages;
-        
+        setMessages(loadedMessages);
+      } catch (error) {
+        console.error('Error loading conversation messages:', error);
         toast({
-          description: newFeedback ? `Message ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
-          duration: 2000,
-        });
-      } else {
-        toast({
-          description: "Failed to update feedback",
+          description: "Failed to load conversation messages",
           duration: 2000,
           variant: "destructive"
         });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error updating feedback:', error);
-      toast({
-        description: "Failed to update feedback",
-        duration: 2000,
-        variant: "destructive"
-      });
-    } finally {
-      setIsUpdatingFeedback(null);
-    }
+    };
+
+    loadMessages();
+  }, [conversation.id, conversation.messages, agentId]);
+
+  // Real-time subscription for new messages
+  useEffect(() => {
+    if (!conversation.id) return;
+
+    console.log('🔄 Setting up real-time subscription for conversation:', conversation.id);
+    
+    const channel = supabase
+      .channel(`conversation-${conversation.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversation.id}`
+        },
+        async (payload) => {
+          console.log('📨 Real-time message received:', payload);
+          
+          const newMessage = payload.new as any;
+          const messageToAdd: ConversationMessage = {
+            id: newMessage.id,
+            role: newMessage.is_agent ? 'assistant' : 'user',
+            content: newMessage.content,
+            timestamp: newMessage.timestamp,
+            feedback: newMessage.feedback as 'like' | 'dislike' | undefined
+          };
+
+          setMessages(prev => {
+            // Check if message already exists to prevent duplicates
+            const exists = prev.some(msg => msg.id === messageToAdd.id);
+            if (exists) {
+              console.log('⚠️ Message already exists, skipping duplicate');
+              return prev;
+            }
+
+            const updated = [...prev, messageToAdd];
+            // Sort by timestamp to maintain order
+            updated.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            
+            console.log('✅ Added new message to conversation view');
+            return updated;
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversation.id}`
+        },
+        (payload) => {
+          console.log('📝 Real-time message update received:', payload);
+          
+          const updatedMessage = payload.new as any;
+          setMessages(prev => prev.map(msg => 
+            msg.id === updatedMessage.id 
+              ? {
+                  ...msg,
+                  content: updatedMessage.content,
+                  feedback: updatedMessage.feedback as 'like' | 'dislike' | undefined
+                }
+              : msg
+          ));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔄 Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [conversation.id]);
+
+  const handleFeedback = (timestamp: string, type: "like" | "dislike") => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.timestamp === timestamp) {
+        const newFeedback = msg.feedback === type ? undefined : type;
+        return { ...msg, feedback: newFeedback };
+      }
+      return msg;
+    }));
+  };
+
+  const handleCopy = (content: string) => {
+    // Copy functionality is handled in SharedChatMessage
   };
 
   const userMessageStyle = userMessageColor ? {
@@ -116,6 +188,11 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     onDelete();
     setShowDeleteDialog(false);
   };
+
+  // Find the last agent message index for regenerate button
+  const lastAgentMessageIndex = messages.reduceRight((lastIndex, msg, index) => {
+    return lastIndex === -1 && msg.role === 'assistant' && msg.id !== 'initial-message' ? index : lastIndex;
+  }, -1);
 
   return (
     <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
@@ -158,81 +235,34 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         </div>
       </div>
 
-      {/* Messages - using the same layout as ChatMessages component */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {conversation.messages.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            Loading messages...
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             No messages in this conversation
           </div>
         ) : (
-          conversation.messages.map((message, index) => (
-            <div key={message.id || index} className={`flex mb-4 ${message.role === 'user' ? 'justify-end' : ''}`}>
-              {message.role === 'assistant' && (
-                <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-                  {profilePicture ? (
-                    <AvatarImage src={profilePicture} alt={displayName} />
-                  ) : (
-                    <AvatarFallback className="bg-gray-100" />
-                  )}
-                </Avatar>
-              )}
-              
-              <div className="flex flex-col max-w-[80%]">
-                {/* Message bubble */}
-                <div 
-                  className={`rounded-lg p-3 text-sm ${
-                    message.role === 'user' 
-                      ? 'bg-blue-500 text-white ml-auto' 
-                      : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
-                  }`}
-                  style={message.role === 'user' ? userMessageStyle : {}}
-                >
-                  {message.content}
-                </div>
-                
-                {/* Feedback buttons for assistant messages - positioned OUTSIDE the bubble */}
-                {message.role === 'assistant' && (
-                  <div className="flex items-center space-x-1 mt-2">
-                    {/* Like button */}
-                    <button
-                      onClick={() => message.id && message.id !== 'initial-message' && handleFeedback(message.id, "like", message.feedback)}
-                      disabled={isUpdatingFeedback === message.id || message.id === 'initial-message'}
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
-                        message.feedback === "like" 
-                          ? "bg-green-100 text-green-600 hover:bg-green-200" 
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-                      } disabled:opacity-50`}
-                      title="Like"
-                    >
-                      <ThumbsUp size={14} />
-                    </button>
-                    
-                    {/* Dislike button */}
-                    <button
-                      onClick={() => message.id && message.id !== 'initial-message' && handleFeedback(message.id, "dislike", message.feedback)}
-                      disabled={isUpdatingFeedback === message.id || message.id === 'initial-message'}
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
-                        message.feedback === "dislike" 
-                          ? "bg-red-100 text-red-600 hover:bg-red-200" 
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-                      } disabled:opacity-50`}
-                      title="Dislike"
-                    >
-                      <ThumbsDown size={14} />
-                    </button>
-                    
-                    {/* Copy button */}
-                    <button
-                      onClick={() => handleCopy(message.content)}
-                      className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
-                      title="Copy"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
+          messages.map((message, index) => (
+            <SharedChatMessage
+              key={message.id || index}
+              message={message}
+              agentName={displayName}
+              profilePicture={profilePicture}
+              showFeedback={true}
+              hideUserAvatar={false}
+              onFeedback={handleFeedback}
+              onCopy={handleCopy}
+              allowRegenerate={false}
+              agentBubbleClass={theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}
+              userBubbleClass="bg-blue-500 text-white ml-auto"
+              userMessageStyle={userMessageStyle}
+              isLastAgentMessage={index === lastAgentMessageIndex}
+              theme={theme}
+            />
           ))
         )}
       </div>

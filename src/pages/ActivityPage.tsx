@@ -4,12 +4,22 @@ import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
 import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
 import { getChatSettings } from "@/services/chatSettingsService";
-import { Conversation as UIConversation } from "@/components/activity/ConversationData";
+import { conversationLoader, ConversationMessage } from "@/services/conversationLoader";
 import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+// UI Conversation interface for the activity page
+interface UIConversation {
+  id: string;
+  title: string;
+  snippet: string;
+  daysAgo: string;
+  source: string;
+  messages: ConversationMessage[];
+}
 
 const ActivityPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -82,12 +92,8 @@ const ActivityPage: React.FC = () => {
         async (payload) => {
           console.log('Real-time message update:', payload);
           
-          // If we have a selected conversation, refresh it
-          if (selectedConversation) {
-            await handleConversationClick(selectedConversation.id);
-          }
-          
-          // Refresh the conversations list to update snippets
+          // If we have a selected conversation, it will handle its own updates
+          // We just need to refresh the conversations list to update snippets
           await loadConversations();
         }
       )
@@ -96,7 +102,7 @@ const ActivityPage: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [agentId, selectedConversation?.id]);
+  }, [agentId]);
 
   useEffect(() => {
     if (agentId) {
@@ -188,45 +194,27 @@ const ActivityPage: React.FC = () => {
   };
 
   const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation> => {
-    const messages = await conversationService.getMessages(dbConversation.id);
-    
-    // Create the UI messages array starting with the initial message if we have chat settings
-    const uiMessages = [];
-    
-    // Add initial message as the first assistant message (just like in the live chat)
-    if (chatSettings?.initial_message) {
-      uiMessages.push({
-        id: 'initial-message',
-        role: 'assistant' as const,
-        content: chatSettings.initial_message,
-        timestamp: dbConversation.created_at,
-        feedback: undefined
-      });
+    if (!agentId) {
+      throw new Error('Agent ID is required');
     }
-    
-    // Convert database messages to UI messages with proper feedback handling
-    const dbUIMessages = messages.map(msg => ({
-      id: msg.id,
-      role: msg.is_agent ? 'assistant' : 'user' as 'assistant' | 'user',
-      content: msg.content,
-      timestamp: msg.timestamp,
-      feedback: msg.feedback as 'like' | 'dislike' | undefined
-    }));
-    
-    // Add all the actual conversation messages after the initial message
-    uiMessages.push(...dbUIMessages);
+
+    // Use the conversation loader to get messages with greeting
+    const messages = await conversationLoader.loadConversationWithGreeting(
+      dbConversation.id, 
+      agentId
+    );
 
     const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
     const title = dbConversation.title || `Chat from ${daysAgo}`;
     
     let snippet = 'No messages';
-    if (messages.length > 0) {
+    if (messages.length > 1) { // Skip initial greeting for snippet
       const lastMessage = messages[messages.length - 1];
       const content = lastMessage.content;
       snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
-    } else if (chatSettings?.initial_message) {
-      // If no messages but we have initial message, use that for snippet
-      const content = chatSettings.initial_message;
+    } else if (messages.length === 1) {
+      // Only initial greeting exists
+      const content = messages[0].content;
       snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
     }
 
@@ -238,7 +226,7 @@ const ActivityPage: React.FC = () => {
       snippet,
       daysAgo,
       source,
-      messages: uiMessages
+      messages
     };
   };
 
@@ -338,6 +326,7 @@ const ActivityPage: React.FC = () => {
                   showDeleteButton={true}
                   conversationStatus={selectedDBConversation.status}
                   conversationSource={selectedDBConversation.source}
+                  agentId={agentId}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full bg-white rounded-lg border">
