@@ -18,13 +18,6 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
   React.useEffect(() => {
     setCurrentColor(color);
   }, [color]);
-  
-  // Handle color input changes
-  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newColor = e.target.value;
-    setCurrentColor(newColor);
-    onChange(newColor);
-  };
 
   // Handle HEX input changes
   const handleHexChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,29 +71,10 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
             style={{ backgroundColor: currentColor }}
           />
         </PopoverTrigger>
-        <PopoverContent className="p-4 w-80" style={{ zIndex: 9999 }}>
-          <div className="flex flex-col gap-4">
-            {/* Main color picker area */}
-            <div className="w-full h-48 relative bg-gradient-to-r from-white to-red-500 rounded-lg overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black"></div>
-              <input 
-                type="color"
-                value={currentColor}
-                onChange={handleColorChange}
-                className="w-full h-full opacity-0 cursor-crosshair absolute top-0 left-0"
-              />
-              <div 
-                className="absolute w-3 h-3 border-2 border-white rounded-full pointer-events-none"
-                style={{
-                  left: '50%',
-                  top: '50%',
-                  transform: 'translate(-50%, -50%)'
-                }}
-              />
-            </div>
-
+        <PopoverContent className="p-3 w-64" style={{ zIndex: 9999 }}>
+          <div className="flex flex-col gap-3">
             {/* HEX and RGB inputs */}
-            <div className="grid grid-cols-5 gap-2 text-center">
+            <div className="grid grid-cols-4 gap-2 text-center">
               <div>
                 <label className="block text-xs font-medium mb-1">Hex</label>
                 <Input 
@@ -122,7 +96,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
                     setCurrentColor(newColor);
                     onChange(newColor);
                   }}
-                  className="w-full px-2 py-1 text-xs text-center"
+                  className="w-full px-1 py-1 text-xs text-center"
                   min="0"
                   max="255"
                 />
@@ -138,7 +112,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
                     setCurrentColor(newColor);
                     onChange(newColor);
                   }}
-                  className="w-full px-2 py-1 text-xs text-center"
+                  className="w-full px-1 py-1 text-xs text-center"
                   min="0"
                   max="255"
                 />
@@ -154,18 +128,9 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
                     setCurrentColor(newColor);
                     onChange(newColor);
                   }}
-                  className="w-full px-2 py-1 text-xs text-center"
+                  className="w-full px-1 py-1 text-xs text-center"
                   min="0"
                   max="255"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">A</label>
-                <Input 
-                  type="number"
-                  value="100"
-                  readOnly
-                  className="w-full px-2 py-1 text-xs text-center bg-gray-100"
                 />
               </div>
             </div>
@@ -175,7 +140,7 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
               {colorSwatches.map((swatchColor, index) => (
                 <button
                   key={index}
-                  className="w-6 h-6 rounded border-2 border-gray-200 hover:border-gray-400 transition-colors"
+                  className="w-5 h-5 rounded border-2 border-gray-200 hover:border-gray-400 transition-colors"
                   style={{ backgroundColor: swatchColor }}
                   onClick={() => handlePresetColorClick(swatchColor)}
                 />
