@@ -8,6 +8,8 @@ export const useAnalyticsData = (
   startDate?: string,
   endDate?: string
 ) => {
+  console.log('📊 useAnalyticsData called with:', { agentId, startDate, endDate });
+  
   const {
     data: analyticsData = {
       totalChats: 0,
@@ -20,11 +22,16 @@ export const useAnalyticsData = (
     refetch
   } = useQuery({
     queryKey: ['analytics', agentId, startDate, endDate],
-    queryFn: () => analyticsService.getAnalyticsData(agentId, startDate, endDate),
+    queryFn: () => {
+      console.log('📊 Fetching analytics for agent:', agentId);
+      return analyticsService.getAnalyticsData(agentId, startDate, endDate);
+    },
     enabled: !!agentId,
     refetchOnWindowFocus: false,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  console.log('📊 Analytics data result:', { analyticsData, isLoading, error });
 
   return {
     analyticsData,

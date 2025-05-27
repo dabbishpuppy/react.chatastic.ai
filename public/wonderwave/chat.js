@@ -4,7 +4,7 @@ import { isAgentPrivate } from './settings.js';
 import { doesAgentExist } from './agentVisibility.js';
 import { getBubbleButton } from './ui.js';
 import { setRateLimitSettings } from './messageHandling.js';
-import { createChatIframe, handleIframeMessage } from './chatIframe.js';
+import { createChatIframe, handleIframeMessage as handleIframeMessageFromModule } from './chatIframe.js';
 import { 
   isOpen, 
   getIframe, 
@@ -131,29 +131,9 @@ export function destroy() {
 }
 
 /**
- * Handle messages from the iframe - exported for backward compatibility
- */
-export function handleIframeMessage(event) {
-  const iframe = getIframe();
-  return handleIframeMessage(event, iframe, closeChat);
-}
-
-/**
- * Create and open the chat iframe - exported for backward compatibility
- */
-export function createChatIframe(config) {
-  const result = createChatIframe(config, isOpen(), closeChat);
-  if (result) {
-    setIframeAndHandler(result.iframe, result.messageHandler);
-  }
-}
-
-/**
  * Get the iframe element - exported for backward compatibility
  */
-export function getIframe() {
-  return getIframe();
-}
+export { getIframe };
 
 /**
  * Set the iframe element - exported for backward compatibility

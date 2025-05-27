@@ -16,54 +16,69 @@ export const analyticsService = {
     endDate?: string
   ): Promise<AnalyticsData> {
     try {
-      // Build date filter condition
-      let dateFilter = '';
-      if (startDate && endDate) {
-        dateFilter = `AND conversations.created_at >= '${startDate}' AND conversations.created_at <= '${endDate}'`;
-      }
+      console.log('🔍 Analytics service called with:', { agentId, startDate, endDate });
 
       // Get total conversations (chats) for the agent
-      const { data: conversationsData, error: conversationsError } = await supabase
+      let conversationsQuery = supabase
         .from('conversations')
         .select('id', { count: 'exact' })
-        .eq('agent_id', agentId)
-        .gte('created_at', startDate || '1900-01-01')
-        .lte('created_at', endDate || '2100-01-01');
+        .eq('agent_id', agentId);
+
+      if (startDate) {
+        conversationsQuery = conversationsQuery.gte('created_at', startDate);
+      }
+      if (endDate) {
+        conversationsQuery = conversationsQuery.lte('created_at', endDate);
+      }
+
+      const { data: conversationsData, error: conversationsError, count: totalChats } = await conversationsQuery;
 
       if (conversationsError) {
         console.error('Error fetching conversations:', conversationsError);
         throw conversationsError;
       }
 
-      const totalChats = conversationsData?.length || 0;
+      console.log('📊 Conversations found:', totalChats);
 
       // Get total messages for the agent's conversations
-      const { data: messagesData, error: messagesError } = await supabase
+      let messagesQuery = supabase
         .from('messages')
         .select(`
           id,
           feedback,
           conversations!inner(agent_id, created_at)
         `, { count: 'exact' })
-        .eq('conversations.agent_id', agentId)
-        .gte('conversations.created_at', startDate || '1900-01-01')
-        .lte('conversations.created_at', endDate || '2100-01-01');
+        .eq('conversations.agent_id', agentId);
+
+      if (startDate) {
+        messagesQuery = messagesQuery.gte('conversations.created_at', startDate);
+      }
+      if (endDate) {
+        messagesQuery = messagesQuery.lte('conversations.created_at', endDate);
+      }
+
+      const { data: messagesData, error: messagesError, count: totalMessages } = await messagesQuery;
 
       if (messagesError) {
         console.error('Error fetching messages:', messagesError);
         throw messagesError;
       }
 
-      const totalMessages = messagesData?.length || 0;
+      console.log('📊 Messages found:', totalMessages, 'Message data:', messagesData);
+
       const thumbsUp = messagesData?.filter(msg => msg.feedback === 'like').length || 0;
       const thumbsDown = messagesData?.filter(msg => msg.feedback === 'dislike').length || 0;
 
-      return {
-        totalChats,
-        totalMessages,
+      const result = {
+        totalChats: totalChats || 0,
+        totalMessages: totalMessages || 0,
         thumbsUp,
         thumbsDown
       };
+
+      console.log('📊 Final analytics result:', result);
+
+      return result;
     } catch (error) {
       console.error('Error in getAnalyticsData:', error);
       return {

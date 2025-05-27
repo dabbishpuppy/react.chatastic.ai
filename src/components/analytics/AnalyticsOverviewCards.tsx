@@ -43,14 +43,20 @@ const AnalyticsOverviewCards: React.FC<AnalyticsOverviewCardsProps> = ({
 }) => {
   const { agentId } = useParams();
   
-  // Use the selected agent or fall back to the current agent from URL
+  console.log('📊 AnalyticsOverviewCards props:', { selectedAgent, agentId, startDate, endDate });
+  
+  // Use the current agent from URL if "all" is selected, otherwise use the selected agent
   const targetAgentId = selectedAgent === "all" ? agentId : selectedAgent;
   
+  console.log('📊 Target agent ID for analytics:', targetAgentId);
+  
   const { analyticsData, isLoading } = useAnalyticsData(
-    targetAgentId || agentId || "",
+    targetAgentId || "",
     startDate,
     endDate
   );
+
+  console.log('📊 Analytics data in component:', analyticsData);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
