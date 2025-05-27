@@ -48,69 +48,71 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
   const leadFormMessages = chatHistory.filter(message => message.content === "LEAD_FORM_WIDGET");
 
   return (
-    <ScrollArea className="flex-1 px-4 py-2">
-      <div className="space-y-4">
-        {/* Render regular chat messages */}
-        <ChatMessages
-          chatHistory={regularMessages}
-          isTyping={false}
-          agentName={agentName}
-          profilePicture={profilePicture}
-          showFeedback={showFeedback}
-          hideUserAvatar={hideUserAvatar}
-          onFeedback={onFeedback}
-          onCopy={onCopy}
-          agentBubbleClass={themeClasses.agentMessage}
-          userBubbleClass={themeClasses.userMessage}
-          userMessageStyle={userMessageStyle}
-          messagesEndRef={messagesEndRef}
-        />
+    <ScrollArea className="flex-1 h-full overflow-hidden">
+      <div className="px-4 py-2 min-h-full">
+        <div className="space-y-4">
+          {/* Render regular chat messages */}
+          <ChatMessages
+            chatHistory={regularMessages}
+            isTyping={false}
+            agentName={agentName}
+            profilePicture={profilePicture}
+            showFeedback={showFeedback}
+            hideUserAvatar={hideUserAvatar}
+            onFeedback={onFeedback}
+            onCopy={onCopy}
+            agentBubbleClass={themeClasses.agentMessage}
+            userBubbleClass={themeClasses.userMessage}
+            userMessageStyle={userMessageStyle}
+            messagesEndRef={messagesEndRef}
+          />
 
-        {/* Render lead forms inline where they appear in chat history */}
-        {leadFormMessages.map((message, index) => {
-          if (leadSettings && agentId) {
-            return (
-              <InlineLeadForm
-                key={`lead-form-${index}`}
-                agentId={agentId}
-                conversationId={conversationId}
-                title={leadSettings.title}
-                collectName={leadSettings.collect_name}
-                namePlaceholder={leadSettings.name_placeholder}
-                collectEmail={leadSettings.collect_email}
-                emailPlaceholder={leadSettings.email_placeholder}
-                collectPhone={leadSettings.collect_phone}
-                phonePlaceholder={leadSettings.phone_placeholder}
-                onSubmit={onLeadFormSubmit || (() => {})}
-                theme={theme}
-              />
-            );
-          }
-          return null;
-        })}
-        
-        {isTyping && (
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              {profilePicture ? (
-                <img
-                  src={profilePicture}
-                  alt={agentName}
-                  className="w-8 h-8 rounded-full object-cover"
+          {/* Render lead forms inline where they appear in chat history */}
+          {leadFormMessages.map((message, index) => {
+            if (leadSettings && agentId) {
+              return (
+                <InlineLeadForm
+                  key={`lead-form-${index}`}
+                  agentId={agentId}
+                  conversationId={conversationId}
+                  title={leadSettings.title}
+                  collectName={leadSettings.collect_name}
+                  namePlaceholder={leadSettings.name_placeholder}
+                  collectEmail={leadSettings.collect_email}
+                  emailPlaceholder={leadSettings.email_placeholder}
+                  collectPhone={leadSettings.collect_phone}
+                  phonePlaceholder={leadSettings.phone_placeholder}
+                  onSubmit={onLeadFormSubmit || (() => {})}
+                  theme={theme}
                 />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
-                  {agentName.charAt(0).toUpperCase()}
-                </div>
-              )}
+              );
+            }
+            return null;
+          })}
+          
+          {isTyping && (
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                {profilePicture ? (
+                  <img
+                    src={profilePicture}
+                    alt={agentName}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
+                    {agentName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.agentMessage}`}>
+                <LoadingDots />
+              </div>
             </div>
-            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.agentMessage}`}>
-              <LoadingDots />
-            </div>
-          </div>
-        )}
-        
-        <div ref={messagesEndRef} />
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
       </div>
     </ScrollArea>
   );

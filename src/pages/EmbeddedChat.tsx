@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -208,7 +209,7 @@ const EmbeddedChat: React.FC = () => {
   // Use the chat settings from the agent but don't pass the chat icon
   return (
     <div className="w-full h-screen flex flex-col overflow-hidden" ref={containerRef}>
-      <ScrollArea className="w-full h-full overflow-hidden">
+      <div className="w-full h-full overflow-hidden">
         <ChatSection 
           agentId={agentId} // Pass agentId as prop
           initialMessages={[{
@@ -230,7 +231,7 @@ const EmbeddedChat: React.FC = () => {
           headerColor={headerColor}
           hideUserAvatar={true} // Always hide user avatar in embedded chat
         />
-      </ScrollArea>
+      </div>
     </div>
   );
 };

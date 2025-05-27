@@ -1,17 +1,30 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useParams } from "react-router-dom";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
+import { toast } from "@/hooks/use-toast";
 
 const LeadsSettings: React.FC = () => {
   const { agentId } = useParams();
   const { settings, isLoading, isSaving, saveSettings } = useLeadSettings(agentId || '');
+  
+  // Local state for unsaved changes
+  const [localSettings, setLocalSettings] = useState(settings);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  if (isLoading || !settings) {
+  // Update local state when settings are loaded
+  useEffect(() => {
+    if (settings) {
+      setLocalSettings(settings);
+      setHasUnsavedChanges(false);
+    }
+  }, [settings]);
+
+  if (isLoading || !localSettings) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
@@ -19,22 +32,20 @@ const LeadsSettings: React.FC = () => {
     );
   }
 
-  const handleReset = (field: string, defaultValue: any) => {
-    saveSettings({ [field]: defaultValue }).then((success) => {
-      if (success) {
-        // Trigger refresh for embedded widgets
-        setTimeout(() => {
-          window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
-        }, 500);
-      }
-    });
+  const updateLocalField = (field: string, value: any) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setHasUnsavedChanges(true);
   };
 
-  const updateField = async (field: string, value: any) => {
-    const success = await saveSettings({ [field]: value });
+  const handleSave = async () => {
+    const success = await saveSettings(localSettings);
     if (success) {
-      console.log(`✅ Lead setting updated: ${field} = ${value}`);
-      // Force multiple refresh messages to ensure embedded widgets get updated
+      setHasUnsavedChanges(false);
+      console.log(`✅ Lead settings saved successfully`);
+      // Broadcast settings update only after successful save
       setTimeout(() => {
         window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
         // Send another message after a longer delay for good measure
@@ -43,6 +54,19 @@ const LeadsSettings: React.FC = () => {
         }, 1000);
       }, 500);
     }
+  };
+
+  const handleReset = (field: string, defaultValue: any) => {
+    updateLocalField(field, defaultValue);
+  };
+
+  const handleDiscard = () => {
+    setLocalSettings(settings);
+    setHasUnsavedChanges(false);
+    toast({
+      title: "Changes discarded",
+      description: "All unsaved changes have been discarded."
+    });
   };
 
   return (
@@ -66,12 +90,12 @@ const LeadsSettings: React.FC = () => {
             </div>
             <Switch
               id="enabled"
-              checked={settings.enabled}
-              onCheckedChange={(checked) => updateField('enabled', checked)}
+              checked={localSettings.enabled}
+              onCheckedChange={(checked) => updateLocalField('enabled', checked)}
             />
           </div>
 
-          {settings.enabled && (
+          {localSettings.enabled && (
             <>
               <div className="space-y-2">
                 <label htmlFor="title" className="block text-sm font-medium">
@@ -80,8 +104,8 @@ const LeadsSettings: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <Input
                     id="title"
-                    value={settings.title}
-                    onChange={(e) => updateField('title', e.target.value)}
+                    value={localSettings.title}
+                    onChange={(e) => updateLocalField('title', e.target.value)}
                     className="max-w-md flex-1"
                   />
                   <Button 
@@ -102,16 +126,16 @@ const LeadsSettings: React.FC = () => {
                   </div>
                   <Switch
                     id="collectName"
-                    checked={settings.collect_name}
-                    onCheckedChange={(checked) => updateField('collect_name', checked)}
+                    checked={localSettings.collect_name}
+                    onCheckedChange={(checked) => updateLocalField('collect_name', checked)}
                   />
                 </div>
                 
-                {settings.collect_name && (
+                {localSettings.collect_name && (
                   <div className="pl-6">
                     <Input
-                      value={settings.name_placeholder}
-                      onChange={(e) => updateField('name_placeholder', e.target.value)}
+                      value={localSettings.name_placeholder}
+                      onChange={(e) => updateLocalField('name_placeholder', e.target.value)}
                       placeholder="Name placeholder"
                       className="max-w-md"
                     />
@@ -137,16 +161,16 @@ const LeadsSettings: React.FC = () => {
                   </div>
                   <Switch
                     id="collectEmail"
-                    checked={settings.collect_email}
-                    onCheckedChange={(checked) => updateField('collect_email', checked)}
+                    checked={localSettings.collect_email}
+                    onCheckedChange={(checked) => updateLocalField('collect_email', checked)}
                   />
                 </div>
                 
-                {settings.collect_email && (
+                {localSettings.collect_email && (
                   <div className="pl-6">
                     <Input
-                      value={settings.email_placeholder}
-                      onChange={(e) => updateField('email_placeholder', e.target.value)}
+                      value={localSettings.email_placeholder}
+                      onChange={(e) => updateLocalField('email_placeholder', e.target.value)}
                       placeholder="Email placeholder"
                       className="max-w-md"
                     />
@@ -172,16 +196,16 @@ const LeadsSettings: React.FC = () => {
                   </div>
                   <Switch
                     id="collectPhone"
-                    checked={settings.collect_phone}
-                    onCheckedChange={(checked) => updateField('collect_phone', checked)}
+                    checked={localSettings.collect_phone}
+                    onCheckedChange={(checked) => updateLocalField('collect_phone', checked)}
                   />
                 </div>
 
-                {settings.collect_phone && (
+                {localSettings.collect_phone && (
                   <div className="pl-6">
                     <Input
-                      value={settings.phone_placeholder}
-                      onChange={(e) => updateField('phone_placeholder', e.target.value)}
+                      value={localSettings.phone_placeholder}
+                      onChange={(e) => updateLocalField('phone_placeholder', e.target.value)}
                       placeholder="Phone placeholder"
                       className="max-w-md"
                     />
@@ -198,6 +222,33 @@ const LeadsSettings: React.FC = () => {
                 )}
               </div>
             </>
+          )}
+
+          {/* Save/Discard Actions */}
+          {hasUnsavedChanges && (
+            <div className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-sm text-yellow-800">You have unsaved changes</span>
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDiscard}
+                  disabled={isSaving}
+                >
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -18,7 +18,7 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
 }) => {
   const containerClasses = isEmbedded 
     ? `flex flex-col h-screen w-full ${themeClasses.background} overflow-hidden`
-    : `flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background}`;
+    : `flex flex-col h-full max-w-[800px] mx-auto ${themeClasses.background} overflow-hidden`;
 
   return (
     <div className={containerClasses} ref={chatContainerRef}>

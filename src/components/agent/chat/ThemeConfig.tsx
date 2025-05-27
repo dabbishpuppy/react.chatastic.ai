@@ -2,8 +2,8 @@
 import React from "react";
 
 export interface ThemeClasses {
-  agentBubble: string;
-  userBubble: string;
+  agentMessage: string;
+  userMessage: string;
   background: string;
   text: string;
   inputBg: string;
@@ -13,8 +13,8 @@ export interface ThemeClasses {
 }
 
 export const getThemeClasses = (theme: 'light' | 'dark' | 'system'): ThemeClasses => ({
-  agentBubble: theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-gray-100',
-  userBubble: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
+  agentMessage: theme === 'dark' ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-800',
+  userMessage: theme === 'dark' ? 'bg-blue-900 text-white' : 'bg-primary text-primary-foreground',
   background: theme === 'dark' ? 'bg-gray-900' : 'bg-white',
   text: theme === 'dark' ? 'text-gray-100' : 'text-gray-800',
   inputBg: theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200',
