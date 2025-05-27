@@ -16,7 +16,6 @@ interface ConversationViewProps {
   userMessageColor?: string;
   showDeleteButton?: boolean;
   initialMessage?: string;
-  // Add new props for dynamic status and source
   conversationStatus?: 'active' | 'ended';
   conversationSource?: 'iframe' | 'bubble';
 }
@@ -28,9 +27,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   theme = 'light',
   profilePicture,
   displayName = "AI Assistant",
-  userMessageColor,
+  userMessageColor = '#000000', // Default to black
   showDeleteButton = false,
-  initialMessage,
+  initialMessage = '👋 Hi! How can I help you today?', // Default initial message
   conversationStatus = 'active',
   conversationSource = 'iframe'
 }) => {
@@ -47,12 +46,12 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     return brightness > 128 ? '#000000' : '#ffffff';
   };
 
-  const userMessageStyle = userMessageColor ? {
+  const userMessageStyle = {
     backgroundColor: userMessageColor,
     color: getContrastColor(userMessageColor)
-  } : {};
+  };
 
-  // Use dynamic status and source
+  // Use dynamic status and source from props
   const status = conversationStatus;
   const sourceLabel = conversationSource === 'bubble' ? 'Widget' : 'Iframe';
 
@@ -89,10 +88,16 @@ const ConversationView: React.FC<ConversationViewProps> = ({
         isDark ? 'border-gray-700' : 'border-gray-200'
       }`}>
         <div className="flex items-center gap-3">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={profilePicture} alt={displayName} />
-            <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
-          </Avatar>
+          {profilePicture ? (
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={profilePicture} alt={displayName} />
+              <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
+            </Avatar>
+          ) : (
+            <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center">
+              <span className="text-xs text-gray-600">AI</span>
+            </div>
+          )}
           <div>
             <h3 className={`font-medium text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
               {conversation.title}
@@ -163,19 +168,21 @@ const ConversationView: React.FC<ConversationViewProps> = ({
           >
             <div className="flex items-start gap-2 max-w-[80%]">
               {message.role === 'assistant' && (
-                <Avatar className="h-6 w-6 flex-shrink-0">
-                  <AvatarImage src={profilePicture} alt={displayName} />
-                  <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
-                </Avatar>
+                profilePicture ? (
+                  <Avatar className="h-6 w-6 flex-shrink-0">
+                    <AvatarImage src={profilePicture} alt={displayName} />
+                    <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs text-gray-600">AI</span>
+                  </div>
+                )
               )}
               <div
                 className={`px-3 py-2 rounded-lg text-sm ${
                   message.role === 'user'
-                    ? userMessageColor 
-                      ? 'text-white' 
-                      : isDark 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-blue-500 text-white'
+                    ? 'text-white' 
                     : isDark
                       ? 'bg-gray-800 text-gray-100'
                       : 'bg-gray-100 text-gray-900'

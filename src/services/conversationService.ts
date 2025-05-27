@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -69,9 +68,10 @@ export const conversationService = {
       .from('conversations')
       .select(`
         *,
-        messages!inner(id)
+        message_count:messages(count)
       `)
       .eq('agent_id', agentId)
+      .having('message_count', 'gt', 0)
       .order('updated_at', { ascending: false })
       .limit(limit);
 
@@ -81,11 +81,14 @@ export const conversationService = {
     }
 
     // Filter to only return conversations that have at least one message
-    const conversationsWithMessages = data?.filter(conv => conv.messages && conv.messages.length > 0) || [];
+    const conversationsWithMessages = data?.filter(conv => {
+      const count = Array.isArray(conv.message_count) ? conv.message_count.length : conv.message_count;
+      return count > 0;
+    }) || [];
     
-    // Remove the messages property from the result as we only needed it for filtering
+    // Remove the message_count property from the result
     return conversationsWithMessages.map(conv => {
-      const { messages, ...conversation } = conv;
+      const { message_count, ...conversation } = conv;
       return conversation as Conversation;
     });
   },

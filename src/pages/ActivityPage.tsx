@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
@@ -47,6 +46,24 @@ const ActivityPage: React.FC = () => {
     return [];
   };
 
+  // Default chat settings to use when none are found
+  const defaultChatSettings: ChatInterfaceSettings = {
+    initial_message: '👋 Hi! How can I help you today?',
+    suggested_messages: [],
+    message_placeholder: 'Write message here...',
+    show_feedback: true,
+    allow_regenerate: true,
+    theme: 'light',
+    display_name: 'AI Assistant',
+    bubble_position: 'right',
+    show_suggestions_after_chat: true,
+    auto_show_delay: 1,
+    user_message_color: '#000000', // Default to black
+    bubble_color: '#000000',
+    sync_colors: false,
+    primary_color: '#000000'
+  };
+
   useEffect(() => {
     if (agentId) {
       loadConversations();
@@ -82,6 +99,7 @@ const ActivityPage: React.FC = () => {
       if (settings) {
         // Ensure proper typing for the settings
         const typedSettings: ChatInterfaceSettings = {
+          ...defaultChatSettings,
           ...settings,
           theme: (settings.theme === 'light' || settings.theme === 'dark' || settings.theme === 'system') 
             ? settings.theme 
@@ -89,12 +107,17 @@ const ActivityPage: React.FC = () => {
           bubble_position: (settings.bubble_position === 'left' || settings.bubble_position === 'right')
             ? settings.bubble_position
             : 'right',
-          suggested_messages: ensureSuggestedMessagesArray(settings.suggested_messages)
+          suggested_messages: ensureSuggestedMessagesArray(settings.suggested_messages),
+          user_message_color: settings.user_message_color || '#000000', // Ensure black default
         };
         setChatSettings(typedSettings);
+      } else {
+        // Use default settings if none found
+        setChatSettings(defaultChatSettings);
       }
     } catch (error) {
       console.error('Error loading chat settings:', error);
+      setChatSettings(defaultChatSettings);
     }
   };
 
@@ -107,9 +130,7 @@ const ActivityPage: React.FC = () => {
         setConversations(updatedConversations);
         setHasAnyConversations(updatedConversations.length > 0);
         
-        // Close conversation view if the deleted conversation was selected
         if (selectedConversation?.id === conversationId) {
-          // Auto-select next conversation if available
           if (updatedConversations.length > 0) {
             const nextConversation = await convertDBConversationToUI(updatedConversations[0]);
             setSelectedConversation(nextConversation);
@@ -138,10 +159,8 @@ const ActivityPage: React.FC = () => {
   };
 
   const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation> => {
-    // Get messages for this conversation
     const messages = await conversationService.getMessages(dbConversation.id);
     
-    // Convert messages to UI format
     const uiMessages = messages.map(msg => ({
       id: msg.id,
       role: msg.is_agent ? 'assistant' : 'user' as 'assistant' | 'user',
@@ -152,7 +171,6 @@ const ActivityPage: React.FC = () => {
     const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
     const title = dbConversation.title || `Chat from ${daysAgo}`;
     
-    // Get snippet from last message
     let snippet = 'No messages';
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
@@ -160,7 +178,6 @@ const ActivityPage: React.FC = () => {
       snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
     }
 
-    // Use the source from database to determine display source
     const source = dbConversation.source === 'bubble' ? 'Widget' : 'Iframe';
 
     return {
@@ -189,7 +206,6 @@ const ActivityPage: React.FC = () => {
   // Helper function to convert 'system' theme to 'light' or 'dark'
   const getConversationTheme = (theme: 'light' | 'dark' | 'system'): 'light' | 'dark' => {
     if (theme === 'system') {
-      // Check if user prefers dark mode
       return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     return theme;
@@ -243,11 +259,11 @@ const ActivityPage: React.FC = () => {
                   onClose={() => {}}
                   onDelete={() => handleDeleteConversation(selectedConversation.id)}
                   theme={getConversationTheme(chatSettings?.theme || 'light')}
-                  profilePicture={chatSettings?.profile_picture}
-                  displayName={chatSettings?.display_name}
-                  userMessageColor={chatSettings?.user_message_color}
+                  profilePicture={chatSettings?.profile_picture || undefined}
+                  displayName={chatSettings?.display_name || 'AI Assistant'}
+                  userMessageColor={chatSettings?.user_message_color || '#000000'}
                   showDeleteButton={true}
-                  initialMessage={chatSettings?.initial_message}
+                  initialMessage={chatSettings?.initial_message || '👋 Hi! How can I help you today?'}
                   conversationStatus={selectedDBConversation.status}
                   conversationSource={selectedDBConversation.source}
                 />
