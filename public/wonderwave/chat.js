@@ -96,7 +96,7 @@ export function createChatIframe(config) {
   // Create iframe
   iframe = document.createElement('iframe');
   
-  // Build URL with parameters
+  // Build URL with parameters - add cache buster to ensure latest version
   let iframeSrc = `https://${config.cdnDomain}/embed/${config.agentId}`;
   
   // Append identity hash params if they exist
@@ -115,6 +115,10 @@ export function createChatIframe(config) {
     
     iframeSrc += separator + params.join('&');
   }
+  
+  // Add cache buster to ensure latest version
+  const separator = iframeSrc.includes('?') ? '&' : '?';
+  iframeSrc += `${separator}_t=${Date.now()}`;
   
   // Apply iframe styles
   Object.assign(iframe.style, {
@@ -145,6 +149,18 @@ export function createChatIframe(config) {
     container.style.opacity = '1';
     container.style.transform = 'translateY(0)';
   }, 10);
+  
+  // Send refresh message to iframe once loaded
+  iframe.onload = function() {
+    try {
+      iframe.contentWindow.postMessage({ 
+        type: 'wonderwave-refresh-settings',
+        agentId: config.agentId 
+      }, '*');
+    } catch (error) {
+      logError('Error sending refresh message to iframe:', error);
+    }
+  };
 }
 
 /**
