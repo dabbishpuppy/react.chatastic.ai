@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -172,7 +171,7 @@ export const conversationService = {
         timestamp: msg.timestamp,
         created_at: msg.created_at,
         feedback: feedback
-      } as Message;
+      };
     });
   },
 
