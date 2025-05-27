@@ -55,7 +55,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
   leadSettings: propLeadSettings = null,
-  conversationSource, // New prop for source detection
+  conversationSource = 'iframe', // Default to iframe for backward compatibility
 }) => {
   const { agentId: paramAgentId } = useParams();
   const agentId = propAgentId || paramAgentId;
@@ -119,29 +119,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
   }, [isEmbedded, agentId, refreshSettings, propLeadSettings]);
   
-  // Determine conversation source - use prop if provided, otherwise determine based on embedded state
-  const determineConversationSource = (): 'iframe' | 'bubble' => {
-    if (conversationSource) {
-      return conversationSource;
-    }
-    // Fallback logic - if embedded but no source specified, try to detect
-    if (isEmbedded) {
-      return window !== window.top ? 'iframe' : 'bubble';
-    }
-    // Not embedded - this is the main app interface
-    return 'iframe'; // Default for non-embedded usage
-  };
+  console.log('🔍 ChatSection - Using conversation source:', conversationSource);
   
-  const finalConversationSource = determineConversationSource();
-  
-  console.log('🔍 ChatSection - Source determination:', {
-    conversationSource,
-    isEmbedded,
-    windowCheck: window !== window.top,
-    finalConversationSource
-  });
-  
-  // Conversation management with correct source
+  // Conversation management with the correct source
   const {
     currentConversation,
     conversationEnded,
@@ -151,7 +131,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     loadConversation,
     saveMessage,
     getConversationMessages
-  } = useConversationManager(finalConversationSource);
+  } = useConversationManager(conversationSource);
 
   const {
     message,
@@ -271,7 +251,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     
     // Create conversation if it doesn't exist (for embedded mode)
     if (isEmbedded && !currentConversation && agentId) {
-      console.log('🆕 Creating conversation for embedded mode');
+      console.log('🆕 Creating conversation for embedded mode with source:', conversationSource);
       await startNewConversation();
     }
     

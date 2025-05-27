@@ -43,18 +43,53 @@ const EmbeddedChat: React.FC = () => {
   const headerColor = headerColorParam || 
     (settings?.sync_colors ? (settings?.user_message_color || '#000000') : null);
 
-  // Detect if this is running in an iframe vs bubble widget
-  // Check if we're in an iframe by looking at window context and referrer
-  const isInIframe = window !== window.top;
-  const conversationSource: 'iframe' | 'bubble' = isInIframe ? 'iframe' : 'bubble';
+  // Enhanced source detection - check multiple indicators
+  const detectConversationSource = (): 'iframe' | 'bubble' => {
+    // Check if we're in an iframe
+    const isInIframe = window !== window.top;
+    
+    // Check for bubble-specific URL parameters or identifiers
+    const isBubbleMode = searchParams.get('mode') === 'bubble' || 
+                        searchParams.get('widget') === 'true' ||
+                        window.location.pathname.includes('/bubble') ||
+                        document.referrer.includes('wonderwave-bubble');
+    
+    // Check for iframe-specific indicators  
+    const isIframeMode = searchParams.get('mode') === 'iframe' ||
+                        window.location.pathname.includes('/iframe') ||
+                        isInIframe;
+    
+    console.log('🔍 EmbeddedChat - Enhanced source detection:', {
+      isInIframe,
+      isBubbleMode,
+      isIframeMode,
+      searchParams: Object.fromEntries(searchParams),
+      pathname: window.location.pathname,
+      referrer: document.referrer,
+      windowTop: window.top,
+      currentWindow: window
+    });
+    
+    // Priority logic: bubble mode takes precedence if explicitly set
+    if (isBubbleMode && !isIframeMode) {
+      console.log('✅ Detected as BUBBLE widget');
+      return 'bubble';
+    }
+    
+    // Default to iframe if in iframe context or explicitly set
+    if (isIframeMode || isInIframe) {
+      console.log('✅ Detected as IFRAME');
+      return 'iframe';
+    }
+    
+    // Fallback: assume iframe for embedded contexts
+    console.log('⚠️ Using fallback detection as IFRAME');
+    return 'iframe';
+  };
+
+  const conversationSource = detectConversationSource();
   
-  console.log('🔍 EmbeddedChat - Source detection:', {
-    isInIframe,
-    conversationSource,
-    windowTop: window.top,
-    currentWindow: window,
-    referrer: document.referrer
-  });
+  console.log('🎯 EmbeddedChat - Final conversation source:', conversationSource);
 
   // Use custom hooks for embedded functionality
   useEmbeddedStyles();
