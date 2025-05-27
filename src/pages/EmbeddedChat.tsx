@@ -48,14 +48,20 @@ const EmbeddedChat: React.FC = () => {
     // Check if we're in an iframe
     const isInIframe = window !== window.top;
     
+    // Get the source parameter from URL - this is the most reliable indicator
+    const sourceParam = searchParams.get('source');
+    const modeParam = searchParams.get('mode');
+    
     // Check for bubble-specific URL parameters or identifiers
-    const isBubbleMode = searchParams.get('mode') === 'bubble' || 
+    const isBubbleMode = sourceParam === 'bubble' || 
+                        modeParam === 'bubble' || 
                         searchParams.get('widget') === 'true' ||
                         window.location.pathname.includes('/bubble') ||
                         document.referrer.includes('wonderwave-bubble');
     
     // Check for iframe-specific indicators  
-    const isIframeMode = searchParams.get('mode') === 'iframe' ||
+    const isIframeMode = sourceParam === 'iframe' ||
+                        modeParam === 'iframe' ||
                         window.location.pathname.includes('/iframe') ||
                         isInIframe;
     
@@ -63,6 +69,8 @@ const EmbeddedChat: React.FC = () => {
       isInIframe,
       isBubbleMode,
       isIframeMode,
+      sourceParam,
+      modeParam,
       searchParams: Object.fromEntries(searchParams),
       pathname: window.location.pathname,
       referrer: document.referrer,
@@ -70,15 +78,26 @@ const EmbeddedChat: React.FC = () => {
       currentWindow: window
     });
     
-    // Priority logic: bubble mode takes precedence if explicitly set
+    // Priority logic: source parameter takes highest precedence
+    if (sourceParam === 'bubble') {
+      console.log('✅ Detected as BUBBLE widget (via source param)');
+      return 'bubble';
+    }
+    
+    if (sourceParam === 'iframe') {
+      console.log('✅ Detected as IFRAME (via source param)');
+      return 'iframe';
+    }
+    
+    // Fallback to other indicators
     if (isBubbleMode && !isIframeMode) {
-      console.log('✅ Detected as BUBBLE widget');
+      console.log('✅ Detected as BUBBLE widget (via mode/widget params)');
       return 'bubble';
     }
     
     // Default to iframe if in iframe context or explicitly set
     if (isIframeMode || isInIframe) {
-      console.log('✅ Detected as IFRAME');
+      console.log('✅ Detected as IFRAME (via iframe context)');
       return 'iframe';
     }
     

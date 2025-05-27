@@ -1,3 +1,4 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { doesAgentExist } from './agentVisibility.js';
@@ -97,29 +98,28 @@ export function createChatIframe(config) {
   // Create iframe
   iframe = document.createElement('iframe');
   
-  // Build URL with parameters - add cache buster to ensure latest version
+  // Build URL with parameters - add source=bubble to identify bubble widget conversations
   let iframeSrc = `https://${config.cdnDomain}/embed/${config.agentId}`;
+  
+  // Always add source=bubble for bubble widget
+  const urlParams = new URLSearchParams();
+  urlParams.set('source', 'bubble');
   
   // Append identity hash params if they exist
   if (config.identityHash && config.userId) {
-    iframeSrc += `?identityHash=${encodeURIComponent(config.identityHash)}&userId=${encodeURIComponent(config.userId)}`;
+    urlParams.set('identityHash', config.identityHash);
+    urlParams.set('userId', config.userId);
   }
   
   // Append theme and color parameters 
-  if (config.theme || config.userMessageColor || config.headerColor) {
-    const separator = iframeSrc.includes('?') ? '&' : '?';
-    let params = [];
-    
-    if (config.theme) params.push(`theme=${encodeURIComponent(config.theme)}`);
-    if (config.userMessageColor) params.push(`userColor=${encodeURIComponent(config.userMessageColor)}`);
-    if (config.headerColor) params.push(`headerColor=${encodeURIComponent(config.headerColor)}`);
-    
-    iframeSrc += separator + params.join('&');
-  }
+  if (config.theme) urlParams.set('theme', config.theme);
+  if (config.userMessageColor) urlParams.set('userColor', config.userMessageColor);
+  if (config.headerColor) urlParams.set('headerColor', config.headerColor);
   
   // Add cache buster to ensure latest version
-  const separator = iframeSrc.includes('?') ? '&' : '?';
-  iframeSrc += `${separator}_t=${Date.now()}`;
+  urlParams.set('_t', Date.now().toString());
+  
+  iframeSrc += '?' + urlParams.toString();
   
   // Apply iframe styles
   Object.assign(iframe.style, {

@@ -79,8 +79,8 @@ export const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode = "", agentId }) =
 })();
 </script>`;
     } else {
-      // Add only agent ID to the iframe URL - colors will be loaded from the backend
-      let iframeSrc = `https://query-spark-start.lovable.app/embed/${agentId}`;
+      // Add source=iframe parameter to distinguish iframe embeds from bubble widgets
+      let iframeSrc = `https://query-spark-start.lovable.app/embed/${agentId}?source=iframe`;
       
       // Simplified iframe embedding code
       return `<iframe
