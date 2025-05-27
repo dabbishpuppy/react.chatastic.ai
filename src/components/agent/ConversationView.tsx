@@ -1,23 +1,24 @@
 
 import React, { useState } from "react";
-import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Copy, ThumbsUp, ThumbsDown, Trash2, X } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import { Conversation } from "@/components/activity/ConversationData";
+import { analyticsService } from "@/services/analyticsService";
 
 interface ConversationViewProps {
   conversation: Conversation;
   onClose: () => void;
-  onDelete?: () => void;
+  onDelete: () => void;
   theme?: 'light' | 'dark';
   profilePicture?: string;
   displayName?: string;
   userMessageColor?: string;
   showDeleteButton?: boolean;
   initialMessage?: string;
-  conversationStatus?: 'active' | 'ended';
-  conversationSource?: 'iframe' | 'bubble';
+  conversationStatus?: string;
+  conversationSource?: string;
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
@@ -26,18 +27,76 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   onDelete,
   theme = 'light',
   profilePicture,
-  displayName = "AI Assistant",
-  userMessageColor = '#000000', // Default to black
+  displayName = 'AI Assistant',
+  userMessageColor = '#000000',
   showDeleteButton = false,
-  initialMessage = '👋 Hi! How can I help you today?', // Default initial message
-  conversationStatus = 'active',
-  conversationSource = 'iframe'
+  initialMessage,
+  conversationStatus,
+  conversationSource
 }) => {
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const isDark = theme === 'dark';
-  
+  const [localMessages, setLocalMessages] = useState(conversation.messages);
+
+  const handleCopy = async (content: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast({
+        description: "Copied to clipboard!",
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      toast({
+        description: "Failed to copy to clipboard",
+        duration: 2000,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFeedback = async (messageId: string, feedbackType: "like" | "dislike") => {
+    // Find the message to update
+    const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) return;
+
+    const currentMessage = localMessages[messageIndex];
+    const newFeedback = currentMessage.feedback === feedbackType ? null : feedbackType;
+    
+    try {
+      // Update in database
+      const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
+      
+      if (success) {
+        // Update local state
+        const updatedMessages = [...localMessages];
+        updatedMessages[messageIndex] = {
+          ...currentMessage,
+          feedback: newFeedback || undefined
+        };
+        setLocalMessages(updatedMessages);
+        
+        toast({
+          description: newFeedback ? `Feedback ${feedbackType === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
+          duration: 2000,
+        });
+      } else {
+        toast({
+          description: "Failed to update feedback",
+          duration: 2000,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      toast({
+        description: "Failed to update feedback",
+        duration: 2000,
+        variant: "destructive"
+      });
+    }
+  };
+
   const getContrastColor = (backgroundColor: string): string => {
-    // Simple contrast calculation
+    if (!backgroundColor) return '#000000';
     const hex = backgroundColor.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
@@ -46,152 +105,128 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     return brightness > 128 ? '#000000' : '#ffffff';
   };
 
-  const userMessageStyle = {
+  const userMessageStyle = userMessageColor ? {
     backgroundColor: userMessageColor,
     color: getContrastColor(userMessageColor)
-  };
-
-  // Use dynamic status and source from props
-  const status = conversationStatus;
-  const sourceLabel = conversationSource === 'bubble' ? 'Widget' : 'Iframe';
-
-  const handleDeleteConfirm = () => {
-    if (onDelete) {
-      onDelete();
-    }
-    setIsDeleteDialogOpen(false);
-  };
-
-  // Create messages array with initial message if provided
-  const allMessages = React.useMemo(() => {
-    const messages = [...conversation.messages];
-    
-    // Add initial message at the beginning if it exists and isn't already there
-    if (initialMessage && (messages.length === 0 || messages[0].content !== initialMessage)) {
-      messages.unshift({
-        id: 'initial-message',
-        role: 'assistant',
-        content: initialMessage,
-        timestamp: conversation.messages[0]?.timestamp || new Date().toISOString()
-      });
-    }
-    
-    return messages;
-  }, [conversation.messages, initialMessage]);
+  } : {};
 
   return (
-    <div className={`border rounded-lg h-[calc(100vh-240px)] flex flex-col ${
-      isDark ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
-    }`}>
+    <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
       {/* Header */}
-      <div className={`p-4 border-b flex items-center justify-between ${
-        isDark ? 'border-gray-700' : 'border-gray-200'
-      }`}>
-        <div className="flex items-center gap-3">
-          {profilePicture ? (
-            <Avatar className="h-8 w-8">
+      <div className={`flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="flex items-center space-x-3">
+          <Avatar className="h-8 w-8">
+            {profilePicture ? (
               <AvatarImage src={profilePicture} alt={displayName} />
-              <AvatarFallback className="text-xs"></AvatarFallback>
-            </Avatar>
-          ) : (
-            <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
-              {/* Empty div - no text */}
-            </div>
-          )}
+            ) : (
+              <AvatarFallback className="bg-gray-100" />
+            )}
+          </Avatar>
           <div>
-            <h3 className={`font-medium text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {conversation.title}
-            </h3>
-            <div className="flex items-center gap-2 text-xs">
-              <span className={`px-2 py-1 rounded ${
-                status === 'active' 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-gray-100 text-gray-700'
-              }`}>
-                {status}
-              </span>
-              <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-                • {sourceLabel}
-              </span>
+            <h2 className="text-lg font-semibold">{conversation.title}</h2>
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <span>{conversation.daysAgo}</span>
+              <span>•</span>
+              <span>{conversation.source}</span>
+              {conversationStatus && (
+                <>
+                  <span>•</span>
+                  <span className="capitalize">{conversationStatus}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
-        {showDeleteButton && onDelete ? (
-          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`${isDark ? 'text-gray-400 hover:text-red-400' : 'text-gray-500 hover:text-red-600'}`}
-              >
-                <Trash2 size={16} />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this conversation? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleDeleteConfirm}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onClose}
-            className={isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'}
-          >
-            ×
+        <div className="flex items-center space-x-2">
+          {showDeleteButton && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDelete}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={onClose}>
+            <X size={16} />
           </Button>
-        )}
+        </div>
       </div>
 
       {/* Messages */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${
-        isDark ? 'bg-gray-900' : 'bg-white'
-      }`} style={{ scrollbarWidth: 'thin' }}>
-        {allMessages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className="flex items-start gap-2 max-w-[80%]">
-              {message.role === 'assistant' && (
-                profilePicture ? (
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarImage src={profilePicture} alt={displayName} />
-                    <AvatarFallback className="text-xs"></AvatarFallback>
-                  </Avatar>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {localMessages.map((message, index) => (
+          <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {message.role === 'assistant' && (
+              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+                {profilePicture ? (
+                  <AvatarImage src={profilePicture} alt={displayName} />
                 ) : (
-                  <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    {/* Empty div - no text */}
-                  </div>
-                )
-              )}
-              <div
-                className={`px-3 py-2 rounded-lg text-sm ${
-                  message.role === 'user'
-                    ? 'text-white' 
-                    : isDark
-                      ? 'bg-gray-800 text-gray-100'
-                      : 'bg-gray-100 text-gray-900'
+                  <AvatarFallback className="bg-gray-100" />
+                )}
+              </Avatar>
+            )}
+            
+            <div className="flex flex-col max-w-[80%]">
+              {/* Message bubble */}
+              <div 
+                className={`rounded-lg p-3 text-sm ${
+                  message.role === 'user' 
+                    ? 'bg-blue-500 text-white ml-auto' 
+                    : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
                 }`}
                 style={message.role === 'user' ? userMessageStyle : {}}
               >
-                <p style={{ fontSize: '0.875rem' }}>{message.content}</p>
+                {message.content}
               </div>
+              
+              {/* Action buttons for assistant messages */}
+              {message.role === 'assistant' && message.id && (
+                <div className="flex items-center space-x-1 mt-2">
+                  {/* Like button */}
+                  <button
+                    onClick={() => handleFeedback(message.id, "like")}
+                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                      message.feedback === "like" 
+                        ? "bg-green-100 text-green-600 hover:bg-green-200" 
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                    }`}
+                    title="Like"
+                  >
+                    <ThumbsUp size={14} />
+                  </button>
+                  
+                  {/* Dislike button */}
+                  <button
+                    onClick={() => handleFeedback(message.id, "dislike")}
+                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                      message.feedback === "dislike" 
+                        ? "bg-red-100 text-red-600 hover:bg-red-200" 
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                    }`}
+                    title="Dislike"
+                  >
+                    <ThumbsDown size={14} />
+                  </button>
+                  
+                  {/* Copy button */}
+                  <button
+                    onClick={() => handleCopy(message.content)}
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+                    title="Copy"
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              )}
             </div>
+            
+            {message.role === 'user' && (
+              <Avatar className="h-8 w-8 ml-2 mt-1 border-0">
+                <AvatarFallback className="bg-gray-100" />
+              </Avatar>
+            )}
           </div>
         ))}
       </div>

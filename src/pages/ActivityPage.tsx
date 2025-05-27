@@ -162,11 +162,13 @@ const ActivityPage: React.FC = () => {
   const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation> => {
     const messages = await conversationService.getMessages(dbConversation.id);
     
+    // Convert database messages to UI messages with proper feedback handling
     const uiMessages = messages.map(msg => ({
-      id: msg.id,
+      id: msg.id, // Use the database message ID
       role: msg.is_agent ? 'assistant' : 'user' as 'assistant' | 'user',
       content: msg.content,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
+      feedback: msg.feedback as 'like' | 'dislike' | undefined // Include feedback state
     }));
 
     const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
