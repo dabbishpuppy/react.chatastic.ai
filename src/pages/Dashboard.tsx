@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -66,7 +65,7 @@ const Dashboard = () => {
           }
           sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
           
-          // Clear any global wonderwave config
+          // Clear any global wonderwave config with proper type checking
           if (window.wonderwaveConfig) {
             delete window.wonderwaveConfig;
           }
