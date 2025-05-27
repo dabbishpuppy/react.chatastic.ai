@@ -107,7 +107,33 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {/* Feedback buttons - positioned OUTSIDE the message bubble */}
         {shouldShowFeedback && (
           <div className="flex items-center space-x-1 mt-2">
-            {/* Copy button */}
+            {/* Like button - FIRST */}
+            <button
+              onClick={() => onFeedback(message.timestamp, "like")}
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                message.feedback === "like" 
+                  ? "bg-green-100 text-green-600 hover:bg-green-200" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+              }`}
+              title="Like"
+            >
+              <ThumbsUp size={14} />
+            </button>
+            
+            {/* Dislike button - SECOND */}
+            <button
+              onClick={() => onFeedback(message.timestamp, "dislike")}
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                message.feedback === "dislike" 
+                  ? "bg-red-100 text-red-600 hover:bg-red-200" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+              }`}
+              title="Dislike"
+            >
+              <ThumbsDown size={14} />
+            </button>
+            
+            {/* Copy button - THIRD */}
             <div className="relative">
               <button
                 onClick={() => handleCopy(message.content)}
@@ -123,7 +149,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               )}
             </div>
             
-            {/* Regenerate button - show for last agent message when allowed */}
+            {/* Regenerate button - FOURTH (last agent message when allowed) */}
             {allowRegenerate && isLastAgentMessage && onRegenerate && (
               <button
                 onClick={onRegenerate}
@@ -133,32 +159,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 <RotateCcw size={14} />
               </button>
             )}
-            
-            {/* Like button */}
-            <button
-              onClick={() => onFeedback(message.timestamp, "like")}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
-                message.feedback === "like" 
-                  ? "bg-green-100 text-green-600 hover:bg-green-200" 
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-              }`}
-              title="Like"
-            >
-              <ThumbsUp size={14} />
-            </button>
-            
-            {/* Dislike button */}
-            <button
-              onClick={() => onFeedback(message.timestamp, "dislike")}
-              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
-                message.feedback === "dislike" 
-                  ? "bg-red-100 text-red-600 hover:bg-red-200" 
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-              }`}
-              title="Dislike"
-            >
-              <ThumbsDown size={14} />
-            </button>
           </div>
         )}
       </div>
