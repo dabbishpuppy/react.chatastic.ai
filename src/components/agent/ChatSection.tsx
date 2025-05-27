@@ -149,7 +149,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     cleanup
   } = useMessageHandling(displayMessages, isEmbedded);
 
-  const { messagesEndRef, chatContainerRef } = useChatScroll(isEmbedded, chatHistory, isTyping);
+  const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded, chatHistory, isTyping);
 
   const {
     handleSubmitWithAgentId,
@@ -176,7 +176,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     });
   }, [agentId, isEmbedded, effectiveLeadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
-  // Enhanced lead form trigger logic with better field validation
+  // Enhanced lead form trigger logic with better field validation and scroll trigger
   useEffect(() => {
     if (!isEmbedded || !effectiveLeadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
       return;
@@ -216,14 +216,23 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           timestamp: new Date().toISOString()
         };
         
-        setChatHistory(prev => [...prev, leadFormMessage]);
+        setChatHistory(prev => {
+          const newHistory = [...prev, leadFormMessage];
+          
+          // Trigger enhanced scroll after lead form is added
+          setTimeout(() => {
+            scrollToBottom();
+          }, 100);
+          
+          return newHistory;
+        });
         setHasShownLeadForm(true);
         console.log('📋 LEAD FORM ADDED TO CHAT');
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, effectiveLeadSettings?.enabled, effectiveLeadSettings?.collect_name, effectiveLeadSettings?.collect_email, effectiveLeadSettings?.collect_phone, effectiveLeadSettings?.title, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
+  }, [isEmbedded, effectiveLeadSettings?.enabled, effectiveLeadSettings?.collect_name, effectiveLeadSettings?.collect_email, effectiveLeadSettings?.collect_phone, effectiveLeadSettings?.title, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory, scrollToBottom]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {

@@ -5,9 +5,14 @@ export const useChatScroll = (isEmbedded: boolean, chatHistory: any[], isTyping:
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (forceSmooth = false) => {
     if (isEmbedded && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      // Enhanced scrolling for embedded mode with better visibility
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: forceSmooth ? "smooth" : "auto", 
+        block: "end",
+        inline: "nearest"
+      });
       
       if (window.self !== window.top) {
         window.parent.postMessage({ 
@@ -19,8 +24,18 @@ export const useChatScroll = (isEmbedded: boolean, chatHistory: any[], isTyping:
     }
   };
 
+  // Enhanced scroll trigger for lead forms
   useEffect(() => {
-    scrollToBottom();
+    const hasLeadForm = chatHistory.some(msg => msg.content === "LEAD_FORM_WIDGET");
+    
+    if (hasLeadForm) {
+      // Delay scroll for lead form to ensure DOM is fully rendered
+      setTimeout(() => {
+        scrollToBottom(true);
+      }, 300);
+    } else {
+      scrollToBottom();
+    }
   }, [chatHistory, isTyping]);
 
   useEffect(() => {

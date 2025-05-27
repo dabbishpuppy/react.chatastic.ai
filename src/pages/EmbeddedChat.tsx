@@ -85,34 +85,41 @@ const EmbeddedChat: React.FC = () => {
     fetchAgentVisibility();
   }, [agentId]);
   
-  // Enhanced styles for proper scrolling in embedded mode
+  // Enhanced styles for proper scrolling and sizing in embedded mode
   useEffect(() => {
-    // Add enhanced styles to ensure proper scrolling behavior
+    // Add enhanced styles to ensure proper scrolling behavior and sizing
     const style = document.createElement('style');
     style.textContent = `
       html, body {
         overflow: auto !important;
         position: relative !important;
         width: 100%;
-        height: 100%;
+        height: 100vh;
         margin: 0;
         padding: 0;
       }
       
-      /* Enable proper scrolling for embedded content */
+      /* Enhanced embedded chat container with better sizing */
       .embedded-chat-container {
         height: 100vh;
+        width: 100vw;
+        max-width: 500px;
+        min-width: 400px;
+        margin: 0 auto;
         overflow: auto;
         -webkit-overflow-scrolling: touch;
+        display: flex;
+        flex-direction: column;
       }
 
-      /* Fix ScrollArea overflow issues */
+      /* Fix ScrollArea overflow issues with enhanced visibility */
       [data-radix-scroll-area-viewport] {
         overflow-y: auto !important;
         overflow-x: hidden !important;
+        scroll-behavior: smooth !important;
       }
       
-      /* Ensure scrollbars are visible and functional */
+      /* Enhanced scrollbars for better visibility */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -130,6 +137,14 @@ const EmbeddedChat: React.FC = () => {
       
       ::-webkit-scrollbar-thumb:hover {
         background: #555;
+      }
+
+      /* Responsive sizing for mobile */
+      @media (max-width: 480px) {
+        .embedded-chat-container {
+          min-width: 100vw;
+          max-width: 100vw;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -224,8 +239,8 @@ const EmbeddedChat: React.FC = () => {
 
   // Use the chat settings from the agent but don't pass the chat icon
   return (
-    <div className="embedded-chat-container w-full h-screen flex flex-col" ref={containerRef}>
-      <div className="w-full h-full">
+    <div className="embedded-chat-container" ref={containerRef}>
+      <div className="w-full h-full flex flex-col">
         <ChatSection 
           agentId={agentId} // Pass agentId as prop
           initialMessages={[{
