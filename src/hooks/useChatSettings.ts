@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -7,13 +8,28 @@ import { getChatSettings, saveChatSettings, uploadChatAsset } from '@/services/c
 export const useChatSettings = () => {
   const { agentId } = useParams();
   const [settings, setSettings] = useState<ChatInterfaceSettings>({...defaultChatSettings});
+  const [draftSettings, setDraftSettings] = useState<ChatInterfaceSettings>({...defaultChatSettings});
   const [leadSettings, setLeadSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Check if agentId is valid (not undefined or the string "undefined")
   const validAgentId = agentId && agentId !== "undefined" ? agentId : null;
+
+  // Helper function to check if settings have changed
+  const checkForChanges = (draft: ChatInterfaceSettings, saved: ChatInterfaceSettings) => {
+    const hasChanges = JSON.stringify(draft) !== JSON.stringify(saved);
+    setHasUnsavedChanges(hasChanges);
+    return hasChanges;
+  };
+
+  // Update draft settings whenever saved settings change
+  useEffect(() => {
+    setDraftSettings({...settings});
+    setHasUnsavedChanges(false);
+  }, [settings]);
 
   const loadSettingsFromEdgeFunction = async (agentId: string, bustCache = false) => {
     try {
@@ -80,7 +96,7 @@ export const useChatSettings = () => {
     if (edgeData && edgeData.visibility !== 'private') {
       console.log('✅ Refreshed settings from edge function:', edgeData);
       
-      setSettings({
+      const newSettings = {
         ...defaultChatSettings,
         agent_id: validAgentId,
         display_name: edgeData.display_name,
@@ -100,7 +116,9 @@ export const useChatSettings = () => {
         suggested_messages: ensureSuggestedMessagesArray(edgeData.suggested_messages),
         show_suggestions_after_chat: edgeData.show_suggestions_after_chat,
         auto_show_delay: edgeData.auto_show_delay
-      });
+      };
+
+      setSettings(newSettings);
 
       if (edgeData.lead_settings) {
         console.log('📋 Refreshed lead settings:', edgeData.lead_settings);
@@ -121,7 +139,7 @@ export const useChatSettings = () => {
           console.log('✅ Using edge function data:', edgeData);
           
           // Set chat settings with proper suggested_messages handling
-          setSettings({
+          const newSettings = {
             ...defaultChatSettings,
             agent_id: validAgentId,
             display_name: edgeData.display_name,
@@ -141,7 +159,9 @@ export const useChatSettings = () => {
             suggested_messages: ensureSuggestedMessagesArray(edgeData.suggested_messages),
             show_suggestions_after_chat: edgeData.show_suggestions_after_chat,
             auto_show_delay: edgeData.auto_show_delay
-          });
+          };
+
+          setSettings(newSettings);
 
           // Set lead settings from edge function
           if (edgeData.lead_settings) {
@@ -153,13 +173,14 @@ export const useChatSettings = () => {
           const data = await getChatSettings(validAgentId);
           
           if (data) {
-            setSettings({
+            const newSettings = {
               ...defaultChatSettings,
               ...data,
               suggested_messages: ensureSuggestedMessagesArray(data.suggested_messages),
               sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
               primary_color: data.primary_color || '#3B82F6'
-            });
+            };
+            setSettings(newSettings);
           } else {
             setSettings({
               ...defaultChatSettings,
@@ -180,16 +201,23 @@ export const useChatSettings = () => {
     loadSettings();
   }, [validAgentId]);
 
-  const updateSetting = <K extends keyof ChatInterfaceSettings>(
+  const updateDraftSetting = <K extends keyof ChatInterfaceSettings>(
     key: K, 
     value: ChatInterfaceSettings[K]
   ) => {
-    console.log(`🔧 Updating setting ${String(key)}:`, value);
-    setSettings(prev => {
-      const newSettings = { ...prev, [key]: value };
-      console.log('🔧 New settings state:', newSettings);
-      return newSettings;
+    console.log(`🔧 Updating draft setting ${String(key)}:`, value);
+    setDraftSettings(prev => {
+      const newDraftSettings = { ...prev, [key]: value };
+      console.log('🔧 New draft settings state:', newDraftSettings);
+      checkForChanges(newDraftSettings, settings);
+      return newDraftSettings;
     });
+  };
+
+  // Function to discard unsaved changes
+  const discardChanges = () => {
+    setDraftSettings({...settings});
+    setHasUnsavedChanges(false);
   };
 
   // Function to notify embedded components about settings changes
@@ -256,11 +284,11 @@ export const useChatSettings = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    console.log('💾 Saving settings:', settings);
+    console.log('💾 Saving draft settings:', draftSettings);
     
     try {
       const updatedSettings = await saveChatSettings({
-        ...settings,
+        ...draftSettings,
         // Only include agent_id if we have a valid one
         ...(validAgentId && { agent_id: validAgentId })
       });
@@ -268,6 +296,7 @@ export const useChatSettings = () => {
       if (updatedSettings) {
         console.log('✅ Settings saved successfully:', updatedSettings);
         setSettings(updatedSettings);
+        setHasUnsavedChanges(false);
         
         // Small delay to ensure database is updated before notifying
         setTimeout(() => {
@@ -305,23 +334,23 @@ export const useChatSettings = () => {
       text 
     };
     
-    updateSetting('suggested_messages', [
-      ...settings.suggested_messages,
+    updateDraftSetting('suggested_messages', [
+      ...draftSettings.suggested_messages,
       newMessage
     ]);
   };
 
   const updateSuggestedMessage = (id: string, text: string) => {
-    updateSetting('suggested_messages', 
-      settings.suggested_messages.map(msg => 
+    updateDraftSetting('suggested_messages', 
+      draftSettings.suggested_messages.map(msg => 
         msg.id === id ? { ...msg, text } : msg
       )
     );
   };
 
   const deleteSuggestedMessage = (id: string) => {
-    updateSetting('suggested_messages', 
-      settings.suggested_messages.filter(msg => msg.id !== id)
+    updateDraftSetting('suggested_messages', 
+      draftSettings.suggested_messages.filter(msg => msg.id !== id)
     );
   };
 
@@ -331,9 +360,9 @@ export const useChatSettings = () => {
       const tempUrl = URL.createObjectURL(file);
       
       if (type === 'profile') {
-        updateSetting('profile_picture', tempUrl);
+        updateDraftSetting('profile_picture', tempUrl);
       } else {
-        updateSetting('chat_icon', tempUrl);
+        updateDraftSetting('chat_icon', tempUrl);
       }
       
       toast({
@@ -350,9 +379,9 @@ export const useChatSettings = () => {
       
       if (url) {
         if (type === 'profile') {
-          updateSetting('profile_picture', url);
+          updateDraftSetting('profile_picture', url);
         } else {
-          updateSetting('chat_icon', url);
+          updateDraftSetting('chat_icon', url);
         }
         
         toast({
@@ -383,13 +412,16 @@ export const useChatSettings = () => {
   };
 
   return {
-    settings,
+    settings, // Published/saved settings (for embedded widgets)
+    draftSettings, // Draft settings (for form inputs and preview)
     leadSettings,
     isLoading,
     isSaving,
     isUploading,
-    updateSetting,
+    hasUnsavedChanges,
+    updateSetting: updateDraftSetting, // Update draft instead of published
     handleSave,
+    discardChanges,
     addSuggestedMessage,
     updateSuggestedMessage,
     deleteSuggestedMessage,
