@@ -74,7 +74,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Agent ${agentId} is PUBLIC, fetching chat interface settings`);
+    console.log(`Agent ${agentId} is PUBLIC, fetching chat interface settings and lead settings`);
 
     // Get chat interface settings
     const { data: settings, error: settingsError } = await supabase
@@ -87,7 +87,20 @@ serve(async (req) => {
       console.error('Error fetching chat interface settings:', settingsError);
     }
 
-    // Construct response with all settings including rate limiting
+    // Get lead settings
+    const { data: leadSettings, error: leadSettingsError } = await supabase
+      .from('lead_settings')
+      .select('*')
+      .eq('agent_id', agentId)
+      .single();
+
+    if (leadSettingsError && leadSettingsError.code !== 'PGRST116') {
+      console.error('Error fetching lead settings:', leadSettingsError);
+    }
+
+    console.log('Lead settings fetched:', leadSettings);
+
+    // Construct response with all settings including rate limiting and lead settings
     const response = {
       visibility: agent.visibility,
       rate_limit_enabled: agent.rate_limit_enabled,
@@ -111,8 +124,21 @@ serve(async (req) => {
       suggested_messages: settings?.suggested_messages || [],
       show_suggestions_after_chat: settings?.show_suggestions_after_chat ?? true,
       auto_show_delay: settings?.auto_show_delay ?? 1,
-      message_placeholder: settings?.message_placeholder || 'Write message here...'
+      message_placeholder: settings?.message_placeholder || 'Write message here...',
+      // Lead settings
+      lead_settings: {
+        enabled: leadSettings?.enabled || false,
+        title: leadSettings?.title || 'Get in touch with us',
+        collect_name: leadSettings?.collect_name || false,
+        collect_email: leadSettings?.collect_email || false,
+        collect_phone: leadSettings?.collect_phone || false,
+        name_placeholder: leadSettings?.name_placeholder || 'Full name',
+        email_placeholder: leadSettings?.email_placeholder || 'Email',
+        phone_placeholder: leadSettings?.phone_placeholder || 'Phone'
+      }
     };
+
+    console.log('Response with lead settings:', response);
 
     return new Response(
       JSON.stringify(response),

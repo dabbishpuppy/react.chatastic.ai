@@ -3,19 +3,19 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import ChatSection from "@/components/agent/ChatSection";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { AlertCircle } from "lucide-react";
 
 const EmbeddedChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [searchParams] = useSearchParams();
-  const { settings, isLoading } = useChatSettings();
+  const { settings, leadSettings, isLoading } = useChatSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const [agentVisibility, setAgentVisibility] = useState<string | null>(null);
   const [visibilityLoading, setVisibilityLoading] = useState(true);
   
   console.log('🎯 EmbeddedChat - agentId from params:', agentId);
+  console.log('📋 EmbeddedChat - leadSettings:', leadSettings);
   
   // Get URL parameters for theme and colors if present
   const themeParam = searchParams.get('theme');
@@ -82,6 +82,12 @@ const EmbeddedChat: React.FC = () => {
         height: 100vh;
         overflow: auto;
         -webkit-overflow-scrolling: touch;
+      }
+
+      /* Fix ScrollArea overflow issues */
+      [data-radix-scroll-area-viewport] {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
       }
       
       /* Ensure scrollbars are visible and functional */
@@ -218,6 +224,7 @@ const EmbeddedChat: React.FC = () => {
           userMessageColor={userMessageColor}
           headerColor={headerColor}
           hideUserAvatar={true} // Always hide user avatar in embedded chat
+          leadSettings={leadSettings} // Pass lead settings from Edge Function
         />
       </div>
     </div>

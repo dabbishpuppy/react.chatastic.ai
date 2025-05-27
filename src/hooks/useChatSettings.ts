@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -8,6 +7,7 @@ import { getChatSettings, saveChatSettings, uploadChatAsset } from '@/services/c
 export const useChatSettings = () => {
   const { agentId } = useParams();
   const [settings, setSettings] = useState<ChatInterfaceSettings>({...defaultChatSettings});
+  const [leadSettings, setLeadSettings] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -15,27 +15,89 @@ export const useChatSettings = () => {
   // Check if agentId is valid (not undefined or the string "undefined")
   const validAgentId = agentId && agentId !== "undefined" ? agentId : null;
 
+  const loadSettingsFromEdgeFunction = async (agentId: string) => {
+    try {
+      console.log('📡 Loading settings from edge function for agent:', agentId);
+      const timestamp = Date.now();
+      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`, {
+        headers: {
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        console.error('Edge function response not ok:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('📡 Edge function response:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('Error loading settings from edge function:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const loadSettings = async () => {
       setIsLoading(true);
       
       if (validAgentId) {
-        // Try to load settings if we have a valid agent ID
-        const data = await getChatSettings(validAgentId);
+        // For embedded mode, try edge function first
+        const edgeData = await loadSettingsFromEdgeFunction(validAgentId);
         
-        if (data) {
-          // Ensure we have the sync_colors and primary_color properties
+        if (edgeData && edgeData.visibility !== 'private') {
+          console.log('✅ Using edge function data:', edgeData);
+          
+          // Set chat settings
           setSettings({
             ...defaultChatSettings,
-            ...data,
-            sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
-            primary_color: data.primary_color || '#3B82F6'
+            agent_id: validAgentId,
+            display_name: edgeData.display_name,
+            initial_message: edgeData.initial_message,
+            message_placeholder: edgeData.message_placeholder,
+            theme: edgeData.theme,
+            profile_picture: edgeData.profile_picture,
+            chat_icon: edgeData.chat_icon,
+            bubble_position: edgeData.bubble_position,
+            footer: edgeData.footer,
+            user_message_color: edgeData.user_message_color,
+            bubble_color: edgeData.bubble_color,
+            sync_colors: edgeData.sync_colors,
+            primary_color: edgeData.primary_color,
+            show_feedback: edgeData.show_feedback,
+            allow_regenerate: edgeData.allow_regenerate,
+            suggested_messages: edgeData.suggested_messages || [],
+            show_suggestions_after_chat: edgeData.show_suggestions_after_chat,
+            auto_show_delay: edgeData.auto_show_delay
           });
+
+          // Set lead settings from edge function
+          if (edgeData.lead_settings) {
+            console.log('📋 Setting lead settings from edge function:', edgeData.lead_settings);
+            setLeadSettings(edgeData.lead_settings);
+          }
         } else {
-          setSettings({
-            ...defaultChatSettings,
-            agent_id: validAgentId
-          });
+          // Fallback to direct database call
+          const data = await getChatSettings(validAgentId);
+          
+          if (data) {
+            setSettings({
+              ...defaultChatSettings,
+              ...data,
+              sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
+              primary_color: data.primary_color || '#3B82F6'
+            });
+          } else {
+            setSettings({
+              ...defaultChatSettings,
+              agent_id: validAgentId
+            });
+          }
         }
       } else {
         // No valid agent ID, just use default settings with no agent_id
@@ -170,6 +232,7 @@ export const useChatSettings = () => {
 
   return {
     settings,
+    leadSettings,
     isLoading,
     isSaving,
     isUploading,

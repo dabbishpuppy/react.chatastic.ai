@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -32,6 +31,7 @@ interface ChatSectionProps {
   userMessageColor?: string | null;
   headerColor?: string | null;
   hideUserAvatar?: boolean;
+  leadSettings?: any; // Lead settings from props (for embedded mode)
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
@@ -53,6 +53,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   userMessageColor = null,
   headerColor = null,
   hideUserAvatar = false,
+  leadSettings: propLeadSettings = null,
 }) => {
   const { agentId: paramAgentId } = useParams();
   const agentId = propAgentId || paramAgentId;
@@ -61,49 +62,59 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
   
-  // Load lead settings with refresh capability
-  const { settings: leadSettings, refreshSettings } = useLeadSettings(agentId || '');
+  // Load lead settings - use prop leadSettings if available (for embedded mode), otherwise use hook
+  const { settings: hookLeadSettings, refreshSettings } = useLeadSettings(agentId || '');
+  const effectiveLeadSettings = propLeadSettings || hookLeadSettings;
+  
+  console.log('📋 ChatSection - Using lead settings:', {
+    propLeadSettings,
+    hookLeadSettings,
+    effectiveLeadSettings,
+    isEmbedded
+  });
   
   // Enhanced refresh logic for embedded mode with immediate updates
   useEffect(() => {
     if (isEmbedded && agentId) {
       console.log('🔄 Setting up enhanced settings refresh for embedded mode');
       
-      // Immediate refresh on mount
-      refreshSettings();
-      
-      // Faster refresh interval for embedded mode (1 second instead of 2)
-      const interval = setInterval(() => {
-        console.log('⏰ Periodic settings refresh for embedded mode');
+      // If using hook (fallback), refresh it
+      if (!propLeadSettings) {
         refreshSettings();
-      }, 1000);
-      
-      // Listen for settings update messages with immediate response
-      const handleMessage = (event: MessageEvent) => {
-        console.log('📨 Received message in ChatSection:', event.data);
         
-        if (event.data && (
-          event.data.type === 'lead-settings-updated' || 
-          event.data.type === 'wonderwave-refresh-settings'
-        ) && event.data.agentId === agentId) {
-          console.log('📋 Received lead settings update message, triggering immediate refresh...');
-          
-          // Multiple immediate refreshes to ensure update
+        // Faster refresh interval for embedded mode (1 second instead of 2)
+        const interval = setInterval(() => {
+          console.log('⏰ Periodic settings refresh for embedded mode');
           refreshSettings();
-          setTimeout(() => refreshSettings(), 100);
-          setTimeout(() => refreshSettings(), 500);
-          setTimeout(() => refreshSettings(), 1000);
-        }
-      };
-      
-      window.addEventListener('message', handleMessage);
-      
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('message', handleMessage);
-      };
+        }, 1000);
+        
+        // Listen for settings update messages with immediate response
+        const handleMessage = (event: MessageEvent) => {
+          console.log('📨 Received message in ChatSection:', event.data);
+          
+          if (event.data && (
+            event.data.type === 'lead-settings-updated' || 
+            event.data.type === 'wonderwave-refresh-settings'
+          ) && event.data.agentId === agentId) {
+            console.log('📋 Received lead settings update message, triggering immediate refresh...');
+            
+            // Multiple immediate refreshes to ensure update
+            refreshSettings();
+            setTimeout(() => refreshSettings(), 100);
+            setTimeout(() => refreshSettings(), 500);
+            setTimeout(() => refreshSettings(), 1000);
+          }
+        };
+        
+        window.addEventListener('message', handleMessage);
+        
+        return () => {
+          clearInterval(interval);
+          window.removeEventListener('message', handleMessage);
+        };
+      }
     }
-  }, [isEmbedded, agentId, refreshSettings]);
+  }, [isEmbedded, agentId, refreshSettings, propLeadSettings]);
   
   // Conversation management
   const {
@@ -151,28 +162,28 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     console.log('🔍 LEAD FORM DEBUG STATE:', {
       agentId,
       isEmbedded,
-      leadSettingsLoaded: !!leadSettings,
-      leadSettingsEnabled: leadSettings?.enabled,
-      collectName: leadSettings?.collect_name,
-      collectEmail: leadSettings?.collect_email,
-      collectPhone: leadSettings?.collect_phone,
+      leadSettingsLoaded: !!effectiveLeadSettings,
+      leadSettingsEnabled: effectiveLeadSettings?.enabled,
+      collectName: effectiveLeadSettings?.collect_name,
+      collectEmail: effectiveLeadSettings?.collect_email,
+      collectPhone: effectiveLeadSettings?.collect_phone,
       hasShownLeadForm,
       userHasMessaged,
       chatHistoryLength: chatHistory.length,
       isTyping,
-      title: leadSettings?.title,
-      leadSettingsObject: leadSettings
+      title: effectiveLeadSettings?.title,
+      leadSettingsObject: effectiveLeadSettings
     });
-  }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
+  }, [agentId, isEmbedded, effectiveLeadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
   // Enhanced lead form trigger logic with better field validation
   useEffect(() => {
-    if (!isEmbedded || !leadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
+    if (!isEmbedded || !effectiveLeadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
       return;
     }
 
     // Check if at least one field is enabled
-    const hasAnyFields = leadSettings.collect_name || leadSettings.collect_email || leadSettings.collect_phone;
+    const hasAnyFields = effectiveLeadSettings.collect_name || effectiveLeadSettings.collect_email || effectiveLeadSettings.collect_phone;
     if (!hasAnyFields) {
       console.log('🚫 No lead form fields enabled, skipping form display');
       return;
@@ -188,9 +199,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       shouldTrigger: userMessages.length >= 1 && aiMessages.length >= 1,
       hasAnyFields,
       enabledFields: {
-        name: leadSettings.collect_name,
-        email: leadSettings.collect_email,
-        phone: leadSettings.collect_phone
+        name: effectiveLeadSettings.collect_name,
+        email: effectiveLeadSettings.collect_email,
+        phone: effectiveLeadSettings.collect_phone
       }
     });
 
@@ -212,7 +223,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, leadSettings?.collect_name, leadSettings?.collect_email, leadSettings?.collect_phone, leadSettings?.title, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
+  }, [isEmbedded, effectiveLeadSettings?.enabled, effectiveLeadSettings?.collect_name, effectiveLeadSettings?.collect_email, effectiveLeadSettings?.collect_phone, effectiveLeadSettings?.title, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
@@ -330,14 +341,18 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         themeClasses={themeClasses}
         userMessageStyle={userMessageStyle}
         messagesEndRef={messagesEndRef}
-        leadSettings={leadSettings}
+        leadSettings={effectiveLeadSettings}
         agentId={agentId || ''}
         conversationId={currentConversation?.id}
         theme={resolvedTheme}
         onLeadFormSubmit={() => {
           console.log('📋 Lead form submitted from chat integration');
-          // Remove the lead form message from chat
-          setChatHistory(prev => prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET"));
+          // Remove the lead form message from chat and add any new messages that were pending
+          setChatHistory(prev => {
+            const filteredHistory = prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
+            console.log('📋 Chat history after lead form removal:', filteredHistory);
+            return filteredHistory;
+          });
         }}
       />
 
