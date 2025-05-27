@@ -33,6 +33,7 @@ const LeadsSettings: React.FC = () => {
   }
 
   const updateLocalField = (field: string, value: any) => {
+    console.log('📝 Updating local field:', field, 'to:', value);
     setLocalSettings(prev => ({
       ...prev,
       [field]: value
@@ -41,18 +42,39 @@ const LeadsSettings: React.FC = () => {
   };
 
   const handleSave = async () => {
+    console.log('💾 Saving lead settings:', localSettings);
     const success = await saveSettings(localSettings);
     if (success) {
       setHasUnsavedChanges(false);
       console.log(`✅ Lead settings saved successfully`);
-      // Broadcast settings update only after successful save
-      setTimeout(() => {
-        window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
-        // Send another message after a longer delay for good measure
+      
+      // Enhanced broadcasting - send multiple message types to ensure compatibility
+      const messages = [
+        { type: 'lead-settings-updated', agentId },
+        { type: 'wonderwave-refresh-settings', agentId }
+      ];
+      
+      messages.forEach((message, index) => {
         setTimeout(() => {
-          window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
-        }, 1000);
-      }, 500);
+          console.log('📢 Broadcasting settings update:', message);
+          window.postMessage(message, '*');
+          
+          // Also broadcast to parent window if in iframe
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(message, '*');
+          }
+        }, index * 100); // Stagger messages slightly
+      });
+      
+      // Additional broadcast after longer delay for external widgets
+      setTimeout(() => {
+        const finalMessage = { type: 'lead-settings-updated', agentId };
+        console.log('📢 Final broadcast for external widgets:', finalMessage);
+        window.postMessage(finalMessage, '*');
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(finalMessage, '*');
+        }
+      }, 2000);
     }
   };
 

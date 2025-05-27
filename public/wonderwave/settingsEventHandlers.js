@@ -25,12 +25,26 @@ export function initializeSettingsEventHandlers() {
  * Handle refresh settings messages
  */
 function handleRefreshMessage(event) {
-  if (event.data && event.data.type === 'wonderwave-refresh-settings') {
+  // Handle both color settings and lead settings updates
+  if (event.data && (
+    event.data.type === 'wonderwave-refresh-settings' || 
+    event.data.type === 'lead-settings-updated'
+  )) {
     const agentId = event.data.agentId || window.wonderwaveConfig?.agentId;
     if (agentId) {
-      log('Received refresh settings message for agent:', agentId);
-      // Force re-check of agent visibility immediately
+      log('Received settings update message for agent:', agentId, 'type:', event.data.type);
+      // Force re-check of agent visibility and settings immediately
       fetchColorSettingsAndVisibility(agentId);
+      
+      // Forward the message to iframe if it exists
+      const iframe = document.querySelector('iframe[src*="/embed/"]');
+      if (iframe && iframe.contentWindow) {
+        log('Forwarding settings update to iframe');
+        iframe.contentWindow.postMessage({
+          type: 'lead-settings-updated',
+          agentId: agentId
+        }, '*');
+      }
     }
   }
 }

@@ -63,21 +63,31 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Load lead settings with refresh capability
   const { settings: leadSettings, refreshSettings } = useLeadSettings(agentId || '');
   
-  // Enhanced refresh logic for embedded mode
+  // Enhanced refresh logic for embedded mode with faster polling
   useEffect(() => {
     if (isEmbedded && agentId) {
-      // Refresh settings more frequently for embedded mode
+      // Faster refresh interval for embedded mode (2 seconds instead of 5)
       const interval = setInterval(() => {
+        console.log('🔄 Refreshing lead settings for embedded mode');
         refreshSettings();
-      }, 5000); // Refresh every 5 seconds
+      }, 2000);
       
-      // Listen for settings update messages
+      // Listen for settings update messages with enhanced logging
       const handleMessage = (event: MessageEvent) => {
+        console.log('📨 Received message in ChatSection:', event.data);
+        
         if (event.data && event.data.type === 'lead-settings-updated' && event.data.agentId === agentId) {
-          console.log('📋 Received lead settings update message, refreshing...');
+          console.log('📋 Received lead settings update message, refreshing immediately...');
+          
+          // Immediate refresh on settings update
           setTimeout(() => {
             refreshSettings();
-          }, 1000); // Delay to ensure database is updated
+          }, 100); // Very fast refresh
+          
+          // Also trigger a second refresh after a brief delay for good measure
+          setTimeout(() => {
+            refreshSettings();
+          }, 1000);
         }
       };
       
@@ -131,9 +141,9 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     handleRegenerateWithAgentId
   } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
-  // Enhanced debug logging for lead form
+  // Enhanced debug logging for lead form with more detailed tracking
   useEffect(() => {
-    console.log('🔍 LEAD FORM DEBUG:', {
+    console.log('🔍 LEAD FORM DEBUG STATE:', {
       agentId,
       isEmbedded,
       leadSettingsLoaded: !!leadSettings,
@@ -144,11 +154,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       hasShownLeadForm,
       userHasMessaged,
       chatHistoryLength: chatHistory.length,
-      isTyping
+      isTyping,
+      title: leadSettings?.title
     });
   }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
-  // Enhanced lead form trigger logic - only show if settings are properly loaded and enabled
+  // Enhanced lead form trigger logic with better field validation
   useEffect(() => {
     if (!isEmbedded || !leadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
       return;
@@ -169,7 +180,12 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       userMessagesCount: userMessages.length,
       aiMessagesCount: aiMessages.length,
       shouldTrigger: userMessages.length >= 1 && aiMessages.length >= 1,
-      hasAnyFields
+      hasAnyFields,
+      enabledFields: {
+        name: leadSettings.collect_name,
+        email: leadSettings.collect_email,
+        phone: leadSettings.collect_phone
+      }
     });
 
     // Show lead form after first user message AND first AI response
@@ -190,7 +206,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, leadSettings?.collect_name, leadSettings?.collect_email, leadSettings?.collect_phone, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
+  }, [isEmbedded, leadSettings?.enabled, leadSettings?.collect_name, leadSettings?.collect_email, leadSettings?.collect_phone, leadSettings?.title, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {

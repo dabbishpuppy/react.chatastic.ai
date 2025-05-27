@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,27 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
     phone: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formKey, setFormKey] = useState(0); // Force re-render when settings change
+
+  // React to settings changes by forcing form re-render and clearing data
+  useEffect(() => {
+    console.log('📋 Lead form settings changed:', {
+      collectName,
+      collectEmail,
+      collectPhone,
+      title
+    });
+    
+    // Clear form data when field visibility changes
+    setFormData(prev => ({
+      name: collectName ? prev.name : '',
+      email: collectEmail ? prev.email : '',
+      phone: collectPhone ? prev.phone : ''
+    }));
+    
+    // Force re-render to ensure UI updates
+    setFormKey(prev => prev + 1);
+  }, [collectName, collectEmail, collectPhone, title]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -131,11 +152,19 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
 
   // If no fields are enabled, don't render the form
   if (!hasAnyFields) {
+    console.log('📋 No lead form fields enabled, hiding form');
     return null;
   }
 
+  console.log('📋 Rendering lead form with fields:', {
+    collectName,
+    collectEmail,
+    collectPhone,
+    hasAnyFields
+  });
+
   return (
-    <div className="my-4">
+    <div className="my-4" key={formKey}>
       <Card className={`max-w-md mx-auto ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <CardHeader className="pb-3">
           <CardTitle className={`text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
