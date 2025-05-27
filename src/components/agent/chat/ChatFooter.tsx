@@ -27,6 +27,7 @@ interface ChatFooterProps {
   onEmojiInsert: (emoji: string) => void;
   isConversationEnded?: boolean;
   onStartNewChat?: () => void;
+  isSubmitting?: boolean;
 }
 
 const ChatFooter: React.FC<ChatFooterProps> = ({
@@ -50,7 +51,8 @@ const ChatFooter: React.FC<ChatFooterProps> = ({
   footerClassName,
   onEmojiInsert,
   isConversationEnded = false,
-  onStartNewChat
+  onStartNewChat,
+  isSubmitting = false
 }) => (
   <div className={`flex-shrink-0 ${themeClasses.background}`}>
     {/* Rate limit error message with live countdown */}
@@ -93,6 +95,7 @@ const ChatFooter: React.FC<ChatFooterProps> = ({
       onEmojiInsert={onEmojiInsert}
       isConversationEnded={isConversationEnded}
       onStartNewChat={onStartNewChat}
+      isSubmitting={isSubmitting}
     />
   </div>
 );

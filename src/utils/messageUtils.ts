@@ -69,6 +69,20 @@ export const proceedWithMessage = async (
   // Simulate AI response after a delay
   setTimeout(async () => {
     const aiResponseText = "Thank you for your message! This is a simulated response.";
+    
+    // Check for duplicate AI response
+    const aiKey = `${conversationId || 'no-conv'}-ai-${aiResponseText}`;
+    const now = Date.now();
+    const lastAiResponse = recentMessages.get(aiKey);
+    
+    if (lastAiResponse && now - lastAiResponse < 2000) { // 2 second window for AI responses
+      console.log('Duplicate AI response detected, skipping');
+      setIsTyping(false);
+      return;
+    }
+    
+    recentMessages.set(aiKey, now);
+    
     const aiMessage: ChatMessage = {
       content: aiResponseText,
       isAgent: true,
@@ -77,10 +91,16 @@ export const proceedWithMessage = async (
 
     // Save AI message to database if conversation exists
     if (conversationId) {
+      console.log('💾 Saving AI response to conversation:', conversationId);
       const savedAiMessage = await messageService.saveMessage(conversationId, aiResponseText, true);
       if (savedAiMessage) {
         aiMessage.id = savedAiMessage.id;
+        console.log('✅ AI response saved successfully with ID:', savedAiMessage.id);
+      } else {
+        console.error('❌ Failed to save AI response to database');
       }
+    } else {
+      console.warn('⚠️ No conversation ID available for saving AI response');
     }
 
     setChatHistory(prev => {

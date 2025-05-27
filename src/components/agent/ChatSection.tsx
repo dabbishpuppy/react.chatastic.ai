@@ -247,16 +247,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     const messageText = message.trim();
     console.log('📤 Submitting message:', messageText);
     
-    // Handle the submission first (this adds user message to chatHistory)
-    await handleSubmitWithAgentId(e);
-    
-    // Create conversation if it doesn't exist (for embedded mode)
-    if (isEmbedded && !currentConversation && agentId) {
+    // Create conversation FIRST if it doesn't exist (for embedded mode)
+    let conversationToUse = currentConversation;
+    if (isEmbedded && !conversationToUse && agentId) {
       console.log('🆕 Creating conversation for embedded mode with source:', conversationSource);
       await startNewConversation();
+      // The conversation will be available in the next render, but we need it now
+      // So we'll let the message handling deal with creating it if needed
     }
     
-    // Save user message to conversation
+    // Handle the submission (this adds user message to chatHistory and triggers AI response)
+    await handleSubmitWithAgentId(e);
+    
+    // Save user message to conversation (the AI response will be saved in proceedWithMessage)
     if (currentConversation || isEmbedded) {
       console.log('💾 Saving user message to conversation');
       await saveMessage(messageText, false);

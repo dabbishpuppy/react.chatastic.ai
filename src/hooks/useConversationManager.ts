@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { conversationService, Conversation, Message } from "@/services/conversationService";
 import { ChatMessage } from "@/types/chatInterface";
@@ -63,6 +64,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
+        return conversation;
       }
     } catch (error) {
       console.error('❌ Error starting new conversation:', error);
@@ -116,13 +118,21 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
 
     try {
       console.log('💾 Saving message to conversation:', conversation.id, 'isAgent:', isAgent, 'source:', conversation.source);
-      await conversationService.addMessage(conversation.id, content, isAgent);
+      const savedMessage = await conversationService.addMessage(conversation.id, content, isAgent);
       
-      // Update conversation title with first user message
-      if (!isAgent && !conversation.title) {
-        const title = conversationService.generateConversationTitle(content);
-        await conversationService.updateConversationTitle(conversation.id, title);
-        setCurrentConversation(prev => prev ? { ...prev, title } : null);
+      if (savedMessage) {
+        console.log('✅ Message saved successfully with ID:', savedMessage.id);
+        
+        // Update conversation title with first user message
+        if (!isAgent && !conversation.title) {
+          const title = conversationService.generateConversationTitle(content);
+          await conversationService.updateConversationTitle(conversation.id, title);
+          setCurrentConversation(prev => prev ? { ...prev, title } : null);
+        }
+        
+        return savedMessage;
+      } else {
+        console.error('❌ Failed to save message to database');
       }
     } catch (error) {
       console.error('Error saving message:', error);
