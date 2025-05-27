@@ -34,14 +34,14 @@ const EmbeddedChat: React.FC = () => {
 
   // Use URL parameters if provided, otherwise use settings from database with fallbacks
   const theme = themeParam || settings?.theme || 'light';
-  const userMessageColor = userColorParam || settings?.user_message_color || '#3B82F6';
+  const userMessageColor = userColorParam || settings?.user_message_color || '#000000';
   
   // For header color:
   // 1. Use headerColorParam if provided in URL
   // 2. If not in URL but sync is enabled, use user message color
   // 3. Otherwise, use null to get default white header
   const headerColor = headerColorParam || 
-    (settings?.sync_colors ? (settings?.user_message_color || '#3B82F6') : null);
+    (settings?.sync_colors ? (settings?.user_message_color || '#000000') : null);
 
   // Use custom hooks for embedded functionality
   useEmbeddedStyles();
