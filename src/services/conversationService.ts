@@ -158,7 +158,12 @@ export const conversationService = {
 
     // Type the data properly to ensure feedback is correctly typed
     return (data || []).map(msg => ({
-      ...msg,
+      id: msg.id,
+      conversation_id: msg.conversation_id,
+      content: msg.content,
+      is_agent: msg.is_agent,
+      timestamp: msg.timestamp,
+      created_at: msg.created_at,
       feedback: msg.feedback === 'like' ? 'like' : msg.feedback === 'dislike' ? 'dislike' : null
     }));
   },

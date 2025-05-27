@@ -2,10 +2,20 @@
 import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Copy, ThumbsUp, ThumbsDown, Trash2, X } from "lucide-react";
+import { Copy, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Conversation } from "@/components/activity/ConversationData";
 import { analyticsService } from "@/services/analyticsService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ConversationViewProps {
   conversation: Conversation;
@@ -35,6 +45,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   conversationSource
 }) => {
   const [localMessages, setLocalMessages] = useState(conversation.messages);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleCopy = async (content: string) => {
     try {
@@ -54,7 +65,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   };
 
   const handleFeedback = async (messageId: string, feedbackType: "like" | "dislike") => {
-    // Find the message to update
     const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1) return;
 
@@ -62,11 +72,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     const newFeedback = currentMessage.feedback === feedbackType ? null : feedbackType;
     
     try {
-      // Update in database
       const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
       
       if (success) {
-        // Update local state
         const updatedMessages = [...localMessages];
         updatedMessages[messageIndex] = {
           ...currentMessage,
@@ -114,18 +122,15 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   const fullConversationTimeline = React.useMemo(() => {
     const timeline = [];
     
-    // Add initial message if it exists and isn't already in the messages
-    if (initialMessage && localMessages.length > 0) {
-      const firstMessage = localMessages[0];
-      if (!firstMessage || firstMessage.role !== 'assistant' || firstMessage.content !== initialMessage) {
-        timeline.push({
-          id: 'initial-message',
-          role: 'assistant' as const,
-          content: initialMessage,
-          timestamp: new Date(Date.now() - 1000).toISOString(),
-          feedback: undefined
-        });
-      }
+    // Add initial message first if it exists
+    if (initialMessage) {
+      timeline.push({
+        id: 'initial-message',
+        role: 'assistant' as const,
+        content: initialMessage,
+        timestamp: new Date(Date.now() - 1000).toISOString(),
+        feedback: undefined
+      });
     }
     
     // Add all actual conversation messages
@@ -135,127 +140,146 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     return timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [localMessages, initialMessage]);
 
+  const handleDeleteConfirm = () => {
+    onDelete();
+    setShowDeleteDialog(false);
+  };
+
   return (
-    <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
-      {/* Header */}
-      <div className={`flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-        <div className="flex items-center space-x-3">
-          <Avatar className="h-8 w-8">
-            {profilePicture ? (
-              <AvatarImage src={profilePicture} alt={displayName} />
-            ) : (
-              <AvatarFallback className="bg-gray-100" />
-            )}
-          </Avatar>
-          <div>
-            <h2 className="text-lg font-semibold">{conversation.title}</h2>
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <span>{conversation.daysAgo}</span>
-              <span>•</span>
-              <span>{conversation.source}</span>
-              {conversationStatus && (
-                <>
-                  <span>•</span>
-                  <span className="capitalize">{conversationStatus}</span>
-                </>
+    <>
+      <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
+        {/* Header */}
+        <div className={`flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="flex items-center space-x-3">
+            <Avatar className="h-8 w-8">
+              {profilePicture ? (
+                <AvatarImage src={profilePicture} alt={displayName} />
+              ) : (
+                <AvatarFallback className="bg-gray-100" />
               )}
+            </Avatar>
+            <div>
+              <h2 className="text-lg font-semibold">{conversation.title}</h2>
+              <div className="flex items-center space-x-2 text-sm text-gray-500">
+                <span>{conversation.daysAgo}</span>
+                <span>•</span>
+                <span>{conversation.source}</span>
+                {conversationStatus && (
+                  <>
+                    <span>•</span>
+                    <span className="capitalize">{conversationStatus}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
+          <div className="flex items-center space-x-2">
+            {showDeleteButton && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteDialog(true)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 size={16} />
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          {showDeleteButton && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onDelete}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              <Trash2 size={16} />
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={onClose}>
-            <X size={16} />
-          </Button>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {fullConversationTimeline.map((message, index) => (
+            <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {message.role === 'assistant' && (
+                <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+                  {profilePicture ? (
+                    <AvatarImage src={profilePicture} alt={displayName} />
+                  ) : (
+                    <AvatarFallback className="bg-gray-100" />
+                  )}
+                </Avatar>
+              )}
+              
+              <div className="flex flex-col max-w-[80%]">
+                {/* Message bubble */}
+                <div 
+                  className={`rounded-lg p-3 text-sm ${
+                    message.role === 'user' 
+                      ? 'bg-blue-500 text-white ml-auto' 
+                      : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
+                  }`}
+                  style={message.role === 'user' ? userMessageStyle : {}}
+                >
+                  {message.content}
+                </div>
+                
+                {/* Action buttons for assistant messages */}
+                {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
+                  <div className="flex items-center space-x-1 mt-2">
+                    {/* Like button */}
+                    <button
+                      onClick={() => handleFeedback(message.id, "like")}
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                        message.feedback === "like" 
+                          ? "bg-green-100 text-green-600 hover:bg-green-200" 
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                      }`}
+                      title="Like"
+                    >
+                      <ThumbsUp size={14} />
+                    </button>
+                    
+                    {/* Dislike button */}
+                    <button
+                      onClick={() => handleFeedback(message.id, "dislike")}
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+                        message.feedback === "dislike" 
+                          ? "bg-red-100 text-red-600 hover:bg-red-200" 
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+                      }`}
+                      title="Dislike"
+                    >
+                      <ThumbsDown size={14} />
+                    </button>
+                    
+                    {/* Copy button */}
+                    <button
+                      onClick={() => handleCopy(message.content)}
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+                      title="Copy"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {fullConversationTimeline.map((message, index) => (
-          <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {message.role === 'assistant' && (
-              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-                {profilePicture ? (
-                  <AvatarImage src={profilePicture} alt={displayName} />
-                ) : (
-                  <AvatarFallback className="bg-gray-100" />
-                )}
-              </Avatar>
-            )}
-            
-            <div className="flex flex-col max-w-[80%]">
-              {/* Message bubble */}
-              <div 
-                className={`rounded-lg p-3 text-sm ${
-                  message.role === 'user' 
-                    ? 'bg-blue-500 text-white ml-auto' 
-                    : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
-                }`}
-                style={message.role === 'user' ? userMessageStyle : {}}
-              >
-                {message.content}
-              </div>
-              
-              {/* Action buttons for assistant messages */}
-              {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
-                <div className="flex items-center space-x-1 mt-2">
-                  {/* Like button */}
-                  <button
-                    onClick={() => handleFeedback(message.id, "like")}
-                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
-                      message.feedback === "like" 
-                        ? "bg-green-100 text-green-600 hover:bg-green-200" 
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-                    }`}
-                    title="Like"
-                  >
-                    <ThumbsUp size={14} />
-                  </button>
-                  
-                  {/* Dislike button */}
-                  <button
-                    onClick={() => handleFeedback(message.id, "dislike")}
-                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
-                      message.feedback === "dislike" 
-                        ? "bg-red-100 text-red-600 hover:bg-red-200" 
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-                    }`}
-                    title="Dislike"
-                  >
-                    <ThumbsDown size={14} />
-                  </button>
-                  
-                  {/* Copy button */}
-                  <button
-                    onClick={() => handleCopy(message.content)}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
-                    title="Copy"
-                  >
-                    <Copy size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            {message.role === 'user' && (
-              <Avatar className="h-8 w-8 ml-2 mt-1 border-0">
-                <AvatarFallback className="bg-gray-100" />
-              </Avatar>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Conversation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this conversation? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
