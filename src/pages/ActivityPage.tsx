@@ -80,7 +80,7 @@ const ActivityPage: React.FC = () => {
       setConversations(recentConversations);
       setHasAnyConversations(recentConversations.length > 0);
       
-      // Auto-select first conversation if available
+      // Auto-select first conversation if available and no conversation is currently selected
       if (recentConversations.length > 0 && !selectedConversation) {
         const firstConversation = await convertDBConversationToUI(recentConversations[0]);
         setSelectedConversation(firstConversation);
@@ -194,11 +194,16 @@ const ActivityPage: React.FC = () => {
   };
 
   const handleConversationClick = async (conversationId: string) => {
+    console.log('Conversation clicked:', conversationId);
     const dbConversation = conversations.find(c => c.id === conversationId);
     if (dbConversation) {
+      console.log('Found DB conversation:', dbConversation);
       const uiConversation = await convertDBConversationToUI(dbConversation);
+      console.log('Converted UI conversation:', uiConversation);
       setSelectedConversation(uiConversation);
       setSelectedDBConversation(dbConversation);
+    } else {
+      console.error('Conversation not found:', conversationId);
     }
   };
 
