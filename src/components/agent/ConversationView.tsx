@@ -94,8 +94,8 @@ const ConversationView: React.FC<ConversationViewProps> = ({
               <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
             </Avatar>
           ) : (
-            <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center">
-              <span className="text-xs text-gray-600">AI</span>
+            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
+              {/* Empty div - no text */}
             </div>
           )}
           <div>
@@ -174,8 +174,8 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                     <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
                   </Avatar>
                 ) : (
-                  <div className="h-6 w-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs text-gray-600">AI</span>
+                  <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    {/* Empty div - no text */}
                   </div>
                 )
               )}
