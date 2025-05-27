@@ -7,6 +7,7 @@ import { hideWidget, showWidget, isAgentPrivate } from './agentVisibility.js';
 // Global settings
 let colorSettings = null;
 let lastVisibilityCheck = 0;
+let failedAgentIds = new Set(); // Track failed agent IDs to avoid repeated requests
 const CHECK_INTERVAL = 15000; // 15 seconds
 
 /**
@@ -15,6 +16,12 @@ const CHECK_INTERVAL = 15000; // 15 seconds
 export async function fetchColorSettingsAndVisibility(agentId) {
   if (!agentId) {
     log('No agentId provided for fetching settings');
+    return null;
+  }
+  
+  // Skip if this agent ID has failed before
+  if (failedAgentIds.has(agentId)) {
+    log(`Skipping request for failed agent ID: ${agentId}`);
     return null;
   }
   
@@ -59,6 +66,14 @@ export async function fetchColorSettingsAndVisibility(agentId) {
     } catch (parseError) {
       logError('Error parsing response:', parseError);
       return getDefaultSettings();
+    }
+    
+    // Handle agent not found error gracefully
+    if (data && data.error === 'agent_not_found') {
+      log(`Agent ${agentId} not found, marking as failed and hiding widget`);
+      failedAgentIds.add(agentId);
+      hideWidget();
+      return null;
     }
     
     // Check for visibility in the response
@@ -133,4 +148,12 @@ export function setColorSettings(settings) {
 export function shouldCheckVisibility() {
   const now = Date.now();
   return (now - lastVisibilityCheck) > CHECK_INTERVAL;
+}
+
+/**
+ * Clear failed agent IDs (useful for testing or when agents are recreated)
+ */
+export function clearFailedAgentIds() {
+  failedAgentIds.clear();
+  log('Cleared failed agent IDs cache');
 }

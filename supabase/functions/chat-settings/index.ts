@@ -54,10 +54,25 @@ serve(async (req) => {
 
     if (agentError) {
       console.error('Error fetching agent:', agentError);
+      // Return a graceful response instead of 404 when agent doesn't exist
+      if (agentError.code === 'PGRST116') {
+        console.log(`Agent ${agentId} not found - returning agent_not_found response`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'agent_not_found',
+            message: 'The requested agent does not exist or has been deleted'
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Agent not found' }),
+        JSON.stringify({ error: 'Database error occurred' }),
         { 
-          status: 404, 
+          status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );

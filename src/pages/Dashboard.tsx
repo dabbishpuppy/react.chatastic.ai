@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import TeamDashboard from "@/components/dashboard/TeamDashboard";
@@ -37,6 +37,45 @@ const Dashboard = () => {
     selectedTeam, 
     setSelectedTeam
   );
+
+  // Clear any WonderWave configurations when no agents exist
+  useEffect(() => {
+    if (!loading && teamsData.length > 0) {
+      const allAgents = teamsData.flatMap(team => team.agents || []);
+      
+      if (allAgents.length === 0) {
+        // Clear any stored WonderWave configurations
+        if (typeof window !== 'undefined') {
+          // Clear localStorage items that might contain agent references
+          const keysToRemove = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('wonderwave') || key.includes('agent'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+          
+          // Clear sessionStorage items
+          const sessionKeysToRemove = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && (key.includes('wonderwave') || key.includes('agent'))) {
+              sessionKeysToRemove.push(key);
+            }
+          }
+          sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+          
+          // Clear any global wonderwave config
+          if (window.wonderwaveConfig) {
+            delete window.wonderwaveConfig;
+          }
+          
+          console.log('Cleared WonderWave configurations - no agents exist');
+        }
+      }
+    }
+  }, [loading, teamsData]);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);

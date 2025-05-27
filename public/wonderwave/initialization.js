@@ -1,3 +1,4 @@
+
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate, shouldCheckVisibility } from './settings.js';
 import { createBubbleButton, setBubbleButton } from './ui.js';
@@ -7,6 +8,27 @@ import { showPopups } from './popups.js';
 // Keep track of initialization state
 let initialized = false;
 let visibilityCheckInterval = null;
+
+/**
+ * Check if we're on a dashboard page with no agents
+ */
+function isOnDashboardWithNoAgents() {
+  const currentPath = window.location.pathname;
+  const currentSearch = window.location.search;
+  
+  // Check if we're on dashboard
+  if (currentPath.includes('/dashboard')) {
+    // Check if there are any agents by looking at the DOM or config
+    // If no agentId is provided, assume no agents exist
+    const config = window.wonderwaveConfig;
+    if (!config || !config.agentId) {
+      log('On dashboard with no agent ID configured, skipping widget initialization');
+      return true;
+    }
+  }
+  
+  return false;
+}
 
 /**
  * Initialize the chat widget
@@ -20,6 +42,12 @@ export async function init(customConfig = {}) {
   // Check if we should prevent initialization
   if (shouldPreventInitialization()) {
     log('Skipping initialization on admin/config page');
+    return;
+  }
+  
+  // Check if we're on dashboard with no agents
+  if (isOnDashboardWithNoAgents()) {
+    log('On dashboard with no agents, skipping widget initialization');
     return;
   }
   
@@ -45,9 +73,9 @@ export async function init(customConfig = {}) {
     // Fetch visibility and color settings from the backend
     const settings = await fetchColorSettingsAndVisibility(config.agentId);
     
-    // If agent is private, don't initialize the widget
-    if (isAgentPrivate()) {
-      log('Agent is private, not initializing widget');
+    // If agent is private or doesn't exist, don't initialize the widget
+    if (isAgentPrivate() || !settings) {
+      log('Agent is private or does not exist, not initializing widget');
       return;
     }
     
@@ -99,15 +127,18 @@ export async function init(customConfig = {}) {
     // Set up visibility check interval - more frequent checks
     clearInterval(visibilityCheckInterval);
     visibilityCheckInterval = setInterval(() => {
-      // Force a re-check of visibility
-      fetchColorSettingsAndVisibility(config.agentId);
-      
-      // If agent becomes private, destroy the widget immediately
-      if (isAgentPrivate()) {
-        log('Agent became private during check interval, destroying widget');
-        destroy();
+      // Only check if we have a valid agent ID
+      if (config.agentId) {
+        // Force a re-check of visibility
+        fetchColorSettingsAndVisibility(config.agentId);
+        
+        // If agent becomes private, destroy the widget immediately
+        if (isAgentPrivate()) {
+          log('Agent became private during check interval, destroying widget');
+          destroy();
+        }
       }
-    }, 10000); // Check every 10 seconds
+    }, 30000); // Check every 30 seconds (less frequent to reduce load)
     
     log('Initialization complete');
   } catch (error) {
