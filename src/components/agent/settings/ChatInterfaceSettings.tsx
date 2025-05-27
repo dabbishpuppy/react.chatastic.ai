@@ -228,7 +228,7 @@ const ChatInterfaceSettings: React.FC = () => {
     updateSetting("sync_colors", checked);
     
     if (checked && draftSettings.bubble_color) {
-      updateSetting("user_message_color", color);
+      updateSetting("user_message_color", draftSettings.bubble_color);
     }
   };
 
