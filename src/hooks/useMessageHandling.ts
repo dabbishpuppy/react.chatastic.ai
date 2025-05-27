@@ -35,9 +35,10 @@ export const useMessageHandling = (
     countdownIntervalRef
   } = useChatState(initialMessages, isEmbedded);
 
-  // Add submission tracking to prevent double submissions
+  // Enhanced submission tracking with longer deduplication window
   const [isSubmitting, setIsSubmitting] = useState(false);
   const lastSubmissionRef = useRef<string>("");
+  const lastSubmissionTimeRef = useRef<number>(0);
 
   // Handle countdown finish - clear rate limit error
   const handleCountdownFinished = () => {
@@ -62,22 +63,37 @@ export const useMessageHandling = (
     );
   };
 
-  // Enhanced message submission with deduplication
+  // Enhanced message submission with stronger deduplication
   const submitMessage = async (text: string, agentId?: string) => {
     const trimmedText = text.trim();
+    const now = Date.now();
     
-    // Prevent duplicate submissions
-    if (isSubmitting || !trimmedText || lastSubmissionRef.current === trimmedText) {
-      console.log('Submission blocked - duplicate or empty');
+    // Enhanced duplicate prevention with 2-second window
+    if (isSubmitting || 
+        !trimmedText || 
+        lastSubmissionRef.current === trimmedText ||
+        (now - lastSubmissionTimeRef.current < 2000)) {
+      console.log('🚫 Submission blocked:', {
+        isSubmitting,
+        emptyText: !trimmedText,
+        duplicateText: lastSubmissionRef.current === trimmedText,
+        tooSoon: now - lastSubmissionTimeRef.current < 2000,
+        timeSinceLastSubmission: now - lastSubmissionTimeRef.current
+      });
       return;
     }
 
+    console.log('📤 Starting message submission:', {
+      text: trimmedText.substring(0, 50) + '...',
+      agentId,
+      conversationId
+    });
+
     setIsSubmitting(true);
     lastSubmissionRef.current = trimmedText;
+    lastSubmissionTimeRef.current = now;
     
     try {
-      console.log('Submitting message:', trimmedText);
-      
       // Clear input immediately
       setMessage("");
       
@@ -86,7 +102,7 @@ export const useMessageHandling = (
         const rateLimitStatus = await checkRateLimit(agentId);
         
         if (rateLimitStatus.exceeded) {
-          console.log('Rate limit exceeded');
+          console.log('🚫 Rate limit exceeded');
           setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
           if (rateLimitStatus.timeUntilReset) {
             setTimeUntilReset(rateLimitStatus.timeUntilReset);
@@ -98,13 +114,21 @@ export const useMessageHandling = (
         await recordMessage(agentId);
       }
       
-      // Add message to chat and proceed
+      // Add message to chat and proceed (this will handle the database save)
       await proceedWithMessageWrapper(trimmedText);
+      
+      console.log('✅ Message submission completed successfully');
+    } catch (error) {
+      console.error('❌ Error during message submission:', error);
     } finally {
-      // Reset submission state after a short delay
+      // Extended reset delay to prevent rapid resubmission
       setTimeout(() => {
         setIsSubmitting(false);
-        lastSubmissionRef.current = "";
+        // Clear the last submission after 2 seconds to allow legitimate resubmissions
+        setTimeout(() => {
+          lastSubmissionRef.current = "";
+          lastSubmissionTimeRef.current = 0;
+        }, 2000);
       }, 1000);
     }
   };
@@ -113,6 +137,12 @@ export const useMessageHandling = (
     e.preventDefault();
     
     if (!message.trim() || isTyping || rateLimitError || isSubmitting) {
+      console.log('🚫 Submit blocked:', {
+        emptyMessage: !message.trim(),
+        isTyping,
+        rateLimitError: !!rateLimitError,
+        isSubmitting
+      });
       return;
     }
 
@@ -125,7 +155,14 @@ export const useMessageHandling = (
   };
 
   const handleSuggestedMessageClick = async (text: string, agentId?: string) => {
-    if (isTyping || rateLimitError || isSubmitting) return;
+    if (isTyping || rateLimitError || isSubmitting) {
+      console.log('🚫 Suggested message click blocked:', {
+        isTyping,
+        rateLimitError: !!rateLimitError,
+        isSubmitting
+      });
+      return;
+    }
     
     await submitMessage(text, agentId);
     
@@ -187,6 +224,6 @@ export const useMessageHandling = (
     submitMessage,
     handleCountdownFinished,
     cleanup,
-    isSubmitting // Export for UI state
+    isSubmitting
   };
 };

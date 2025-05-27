@@ -24,7 +24,7 @@ interface ChatInputProps {
   onEmojiInsert: (emoji: string) => void;
   isConversationEnded?: boolean;
   onStartNewChat?: () => void;
-  isSubmitting?: boolean; // New prop for submission state
+  isSubmitting?: boolean;
 }
 
 // Emoji list for the emoji picker
@@ -63,20 +63,34 @@ const ChatInput: React.FC<ChatInputProps> = ({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (message.trim() && !isWaitingForRateLimit && !isSubmitting) {
+        console.log('⌨️ Enter key pressed, submitting message');
         onSubmit(e as any);
+      } else {
+        console.log('🚫 Enter key blocked:', {
+          emptyMessage: !message.trim(),
+          isWaitingForRateLimit,
+          isSubmitting
+        });
       }
     }
   };
 
-  // Handle send button click
+  // Handle send button click with enhanced logging
   const handleSendClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (message.trim() && !isWaitingForRateLimit && !isSubmitting) {
+      console.log('🖱️ Send button clicked, submitting message');
       const syntheticEvent = {
         preventDefault: () => {},
         stopPropagation: () => {}
       } as React.FormEvent;
       onSubmit(syntheticEvent);
+    } else {
+      console.log('🚫 Send button click blocked:', {
+        emptyMessage: !message.trim(),
+        isWaitingForRateLimit,
+        isSubmitting
+      });
     }
   };
 
@@ -186,7 +200,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           type="button" 
           size="sm" 
           variant="ghost"
-          className={`absolute right-1 rounded-full h-8 w-8 ${iconButtonClass}`}
+          className={`absolute right-1 rounded-full h-8 w-8 ${iconButtonClass} ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={!message.trim() || isInputDisabled}
           onClick={handleSendClick}
         >

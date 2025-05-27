@@ -3,8 +3,35 @@ import { supabase } from "@/integrations/supabase/client";
 import { Message, validateFeedback } from "./types";
 
 export const messageOperations = {
-  // Add message to conversation
+  // Add message to conversation with duplicate prevention
   async addMessage(conversationId: string, content: string, isAgent: boolean): Promise<Message | null> {
+    // First check for recent duplicates (within 2 seconds)
+    const twoSecondsAgo = new Date(Date.now() - 2000).toISOString();
+    
+    const { data: existingMessages } = await supabase
+      .from('messages')
+      .select('id, content, timestamp')
+      .eq('conversation_id', conversationId)
+      .eq('content', content)
+      .eq('is_agent', isAgent)
+      .gte('timestamp', twoSecondsAgo);
+
+    if (existingMessages && existingMessages.length > 0) {
+      console.log('🚫 Duplicate message detected, skipping save:', {
+        content: content.substring(0, 50) + '...',
+        existingCount: existingMessages.length,
+        conversationId
+      });
+      return existingMessages[0] as Message;
+    }
+
+    console.log('💾 Saving new message:', {
+      conversationId,
+      content: content.substring(0, 50) + '...',
+      isAgent,
+      timestamp: new Date().toISOString()
+    });
+
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -17,9 +44,11 @@ export const messageOperations = {
       .single();
 
     if (error) {
-      console.error('Error adding message:', error);
+      console.error('❌ Error adding message:', error);
       return null;
     }
+
+    console.log('✅ Message saved successfully with ID:', data.id);
 
     // Apply the same type validation as in getMessages
     const message: Message = {

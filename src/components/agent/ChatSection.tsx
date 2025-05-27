@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -240,12 +241,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
   }, [isEmbedded, effectiveLeadSettings?.enabled, effectiveLeadSettings?.collect_name, effectiveLeadSettings?.collect_email, effectiveLeadSettings?.collect_phone, effectiveLeadSettings?.title, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory, scrollToBottom]);
 
-  // Enhanced message submission with proper conversation and lead form management
+  // FIXED: Enhanced message submission - removed redundant saveMessage call
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
     if (!message.trim() || isTyping || rateLimitError || isSubmitting) return;
     
     const messageText = message.trim();
-    console.log('📤 Submitting message:', messageText);
+    console.log('📤 Submitting message through ChatSection:', {
+      message: messageText.substring(0, 50) + '...',
+      hasConversation: !!currentConversation,
+      conversationId: currentConversation?.id
+    });
     
     // Create conversation FIRST if it doesn't exist (for embedded mode)
     let conversationToUse = currentConversation;
@@ -256,14 +261,11 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       // So we'll let the message handling deal with creating it if needed
     }
     
-    // Handle the submission (this adds user message to chatHistory and triggers AI response)
+    // FIXED: Only handle the submission once - proceedWithMessage will save the message
+    // Removed the redundant saveMessage call that was causing duplicates
     await handleSubmitWithAgentId(e);
     
-    // Save user message to conversation (the AI response will be saved in proceedWithMessage)
-    if (currentConversation || isEmbedded) {
-      console.log('💾 Saving user message to conversation');
-      await saveMessage(messageText, false);
-    }
+    console.log('✅ Message submission completed');
   };
 
   const handleStartNewChat = async () => {

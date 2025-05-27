@@ -1,14 +1,14 @@
 import { ChatMessage } from "@/types/chatInterface";
 import { messageService } from "@/services/messageService";
 
-// Track recent messages to prevent duplicates
+// Track recent messages to prevent duplicates - expanded to 2 seconds
 const recentMessages = new Map<string, number>();
 
 // Clean up old entries every 30 seconds
 setInterval(() => {
   const now = Date.now();
   for (const [key, timestamp] of recentMessages.entries()) {
-    if (now - timestamp > 5000) { // Remove entries older than 5 seconds
+    if (now - timestamp > 2000) { // Remove entries older than 2 seconds
       recentMessages.delete(key);
     }
   }
@@ -19,7 +19,12 @@ const isDuplicateMessage = (content: string, conversationId?: string): boolean =
   const now = Date.now();
   const lastSubmitted = recentMessages.get(key);
   
-  if (lastSubmitted && now - lastSubmitted < 1000) { // 1 second window
+  if (lastSubmitted && now - lastSubmitted < 2000) { // Expanded to 2 second window
+    console.log('🚫 Client-side duplicate detected:', {
+      content: content.substring(0, 50) + '...',
+      timeSinceLastMessage: now - lastSubmitted,
+      conversationId
+    });
     return true;
   }
   
@@ -38,9 +43,15 @@ export const proceedWithMessage = async (
 ) => {
   const trimmedText = text.trim();
   
+  console.log('📤 Processing user message:', {
+    content: trimmedText.substring(0, 50) + '...',
+    conversationId,
+    isEmbedded
+  });
+  
   // Check for duplicate message
   if (isDuplicateMessage(trimmedText, conversationId)) {
-    console.log('Duplicate message detected, skipping:', trimmedText);
+    console.log('🚫 Duplicate message detected, skipping:', trimmedText.substring(0, 50) + '...');
     return;
   }
 
@@ -52,15 +63,19 @@ export const proceedWithMessage = async (
 
   // Save user message to database if conversation exists
   if (conversationId) {
+    console.log('💾 Saving user message to conversation:', conversationId);
     const savedUserMessage = await messageService.saveMessage(conversationId, trimmedText, false);
     if (savedUserMessage) {
       userMessage.id = savedUserMessage.id;
+      console.log('✅ User message saved with ID:', savedUserMessage.id);
+    } else {
+      console.error('❌ Failed to save user message to database');
     }
   }
 
-  // Add user message immediately
+  // Add user message immediately to UI
   setChatHistory(prev => {
-    console.log('📝 Adding user message to chat history');
+    console.log('📝 Adding user message to chat history UI');
     return [...prev, userMessage];
   });
   setUserHasMessaged(true);
@@ -70,13 +85,13 @@ export const proceedWithMessage = async (
   setTimeout(async () => {
     const aiResponseText = "Thank you for your message! This is a simulated response.";
     
-    // Check for duplicate AI response
+    // Check for duplicate AI response with expanded window
     const aiKey = `${conversationId || 'no-conv'}-ai-${aiResponseText}`;
     const now = Date.now();
     const lastAiResponse = recentMessages.get(aiKey);
     
-    if (lastAiResponse && now - lastAiResponse < 2000) { // 2 second window for AI responses
-      console.log('Duplicate AI response detected, skipping');
+    if (lastAiResponse && now - lastAiResponse < 2000) { // Expanded to 2 second window for AI responses
+      console.log('🚫 Duplicate AI response detected, skipping');
       setIsTyping(false);
       return;
     }
@@ -104,7 +119,7 @@ export const proceedWithMessage = async (
     }
 
     setChatHistory(prev => {
-      console.log('🤖 Adding AI response to chat history');
+      console.log('🤖 Adding AI response to chat history UI');
       return [...prev, aiMessage];
     });
     setIsTyping(false);
