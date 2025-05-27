@@ -287,11 +287,17 @@ export const useChatSettings = () => {
     console.log('💾 Saving draft settings:', draftSettings);
     
     try {
-      const updatedSettings = await saveChatSettings({
+      // Prepare settings to save - ensure null values are preserved
+      const settingsToSave = {
         ...draftSettings,
+        // Explicitly handle null values for removed images
+        profile_picture: draftSettings.profile_picture === null ? null : draftSettings.profile_picture,
+        chat_icon: draftSettings.chat_icon === null ? null : draftSettings.chat_icon,
         // Only include agent_id if we have a valid one
         ...(validAgentId && { agent_id: validAgentId })
-      });
+      };
+      
+      const updatedSettings = await saveChatSettings(settingsToSave);
       
       if (updatedSettings) {
         console.log('✅ Settings saved successfully:', updatedSettings);
@@ -300,7 +306,7 @@ export const useChatSettings = () => {
         
         // Small delay to ensure database is updated before notifying
         setTimeout(() => {
-          // Notify embedded components about the change
+          // Notify embedded components about the change with the updated settings
           notifySettingsChange(updatedSettings);
           
           toast({
