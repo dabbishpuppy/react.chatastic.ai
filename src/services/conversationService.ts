@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -158,7 +159,7 @@ export const conversationService = {
     // Type the data properly to ensure feedback is correctly typed
     return (data || []).map(msg => ({
       ...msg,
-      feedback: msg.feedback as 'like' | 'dislike' | null
+      feedback: msg.feedback === 'like' ? 'like' : msg.feedback === 'dislike' ? 'dislike' : null
     }));
   },
 
