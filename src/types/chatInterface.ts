@@ -44,8 +44,8 @@ export const defaultChatSettings: ChatInterfaceSettings = {
   bubble_position: 'right',
   show_suggestions_after_chat: true,
   auto_show_delay: 1,
-  user_message_color: '#3B82F6',
-  bubble_color: '#3B82F6',
+  user_message_color: '#000000',
+  bubble_color: '#000000',
   sync_colors: false,
-  primary_color: '#3B82F6'
+  primary_color: '#000000'
 }

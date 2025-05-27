@@ -334,9 +334,9 @@ const ChatInterfaceSettings: React.FC = () => {
                   User message color
                 </label>
                 <ColorPicker
-                  color={draftSettings.user_message_color || "#3B82F6"}
+                  color={draftSettings.user_message_color || "#000000"}
                   onChange={(color) => updateSetting("user_message_color", color)}
-                  onReset={() => updateSetting("user_message_color", "#3B82F6")}
+                  onReset={() => updateSetting("user_message_color", "#000000")}
                 />
                 
                 <div className="flex items-center mt-2">
@@ -357,9 +357,9 @@ const ChatInterfaceSettings: React.FC = () => {
                   Chat bubble button color
                 </label>
                 <ColorPicker
-                  color={draftSettings.bubble_color || "#3B82F6"}
+                  color={draftSettings.bubble_color || "#000000"}
                   onChange={handleBubbleColorChange}
-                  onReset={() => updateSetting("bubble_color", "#3B82F6")}
+                  onReset={() => updateSetting("bubble_color", "#000000")}
                 />
               </div>
               
@@ -493,33 +493,25 @@ const ChatInterfaceSettings: React.FC = () => {
             </div>
           </div>
           
-          {/* Only show the chat bubble button color preview when there's no chat icon */}
-          {showChatIconInPreview && (
-            <div className="mt-4 flex justify-end">
-              <div 
-                className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
-                style={{ backgroundColor: draftSettings.bubble_color || "#3B82F6" }}
-              >
-                <span className="text-white text-xl">💬</span>
-              </div>
-            </div>
-          )}
-
-          {/* Show the chat icon when available */}
-          {draftSettings.chat_icon && (
-            <div className="mt-4 flex justify-end">
-              <div 
-                className="h-20 w-20 rounded-full shadow-lg overflow-hidden"
-                style={{ backgroundColor: draftSettings.bubble_color || "#3B82F6" }}
-              >
+          {/* Chat bubble preview with black default */}
+          <div className="mt-4 flex justify-end">
+            <div 
+              className="h-16 w-16 rounded-full shadow-lg flex items-center justify-center overflow-hidden"
+              style={{ backgroundColor: draftSettings.bubble_color || "#000000" }}
+            >
+              {draftSettings.chat_icon ? (
                 <img 
                   src={draftSettings.chat_icon} 
                   alt="Chat Icon"
                   className="h-full w-full object-cover" 
                 />
-              </div>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

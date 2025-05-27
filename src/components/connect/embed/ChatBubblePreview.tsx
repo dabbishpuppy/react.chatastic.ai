@@ -9,13 +9,13 @@ export const ChatBubblePreview: React.FC<ChatBubblePreviewProps> = ({ settings }
   // Determine the background style based on whether a chat icon is available
   const backgroundStyle = settings.chat_icon 
     ? {
-        backgroundColor: settings.bubble_color || "#3B82F6",
+        backgroundColor: settings.bubble_color || "#000000",
         backgroundImage: `url(${settings.chat_icon})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }
     : {
-        backgroundColor: settings.bubble_color || "#3B82F6"
+        backgroundColor: settings.bubble_color || "#000000"
       };
 
   return (

@@ -70,15 +70,12 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8 border-0">
-              {profilePicture ? (
+            {profilePicture && (
+              <Avatar className="h-8 w-8 border-0">
                 <AvatarImage src={profilePicture} alt={agentName} />
-              ) : (
-                <AvatarFallback className="bg-gray-200 text-gray-600">
-                  {agentName.charAt(0)}
-                </AvatarFallback>
-              )}
-            </Avatar>
+                <AvatarFallback className="bg-transparent" />
+              </Avatar>
+            )}
             <div>
               <h3 className="font-medium">{agentName}</h3>
               {showEndedMessage && (
