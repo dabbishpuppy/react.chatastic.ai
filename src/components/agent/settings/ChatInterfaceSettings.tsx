@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -153,6 +154,9 @@ const ChatInterfaceSettings: React.FC = () => {
 
   // Determine the header color based on sync settings
   const headerColor = syncColorWithHeader ? settings.user_message_color : null;
+
+  // Get the current theme for proper styling
+  const currentTheme = settings.theme || 'light';
 
   return (
     <div className="flex flex-col md:flex-row border-t">
@@ -429,8 +433,12 @@ const ChatInterfaceSettings: React.FC = () => {
       {/* Right panel - Chat Preview */}
       <div className="w-full md:w-2/5 border-l">
         <div className="p-6 sticky top-0">
-          <div className="w-full max-w-md mx-auto h-[700px] bg-white rounded-lg shadow overflow-hidden flex flex-col">
-            <div className="text-center py-2 text-sm text-gray-500 border-b">
+          <div className={`w-full max-w-md mx-auto h-[700px] rounded-lg shadow overflow-hidden flex flex-col ${
+            currentTheme === 'dark' ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            <div className={`text-center py-2 text-sm border-b ${
+              currentTheme === 'dark' ? 'text-gray-400 border-gray-700' : 'text-gray-500 border-gray-200'
+            }`}>
               Chat Preview
             </div>
             <div className="flex-1 overflow-hidden">
@@ -442,7 +450,7 @@ const ChatInterfaceSettings: React.FC = () => {
                 showSuggestions={settings.show_suggestions_after_chat}
                 showFeedback={settings.show_feedback}
                 allowRegenerate={settings.allow_regenerate}
-                theme={settings.theme}
+                theme={currentTheme}
                 profilePicture={settings.profile_picture || undefined}
                 footer={settings.footer || undefined}
                 userMessageColor={settings.user_message_color}
@@ -467,7 +475,10 @@ const ChatInterfaceSettings: React.FC = () => {
           {/* Show the chat icon when available */}
           {settings.chat_icon && (
             <div className="mt-4 flex justify-end">
-              <div className="h-20 w-20 rounded-full shadow-lg overflow-hidden">
+              <div 
+                className="h-20 w-20 rounded-full shadow-lg overflow-hidden"
+                style={{ backgroundColor: settings.bubble_color || "#3B82F6" }}
+              >
                 <img 
                   src={settings.chat_icon} 
                   alt="Chat Icon"
