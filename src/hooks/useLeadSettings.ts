@@ -46,11 +46,11 @@ export const useLeadSettings = (agentId: string) => {
         console.log('🔍 useLeadSettings: Found existing settings:', data);
         setSettings(data);
       } else {
-        console.log('🔍 useLeadSettings: No settings found, creating default settings');
-        // Create default settings only when we have a valid agentId
+        console.log('🔍 useLeadSettings: No settings found, creating default settings with enabled=true');
+        // Create default settings with enabled=true so lead form will show
         const defaultSettings: Omit<LeadSettings, 'id'> = {
           agent_id: agentId,
-          enabled: false,
+          enabled: true, // Changed from false to true
           title: 'Get in touch with us',
           collect_name: true,
           name_placeholder: 'Full name',
