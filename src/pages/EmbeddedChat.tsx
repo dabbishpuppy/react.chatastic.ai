@@ -9,7 +9,7 @@ import { AlertCircle } from "lucide-react";
 const EmbeddedChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [searchParams] = useSearchParams();
-  const { settings, leadSettings, isLoading } = useChatSettings();
+  const { settings, leadSettings, isLoading, refreshSettings } = useChatSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const [agentVisibility, setAgentVisibility] = useState<string | null>(null);
   const [visibilityLoading, setVisibilityLoading] = useState(true);
@@ -32,6 +32,28 @@ const EmbeddedChat: React.FC = () => {
   // 3. Otherwise, use null to get default white header
   const headerColor = headerColorParam || 
     (settings?.sync_colors ? settings?.user_message_color : null);
+  
+  // Listen for settings refresh messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      console.log('📨 EmbeddedChat received message:', event.data);
+      
+      if (event.data?.type === 'wonderwave-refresh-settings' || 
+          event.data?.type === 'lead-settings-updated') {
+        const messageAgentId = event.data.agentId;
+        if (messageAgentId === agentId) {
+          console.log('🔄 Refreshing settings due to external update');
+          refreshSettings();
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [agentId, refreshSettings]);
   
   // Fetch agent visibility when the component mounts
   useEffect(() => {

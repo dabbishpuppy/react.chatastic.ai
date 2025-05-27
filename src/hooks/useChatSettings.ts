@@ -15,10 +15,10 @@ export const useChatSettings = () => {
   // Check if agentId is valid (not undefined or the string "undefined")
   const validAgentId = agentId && agentId !== "undefined" ? agentId : null;
 
-  const loadSettingsFromEdgeFunction = async (agentId: string) => {
+  const loadSettingsFromEdgeFunction = async (agentId: string, bustCache = false) => {
     try {
       console.log('📡 Loading settings from edge function for agent:', agentId);
-      const timestamp = Date.now();
+      const timestamp = bustCache ? Date.now() : '';
       const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}&_t=${timestamp}`, {
         headers: {
           'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
@@ -68,6 +68,45 @@ export const useChatSettings = () => {
     }
     
     return [];
+  };
+
+  // Function to refresh settings from server
+  const refreshSettings = async () => {
+    if (!validAgentId) return;
+    
+    console.log('🔄 Refreshing settings for agent:', validAgentId);
+    const edgeData = await loadSettingsFromEdgeFunction(validAgentId, true);
+    
+    if (edgeData && edgeData.visibility !== 'private') {
+      console.log('✅ Refreshed settings from edge function:', edgeData);
+      
+      setSettings({
+        ...defaultChatSettings,
+        agent_id: validAgentId,
+        display_name: edgeData.display_name,
+        initial_message: edgeData.initial_message,
+        message_placeholder: edgeData.message_placeholder,
+        theme: edgeData.theme,
+        profile_picture: edgeData.profile_picture,
+        chat_icon: edgeData.chat_icon,
+        bubble_position: edgeData.bubble_position,
+        footer: edgeData.footer,
+        user_message_color: edgeData.user_message_color,
+        bubble_color: edgeData.bubble_color,
+        sync_colors: edgeData.sync_colors,
+        primary_color: edgeData.primary_color,
+        show_feedback: edgeData.show_feedback,
+        allow_regenerate: edgeData.allow_regenerate,
+        suggested_messages: ensureSuggestedMessagesArray(edgeData.suggested_messages),
+        show_suggestions_after_chat: edgeData.show_suggestions_after_chat,
+        auto_show_delay: edgeData.auto_show_delay
+      });
+
+      if (edgeData.lead_settings) {
+        console.log('📋 Refreshed lead settings:', edgeData.lead_settings);
+        setLeadSettings(edgeData.lead_settings);
+      }
+    }
   };
 
   useEffect(() => {
@@ -145,11 +184,56 @@ export const useChatSettings = () => {
     key: K, 
     value: ChatInterfaceSettings[K]
   ) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    console.log(`🔧 Updating setting ${String(key)}:`, value);
+    setSettings(prev => {
+      const newSettings = { ...prev, [key]: value };
+      console.log('🔧 New settings state:', newSettings);
+      return newSettings;
+    });
+  };
+
+  // Function to notify embedded components about settings changes
+  const notifySettingsChange = (settingsToNotify: ChatInterfaceSettings) => {
+    console.log('📢 Notifying settings change to embedded components');
+    
+    // Send message to all iframes on the page
+    const iframes = document.querySelectorAll('iframe[src*="/embed/"]');
+    iframes.forEach(iframe => {
+      if (iframe.contentWindow) {
+        console.log('📤 Sending settings update to iframe');
+        iframe.contentWindow.postMessage({
+          type: 'wonderwave-refresh-settings',
+          agentId: validAgentId,
+          settings: settingsToNotify
+        }, '*');
+      }
+    });
+
+    // Send message to parent window (in case this settings page is embedded)
+    if (window.parent !== window) {
+      console.log('📤 Sending settings update to parent window');
+      window.parent.postMessage({
+        type: 'wonderwave-refresh-settings',
+        agentId: validAgentId,
+        settings: settingsToNotify
+      }, '*');
+    }
+
+    // Send message to any wonderwave widgets on external sites
+    if (window.opener) {
+      console.log('📤 Sending settings update to opener window');
+      window.opener.postMessage({
+        type: 'wonderwave-refresh-settings',
+        agentId: validAgentId,
+        settings: settingsToNotify
+      }, '*');
+    }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
+    console.log('💾 Saving settings:', settings);
+    
     try {
       const updatedSettings = await saveChatSettings({
         ...settings,
@@ -158,12 +242,21 @@ export const useChatSettings = () => {
       });
       
       if (updatedSettings) {
+        console.log('✅ Settings saved successfully:', updatedSettings);
         setSettings(updatedSettings);
-        toast({
-          title: "Settings saved",
-          description: "Your chat interface settings have been updated successfully."
-        });
+        
+        // Notify embedded components about the change
+        notifySettingsChange(updatedSettings);
+        
+        // Small delay to ensure the message is sent before showing success
+        setTimeout(() => {
+          toast({
+            title: "Settings saved",
+            description: "Your chat interface settings have been updated successfully."
+          });
+        }, 100);
       } else {
+        console.error('❌ Failed to save settings - no data returned');
         toast({
           title: "Error",
           description: "Failed to save settings. Please try again.",
@@ -171,7 +264,7 @@ export const useChatSettings = () => {
         });
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('❌ Error saving settings:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -270,6 +363,7 @@ export const useChatSettings = () => {
     addSuggestedMessage,
     updateSuggestedMessage,
     deleteSuggestedMessage,
-    uploadImage
+    uploadImage,
+    refreshSettings
   };
 };

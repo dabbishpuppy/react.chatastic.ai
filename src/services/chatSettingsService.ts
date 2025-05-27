@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { Json } from "@/integrations/supabase/types";
@@ -42,27 +41,42 @@ const validateBubblePosition = (position: string): 'left' | 'right' => {
 
 export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise<ChatInterfaceSettings | null> => {
   try {
+    console.log('💾 Saving chat settings to database:', settings);
+    
+    // Validate the settings before saving
+    if (!settings.theme) {
+      console.warn('⚠️ No theme specified, defaulting to light');
+      settings.theme = 'light';
+    }
+    
+    if (!settings.suggested_messages) {
+      console.warn('⚠️ No suggested messages, defaulting to empty array');
+      settings.suggested_messages = [];
+    }
+    
     // If no agent_id is provided, create/update settings without associating with an agent
     const settingsData = {
-      initial_message: settings.initial_message,
+      initial_message: settings.initial_message || '👋 Hi! How can I help you today?',
       suggested_messages: JSON.stringify(settings.suggested_messages),
-      message_placeholder: settings.message_placeholder,
-      show_feedback: settings.show_feedback,
-      allow_regenerate: settings.allow_regenerate,
-      theme: settings.theme,
-      display_name: settings.display_name,
+      message_placeholder: settings.message_placeholder || 'Write message here...',
+      show_feedback: settings.show_feedback ?? true,
+      allow_regenerate: settings.allow_regenerate ?? true,
+      theme: validateTheme(settings.theme),
+      display_name: settings.display_name || 'AI Assistant',
       profile_picture: settings.profile_picture,
       chat_icon: settings.chat_icon,
-      bubble_position: settings.bubble_position,
-      show_suggestions_after_chat: settings.show_suggestions_after_chat,
-      auto_show_delay: settings.auto_show_delay,
+      bubble_position: validateBubblePosition(settings.bubble_position || 'right'),
+      show_suggestions_after_chat: settings.show_suggestions_after_chat ?? true,
+      auto_show_delay: settings.auto_show_delay ?? 1,
       footer: settings.footer,
-      user_message_color: settings.user_message_color,
-      bubble_color: settings.bubble_color,
-      sync_colors: settings.sync_colors,
-      primary_color: settings.primary_color,
+      user_message_color: settings.user_message_color || '#3B82F6',
+      bubble_color: settings.bubble_color || '#3B82F6',
+      sync_colors: settings.sync_colors ?? false,
+      primary_color: settings.primary_color || '#3B82F6',
       updated_at: new Date().toISOString(),
     };
+    
+    console.log('💾 Prepared settings data for save:', settingsData);
     
     // Only include agent_id if it exists and is valid
     if (settings.agent_id && settings.agent_id !== "undefined") {
@@ -71,6 +85,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
 
     if (settings.id) {
       // Update existing settings
+      console.log('📝 Updating existing settings with ID:', settings.id);
       const { data, error } = await supabase
         .from("chat_interface_settings")
         .update(settingsData)
@@ -79,9 +94,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .single();
 
       if (error) {
-        console.error('Error updating settings:', error);
+        console.error('❌ Error updating settings:', error);
         throw error;
       }
+      
+      console.log('✅ Settings updated successfully:', data);
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
@@ -94,6 +111,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       return result;
     } else {
       // Create new settings
+      console.log('🆕 Creating new settings');
       const { data, error } = await supabase
         .from("chat_interface_settings")
         .insert(settingsData)
@@ -101,9 +119,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .single();
 
       if (error) {
-        console.error('Error creating settings:', error);
+        console.error('❌ Error creating settings:', error);
         throw error;
       }
+      
+      console.log('✅ Settings created successfully:', data);
       
       // Transform to expected type
       const result: ChatInterfaceSettings = {
@@ -116,7 +136,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       return result;
     }
   } catch (error) {
-    console.error('Error saving chat settings:', error);
+    console.error('❌ Error saving chat settings:', error);
     return null;
   }
 };

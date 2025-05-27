@@ -41,8 +41,9 @@ function handleRefreshMessage(event) {
       if (iframe && iframe.contentWindow) {
         log('Forwarding settings update to iframe');
         iframe.contentWindow.postMessage({
-          type: 'lead-settings-updated',
-          agentId: agentId
+          type: 'wonderwave-refresh-settings',
+          agentId: agentId,
+          settings: event.data.settings
         }, '*');
       }
     }
