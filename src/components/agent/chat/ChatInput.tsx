@@ -24,6 +24,7 @@ interface ChatInputProps {
   onEmojiInsert: (emoji: string) => void;
   isConversationEnded?: boolean;
   onStartNewChat?: () => void;
+  isSubmitting?: boolean; // New prop for submission state
 }
 
 // Emoji list for the emoji picker
@@ -47,28 +48,30 @@ const ChatInput: React.FC<ChatInputProps> = ({
   textClass,
   onEmojiInsert,
   isConversationEnded = false,
-  onStartNewChat
+  onStartNewChat,
+  isSubmitting = false
 }) => {
   // Handle input change - properly handle space and other characters
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMessage(e.target.value);
+    if (!isSubmitting) {
+      setMessage(e.target.value);
+    }
   };
 
   // Handle key press for form submission
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (message.trim() && !isWaitingForRateLimit) {
+      if (message.trim() && !isWaitingForRateLimit && !isSubmitting) {
         onSubmit(e as any);
       }
     }
-    // Allow space and other keys to work normally - don't prevent default
   };
 
   // Handle send button click
   const handleSendClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (message.trim() && !isWaitingForRateLimit) {
+    if (message.trim() && !isWaitingForRateLimit && !isSubmitting) {
       const syntheticEvent = {
         preventDefault: () => {},
         stopPropagation: () => {}
@@ -81,6 +84,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const getPlaceholderText = () => {
     if (isConversationEnded) {
       return "Your conversation has ended";
+    }
+    if (isSubmitting) {
+      return "Sending...";
     }
     if (isWaitingForRateLimit) {
       return "Checking rate limit...";
@@ -130,6 +136,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
     );
   }
 
+  const isInputDisabled = isWaitingForRateLimit || isSubmitting;
+
   return (
     <div className="border-t p-4">
       <form onSubmit={onSubmit} className="flex items-center w-full relative">
@@ -139,7 +147,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               variant="ghost" 
               size="icon"
               className={`absolute left-1 top-1/2 -translate-y-1/2 h-8 w-8 z-10 ${iconButtonClass}`}
-              disabled={isWaitingForRateLimit}
+              disabled={isInputDisabled}
               type="button"
             >
               <Smile size={18} />
@@ -153,7 +161,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   variant="ghost"
                   className={`h-8 w-8 p-0 ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                   onClick={() => onEmojiInsert(emoji)}
-                  disabled={isWaitingForRateLimit}
+                  disabled={isInputDisabled}
                   type="button"
                 >
                   {emoji}
@@ -170,7 +178,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onKeyDown={handleKeyDown}
           placeholder={getPlaceholderText()}
           className={`w-full border rounded-full px-4 py-3 pr-12 pl-10 focus:outline-none focus:ring-1 focus:ring-primary ${inputBackgroundClass} ${inputTextClass}`}
-          disabled={isWaitingForRateLimit}
+          disabled={isInputDisabled}
           autoComplete="off"
           spellCheck="false"
         />
@@ -179,7 +187,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           size="sm" 
           variant="ghost"
           className={`absolute right-1 rounded-full h-8 w-8 ${iconButtonClass}`}
-          disabled={!message.trim() || isWaitingForRateLimit}
+          disabled={!message.trim() || isInputDisabled}
           onClick={handleSendClick}
         >
           <SendIcon size={16} />

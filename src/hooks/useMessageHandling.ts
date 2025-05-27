@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import { useChatState } from "./useChatState";
 import { checkRateLimit, recordMessage } from "@/utils/rateLimitUtils";
@@ -35,6 +35,10 @@ export const useMessageHandling = (
     countdownIntervalRef
   } = useChatState(initialMessages, isEmbedded);
 
+  // Add submission tracking to prevent double submissions
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const lastSubmissionRef = useRef<string>("");
+
   // Handle countdown finish - clear rate limit error
   const handleCountdownFinished = () => {
     setRateLimitError(null);
@@ -58,37 +62,59 @@ export const useMessageHandling = (
     );
   };
 
-  // Enhanced message submission with rate limiting
+  // Enhanced message submission with deduplication
   const submitMessage = async (text: string, agentId?: string) => {
-    console.log('Submitting message:', text);
+    const trimmedText = text.trim();
     
-    // Clear input immediately
-    setMessage("");
+    // Prevent duplicate submissions
+    if (isSubmitting || !trimmedText || lastSubmissionRef.current === trimmedText) {
+      console.log('Submission blocked - duplicate or empty');
+      return;
+    }
+
+    setIsSubmitting(true);
+    lastSubmissionRef.current = trimmedText;
     
-    // Check rate limit if agentId is provided
-    if (agentId) {
-      const rateLimitStatus = await checkRateLimit(agentId);
+    try {
+      console.log('Submitting message:', trimmedText);
       
-      if (rateLimitStatus.exceeded) {
-        console.log('Rate limit exceeded');
-        setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
-        if (rateLimitStatus.timeUntilReset) {
-          setTimeUntilReset(rateLimitStatus.timeUntilReset);
+      // Clear input immediately
+      setMessage("");
+      
+      // Check rate limit if agentId is provided
+      if (agentId) {
+        const rateLimitStatus = await checkRateLimit(agentId);
+        
+        if (rateLimitStatus.exceeded) {
+          console.log('Rate limit exceeded');
+          setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
+          if (rateLimitStatus.timeUntilReset) {
+            setTimeUntilReset(rateLimitStatus.timeUntilReset);
+          }
+          return;
         }
-        return;
+        
+        // Record the message
+        await recordMessage(agentId);
       }
       
-      // Record the message
-      await recordMessage(agentId);
+      // Add message to chat and proceed
+      await proceedWithMessageWrapper(trimmedText);
+    } finally {
+      // Reset submission state after a short delay
+      setTimeout(() => {
+        setIsSubmitting(false);
+        lastSubmissionRef.current = "";
+      }, 1000);
     }
-    
-    // Add message to chat and proceed
-    await proceedWithMessageWrapper(text);
   };
 
   const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
     e.preventDefault();
-    if (!message.trim() || isTyping || rateLimitError) return;
+    
+    if (!message.trim() || isTyping || rateLimitError || isSubmitting) {
+      return;
+    }
 
     const messageToSend = message.trim();
     await submitMessage(messageToSend, agentId);
@@ -99,7 +125,7 @@ export const useMessageHandling = (
   };
 
   const handleSuggestedMessageClick = async (text: string, agentId?: string) => {
-    if (isTyping || rateLimitError) return;
+    if (isTyping || rateLimitError || isSubmitting) return;
     
     await submitMessage(text, agentId);
     
@@ -160,6 +186,7 @@ export const useMessageHandling = (
     proceedWithMessage: proceedWithMessageWrapper,
     submitMessage,
     handleCountdownFinished,
-    cleanup
+    cleanup,
+    isSubmitting // Export for UI state
   };
 };

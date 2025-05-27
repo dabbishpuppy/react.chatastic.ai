@@ -31,8 +31,8 @@ interface ChatSectionProps {
   userMessageColor?: string | null;
   headerColor?: string | null;
   hideUserAvatar?: boolean;
-  leadSettings?: any; // Lead settings from props (for embedded mode)
-  conversationSource?: 'iframe' | 'bubble'; // New prop to specify the source
+  leadSettings?: any;
+  conversationSource?: 'iframe' | 'bubble';
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
@@ -55,7 +55,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
   leadSettings: propLeadSettings = null,
-  conversationSource = 'iframe', // Default to iframe for backward compatibility
+  conversationSource = 'iframe',
 }) => {
   const { agentId: paramAgentId } = useParams();
   const agentId = propAgentId || paramAgentId;
@@ -151,7 +151,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     regenerateResponse,
     insertEmoji,
     handleCountdownFinished,
-    cleanup
+    cleanup,
+    isSubmitting
   } = useMessageHandling(displayMessages, isEmbedded, currentConversation?.id);
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded, chatHistory, isTyping);
@@ -241,7 +242,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
-    if (!message.trim() || isTyping || rateLimitError) return;
+    if (!message.trim() || isTyping || rateLimitError || isSubmitting) return;
     
     const messageText = message.trim();
     console.log('📤 Submitting message:', messageText);
@@ -313,7 +314,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   } : {};
 
   // Check if input should be disabled - only for rate limit and typing, not conversation ended
-  const isInputDisabled = isTyping || !!rateLimitError;
+  const isInputDisabled = isTyping || !!rateLimitError || isSubmitting;
 
   // Convert 'system' theme to 'light' or 'dark' for components that don't support 'system'
   const resolvedTheme: 'light' | 'dark' = theme === 'system' ? 'light' : theme;
@@ -393,6 +394,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         onEmojiInsert={insertEmoji}
         isConversationEnded={conversationEnded}
         onStartNewChat={handleStartNewChat}
+        isSubmitting={isSubmitting}
       />
     </ChatContainer>
   );

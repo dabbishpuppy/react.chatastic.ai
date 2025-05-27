@@ -1,6 +1,31 @@
-
 import { ChatMessage } from "@/types/chatInterface";
 import { messageService } from "@/services/messageService";
+
+// Track recent messages to prevent duplicates
+const recentMessages = new Map<string, number>();
+
+// Clean up old entries every 30 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of recentMessages.entries()) {
+    if (now - timestamp > 5000) { // Remove entries older than 5 seconds
+      recentMessages.delete(key);
+    }
+  }
+}, 30000);
+
+const isDuplicateMessage = (content: string, conversationId?: string): boolean => {
+  const key = `${conversationId || 'no-conv'}-${content.trim()}`;
+  const now = Date.now();
+  const lastSubmitted = recentMessages.get(key);
+  
+  if (lastSubmitted && now - lastSubmitted < 1000) { // 1 second window
+    return true;
+  }
+  
+  recentMessages.set(key, now);
+  return false;
+};
 
 export const proceedWithMessage = async (
   text: string,
@@ -11,15 +36,23 @@ export const proceedWithMessage = async (
   isEmbedded: boolean = false,
   conversationId?: string
 ) => {
+  const trimmedText = text.trim();
+  
+  // Check for duplicate message
+  if (isDuplicateMessage(trimmedText, conversationId)) {
+    console.log('Duplicate message detected, skipping:', trimmedText);
+    return;
+  }
+
   const userMessage: ChatMessage = {
-    content: text,
+    content: trimmedText,
     isAgent: false,
     timestamp: new Date().toISOString(),
   };
 
   // Save user message to database if conversation exists
   if (conversationId) {
-    const savedUserMessage = await messageService.saveMessage(conversationId, text, false);
+    const savedUserMessage = await messageService.saveMessage(conversationId, trimmedText, false);
     if (savedUserMessage) {
       userMessage.id = savedUserMessage.id;
     }
@@ -52,7 +85,6 @@ export const proceedWithMessage = async (
 
     setChatHistory(prev => {
       console.log('🤖 Adding AI response to chat history');
-      // DO NOT filter out lead form widgets - keep them in the history
       return [...prev, aiMessage];
     });
     setIsTyping(false);
