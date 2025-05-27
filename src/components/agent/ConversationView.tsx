@@ -89,12 +89,12 @@ const ConversationView: React.FC<ConversationViewProps> = ({
       }`}>
         <div className="flex items-center gap-3">
           {profilePicture ? (
-            <Avatar className="h-6 w-6">
+            <Avatar className="h-8 w-8">
               <AvatarImage src={profilePicture} alt={displayName} />
-              <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
+              <AvatarFallback className="text-xs"></AvatarFallback>
             </Avatar>
           ) : (
-            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
               {/* Empty div - no text */}
             </div>
           )}
@@ -169,12 +169,12 @@ const ConversationView: React.FC<ConversationViewProps> = ({
             <div className="flex items-start gap-2 max-w-[80%]">
               {message.role === 'assistant' && (
                 profilePicture ? (
-                  <Avatar className="h-6 w-6 flex-shrink-0">
+                  <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarImage src={profilePicture} alt={displayName} />
-                    <AvatarFallback className="text-xs">{displayName.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="text-xs"></AvatarFallback>
                   </Avatar>
                 ) : (
-                  <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                     {/* Empty div - no text */}
                   </div>
                 )
