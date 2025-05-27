@@ -37,6 +37,13 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
     }
   };
 
+  // Handle color input changes from the gradient picker
+  const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newColor = e.target.value;
+    setCurrentColor(newColor);
+    onChange(newColor);
+  };
+
   // Convert hex to RGB
   const hexToRgb = (hex: string) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -73,6 +80,25 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
         </PopoverTrigger>
         <PopoverContent className="p-3 w-64" style={{ zIndex: 9999 }}>
           <div className="flex flex-col gap-3">
+            {/* Main color picker area */}
+            <div className="w-full h-32 relative bg-gradient-to-r from-white to-red-500 rounded-lg overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black"></div>
+              <input 
+                type="color"
+                value={currentColor}
+                onChange={handleColorChange}
+                className="w-full h-full opacity-0 cursor-crosshair absolute top-0 left-0"
+              />
+              <div 
+                className="absolute w-2 h-2 border border-white rounded-full pointer-events-none"
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)'
+                }}
+              />
+            </div>
+
             {/* HEX and RGB inputs */}
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
