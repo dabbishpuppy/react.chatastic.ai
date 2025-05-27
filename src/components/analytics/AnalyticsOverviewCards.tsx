@@ -45,8 +45,8 @@ const AnalyticsOverviewCards: React.FC<AnalyticsOverviewCardsProps> = ({
   
   console.log('📊 AnalyticsOverviewCards props:', { selectedAgent, agentId, startDate, endDate });
   
-  // Use the current agent from URL if "all" is selected, otherwise use the selected agent
-  const targetAgentId = selectedAgent === "all" ? agentId : selectedAgent;
+  // Always use the current agent from URL
+  const targetAgentId = agentId;
   
   console.log('📊 Target agent ID for analytics:', targetAgentId);
   
