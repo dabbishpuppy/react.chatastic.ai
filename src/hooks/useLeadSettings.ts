@@ -52,7 +52,7 @@ export const useLeadSettings = (agentId: string) => {
           enabled: true, // Changed from false to true
           title: 'Get in touch with us',
           collect_name: true,
-          name_placeholder: 'Name', // Keep as 'Name' not 'Full name'
+          name_placeholder: 'Name', // Changed from 'Full name' to 'Name'
           collect_email: true,
           email_placeholder: 'Email',
           collect_phone: false,
