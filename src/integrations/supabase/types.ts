@@ -139,7 +139,7 @@ export type Database = {
           {
             foreignKeyName: "chat_interface_settings_agent_id_fkey"
             columns: ["agent_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "agents"
             referencedColumns: ["id"]
           },

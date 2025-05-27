@@ -116,10 +116,13 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       }
     } else if (agentIdToUse) {
       console.log('📖 Checking for existing settings for agent:', agentIdToUse);
+      // Use order by and limit to handle potential duplicates gracefully
       const { data: existing, error: fetchError } = await supabase
         .from("chat_interface_settings")
         .select('*')
         .eq('agent_id', agentIdToUse)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
         
       if (fetchError) {
@@ -210,10 +213,13 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
       return null;
     }
     
+    // Use order by and limit to handle potential duplicates gracefully
     const { data, error } = await supabase
       .from("chat_interface_settings")
       .select('*')
       .eq('agent_id', agentId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) {
