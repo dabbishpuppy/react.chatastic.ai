@@ -1,6 +1,6 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
+import { doesAgentExist } from './agentVisibility.js';
 import { getBubbleButton } from './ui.js';
 import { checkRateLimit, recordMessage } from './rateLimit.js';
 
@@ -69,7 +69,7 @@ function showRateLimitError(errorInfo) {
  * Create and open the chat iframe
  */
 export function createChatIframe(config) {
-  if (iframe || isAgentPrivate()) return;
+  if (iframe || isAgentPrivate() || !doesAgentExist()) return;
   
   // Create chat container
   const container = document.createElement('div');
@@ -233,7 +233,7 @@ async function handleMessageSend(messageData) {
 }
 
 /**
- * Open the chat widget only if the agent is public
+ * Open the chat widget only if the agent is public and exists
  */
 export function openChat() {
   if (!window.wonderwaveConfig) {
@@ -243,6 +243,11 @@ export function openChat() {
   
   if (isAgentPrivate()) {
     logError('Cannot open chat. Agent is private.');
+    return;
+  }
+  
+  if (!doesAgentExist()) {
+    logError('Cannot open chat. Agent does not exist.');
     return;
   }
   

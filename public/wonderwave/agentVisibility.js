@@ -1,14 +1,22 @@
 
 import { log, logError } from './utils.js';
 
-// Global state for agent privacy
+// Global state for agent privacy and existence
 let isPrivate = false;
+let agentExists = true;
 
 /**
  * Check if agent is private
  */
 export function isAgentPrivate() {
   return isPrivate;
+}
+
+/**
+ * Check if agent exists
+ */
+export function doesAgentExist() {
+  return agentExists;
 }
 
 /**
@@ -23,7 +31,17 @@ export function setAgentPrivacy(privacy) {
 }
 
 /**
- * Hide the widget components when the agent is private
+ * Set agent existence status
+ */
+export function setAgentExists(exists) {
+  agentExists = exists;
+  if (!exists) {
+    hideWidget();
+  }
+}
+
+/**
+ * Hide the widget components when the agent is private or doesn't exist
  */
 export function hideWidget() {
   isPrivate = true;
@@ -42,14 +60,17 @@ export function hideWidget() {
 }
 
 /**
- * Show the widget components when the agent is public
+ * Show the widget components when the agent is public and exists
  */
 export function showWidget() {
   isPrivate = false;
   
-  // Show the chat bubble if it exists
-  const existingBubble = document.getElementById('wonderwave-bubble');
-  if (existingBubble) {
-    existingBubble.style.display = 'flex';
+  // Only show if agent exists
+  if (agentExists) {
+    // Show the chat bubble if it exists
+    const existingBubble = document.getElementById('wonderwave-bubble');
+    if (existingBubble) {
+      existingBubble.style.display = 'flex';
+    }
   }
 }

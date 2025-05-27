@@ -5,10 +5,12 @@ import { useChatSettings } from "@/hooks/useChatSettings";
 import ChatSection from "@/components/agent/ChatSection";
 import EmbeddedChatLoading from "@/components/agent/chat/EmbeddedChatLoading";
 import PrivateAgentError from "@/components/agent/chat/PrivateAgentError";
+import AgentNotFoundError from "@/components/agent/chat/AgentNotFoundError";
 import { useEmbeddedStyles } from "@/hooks/useEmbeddedStyles";
 import { useEmbeddedResizeObserver } from "@/hooks/useEmbeddedResizeObserver";
 import { useEmbeddedMessageHandler } from "@/hooks/useEmbeddedMessageHandler";
 import { useAgentVisibility } from "@/hooks/useAgentVisibility";
+import { useAgentExists } from "@/hooks/useAgentExists";
 
 const EmbeddedChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -16,12 +18,14 @@ const EmbeddedChat: React.FC = () => {
   const { settings, leadSettings, isLoading, refreshSettings } = useChatSettings();
   const containerRef = useRef<HTMLDivElement>(null);
   const { agentVisibility, visibilityLoading } = useAgentVisibility(agentId);
+  const { agentExists, isLoading: agentExistsLoading } = useAgentExists(agentId);
   
   console.log('🎯 EmbeddedChat - agentId from params:', agentId);
   console.log('📋 EmbeddedChat - settings:', settings);
   console.log('📋 EmbeddedChat - leadSettings:', leadSettings);
   console.log('🔄 EmbeddedChat - isLoading:', isLoading);
   console.log('👁️ EmbeddedChat - agentVisibility:', agentVisibility);
+  console.log('🔍 EmbeddedChat - agentExists:', agentExists);
   
   // Get URL parameters for theme and colors if present
   const themeParam = searchParams.get('theme');
@@ -44,10 +48,16 @@ const EmbeddedChat: React.FC = () => {
   useEmbeddedResizeObserver(containerRef, agentId);
   useEmbeddedMessageHandler(agentId, refreshSettings);
 
-  // Show loading while either settings or visibility are loading
-  if (isLoading || visibilityLoading) {
+  // Show loading while any of the checks are loading
+  if (isLoading || visibilityLoading || agentExistsLoading) {
     console.log('⏳ EmbeddedChat - Still loading, showing loading component');
     return <EmbeddedChatLoading />;
+  }
+
+  // If agent doesn't exist, show error message
+  if (agentExists === false) {
+    console.log('❌ EmbeddedChat - Agent does not exist, showing error');
+    return <AgentNotFoundError />;
   }
 
   // If agent is private, show an error message

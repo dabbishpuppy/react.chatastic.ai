@@ -1,6 +1,7 @@
 
 import { log, logError, setDebugMode, defaultConfig } from './utils.js';
 import { fetchColorSettingsAndVisibility, isAgentPrivate, shouldCheckVisibility } from './settings.js';
+import { doesAgentExist, setAgentExists } from './agentVisibility.js';
 import { createBubbleButton, setBubbleButton } from './ui.js';
 import { openChat, destroy as destroyChat, setIframe } from './chat.js';
 import { showPopups } from './popups.js';
@@ -73,9 +74,19 @@ export async function init(customConfig = {}) {
     // Fetch visibility and color settings from the backend
     const settings = await fetchColorSettingsAndVisibility(config.agentId);
     
-    // If agent is private or doesn't exist, don't initialize the widget
-    if (isAgentPrivate() || !settings) {
-      log('Agent is private or does not exist, not initializing widget');
+    // Check if agent exists (settings will be null if agent doesn't exist)
+    if (!settings) {
+      log('Agent does not exist, not initializing widget');
+      setAgentExists(false);
+      return;
+    }
+    
+    // Agent exists, update the state
+    setAgentExists(true);
+    
+    // If agent is private, don't initialize the widget
+    if (isAgentPrivate()) {
+      log('Agent is private, not initializing widget');
       return;
     }
     
@@ -129,16 +140,23 @@ export async function init(customConfig = {}) {
     visibilityCheckInterval = setInterval(() => {
       // Only check if we have a valid agent ID
       if (config.agentId) {
-        // Force a re-check of visibility
-        fetchColorSettingsAndVisibility(config.agentId);
-        
-        // If agent becomes private, destroy the widget immediately
-        if (isAgentPrivate()) {
-          log('Agent became private during check interval, destroying widget');
-          destroy();
-        }
+        // Force a re-check of visibility and existence
+        fetchColorSettingsAndVisibility(config.agentId).then(result => {
+          if (!result) {
+            // Agent no longer exists
+            log('Agent no longer exists during check interval, destroying widget');
+            setAgentExists(false);
+            destroy();
+          } else if (isAgentPrivate()) {
+            // Agent became private
+            log('Agent became private during check interval, destroying widget');
+            destroy();
+          }
+        }).catch(error => {
+          logError('Error checking agent status:', error);
+        });
       }
-    }, 30000); // Check every 30 seconds (less frequent to reduce load)
+    }, 30000); // Check every 30 seconds
     
     log('Initialization complete');
   } catch (error) {
