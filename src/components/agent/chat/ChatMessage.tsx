@@ -82,10 +82,10 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         </Avatar>
       )}
       
-      <div className="flex flex-col">
-        {/* Message bubble - now contains ONLY the message content */}
+      <div className="flex flex-col max-w-[80%]">
+        {/* Message bubble - contains ONLY the message content */}
         <div 
-          className={`rounded-lg p-3 text-[0.875rem] max-w-[80%] ${
+          className={`rounded-lg p-3 text-[0.875rem] ${
             message.isAgent ? agentBubbleClass : userBubbleClass
           }`}
           style={message.isAgent ? {} : userMessageStyle}
@@ -93,17 +93,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {message.content}
         </div>
         
-        {/* Feedback buttons - now COMPLETELY outside the message bubble */}
+        {/* Feedback buttons - positioned OUTSIDE the message bubble */}
         {message.isAgent && showFeedback && (
           <div className="flex items-center space-x-1 mt-2">
             {/* Copy button */}
             <div className="relative">
               <button
                 onClick={() => handleCopy(message.content)}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all duration-200 p-2 rounded-md"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
                 title="Copy"
               >
-                <Copy size={16} />
+                <Copy size={14} />
               </button>
               {showCopiedTooltip && (
                 <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
@@ -115,27 +115,27 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             {/* Like button */}
             <button
               onClick={() => onFeedback(message.timestamp, "like")}
-              className={`transition-all duration-200 p-2 rounded-md ${
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
                 message.feedback === "like" 
-                  ? "text-green-600 bg-green-50" 
-                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  ? "bg-green-100 text-green-600 hover:bg-green-200" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
               }`}
               title="Like"
             >
-              <ThumbsUp size={16} />
+              <ThumbsUp size={14} />
             </button>
             
             {/* Dislike button */}
             <button
               onClick={() => onFeedback(message.timestamp, "dislike")}
-              className={`transition-all duration-200 p-2 rounded-md ${
+              className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
                 message.feedback === "dislike" 
-                  ? "text-red-600 bg-red-50" 
-                  : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  ? "bg-red-100 text-red-600 hover:bg-red-200" 
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
               }`}
               title="Dislike"
             >
-              <ThumbsDown size={16} />
+              <ThumbsDown size={14} />
             </button>
           </div>
         )}

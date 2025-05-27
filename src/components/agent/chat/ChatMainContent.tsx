@@ -2,7 +2,6 @@
 import React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChatMessages from "./ChatMessages";
-import LoadingDots from "./LoadingDots";
 import InlineLeadForm from "./InlineLeadForm";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -59,6 +58,9 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
     };
   });
 
+  // Filter out lead form messages for the ChatMessages component
+  const regularMessages = chatHistory.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <ScrollArea className="flex-1 overflow-auto">
@@ -88,88 +90,55 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
                 }
                 return null;
               } else {
-                // Render regular message
-                return (
-                  <div key={`message-${item.index}`}>
-                    {item.message.isAgent ? (
-                      <div className="flex items-start space-x-3">
-                        <div className="flex-shrink-0">
-                          {profilePicture ? (
-                            <img
-                              src={profilePicture}
-                              alt={agentName}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
-                              {agentName.charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.agentMessage}`}>
-                          <div className="text-sm">
-                            {item.message.content}
-                          </div>
-                          {showFeedback && (
-                            <div className="flex items-center space-x-2 mt-2">
-                              <button
-                                onClick={() => onFeedback(item.message.timestamp, "like")}
-                                className="text-xs text-gray-500 hover:text-gray-700"
-                              >
-                                👍
-                              </button>
-                              <button
-                                onClick={() => onFeedback(item.message.timestamp, "dislike")}
-                                className="text-xs text-gray-500 hover:text-gray-700"
-                              >
-                                👎
-                              </button>
-                              <button
-                                onClick={() => onCopy(item.message.content)}
-                                className="text-xs text-gray-500 hover:text-gray-700"
-                              >
-                                Copy
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex justify-end">
-                        <div 
-                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.userMessage}`}
-                          style={userMessageStyle}
-                        >
-                          <div className="text-sm">
-                            {item.message.content}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                // Check if this message should be rendered by looking at its position
+                const messageIndex = regularMessages.findIndex(msg => 
+                  msg.timestamp === item.message.timestamp && 
+                  msg.content === item.message.content
                 );
+                
+                // Only render if this is the first occurrence of this message in regular messages
+                if (messageIndex !== -1) {
+                  const isLastMessage = messageIndex === regularMessages.length - 1;
+                  
+                  return (
+                    <div key={`message-${item.index}-${item.message.timestamp}`}>
+                      <ChatMessages
+                        chatHistory={[item.message]}
+                        isTyping={isLastMessage ? isTyping : false}
+                        agentName={agentName}
+                        profilePicture={profilePicture}
+                        showFeedback={showFeedback}
+                        hideUserAvatar={hideUserAvatar}
+                        onFeedback={onFeedback}
+                        onCopy={onCopy}
+                        agentBubbleClass={themeClasses.agentMessage}
+                        userBubbleClass={themeClasses.userMessage}
+                        userMessageStyle={userMessageStyle}
+                        messagesEndRef={messagesEndRef}
+                      />
+                    </div>
+                  );
+                }
+                return null;
               }
             })}
             
-            {isTyping && (
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  {profilePicture ? (
-                    <img
-                      src={profilePicture}
-                      alt={agentName}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
-                      {agentName.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.agentMessage}`}>
-                  <LoadingDots />
-                </div>
-              </div>
+            {/* Show typing indicator only if not already shown above */}
+            {isTyping && regularMessages.length === 0 && (
+              <ChatMessages
+                chatHistory={[]}
+                isTyping={true}
+                agentName={agentName}
+                profilePicture={profilePicture}
+                showFeedback={showFeedback}
+                hideUserAvatar={hideUserAvatar}
+                onFeedback={onFeedback}
+                onCopy={onCopy}
+                agentBubbleClass={themeClasses.agentMessage}
+                userBubbleClass={themeClasses.userMessage}
+                userMessageStyle={userMessageStyle}
+                messagesEndRef={messagesEndRef}
+              />
             )}
             
             <div ref={messagesEndRef} />
