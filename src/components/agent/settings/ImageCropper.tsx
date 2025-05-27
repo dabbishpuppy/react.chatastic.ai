@@ -2,11 +2,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { pipeline, env } from '@huggingface/transformers';
-
-// Configure transformers.js to always download models
-env.allowLocalModels = false;
-env.useBrowserCache = false;
 
 interface ImageCropperProps {
   imageUrl: string;
@@ -26,10 +21,10 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [imageObj, setImageObj] = useState<HTMLImageElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 200, height: 200 });
+  const [cropArea, setCropArea] = useState({ x: 0, y: 0, radius: 100 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Load the image when the URL changes or dialog opens
@@ -42,12 +37,12 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
         setImageLoaded(true);
         
         // Center the crop area after the image is loaded
-        const size = Math.min(img.width, img.height) * 0.8;
+        const minDimension = Math.min(img.width, img.height);
+        const radius = minDimension * 0.3;
         setCropArea({
-          x: (img.width - size) / 2,
-          y: (img.height - size) / 2,
-          width: size,
-          height: size
+          x: img.width / 2,
+          y: img.height / 2,
+          radius: radius
         });
       };
       
@@ -102,155 +97,153 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
     // Draw image
     ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
 
-    // Draw crop overlay
+    // Draw crop overlay (darken everything)
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(0, 0, 400, 400);
 
-    // Clear crop area
-    const cropX = offsetX + (cropArea.x / img.width) * scaledWidth;
-    const cropY = offsetY + (cropArea.y / img.height) * scaledHeight;
-    const cropW = (cropArea.width / img.width) * scaledWidth;
-    const cropH = (cropArea.height / img.height) * scaledHeight;
+    // Calculate circle position on canvas
+    const centerX = offsetX + (cropArea.x / img.width) * scaledWidth;
+    const centerY = offsetY + (cropArea.y / img.height) * scaledHeight;
+    const radiusOnCanvas = (cropArea.radius / img.width) * scaledWidth;
 
-    ctx.clearRect(cropX, cropY, cropW, cropH);
-    ctx.drawImage(img, 
-      cropArea.x, cropArea.y, cropArea.width, cropArea.height,
-      cropX, cropY, cropW, cropH
-    );
+    // Clear circular crop area
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radiusOnCanvas, 0, 2 * Math.PI);
+    ctx.fill();
 
-    // Draw crop border
+    // Reset composite operation and draw the image again in the circle
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radiusOnCanvas, 0, 2 * Math.PI);
+    ctx.clip();
+    ctx.drawImage(img, offsetX, offsetY, scaledWidth, scaledHeight);
+    ctx.restore();
+
+    // Draw circle border
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
-    ctx.strokeRect(cropX, cropY, cropW, cropH);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radiusOnCanvas, 0, 2 * Math.PI);
+    ctx.stroke();
 
-    // Draw resize handles
+    // Draw resize handle
     const handleSize = 8;
     ctx.fillStyle = '#fff';
-    ctx.fillRect(cropX + cropW - handleSize, cropY + cropH - handleSize, handleSize, handleSize);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    const handleX = centerX + radiusOnCanvas - handleSize / 2;
+    const handleY = centerY;
+    ctx.fillRect(handleX - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+    ctx.strokeRect(handleX - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+  };
+
+  const getMousePos = (e: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  };
+
+  const canvasToImageCoords = (canvasX: number, canvasY: number) => {
+    if (!imageObj) return { x: 0, y: 0 };
+
+    const scale = Math.min(400 / imageObj.width, 400 / imageObj.height);
+    const scaledWidth = imageObj.width * scale;
+    const scaledHeight = imageObj.height * scale;
+    const offsetX = (400 - scaledWidth) / 2;
+    const offsetY = (400 - scaledHeight) / 2;
+
+    return {
+      x: ((canvasX - offsetX) / scaledWidth) * imageObj.width,
+      y: ((canvasY - offsetY) / scaledHeight) * imageObj.height
+    };
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!imageObj) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const mousePos = getMousePos(e);
+    const scale = Math.min(400 / imageObj.width, 400 / imageObj.height);
+    const offsetX = (400 - (imageObj.width * scale)) / 2;
+    const offsetY = (400 - (imageObj.height * scale)) / 2;
+    
+    const centerX = offsetX + (cropArea.x / imageObj.width) * (imageObj.width * scale);
+    const centerY = offsetY + (cropArea.y / imageObj.height) * (imageObj.height * scale);
+    const radiusOnCanvas = (cropArea.radius / imageObj.width) * (imageObj.width * scale);
 
-    setDragStart({ x, y });
-    setIsDragging(true);
+    // Check if clicking on resize handle
+    const handleX = centerX + radiusOnCanvas;
+    const handleY = centerY;
+    const handleDistance = Math.sqrt(Math.pow(mousePos.x - handleX, 2) + Math.pow(mousePos.y - handleY, 2));
+
+    if (handleDistance <= 12) {
+      setIsResizing(true);
+    } else {
+      // Check if clicking inside the circle for dragging
+      const distanceFromCenter = Math.sqrt(Math.pow(mousePos.x - centerX, 2) + Math.pow(mousePos.y - centerY, 2));
+      if (distanceFromCenter <= radiusOnCanvas) {
+        setIsDragging(true);
+      }
+    }
+
+    setDragStart(mousePos);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !imageObj) return;
+    if (!imageObj || (!isDragging && !isResizing)) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const mousePos = getMousePos(e);
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (isResizing) {
+      // Calculate new radius based on distance from center
+      const scale = Math.min(400 / imageObj.width, 400 / imageObj.height);
+      const offsetX = (400 - (imageObj.width * scale)) / 2;
+      const offsetY = (400 - (imageObj.height * scale)) / 2;
+      const centerX = offsetX + (cropArea.x / imageObj.width) * (imageObj.width * scale);
+      const centerY = offsetY + (cropArea.y / imageObj.height) * (imageObj.height * scale);
+      
+      const newRadiusOnCanvas = Math.sqrt(Math.pow(mousePos.x - centerX, 2) + Math.pow(mousePos.y - centerY, 2));
+      const newRadius = (newRadiusOnCanvas / (imageObj.width * scale)) * imageObj.width;
+      
+      // Limit radius to image boundaries
+      const maxRadius = Math.min(
+        cropArea.x,
+        cropArea.y,
+        imageObj.width - cropArea.x,
+        imageObj.height - cropArea.y
+      );
+      
+      setCropArea(prev => ({
+        ...prev,
+        radius: Math.max(20, Math.min(newRadius, maxRadius))
+      }));
+    } else if (isDragging) {
+      // Move the crop area
+      const deltaX = mousePos.x - dragStart.x;
+      const deltaY = mousePos.y - dragStart.y;
+      const imageCoordsDelta = canvasToImageCoords(deltaX, deltaY);
+      const imageCoordsDeltaX = imageCoordsDelta.x - canvasToImageCoords(0, 0).x;
+      const imageCoordsDeltaY = imageCoordsDelta.y - canvasToImageCoords(0, 0).y;
 
-    const deltaX = x - dragStart.x;
-    const deltaY = y - dragStart.y;
+      setCropArea(prev => ({
+        ...prev,
+        x: Math.max(prev.radius, Math.min(prev.x + imageCoordsDeltaX, imageObj.width - prev.radius)),
+        y: Math.max(prev.radius, Math.min(prev.y + imageCoordsDeltaY, imageObj.height - prev.radius))
+      }));
 
-    setCropArea(prev => ({
-      ...prev,
-      x: Math.max(0, Math.min(prev.x + deltaX, imageObj.width - prev.width)),
-      y: Math.max(0, Math.min(prev.y + deltaY, imageObj.height - prev.height))
-    }));
-
-    setDragStart({ x, y });
+      setDragStart(mousePos);
+    }
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
     setIsResizing(false);
-  };
-
-  const removeBackground = async (imageElement: HTMLImageElement): Promise<Blob> => {
-    try {
-      console.log('Starting background removal process...');
-      const segmenter = await pipeline('image-segmentation', 'Xenova/segformer-b0-finetuned-ade-512-512', {
-        device: 'webgpu',
-      });
-      
-      // Convert HTMLImageElement to canvas
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) throw new Error('Could not get canvas context');
-      
-      // Resize image if needed
-      const MAX_DIMENSION = 512;
-      let width = imageElement.naturalWidth;
-      let height = imageElement.naturalHeight;
-
-      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-        if (width > height) {
-          height = Math.round((height * MAX_DIMENSION) / width);
-          width = MAX_DIMENSION;
-        } else {
-          width = Math.round((width * MAX_DIMENSION) / height);
-          height = MAX_DIMENSION;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(imageElement, 0, 0, width, height);
-      
-      // Get image data as base64
-      const imageData = canvas.toDataURL('image/jpeg', 0.8);
-      
-      // Process the image with the segmentation model
-      const result = await segmenter(imageData);
-      
-      if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
-        throw new Error('Invalid segmentation result');
-      }
-      
-      // Create a new canvas for the masked image
-      const outputCanvas = document.createElement('canvas');
-      outputCanvas.width = canvas.width;
-      outputCanvas.height = canvas.height;
-      const outputCtx = outputCanvas.getContext('2d');
-      
-      if (!outputCtx) throw new Error('Could not get output canvas context');
-      
-      // Draw original image
-      outputCtx.drawImage(canvas, 0, 0);
-      
-      // Apply the mask
-      const outputImageData = outputCtx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
-      const data = outputImageData.data;
-      
-      // Apply inverted mask to alpha channel
-      for (let i = 0; i < result[0].mask.data.length; i++) {
-        const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
-        data[i * 4 + 3] = alpha;
-      }
-      
-      outputCtx.putImageData(outputImageData, 0, 0);
-      
-      // Convert canvas to blob
-      return new Promise((resolve, reject) => {
-        outputCanvas.toBlob(
-          (blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('Failed to create blob'));
-            }
-          },
-          'image/png',
-          1.0
-        );
-      });
-    } catch (error) {
-      console.error('Error removing background:', error);
-      throw error;
-    }
   };
 
   const handleCrop = async () => {
@@ -263,41 +256,33 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
-      // Set canvas size to crop area
-      canvas.width = cropArea.width;
-      canvas.height = cropArea.height;
+      // Set canvas size to diameter of crop circle
+      const diameter = cropArea.radius * 2;
+      canvas.width = diameter;
+      canvas.height = diameter;
 
-      // Draw cropped portion
+      // Create circular clipping path
+      ctx.beginPath();
+      ctx.arc(cropArea.radius, cropArea.radius, cropArea.radius, 0, 2 * Math.PI);
+      ctx.clip();
+
+      // Draw the cropped portion
       ctx.drawImage(
         imageObj,
-        cropArea.x, cropArea.y, cropArea.width, cropArea.height,
-        0, 0, cropArea.width, cropArea.height
+        cropArea.x - cropArea.radius, cropArea.y - cropArea.radius, diameter, diameter,
+        0, 0, diameter, diameter
       );
 
-      // Convert to image element for background removal
-      const croppedImg = new Image();
-      croppedImg.onload = async () => {
-        try {
-          // Remove background
-          const blob = await removeBackground(croppedImg);
+      // Convert to blob and create file
+      canvas.toBlob((blob) => {
+        if (blob) {
           const file = new File([blob], "cropped-image.png", { type: "image/png" });
           onCrop(file);
-        } catch (error) {
-          console.error("Error processing image:", error);
-          // Fallback: just crop without background removal
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const file = new File([blob], "cropped-image.png", { type: "image/png" });
-              onCrop(file);
-            }
-          }, 'image/png');
-        } finally {
-          setIsProcessing(false);
         }
-      };
-      croppedImg.src = canvas.toDataURL();
+      }, 'image/png');
     } catch (error) {
       console.error("Error cropping image:", error);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -308,7 +293,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Drag to reposition the crop area. The background will be automatically removed.
+            Drag to reposition the crop area. Drag the handle to resize the circle.
           </DialogDescription>
         </DialogHeader>
         
@@ -329,7 +314,7 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
               Cancel
             </Button>
             <Button onClick={handleCrop} disabled={isProcessing || !imageLoaded}>
-              {isProcessing ? "Processing..." : "Crop & Remove Background"}
+              {isProcessing ? "Processing..." : "Crop & Attach Image"}
             </Button>
           </div>
         </div>
