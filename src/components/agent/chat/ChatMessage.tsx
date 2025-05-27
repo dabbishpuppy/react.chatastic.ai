@@ -1,7 +1,7 @@
-
 import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChatMessage as ChatMessageType } from "@/types/chatInterface";
+import { Copy, ThumbsUp, ThumbsDown } from "lucide-react";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -50,33 +50,33 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {message.content}
       </div>
       
-      {/* Message actions for agent messages - emoji icons under AI response */}
+      {/* Message actions for agent messages - small grey icons under AI response */}
       {message.isAgent && showFeedback && (
-        <div className="flex items-center space-x-3 mt-1 text-xs text-gray-400">
+        <div className="flex items-center space-x-2 mt-1">
           <button
             onClick={() => onCopy(message.content)}
-            className="hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
             title="Copy"
           >
-            📋
+            <Copy size={12} />
           </button>
           <button
             onClick={() => onFeedback(message.timestamp, "like")}
-            className={`hover:text-gray-600 transition-colors ${
-              message.feedback === "like" ? "text-green-600" : ""
+            className={`hover:text-gray-600 transition-colors p-1 ${
+              message.feedback === "like" ? "text-green-600" : "text-gray-400"
             }`}
             title="Like"
           >
-            👍
+            <ThumbsUp size={12} />
           </button>
           <button
             onClick={() => onFeedback(message.timestamp, "dislike")}
-            className={`hover:text-gray-600 transition-colors ${
-              message.feedback === "dislike" ? "text-red-600" : ""
+            className={`hover:text-gray-600 transition-colors p-1 ${
+              message.feedback === "dislike" ? "text-red-600" : "text-gray-400"
             }`}
             title="Dislike"
           >
-            👎
+            <ThumbsDown size={12} />
           </button>
         </div>
       )}
