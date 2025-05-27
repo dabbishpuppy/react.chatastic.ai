@@ -1,4 +1,3 @@
-
 import { ChatMessage } from "@/types/chatInterface";
 
 export const proceedWithMessage = (
@@ -33,9 +32,8 @@ export const proceedWithMessage = (
 
     setChatHistory(prev => {
       console.log('🤖 Adding AI response to chat history');
-      // Filter out any lead form widgets before adding new AI message
-      const filteredHistory = prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
-      return [...filteredHistory, aiMessage];
+      // DO NOT filter out lead form widgets - keep them in the history
+      return [...prev, aiMessage];
     });
     setIsTyping(false);
 

@@ -1,9 +1,6 @@
 
 import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { ThumbsUp, ThumbsDown, Copy } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatMessage as ChatMessageType } from "@/types/chatInterface";
 
 interface ChatMessageProps {
@@ -53,58 +50,31 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {message.content}
       </div>
       
-      {/* Message actions for agent messages */}
+      {/* Message actions for agent messages - reverted to simple emoji buttons */}
       {message.isAgent && showFeedback && (
-        <div className="flex mt-1 space-x-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={() => onFeedback(message.timestamp, "like")}
-                  variant="ghost"
-                  size="icon"
-                  className={`h-6 w-6 rounded-full ${message.feedback === "like" ? "bg-green-100" : ""}`}
-                >
-                  <ThumbsUp size={14} className={message.feedback === "like" ? "text-green-600" : "text-gray-500"} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Like</p>
-              </TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={() => onFeedback(message.timestamp, "dislike")}
-                  variant="ghost"
-                  size="icon"
-                  className={`h-6 w-6 rounded-full ${message.feedback === "dislike" ? "bg-red-100" : ""}`}
-                >
-                  <ThumbsDown size={14} className={message.feedback === "dislike" ? "text-red-600" : "text-gray-500"} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Dislike</p>
-              </TooltipContent>
-            </Tooltip>
-            
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={() => onCopy(message.content)}
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 rounded-full"
-                >
-                  <Copy size={14} className="text-gray-500" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Copy</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <div className="flex items-center space-x-2 mt-2">
+          <button
+            onClick={() => onFeedback(message.timestamp, "like")}
+            className={`text-xs hover:text-gray-700 ${
+              message.feedback === "like" ? "text-green-600" : "text-gray-500"
+            }`}
+          >
+            👍
+          </button>
+          <button
+            onClick={() => onFeedback(message.timestamp, "dislike")}
+            className={`text-xs hover:text-gray-700 ${
+              message.feedback === "dislike" ? "text-red-600" : "text-gray-500"
+            }`}
+          >
+            👎
+          </button>
+          <button
+            onClick={() => onCopy(message.content)}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            Copy
+          </button>
         </div>
       )}
     </div>
