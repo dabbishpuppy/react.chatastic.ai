@@ -43,12 +43,32 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
   theme = 'light',
   onLeadFormSubmit
 }) => {
+  // Filter out lead form messages and handle them separately
+  const regularMessages = chatHistory.filter(message => message.content !== "LEAD_FORM_WIDGET");
+  const leadFormMessages = chatHistory.filter(message => message.content === "LEAD_FORM_WIDGET");
+
   return (
     <ScrollArea className="flex-1 px-4 py-2">
       <div className="space-y-4">
-        {chatHistory.map((message, index) => {
-          // Check if this is a lead form widget message
-          if (message.content === "LEAD_FORM_WIDGET" && leadSettings && agentId) {
+        {/* Render regular chat messages */}
+        <ChatMessages
+          chatHistory={regularMessages}
+          isTyping={false}
+          agentName={agentName}
+          profilePicture={profilePicture}
+          showFeedback={showFeedback}
+          hideUserAvatar={hideUserAvatar}
+          onFeedback={onFeedback}
+          onCopy={onCopy}
+          agentBubbleClass={themeClasses.agentMessage}
+          userBubbleClass={themeClasses.userMessage}
+          userMessageStyle={userMessageStyle}
+          messagesEndRef={messagesEndRef}
+        />
+
+        {/* Render lead forms inline where they appear in chat history */}
+        {leadFormMessages.map((message, index) => {
+          if (leadSettings && agentId) {
             return (
               <InlineLeadForm
                 key={`lead-form-${index}`}
@@ -66,22 +86,7 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
               />
             );
           }
-
-          // Regular chat message
-          return (
-            <ChatMessages
-              key={index}
-              message={message}
-              agentName={agentName}
-              profilePicture={profilePicture}
-              showFeedback={showFeedback}
-              hideUserAvatar={hideUserAvatar}
-              onFeedback={onFeedback}
-              onCopy={onCopy}
-              themeClasses={themeClasses}
-              userMessageStyle={userMessageStyle}
-            />
-          );
+          return null;
         })}
         
         {isTyping && (
