@@ -71,6 +71,7 @@ const LeadFormWidget: React.FC<LeadFormWidgetProps> = ({
         phone: collectPhone ? formData.phone || null : null
       };
 
+      // Insert lead into database
       const { error } = await supabase
         .from('leads')
         .insert([leadData]);
@@ -83,6 +84,22 @@ const LeadFormWidget: React.FC<LeadFormWidgetProps> = ({
           variant: "destructive"
         });
         return;
+      }
+
+      // Send email notification - don't block on this
+      try {
+        console.log('📧 Triggering lead notification email for agent:', agentId);
+        await supabase.functions.invoke('send-lead-notification', {
+          body: {
+            agentId,
+            leadData,
+            conversationId
+          }
+        });
+        console.log('📧 Lead notification triggered successfully');
+      } catch (emailError) {
+        // Log the error but don't fail the lead submission
+        console.error('Email notification failed (non-blocking):', emailError);
       }
 
       toast({
