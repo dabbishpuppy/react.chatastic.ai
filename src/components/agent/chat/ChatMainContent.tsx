@@ -14,6 +14,8 @@ interface ChatMainContentProps {
   hideUserAvatar: boolean;
   onFeedback: (timestamp: string, type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
+  onRegenerate?: () => void;
+  allowRegenerate?: boolean;
   themeClasses: any;
   userMessageStyle: any;
   messagesEndRef: React.RefObject<HTMLDivElement>;
@@ -33,6 +35,8 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
   hideUserAvatar,
   onFeedback,
   onCopy,
+  onRegenerate,
+  allowRegenerate = false,
   themeClasses,
   userMessageStyle,
   messagesEndRef,
@@ -42,106 +46,55 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
   theme = 'light',
   onLeadFormSubmit
 }) => {
-  // Process messages to render them in order, including lead forms
-  const processedMessages = chatHistory.map((message, index) => {
-    if (message.content === "LEAD_FORM_WIDGET") {
-      return {
-        type: 'lead-form',
-        message,
-        index
-      };
-    }
-    return {
-      type: 'message',
-      message,
-      index
-    };
-  });
-
-  // Filter out lead form messages for the ChatMessages component
+  // Separate regular messages from lead form widgets
   const regularMessages = chatHistory.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
+  const leadFormMessages = chatHistory.filter(msg => msg.content === "LEAD_FORM_WIDGET");
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <ScrollArea className="flex-1 overflow-auto">
         <div className="px-4 py-2 min-h-full">
           <div className="space-y-4">
-            {/* Render all messages and lead forms in chronological order */}
-            {processedMessages.map((item) => {
-              if (item.type === 'lead-form') {
-                // Render lead form inline
-                if (leadSettings && agentId) {
-                  return (
-                    <InlineLeadForm
-                      key={`lead-form-${item.index}`}
-                      agentId={agentId}
-                      conversationId={conversationId}
-                      title={leadSettings.title}
-                      collectName={leadSettings.collect_name}
-                      namePlaceholder={leadSettings.name_placeholder}
-                      collectEmail={leadSettings.collect_email}
-                      emailPlaceholder={leadSettings.email_placeholder}
-                      collectPhone={leadSettings.collect_phone}
-                      phonePlaceholder={leadSettings.phone_placeholder}
-                      onSubmit={onLeadFormSubmit || (() => {})}
-                      theme={theme}
-                    />
-                  );
-                }
-                return null;
-              } else {
-                // Check if this message should be rendered by looking at its position
-                const messageIndex = regularMessages.findIndex(msg => 
-                  msg.timestamp === item.message.timestamp && 
-                  msg.content === item.message.content
+            {/* Render all regular messages using ChatMessages component */}
+            <ChatMessages
+              chatHistory={regularMessages}
+              isTyping={isTyping}
+              agentName={agentName}
+              profilePicture={profilePicture}
+              showFeedback={showFeedback}
+              hideUserAvatar={hideUserAvatar}
+              onFeedback={onFeedback}
+              onCopy={onCopy}
+              onRegenerate={onRegenerate}
+              allowRegenerate={allowRegenerate}
+              agentBubbleClass={themeClasses.agentMessage}
+              userBubbleClass={themeClasses.userMessage}
+              userMessageStyle={userMessageStyle}
+              messagesEndRef={messagesEndRef}
+            />
+            
+            {/* Render lead forms inline */}
+            {leadFormMessages.map((leadMsg, index) => {
+              if (leadSettings && agentId) {
+                return (
+                  <InlineLeadForm
+                    key={`lead-form-${index}`}
+                    agentId={agentId}
+                    conversationId={conversationId}
+                    title={leadSettings.title}
+                    collectName={leadSettings.collect_name}
+                    namePlaceholder={leadSettings.name_placeholder}
+                    collectEmail={leadSettings.collect_email}
+                    emailPlaceholder={leadSettings.email_placeholder}
+                    collectPhone={leadSettings.collect_phone}
+                    phonePlaceholder={leadSettings.phone_placeholder}
+                    onSubmit={onLeadFormSubmit || (() => {})}
+                    theme={theme}
+                  />
                 );
-                
-                // Only render if this is the first occurrence of this message in regular messages
-                if (messageIndex !== -1) {
-                  const isLastMessage = messageIndex === regularMessages.length - 1;
-                  
-                  return (
-                    <div key={`message-${item.index}-${item.message.timestamp}`}>
-                      <ChatMessages
-                        chatHistory={[item.message]}
-                        isTyping={isLastMessage ? isTyping : false}
-                        agentName={agentName}
-                        profilePicture={profilePicture}
-                        showFeedback={showFeedback}
-                        hideUserAvatar={hideUserAvatar}
-                        onFeedback={onFeedback}
-                        onCopy={onCopy}
-                        agentBubbleClass={themeClasses.agentMessage}
-                        userBubbleClass={themeClasses.userMessage}
-                        userMessageStyle={userMessageStyle}
-                        messagesEndRef={messagesEndRef}
-                      />
-                    </div>
-                  );
-                }
-                return null;
               }
+              return null;
             })}
-            
-            {/* Show typing indicator only if not already shown above */}
-            {isTyping && regularMessages.length === 0 && (
-              <ChatMessages
-                chatHistory={[]}
-                isTyping={true}
-                agentName={agentName}
-                profilePicture={profilePicture}
-                showFeedback={showFeedback}
-                hideUserAvatar={hideUserAvatar}
-                onFeedback={onFeedback}
-                onCopy={onCopy}
-                agentBubbleClass={themeClasses.agentMessage}
-                userBubbleClass={themeClasses.userMessage}
-                userMessageStyle={userMessageStyle}
-                messagesEndRef={messagesEndRef}
-              />
-            )}
-            
-            <div ref={messagesEndRef} />
           </div>
         </div>
       </ScrollArea>

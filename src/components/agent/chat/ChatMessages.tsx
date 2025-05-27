@@ -14,6 +14,8 @@ interface ChatMessagesProps {
   hideUserAvatar: boolean;
   onFeedback: (timestamp: string, type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
+  onRegenerate?: () => void;
+  allowRegenerate?: boolean;
   agentBubbleClass: string;
   userBubbleClass: string;
   userMessageStyle: React.CSSProperties;
@@ -29,47 +31,60 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   hideUserAvatar,
   onFeedback,
   onCopy,
+  onRegenerate,
+  allowRegenerate = false,
   agentBubbleClass,
   userBubbleClass,
   userMessageStyle,
   messagesEndRef
-}) => (
-  <>
-    {chatHistory.map((msg, idx) => (
-      <ChatMessageComponent
-        key={idx}
-        message={msg}
-        agentName={agentName}
-        profilePicture={profilePicture}
-        showFeedback={showFeedback}
-        hideUserAvatar={hideUserAvatar}
-        onFeedback={onFeedback}
-        onCopy={onCopy}
-        agentBubbleClass={agentBubbleClass}
-        userBubbleClass={userBubbleClass}
-        userMessageStyle={userMessageStyle}
-      />
-    ))}
-    
-    {isTyping && (
-      <div className="flex mb-4">
-        <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-          {profilePicture ? (
-            <AvatarImage src={profilePicture} alt={agentName} />
-          ) : (
-            <AvatarFallback className="bg-gray-200 text-gray-600">
-              {agentName.charAt(0)}
-            </AvatarFallback>
-          )}
-        </Avatar>
-        <div className={`rounded-lg p-3 max-w-[80%] ${agentBubbleClass}`}>
-          <LoadingDots />
+}) => {
+  // Find the last agent message index
+  const lastAgentMessageIndex = chatHistory.reduceRight((lastIndex, msg, index) => {
+    return lastIndex === -1 && msg.isAgent && msg.content !== "LEAD_FORM_WIDGET" ? index : lastIndex;
+  }, -1);
+
+  return (
+    <>
+      {chatHistory.map((msg, idx) => (
+        <ChatMessageComponent
+          key={idx}
+          message={msg}
+          agentName={agentName}
+          profilePicture={profilePicture}
+          showFeedback={showFeedback}
+          hideUserAvatar={hideUserAvatar}
+          onFeedback={onFeedback}
+          onCopy={onCopy}
+          onRegenerate={onRegenerate}
+          allowRegenerate={allowRegenerate}
+          agentBubbleClass={agentBubbleClass}
+          userBubbleClass={userBubbleClass}
+          userMessageStyle={userMessageStyle}
+          isInitialMessage={idx === 0 && msg.isAgent}
+          isLastAgentMessage={idx === lastAgentMessageIndex}
+        />
+      ))}
+      
+      {isTyping && (
+        <div className="flex mb-4">
+          <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+            {profilePicture ? (
+              <AvatarImage src={profilePicture} alt={agentName} />
+            ) : (
+              <AvatarFallback className="bg-gray-200 text-gray-600">
+                {agentName.charAt(0)}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          <div className={`rounded-lg p-3 max-w-[80%] ${agentBubbleClass}`}>
+            <LoadingDots />
+          </div>
         </div>
-      </div>
-    )}
-    
-    <div ref={messagesEndRef} />
-  </>
-);
+      )}
+      
+      <div ref={messagesEndRef} />
+    </>
+  );
+};
 
 export default ChatMessages;

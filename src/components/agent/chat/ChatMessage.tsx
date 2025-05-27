@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChatMessage as ChatMessageType } from "@/types/chatInterface";
-import { Copy, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Copy, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface ChatMessageProps {
@@ -13,9 +13,13 @@ interface ChatMessageProps {
   hideUserAvatar: boolean;
   onFeedback: (timestamp: string, type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
+  onRegenerate?: () => void;
+  allowRegenerate?: boolean;
   agentBubbleClass: string;
   userBubbleClass: string;
   userMessageStyle: React.CSSProperties;
+  isInitialMessage?: boolean;
+  isLastAgentMessage?: boolean;
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
@@ -26,9 +30,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   hideUserAvatar,
   onFeedback,
   onCopy,
+  onRegenerate,
+  allowRegenerate = false,
   agentBubbleClass,
   userBubbleClass,
-  userMessageStyle
+  userMessageStyle,
+  isInitialMessage = false,
+  isLastAgentMessage = false
 }) => {
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
 
@@ -68,6 +76,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
+  // Don't show feedback buttons for initial message or user messages
+  const shouldShowFeedback = message.isAgent && showFeedback && !isInitialMessage;
+
   return (
     <div className={`flex mb-4 ${message.isAgent ? '' : 'justify-end'}`}>
       {message.isAgent && (
@@ -94,7 +105,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         </div>
         
         {/* Feedback buttons - positioned OUTSIDE the message bubble */}
-        {message.isAgent && showFeedback && (
+        {shouldShowFeedback && (
           <div className="flex items-center space-x-1 mt-2">
             {/* Copy button */}
             <div className="relative">
@@ -111,6 +122,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 </div>
               )}
             </div>
+            
+            {/* Regenerate button - only show for last agent message */}
+            {allowRegenerate && isLastAgentMessage && onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+                title="Regenerate"
+              >
+                <RotateCcw size={14} />
+              </button>
+            )}
             
             {/* Like button */}
             <button

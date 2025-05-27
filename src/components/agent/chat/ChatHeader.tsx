@@ -1,7 +1,6 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RotateCcw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getContrastColor } from "./ThemeConfig";
 import ChatMenuDropdown from "./ChatMenuDropdown";
@@ -89,18 +88,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
           </div>
           
           <div className="flex items-center space-x-1">
-            {/* Regenerate button */}
-            {allowRegenerate && !isEmbedded && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={onRegenerate}
-                className={iconButtonClass}
-              >
-                <RotateCcw size={18} />
-              </Button>
-            )}
-            
             {/* Three-dot menu */}
             {(onStartNewChat || onEndChat || (onLoadConversation && agentId)) && (
               <ChatMenuDropdown
