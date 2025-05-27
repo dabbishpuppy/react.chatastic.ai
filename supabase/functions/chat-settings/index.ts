@@ -52,8 +52,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`Agent ${agentId} not found - returning agent_not_found response`);
-
     // If agent is private, return minimal response
     if (agent.visibility === 'private') {
       return new Response(JSON.stringify({ 
@@ -81,7 +79,7 @@ Deno.serve(async (req) => {
 
     console.log(`Lead settings fetched: ${leadSettings}`);
 
-    // Prepare response with defaults
+    // Prepare response with defaults - ensure user_message_color defaults to black
     const response = {
       visibility: agent.visibility,
       rate_limit_enabled: agent.rate_limit_enabled || false,
