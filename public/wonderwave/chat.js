@@ -1,239 +1,22 @@
+
 import { log, logError, defaultConfig } from './utils.js';
-import { getColorSettings, isAgentPrivate } from './settings.js';
+import { isAgentPrivate } from './settings.js';
 import { doesAgentExist } from './agentVisibility.js';
 import { getBubbleButton } from './ui.js';
-import { checkRateLimit, recordMessage } from './rateLimit.js';
+import { setRateLimitSettings } from './messageHandling.js';
+import { createChatIframe, handleIframeMessage } from './chatIframe.js';
+import { 
+  isOpen, 
+  getIframe, 
+  setIframeAndHandler, 
+  setChatOpen,
+  updateBubbleForOpenState,
+  updateBubbleForClosedState,
+  cleanup
+} from './chatState.js';
 
-// Reference to iframe
-let iframe = null;
-let chatOpen = false; // Track chat state - renamed from isOpen to avoid conflicts
-let currentRateLimitSettings = null; // Store current rate limit settings
-
-/**
- * Set rate limit settings from the server
- */
-export function setRateLimitSettings(settings) {
-  currentRateLimitSettings = settings;
-  log('Rate limit settings updated:', settings);
-}
-
-/**
- * Check if a message can be sent (rate limit check)
- */
-async function canSendMessage() {
-  const config = window.wonderwaveConfig;
-  if (!config || !config.agentId) {
-    return { allowed: true };
-  }
-  
-  try {
-    const rateLimitResult = await checkRateLimit(config.agentId);
-    
-    if (rateLimitResult.exceeded) {
-      return {
-        allowed: false,
-        message: rateLimitResult.message,
-        resetTime: rateLimitResult.resetTime,
-        timeUntilReset: rateLimitResult.timeUntilReset
-      };
-    }
-    
-    return { allowed: true, remaining: rateLimitResult.current };
-  } catch (error) {
-    logError('Error checking rate limit:', error);
-    return { allowed: true }; // Fail open
-  }
-}
-
-/**
- * Show rate limit error message in the chat
- */
-function showRateLimitError(errorInfo) {
-  if (!iframe) return;
-  
-  try {
-    const message = {
-      type: 'rate-limit-error',
-      message: errorInfo.message,
-      timeUntilReset: errorInfo.timeUntilReset
-    };
-    
-    iframe.contentWindow.postMessage(message, '*');
-    log('Sent rate limit error to iframe:', message);
-  } catch (error) {
-    logError('Error sending rate limit message to iframe:', error);
-  }
-}
-
-/**
- * Create and open the chat iframe
- */
-export function createChatIframe(config) {
-  if (iframe || isAgentPrivate() || !doesAgentExist()) return;
-  
-  // Create chat container
-  const container = document.createElement('div');
-  container.id = 'wonderwave-container';
-  
-  // Apply container styles with fixed dimensions
-  Object.assign(container.style, {
-    position: 'fixed',
-    bottom: '90px',
-    [config.position]: '20px',
-    width: '450px',
-    height: '800px',
-    maxHeight: 'calc(100vh - 120px)',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    boxShadow: '0 10px 20px rgba(0, 0, 0, 0.2)',
-    transition: 'opacity 0.3s ease, transform 0.3s ease',
-    opacity: '0',
-    transform: 'translateY(20px)',
-    zIndex: config.zIndex - 1,
-    display: 'flex',
-    flexDirection: 'column'
-  });
-  
-  // Create iframe
-  iframe = document.createElement('iframe');
-  
-  // Build URL with parameters - ALWAYS add source=bubble for bubble widget
-  let iframeSrc = `https://${config.cdnDomain}/embed/${config.agentId}`;
-  
-  // Always add source=bubble for bubble widget - this is crucial for proper source detection
-  const urlParams = new URLSearchParams();
-  urlParams.set('source', 'bubble');
-  
-  log('🎯 Setting iframe source parameter to: bubble');
-  
-  // Append identity hash params if they exist
-  if (config.identityHash && config.userId) {
-    urlParams.set('identityHash', config.identityHash);
-    urlParams.set('userId', config.userId);
-  }
-  
-  // Append theme and color parameters 
-  if (config.theme) urlParams.set('theme', config.theme);
-  if (config.userMessageColor) urlParams.set('userColor', config.userMessageColor);
-  if (config.headerColor) urlParams.set('headerColor', config.headerColor);
-  
-  // Add cache buster to ensure latest version
-  urlParams.set('_t', Date.now().toString());
-  
-  iframeSrc += '?' + urlParams.toString();
-  
-  log('🔗 Final iframe URL:', iframeSrc);
-  
-  // Apply iframe styles
-  Object.assign(iframe.style, {
-    border: 'none',
-    width: '100%',
-    height: '100%',
-    borderRadius: '12px',
-    backgroundColor: '#FFFFFF'
-  });
-  
-  iframe.src = iframeSrc;
-  iframe.title = 'Chat';
-  iframe.id = 'wonderwave-iframe';
-  
-  // Set iframe attributes
-  iframe.setAttribute('loading', 'lazy');
-  iframe.setAttribute('allow', 'microphone');
-  
-  // Add resize listener for responsive design
-  container.appendChild(iframe);
-  document.body.appendChild(container);
-  
-  // Add event listener for iframe messages
-  window.addEventListener('message', handleIframeMessage);
-  
-  // Animate in
-  setTimeout(() => {
-    container.style.opacity = '1';
-    container.style.transform = 'translateY(0)';
-  }, 10);
-  
-  // Send refresh message to iframe once loaded
-  iframe.onload = function() {
-    try {
-      iframe.contentWindow.postMessage({ 
-        type: 'wonderwave-refresh-settings',
-        agentId: config.agentId 
-      }, '*');
-    } catch (error) {
-      logError('Error sending refresh message to iframe:', error);
-    }
-  };
-}
-
-/**
- * Handle messages from the iframe
- */
-export function handleIframeMessage(event) {
-  // Make sure the message is from our iframe
-  if (!iframe || event.source !== iframe.contentWindow) return;
-  
-  // Handle different message types
-  if (event.data && event.data.type) {
-    switch (event.data.type) {
-      case 'close-widget':
-        // Handle close button click inside iframe
-        closeChat();
-        break;
-        
-      case 'send-message':
-        // Handle message sending with rate limiting
-        log('Received send-message request from iframe:', event.data);
-        handleMessageSend(event.data);
-        break;
-    }
-  }
-}
-
-/**
- * Handle message sending with rate limiting
- */
-async function handleMessageSend(messageData) {
-  const config = window.wonderwaveConfig;
-  if (!config || !config.agentId) {
-    log('No config or agentId available for rate limiting');
-    return;
-  }
-  
-  log('Checking rate limit for message:', messageData);
-  
-  // Check rate limit
-  const rateLimitResult = await canSendMessage();
-  log('Rate limit check result:', rateLimitResult);
-  
-  if (!rateLimitResult.allowed) {
-    // Show rate limit error
-    log('Rate limit exceeded, showing error');
-    showRateLimitError(rateLimitResult);
-    return;
-  }
-  
-  // Record the message timestamp
-  try {
-    log('Recording message for rate limiting');
-    await recordMessage(config.agentId);
-  } catch (error) {
-    logError('Error recording message:', error);
-  }
-  
-  // Allow the message to be sent immediately
-  try {
-    const allowMessage = {
-      type: 'message-allowed',
-      originalMessage: messageData
-    };
-    iframe.contentWindow.postMessage(allowMessage, '*');
-    log('Sent message-allowed to iframe:', allowMessage);
-  } catch (error) {
-    logError('Error sending message allowed confirmation:', error);
-  }
-}
+// Export rate limit settings function for backward compatibility
+export { setRateLimitSettings };
 
 /**
  * Open the chat widget only if the agent is public and exists
@@ -255,7 +38,7 @@ export function openChat() {
   }
   
   log('Opening chat');
-  chatOpen = true;
+  setChatOpen(true);
   
   // Clear any popups when opening chat
   const popupsContainer = document.getElementById('wonderwave-popups');
@@ -264,9 +47,13 @@ export function openChat() {
   }
   
   // Create iframe if it doesn't exist
+  let iframe = getIframe();
   if (!iframe) {
     const config = { ...defaultConfig, ...(window.wonderwaveConfig || {}) };
-    createChatIframe(config);
+    const result = createChatIframe(config, isOpen(), closeChat);
+    if (result) {
+      setIframeAndHandler(result.iframe, result.messageHandler);
+    }
   } else {
     // Show existing iframe
     const container = document.getElementById('wonderwave-container');
@@ -280,27 +67,7 @@ export function openChat() {
   }
   
   // Update bubble button with close icon and bubble color background
-  const bubbleButton = getBubbleButton();
-  if (bubbleButton) {
-    const config = { ...defaultConfig, ...(window.wonderwaveConfig || {}) };
-    const colorSettings = getColorSettings();
-    
-    // Always show bubble color with X icon when open, regardless of chat icon
-    let bubbleColor;
-    if (colorSettings && colorSettings.bubble_color) {
-      bubbleColor = colorSettings.bubble_color;
-    } else if (config.bubbleColor) {
-      bubbleColor = config.bubbleColor;
-    } else {
-      bubbleColor = '#000000'; // Default to black
-    }
-    
-    // Remove any background image and set bubble color
-    bubbleButton.style.backgroundImage = 'none';
-    bubbleButton.style.backgroundColor = bubbleColor;
-    bubbleButton.style.color = '#FFFFFF';
-    bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
-  }
+  updateBubbleForOpenState();
 }
 
 /**
@@ -308,7 +75,7 @@ export function openChat() {
  */
 export function closeChat() {
   log('Closing chat');
-  chatOpen = false;
+  setChatOpen(false);
   
   const container = document.getElementById('wonderwave-container');
   if (container) {
@@ -322,42 +89,7 @@ export function closeChat() {
   }
   
   // Restore proper icon on the button based on chat icon availability
-  const bubbleButton = getBubbleButton();
-  if (bubbleButton) {
-    const config = { ...defaultConfig, ...(window.wonderwaveConfig || {}) };
-    const colorSettings = getColorSettings();
-    
-    // Use custom chat icon if specified in config or settings, otherwise use default with bubble color
-    if (colorSettings && colorSettings.chat_icon) {
-      bubbleButton.innerHTML = '';
-      bubbleButton.style.backgroundImage = `url("${colorSettings.chat_icon}")`;
-      bubbleButton.style.backgroundSize = 'cover';
-      bubbleButton.style.backgroundPosition = 'center';
-      bubbleButton.style.backgroundColor = 'transparent';
-    } else if (config.chatIcon) {
-      bubbleButton.innerHTML = '';
-      bubbleButton.style.backgroundImage = `url("${config.chatIcon}")`;
-      bubbleButton.style.backgroundSize = 'cover';
-      bubbleButton.style.backgroundPosition = 'center';
-      bubbleButton.style.backgroundColor = 'transparent';
-    } else {
-      // Default icon with bubble color - use the correct chat icon
-      bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
-      bubbleButton.style.backgroundImage = 'none';
-      
-      // Determine bubble color for default icon
-      let bubbleColor;
-      if (colorSettings && colorSettings.bubble_color) {
-        bubbleColor = colorSettings.bubble_color;
-      } else if (config.bubbleColor) {
-        bubbleColor = config.bubbleColor;
-      } else {
-        bubbleColor = '#000000'; // Default to black
-      }
-      bubbleButton.style.backgroundColor = bubbleColor;
-      bubbleButton.style.color = '#FFFFFF';
-    }
-  }
+  updateBubbleForClosedState();
 }
 
 /**
@@ -386,42 +118,51 @@ export function destroy() {
     bubbleButton.parentNode.removeChild(bubbleButton);
   }
   
-  // Remove the iframe container
-  const container = document.getElementById('wonderwave-container');
-  if (container && container.parentNode) {
-    container.parentNode.removeChild(container);
-    iframe = null;
-  }
-  
   // Remove any popup containers
   const popupsContainer = document.getElementById('wonderwave-popups');
   if (popupsContainer && popupsContainer.parentNode) {
     popupsContainer.parentNode.removeChild(popupsContainer);
   }
   
-  // Remove event listeners
-  window.removeEventListener('message', handleIframeMessage);
+  // Clean up chat resources
+  cleanup();
   
   log('Widget destroyed');
 }
 
 /**
- * Get the iframe element
+ * Handle messages from the iframe - exported for backward compatibility
+ */
+export function handleIframeMessage(event) {
+  const iframe = getIframe();
+  return handleIframeMessage(event, iframe, closeChat);
+}
+
+/**
+ * Create and open the chat iframe - exported for backward compatibility
+ */
+export function createChatIframe(config) {
+  const result = createChatIframe(config, isOpen(), closeChat);
+  if (result) {
+    setIframeAndHandler(result.iframe, result.messageHandler);
+  }
+}
+
+/**
+ * Get the iframe element - exported for backward compatibility
  */
 export function getIframe() {
-  return iframe;
+  return getIframe();
 }
 
 /**
- * Set the iframe element
+ * Set the iframe element - exported for backward compatibility
  */
 export function setIframe(newIframe) {
-  iframe = newIframe;
+  setIframeAndHandler(newIframe, null);
 }
 
 /**
- * Get chat state
+ * Get chat state - exported for backward compatibility
  */
-export function isOpen() {
-  return chatOpen;
-}
+export { isOpen };
