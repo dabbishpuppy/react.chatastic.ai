@@ -55,6 +55,7 @@ const LeadsPage: React.FC = () => {
         return;
       }
 
+      console.log('📋 Fetched leads:', data);
       setLeads(data || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -115,10 +116,11 @@ const LeadsPage: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  // Set up real-time subscription
+  // Set up real-time subscription for new leads
   useEffect(() => {
     if (!agentId) return;
 
+    console.log('📋 Setting up real-time subscription for leads');
     const channel = supabase
       .channel('leads-changes')
       .on(
@@ -130,17 +132,19 @@ const LeadsPage: React.FC = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          console.log('New lead received:', payload);
-          setLeads(prev => [payload.new as Lead, ...prev]);
+          console.log('📋 New lead received via real-time:', payload);
+          const newLead = payload.new as Lead;
+          setLeads(prev => [newLead, ...prev]);
           toast({
             title: "New lead received!",
-            description: "A new lead has been submitted.",
+            description: `Lead from ${newLead.email || newLead.name || 'Unknown'} has been submitted.`,
           });
         }
       )
       .subscribe();
 
     return () => {
+      console.log('📋 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [agentId]);

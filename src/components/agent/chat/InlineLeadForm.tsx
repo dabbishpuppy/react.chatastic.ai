@@ -72,8 +72,9 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
 
   const sendNotificationEmail = async (leadData: any) => {
     try {
+      console.log('📧 Sending notification email for lead:', leadData);
       // Call the edge function to send notification email
-      const { error } = await supabase.functions.invoke('send-lead-notification', {
+      const { data, error } = await supabase.functions.invoke('send-lead-notification', {
         body: { 
           agentId,
           leadData,
@@ -84,7 +85,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
       if (error) {
         console.error('Error sending notification email:', error);
       } else {
-        console.log('Notification email sent successfully');
+        console.log('📧 Notification email sent successfully:', data);
       }
     } catch (error) {
       console.error('Error calling notification function:', error);
@@ -131,7 +132,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
         return;
       }
 
-      // Send notification email
+      // Send notification email - this will now properly work
       await sendNotificationEmail(leadData);
 
       toast({

@@ -1,3 +1,4 @@
+
 import { ChatMessage } from "@/types/chatInterface";
 
 export const proceedWithMessage = (
@@ -32,7 +33,9 @@ export const proceedWithMessage = (
 
     setChatHistory(prev => {
       console.log('🤖 Adding AI response to chat history');
-      return [...prev, aiMessage];
+      // Filter out any lead form widgets before adding new AI message
+      const filteredHistory = prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
+      return [...filteredHistory, aiMessage];
     });
     setIsTyping(false);
 
@@ -79,7 +82,7 @@ export const regenerateResponse = (
   // Find the last AI message using reverse iteration
   let lastAiMessageIndex = -1;
   for (let i = chatHistory.length - 1; i >= 0; i--) {
-    if (chatHistory[i].isAgent) {
+    if (chatHistory[i].isAgent && chatHistory[i].content !== "LEAD_FORM_WIDGET") {
       lastAiMessageIndex = i;
       break;
     }

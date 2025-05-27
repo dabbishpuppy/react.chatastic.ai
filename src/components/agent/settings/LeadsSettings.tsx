@@ -165,7 +165,7 @@ const LeadsSettings: React.FC = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleReset('name_placeholder', 'Full name')}
+                        onClick={() => handleReset('name_placeholder', 'Name')}
                       >
                         Reset
                       </Button>

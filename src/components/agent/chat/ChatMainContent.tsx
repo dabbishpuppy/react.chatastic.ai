@@ -43,52 +43,112 @@ const ChatMainContent: React.FC<ChatMainContentProps> = ({
   theme = 'light',
   onLeadFormSubmit
 }) => {
-  // Filter out lead form messages and handle them separately
-  const regularMessages = chatHistory.filter(message => message.content !== "LEAD_FORM_WIDGET");
-  const leadFormMessages = chatHistory.filter(message => message.content === "LEAD_FORM_WIDGET");
+  // Process messages to render them in order, including lead forms
+  const processedMessages = chatHistory.map((message, index) => {
+    if (message.content === "LEAD_FORM_WIDGET") {
+      return {
+        type: 'lead-form',
+        message,
+        index
+      };
+    }
+    return {
+      type: 'message',
+      message,
+      index
+    };
+  });
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <ScrollArea className="flex-1 overflow-auto">
         <div className="px-4 py-2 min-h-full">
           <div className="space-y-4">
-            {/* Render regular chat messages */}
-            <ChatMessages
-              chatHistory={regularMessages}
-              isTyping={false}
-              agentName={agentName}
-              profilePicture={profilePicture}
-              showFeedback={showFeedback}
-              hideUserAvatar={hideUserAvatar}
-              onFeedback={onFeedback}
-              onCopy={onCopy}
-              agentBubbleClass={themeClasses.agentMessage}
-              userBubbleClass={themeClasses.userMessage}
-              userMessageStyle={userMessageStyle}
-              messagesEndRef={messagesEndRef}
-            />
-
-            {/* Render lead forms inline where they appear in chat history */}
-            {leadFormMessages.map((message, index) => {
-              if (leadSettings && agentId) {
+            {/* Render all messages and lead forms in chronological order */}
+            {processedMessages.map((item) => {
+              if (item.type === 'lead-form') {
+                // Render lead form inline
+                if (leadSettings && agentId) {
+                  return (
+                    <InlineLeadForm
+                      key={`lead-form-${item.index}`}
+                      agentId={agentId}
+                      conversationId={conversationId}
+                      title={leadSettings.title}
+                      collectName={leadSettings.collect_name}
+                      namePlaceholder={leadSettings.name_placeholder}
+                      collectEmail={leadSettings.collect_email}
+                      emailPlaceholder={leadSettings.email_placeholder}
+                      collectPhone={leadSettings.collect_phone}
+                      phonePlaceholder={leadSettings.phone_placeholder}
+                      onSubmit={onLeadFormSubmit || (() => {})}
+                      theme={theme}
+                    />
+                  );
+                }
+                return null;
+              } else {
+                // Render regular message
                 return (
-                  <InlineLeadForm
-                    key={`lead-form-${index}`}
-                    agentId={agentId}
-                    conversationId={conversationId}
-                    title={leadSettings.title}
-                    collectName={leadSettings.collect_name}
-                    namePlaceholder={leadSettings.name_placeholder}
-                    collectEmail={leadSettings.collect_email}
-                    emailPlaceholder={leadSettings.email_placeholder}
-                    collectPhone={leadSettings.collect_phone}
-                    phonePlaceholder={leadSettings.phone_placeholder}
-                    onSubmit={onLeadFormSubmit || (() => {})}
-                    theme={theme}
-                  />
+                  <div key={`message-${item.index}`}>
+                    {item.message.isAgent ? (
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          {profilePicture ? (
+                            <img
+                              src={profilePicture}
+                              alt={agentName}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
+                              {agentName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.agentMessage}`}>
+                          <div className="text-sm">
+                            {item.message.content}
+                          </div>
+                          {showFeedback && (
+                            <div className="flex items-center space-x-2 mt-2">
+                              <button
+                                onClick={() => onFeedback(item.message.timestamp, "like")}
+                                className="text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                👍
+                              </button>
+                              <button
+                                onClick={() => onFeedback(item.message.timestamp, "dislike")}
+                                className="text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                👎
+                              </button>
+                              <button
+                                onClick={() => onCopy(item.message.content)}
+                                className="text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end">
+                        <div 
+                          className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${themeClasses.userMessage}`}
+                          style={userMessageStyle}
+                        >
+                          <div className="text-sm">
+                            {item.message.content}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               }
-              return null;
             })}
             
             {isTyping && (
