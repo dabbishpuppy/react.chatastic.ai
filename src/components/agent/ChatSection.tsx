@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -59,6 +60,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>(initialMessages);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
+  const [leadFormKey, setLeadFormKey] = useState(0); // Force re-render key
   
   // Load lead settings with refresh capability
   const { settings: leadSettings, refreshSettings } = useLeadSettings(agentId || '');
@@ -66,18 +68,20 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Enhanced refresh logic for embedded mode
   useEffect(() => {
     if (isEmbedded && agentId) {
-      // Refresh settings more frequently for embedded mode
+      // Faster refresh for embedded mode
       const interval = setInterval(() => {
         refreshSettings();
-      }, 5000); // Refresh every 5 seconds
+      }, 2000); // Reduced from 5 to 2 seconds
       
       // Listen for settings update messages
       const handleMessage = (event: MessageEvent) => {
         if (event.data && event.data.type === 'lead-settings-updated' && event.data.agentId === agentId) {
           console.log('📋 Received lead settings update message, refreshing...');
+          // Force immediate refresh and lead form re-render
           setTimeout(() => {
             refreshSettings();
-          }, 1000); // Delay to ensure database is updated
+            setLeadFormKey(prev => prev + 1); // Force re-render of lead form
+          }, 100); // Immediate refresh
         }
       };
       
@@ -144,19 +148,23 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       hasShownLeadForm,
       userHasMessaged,
       chatHistoryLength: chatHistory.length,
-      isTyping
+      isTyping,
+      leadFormKey
     });
-  }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
+  }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping, leadFormKey]);
 
-  // Enhanced lead form trigger logic - only show if settings are properly loaded and enabled
+  // Check if any fields are enabled for lead form
+  const hasAnyEnabledFields = leadSettings && (
+    leadSettings.collect_name || leadSettings.collect_email || leadSettings.collect_phone
+  );
+
+  // Enhanced lead form trigger logic
   useEffect(() => {
     if (!isEmbedded || !leadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
       return;
     }
 
-    // Check if at least one field is enabled
-    const hasAnyFields = leadSettings.collect_name || leadSettings.collect_email || leadSettings.collect_phone;
-    if (!hasAnyFields) {
+    if (!hasAnyEnabledFields) {
       console.log('🚫 No lead form fields enabled, skipping form display');
       return;
     }
@@ -169,14 +177,14 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       userMessagesCount: userMessages.length,
       aiMessagesCount: aiMessages.length,
       shouldTrigger: userMessages.length >= 1 && aiMessages.length >= 1,
-      hasAnyFields
+      hasAnyEnabledFields
     });
 
     // Show lead form after first user message AND first AI response
     if (userMessages.length >= 1 && aiMessages.length >= 1) {
       console.log('✅ TRIGGERING LEAD FORM NOW - Adding to chat');
       const timer = setTimeout(() => {
-        // Add lead form message to chat history instead of showing popup
+        // Add lead form message to chat history
         const leadFormMessage: ChatMessage = {
           isAgent: true,
           content: "LEAD_FORM_WIDGET",
@@ -190,7 +198,16 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, leadSettings?.collect_name, leadSettings?.collect_email, leadSettings?.collect_phone, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
+  }, [isEmbedded, leadSettings?.enabled, hasAnyEnabledFields, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
+
+  // Remove lead form from chat if no fields are enabled
+  useEffect(() => {
+    if (isEmbedded && leadSettings && !hasAnyEnabledFields) {
+      console.log('🗑️ Removing lead form from chat - no fields enabled');
+      setChatHistory(prev => prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET"));
+      setHasShownLeadForm(false);
+    }
+  }, [isEmbedded, leadSettings, hasAnyEnabledFields, setChatHistory]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
@@ -223,6 +240,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       timestamp: new Date().toISOString()
     }]);
     setHasShownLeadForm(false);
+    setLeadFormKey(prev => prev + 1); // Reset lead form key
   };
 
   const handleEndChat = async () => {
@@ -317,6 +335,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
           // Remove the lead form message from chat
           setChatHistory(prev => prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET"));
         }}
+        leadFormKey={leadFormKey}
       />
 
       {/* Fixed footer section */}
