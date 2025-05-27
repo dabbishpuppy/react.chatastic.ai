@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -199,9 +200,10 @@ export const useChatSettings = () => {
     // Send message to all iframes on the page
     const iframes = document.querySelectorAll('iframe[src*="/embed/"]');
     iframes.forEach(iframe => {
-      if (iframe.contentWindow) {
+      const iframeElement = iframe as HTMLIFrameElement;
+      if (iframeElement.contentWindow) {
         console.log('📤 Sending settings update to iframe');
-        iframe.contentWindow.postMessage({
+        iframeElement.contentWindow.postMessage({
           type: 'wonderwave-refresh-settings',
           agentId: validAgentId,
           settings: settingsToNotify
@@ -232,7 +234,7 @@ export const useChatSettings = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    console.log('💾 Saving settings:', settings);
+    console.log('💾 Saving settings (partial update):', settings);
     
     try {
       const updatedSettings = await saveChatSettings({

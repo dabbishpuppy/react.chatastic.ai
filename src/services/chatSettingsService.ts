@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { Json } from "@/integrations/supabase/types";
@@ -39,48 +40,85 @@ const validateBubblePosition = (position: string): 'left' | 'right' => {
   return 'right'; // Default to right if invalid
 };
 
+// Helper function to merge settings intelligently
+const mergeSettings = (existingSettings: any, newSettings: ChatInterfaceSettings) => {
+  console.log('🔄 Merging settings - Existing:', existingSettings);
+  console.log('🔄 Merging settings - New:', newSettings);
+  
+  // Start with existing settings or defaults
+  const merged = {
+    initial_message: newSettings.initial_message ?? existingSettings?.initial_message ?? '👋 Hi! How can I help you today?',
+    suggested_messages: JSON.stringify(newSettings.suggested_messages ?? parseSuggestedMessages(existingSettings) ?? []),
+    message_placeholder: newSettings.message_placeholder ?? existingSettings?.message_placeholder ?? 'Write message here...',
+    show_feedback: newSettings.show_feedback !== undefined ? newSettings.show_feedback : (existingSettings?.show_feedback ?? true),
+    allow_regenerate: newSettings.allow_regenerate !== undefined ? newSettings.allow_regenerate : (existingSettings?.allow_regenerate ?? true),
+    theme: validateTheme(newSettings.theme ?? existingSettings?.theme ?? 'light'),
+    display_name: newSettings.display_name ?? existingSettings?.display_name ?? 'AI Assistant',
+    profile_picture: newSettings.profile_picture !== undefined ? newSettings.profile_picture : existingSettings?.profile_picture,
+    chat_icon: newSettings.chat_icon !== undefined ? newSettings.chat_icon : existingSettings?.chat_icon,
+    bubble_position: validateBubblePosition(newSettings.bubble_position ?? existingSettings?.bubble_position ?? 'right'),
+    show_suggestions_after_chat: newSettings.show_suggestions_after_chat !== undefined ? newSettings.show_suggestions_after_chat : (existingSettings?.show_suggestions_after_chat ?? true),
+    auto_show_delay: newSettings.auto_show_delay !== undefined ? newSettings.auto_show_delay : (existingSettings?.auto_show_delay ?? 1),
+    footer: newSettings.footer !== undefined ? newSettings.footer : existingSettings?.footer,
+    user_message_color: newSettings.user_message_color !== undefined ? newSettings.user_message_color : (existingSettings?.user_message_color ?? '#3B82F6'),
+    bubble_color: newSettings.bubble_color !== undefined ? newSettings.bubble_color : (existingSettings?.bubble_color ?? '#3B82F6'),
+    sync_colors: newSettings.sync_colors !== undefined ? newSettings.sync_colors : (existingSettings?.sync_colors ?? false),
+    primary_color: newSettings.primary_color !== undefined ? newSettings.primary_color : (existingSettings?.primary_color ?? '#3B82F6'),
+    updated_at: new Date().toISOString(),
+  };
+  
+  console.log('✅ Merged settings result:', merged);
+  return merged;
+};
+
 export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise<ChatInterfaceSettings | null> => {
   try {
-    console.log('💾 Saving chat settings to database:', settings);
-    
-    // Validate the settings before saving
-    if (!settings.theme) {
-      console.warn('⚠️ No theme specified, defaulting to light');
-      settings.theme = 'light';
-    }
-    
-    if (!settings.suggested_messages) {
-      console.warn('⚠️ No suggested messages, defaulting to empty array');
-      settings.suggested_messages = [];
-    }
-    
-    // If no agent_id is provided, create/update settings without associating with an agent
-    const settingsData = {
-      initial_message: settings.initial_message || '👋 Hi! How can I help you today?',
-      suggested_messages: JSON.stringify(settings.suggested_messages),
-      message_placeholder: settings.message_placeholder || 'Write message here...',
-      show_feedback: settings.show_feedback ?? true,
-      allow_regenerate: settings.allow_regenerate ?? true,
-      theme: validateTheme(settings.theme),
-      display_name: settings.display_name || 'AI Assistant',
-      profile_picture: settings.profile_picture,
-      chat_icon: settings.chat_icon,
-      bubble_position: validateBubblePosition(settings.bubble_position || 'right'),
-      show_suggestions_after_chat: settings.show_suggestions_after_chat ?? true,
-      auto_show_delay: settings.auto_show_delay ?? 1,
-      footer: settings.footer,
-      user_message_color: settings.user_message_color || '#3B82F6',
-      bubble_color: settings.bubble_color || '#3B82F6',
-      sync_colors: settings.sync_colors ?? false,
-      primary_color: settings.primary_color || '#3B82F6',
-      updated_at: new Date().toISOString(),
-    };
-    
-    console.log('💾 Prepared settings data for save:', settingsData);
+    console.log('💾 Saving chat settings (with merge logic):', settings);
     
     // Only include agent_id if it exists and is valid
-    if (settings.agent_id && settings.agent_id !== "undefined") {
-      Object.assign(settingsData, { agent_id: settings.agent_id });
+    const agentIdToUse = settings.agent_id && settings.agent_id !== "undefined" ? settings.agent_id : null;
+    
+    let existingSettings = null;
+    
+    if (settings.id) {
+      // For updates, fetch existing settings first
+      console.log('📖 Fetching existing settings for merge, ID:', settings.id);
+      const { data: existing, error: fetchError } = await supabase
+        .from("chat_interface_settings")
+        .select('*')
+        .eq('id', settings.id)
+        .single();
+        
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('❌ Error fetching existing settings:', fetchError);
+      } else if (existing) {
+        existingSettings = existing;
+        console.log('📖 Found existing settings:', existingSettings);
+      }
+    } else if (agentIdToUse) {
+      // For new settings with agent_id, check if settings already exist for this agent
+      console.log('📖 Checking for existing settings for agent:', agentIdToUse);
+      const { data: existing, error: fetchError } = await supabase
+        .from("chat_interface_settings")
+        .select('*')
+        .eq('agent_id', agentIdToUse)
+        .single();
+        
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('❌ Error fetching existing settings for agent:', fetchError);
+      } else if (existing) {
+        existingSettings = existing;
+        settings.id = existing.id; // Set the ID so we do an update instead of insert
+        console.log('📖 Found existing settings for agent:', existingSettings);
+      }
+    }
+    
+    // Merge the settings intelligently
+    const settingsData = mergeSettings(existingSettings, settings);
+    
+    // Add agent_id if available
+    if (agentIdToUse) {
+      Object.assign(settingsData, { agent_id: agentIdToUse });
     }
 
     if (settings.id) {
