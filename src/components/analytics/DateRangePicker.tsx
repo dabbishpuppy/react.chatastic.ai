@@ -74,17 +74,21 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   };
 
   const handleCalendarSelect = (range: { from: Date | undefined; to: Date | undefined } | undefined) => {
-    if (range) {
-      setSelectedRange(range);
-      
-      // Only close and apply the filter when both dates are selected
-      if (range.from && range.to) {
-        onDateRangeChange(
-          format(range.from, 'yyyy-MM-dd'),
-          format(range.to, 'yyyy-MM-dd')
-        );
-        setIsOpen(false);
-      }
+    console.log('Calendar select:', range);
+    
+    if (!range) return;
+    
+    // Update the selected range immediately for visual feedback
+    setSelectedRange(range);
+    
+    // Only apply the filter and close when both dates are selected
+    if (range.from && range.to) {
+      console.log('Both dates selected, applying filter');
+      onDateRangeChange(
+        format(range.from, 'yyyy-MM-dd'),
+        format(range.to, 'yyyy-MM-dd')
+      );
+      setIsOpen(false);
     }
   };
 
