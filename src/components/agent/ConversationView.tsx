@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -118,34 +117,25 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Create the correct conversation timeline - only add initial message if there are no messages
-  // or if the first message is not from the assistant
-  const fullConversationTimeline = React.useMemo(() => {
-    const timeline = [];
+  // Simplified message display - trust the database order completely
+  const messagesToDisplay = React.useMemo(() => {
+    const messages = [];
     
-    // Only add initial message if:
-    // 1. We have an initial message
-    // 2. AND either no messages exist OR the first message is not from assistant
-    const shouldAddInitialMessage = initialMessage && (
-      localMessages.length === 0 || 
-      localMessages[0]?.role !== 'assistant'
-    );
-    
-    if (shouldAddInitialMessage) {
-      timeline.push({
+    // Add initial message first if it exists and there are no messages or first message is not from assistant
+    if (initialMessage && (localMessages.length === 0 || localMessages[0]?.role !== 'assistant')) {
+      messages.push({
         id: 'initial-message',
         role: 'assistant' as const,
         content: initialMessage,
-        timestamp: new Date(Date.now() - 1000).toISOString(), // Just slightly before to ensure it's first
+        timestamp: '', // No timestamp manipulation
         feedback: undefined
       });
     }
     
-    // Add all actual conversation messages in their original order
-    timeline.push(...localMessages);
+    // Add all conversation messages in their exact database order
+    messages.push(...localMessages);
     
-    // Sort by timestamp to maintain chronological order
-    return timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return messages;
   }, [localMessages, initialMessage]);
 
   const handleDeleteConfirm = () => {
@@ -197,7 +187,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {fullConversationTimeline.map((message, index) => (
+          {messagesToDisplay.map((message, index) => (
             <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {message.role === 'assistant' && (
                 <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
