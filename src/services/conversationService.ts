@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -21,6 +20,7 @@ export interface Message {
   is_agent: boolean;
   timestamp: string;
   created_at: string;
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export const conversationService = {

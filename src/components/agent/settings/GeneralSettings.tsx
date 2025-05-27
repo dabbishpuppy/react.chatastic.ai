@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DeleteAgentDialog from "@/components/dashboard/DeleteAgentDialog";
 import DeleteConversationsDialog from "@/components/activity/DeleteConversationsDialog";
+import { conversationService } from "@/services/conversationService";
 
 const GeneralSettings: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -88,15 +90,15 @@ const GeneralSettings: React.FC = () => {
     setIsDeletingConversations(true);
     
     try {
-      // For demo purposes: In a real app, this would connect to an API to delete conversations
-      // Here we'll simulate success and provide a placeholder for real implementation
+      // Get all conversations for this agent
+      const conversations = await conversationService.getRecentConversations(agentId, 1000);
       
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Import and call the deleteAllConversations function
-      const { deleteAllConversations } = await import("@/components/activity/ConversationData");
-      deleteAllConversations();
+      // Delete each conversation using the service
+      const deletePromises = conversations.map(conv => 
+        conversationService.deleteConversation(conv.id)
+      );
+      
+      await Promise.all(deletePromises);
       
       toast({
         title: "Conversations deleted",
