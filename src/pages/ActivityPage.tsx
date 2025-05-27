@@ -17,6 +17,34 @@ const ActivityPage: React.FC = () => {
   const [conversations, setConversations] = useState<DBConversation[]>([]);
   const [chatSettings, setChatSettings] = useState<ChatInterfaceSettings | null>(null);
 
+  // Helper function to ensure suggested_messages is properly typed
+  const ensureSuggestedMessagesArray = (messages: any): SuggestedMessage[] => {
+    if (!messages) return [];
+    
+    if (Array.isArray(messages)) {
+      return messages.map((msg, index) => ({
+        id: msg.id || `msg-${index}`,
+        text: msg.text || (typeof msg === 'string' ? msg : '')
+      }));
+    }
+    
+    if (typeof messages === 'string') {
+      try {
+        const parsed = JSON.parse(messages);
+        if (Array.isArray(parsed)) {
+          return parsed.map((msg, index) => ({
+            id: msg.id || `msg-${index}`,
+            text: msg.text || (typeof msg === 'string' ? msg : '')
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing suggested_messages string:', error);
+      }
+    }
+    
+    return [];
+  };
+
   useEffect(() => {
     if (agentId) {
       loadConversations();
@@ -58,11 +86,7 @@ const ActivityPage: React.FC = () => {
           bubble_position: (settings.bubble_position === 'left' || settings.bubble_position === 'right')
             ? settings.bubble_position
             : 'right',
-          suggested_messages: Array.isArray(settings.suggested_messages) 
-            ? settings.suggested_messages as SuggestedMessage[]
-            : (typeof settings.suggested_messages === 'string' 
-               ? JSON.parse(settings.suggested_messages) 
-               : [])
+          suggested_messages: ensureSuggestedMessagesArray(settings.suggested_messages)
         };
         setChatSettings(typedSettings);
       }

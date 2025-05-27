@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
@@ -102,6 +101,22 @@ export const useChatSettings = () => {
     return 'right'; // default fallback
   };
 
+  // Helper function to create properly typed ChatInterfaceSettings
+  const createTypedSettings = (data: any, agentId?: string): ChatInterfaceSettings => {
+    return {
+      ...defaultChatSettings,
+      ...data,
+      agent_id: agentId || data.agent_id,
+      theme: ensureValidTheme(data.theme),
+      bubble_position: ensureValidBubblePosition(data.bubble_position),
+      suggested_messages: ensureSuggestedMessagesArray(data.suggested_messages),
+      sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
+      primary_color: data.primary_color || defaultChatSettings.primary_color || '#3B82F6',
+      profile_picture: data.profile_picture || null,
+      chat_icon: data.chat_icon || null
+    };
+  };
+
   // Function to refresh settings from server
   const refreshSettings = async () => {
     if (!validAgentId) return;
@@ -112,16 +127,14 @@ export const useChatSettings = () => {
     if (edgeData && edgeData.visibility !== 'private') {
       console.log('✅ Refreshed settings from edge function:', edgeData);
       
-      const newSettings: ChatInterfaceSettings = {
-        ...defaultChatSettings,
-        agent_id: validAgentId,
+      const newSettings = createTypedSettings({
         display_name: edgeData.display_name || defaultChatSettings.display_name,
         initial_message: edgeData.initial_message || defaultChatSettings.initial_message,
         message_placeholder: edgeData.message_placeholder || defaultChatSettings.message_placeholder,
-        theme: ensureValidTheme(edgeData.theme),
+        theme: edgeData.theme,
         profile_picture: edgeData.profile_picture || null,
         chat_icon: edgeData.chat_icon || null,
-        bubble_position: ensureValidBubblePosition(edgeData.bubble_position),
+        bubble_position: edgeData.bubble_position,
         footer: edgeData.footer || null,
         user_message_color: edgeData.user_message_color || null,
         bubble_color: edgeData.bubble_color || null,
@@ -129,10 +142,10 @@ export const useChatSettings = () => {
         primary_color: edgeData.primary_color || null,
         show_feedback: edgeData.show_feedback !== undefined ? edgeData.show_feedback : defaultChatSettings.show_feedback,
         allow_regenerate: edgeData.allow_regenerate !== undefined ? edgeData.allow_regenerate : defaultChatSettings.allow_regenerate,
-        suggested_messages: ensureSuggestedMessagesArray(edgeData.suggested_messages),
+        suggested_messages: edgeData.suggested_messages,
         show_suggestions_after_chat: edgeData.show_suggestions_after_chat !== undefined ? edgeData.show_suggestions_after_chat : defaultChatSettings.show_suggestions_after_chat,
         auto_show_delay: edgeData.auto_show_delay !== undefined ? edgeData.auto_show_delay : defaultChatSettings.auto_show_delay
-      };
+      }, validAgentId);
 
       setSettings(newSettings);
 
@@ -155,16 +168,14 @@ export const useChatSettings = () => {
           console.log('✅ Using edge function data:', edgeData);
           
           // Set chat settings with proper suggested_messages handling
-          const newSettings: ChatInterfaceSettings = {
-            ...defaultChatSettings,
-            agent_id: validAgentId,
+          const newSettings = createTypedSettings({
             display_name: edgeData.display_name || defaultChatSettings.display_name,
             initial_message: edgeData.initial_message || defaultChatSettings.initial_message,
             message_placeholder: edgeData.message_placeholder || defaultChatSettings.message_placeholder,
-            theme: ensureValidTheme(edgeData.theme),
+            theme: edgeData.theme,
             profile_picture: edgeData.profile_picture || null,
             chat_icon: edgeData.chat_icon || null,
-            bubble_position: ensureValidBubblePosition(edgeData.bubble_position),
+            bubble_position: edgeData.bubble_position,
             footer: edgeData.footer || null,
             user_message_color: edgeData.user_message_color || null,
             bubble_color: edgeData.bubble_color || null,
@@ -172,10 +183,10 @@ export const useChatSettings = () => {
             primary_color: edgeData.primary_color || null,
             show_feedback: edgeData.show_feedback !== undefined ? edgeData.show_feedback : defaultChatSettings.show_feedback,
             allow_regenerate: edgeData.allow_regenerate !== undefined ? edgeData.allow_regenerate : defaultChatSettings.allow_regenerate,
-            suggested_messages: ensureSuggestedMessagesArray(edgeData.suggested_messages),
+            suggested_messages: edgeData.suggested_messages,
             show_suggestions_after_chat: edgeData.show_suggestions_after_chat !== undefined ? edgeData.show_suggestions_after_chat : defaultChatSettings.show_suggestions_after_chat,
             auto_show_delay: edgeData.auto_show_delay !== undefined ? edgeData.auto_show_delay : defaultChatSettings.auto_show_delay
-          };
+          }, validAgentId);
 
           setSettings(newSettings);
 
@@ -189,17 +200,7 @@ export const useChatSettings = () => {
           const data = await getChatSettings(validAgentId);
           
           if (data) {
-            const newSettings: ChatInterfaceSettings = {
-              ...defaultChatSettings,
-              ...data,
-              theme: ensureValidTheme(data.theme),
-              bubble_position: ensureValidBubblePosition(data.bubble_position),
-              suggested_messages: ensureSuggestedMessagesArray(data.suggested_messages),
-              sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
-              primary_color: data.primary_color || defaultChatSettings.primary_color || '#3B82F6',
-              profile_picture: data.profile_picture || null,
-              chat_icon: data.chat_icon || null
-            };
+            const newSettings = createTypedSettings(data);
             setSettings(newSettings);
           } else {
             setSettings({
@@ -321,13 +322,15 @@ export const useChatSettings = () => {
       
       if (updatedSettings) {
         console.log('✅ Settings saved successfully:', updatedSettings);
-        setSettings(updatedSettings);
+        // Use the helper function to ensure proper typing
+        const typedSettings = createTypedSettings(updatedSettings);
+        setSettings(typedSettings);
         setHasUnsavedChanges(false);
         
         // Small delay to ensure database is updated before notifying
         setTimeout(() => {
           // Notify embedded components about the change with the updated settings
-          notifySettingsChange(updatedSettings);
+          notifySettingsChange(typedSettings);
           
           toast({
             title: "Settings saved",
