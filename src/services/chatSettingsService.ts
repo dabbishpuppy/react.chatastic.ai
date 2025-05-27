@@ -3,42 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { Json } from "@/integrations/supabase/types";
 
-// Helper function to create storage bucket if it doesn't exist
-const ensureStorageBucket = async () => {
-  try {
-    // Try to get the bucket first
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    
-    if (listError) {
-      console.error('Error listing buckets:', listError);
-      return false;
-    }
-    
-    const bucketExists = buckets?.some(bucket => bucket.name === 'chat_interface_assets');
-    
-    if (!bucketExists) {
-      console.log('Creating chat_interface_assets bucket...');
-      const { error: createError } = await supabase.storage.createBucket('chat_interface_assets', {
-        public: true,
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        fileSizeLimit: 5242880 // 5MB
-      });
-      
-      if (createError) {
-        console.error('Error creating bucket:', createError);
-        return false;
-      }
-      
-      console.log('✅ Storage bucket created successfully');
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error ensuring storage bucket:', error);
-    return false;
-  }
-};
-
 // Helper function to parse suggested messages from JSON
 const parseSuggestedMessages = (data: any): SuggestedMessage[] => {
   if (!data.suggested_messages) return [];
@@ -47,7 +11,6 @@ const parseSuggestedMessages = (data: any): SuggestedMessage[] => {
     if (typeof data.suggested_messages === 'string') {
       return JSON.parse(data.suggested_messages);
     } else if (Array.isArray(data.suggested_messages)) {
-      // Make sure each item has id and text properties
       return data.suggested_messages.map((msg: any) => ({
         id: msg.id || `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         text: msg.text || (typeof msg === 'string' ? msg : '')
@@ -65,7 +28,7 @@ const validateTheme = (theme: string): 'light' | 'dark' | 'system' => {
   if (theme === 'light' || theme === 'dark' || theme === 'system') {
     return theme;
   }
-  return 'light'; // Default to light if invalid
+  return 'light';
 };
 
 // Helper function to ensure bubble position is one of the allowed values
@@ -73,7 +36,7 @@ const validateBubblePosition = (position: string): 'left' | 'right' => {
   if (position === 'left' || position === 'right') {
     return position;
   }
-  return 'right'; // Default to right if invalid
+  return 'right';
 };
 
 // Helper function to sanitize data for database insertion
@@ -128,19 +91,16 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
   try {
     console.log('💾 Saving chat settings:', settings);
     
-    // Validate required data
     if (!settings) {
       console.error('❌ No settings provided');
       return null;
     }
     
-    // Only include agent_id if it exists and is valid
     const agentIdToUse = settings.agent_id && settings.agent_id !== "undefined" ? settings.agent_id : null;
     
     let existingSettings = null;
     
     if (settings.id) {
-      // For updates, fetch existing settings first
       console.log('📖 Fetching existing settings for merge, ID:', settings.id);
       const { data: existing, error: fetchError } = await supabase
         .from("chat_interface_settings")
@@ -150,13 +110,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         
       if (fetchError) {
         console.error('❌ Error fetching existing settings:', fetchError);
-        // Don't fail completely, continue with new settings only
       } else if (existing) {
         existingSettings = existing;
         console.log('📖 Found existing settings:', existingSettings);
       }
     } else if (agentIdToUse) {
-      // For new settings with agent_id, check if settings already exist for this agent
       console.log('📖 Checking for existing settings for agent:', agentIdToUse);
       const { data: existing, error: fetchError } = await supabase
         .from("chat_interface_settings")
@@ -166,31 +124,27 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         
       if (fetchError) {
         console.error('❌ Error fetching existing settings for agent:', fetchError);
-        // Don't fail completely, continue with new settings only
       } else if (existing) {
         existingSettings = existing;
-        settings.id = existing.id; // Set the ID so we do an update instead of insert
+        settings.id = existing.id;
         console.log('📖 Found existing settings for agent:', existingSettings);
       }
     }
     
-    // Merge the settings intelligently
     const settingsData = mergeSettings(existingSettings, settings);
     
-    // Add agent_id if available
     if (agentIdToUse) {
       Object.assign(settingsData, { agent_id: agentIdToUse });
     }
 
     if (settings.id) {
-      // Update existing settings
       console.log('📝 Updating existing settings with ID:', settings.id);
       const { data, error } = await supabase
         .from("chat_interface_settings")
         .update(settingsData)
         .eq('id', settings.id)
         .select('*')
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error('❌ Error updating settings:', error);
@@ -198,14 +152,8 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         throw error;
       }
       
-      if (!data) {
-        console.error('❌ No data returned from update');
-        return null;
-      }
-      
       console.log('✅ Settings updated successfully:', data);
       
-      // Transform to expected type
       const result: ChatInterfaceSettings = {
         ...data,
         suggested_messages: parseSuggestedMessages(data),
@@ -215,13 +163,12 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       
       return result;
     } else {
-      // Create new settings
       console.log('🆕 Creating new settings');
       const { data, error } = await supabase
         .from("chat_interface_settings")
         .insert(settingsData)
         .select('*')
-        .maybeSingle();
+        .single();
 
       if (error) {
         console.error('❌ Error creating settings:', error);
@@ -229,14 +176,8 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         throw error;
       }
       
-      if (!data) {
-        console.error('❌ No data returned from insert');
-        return null;
-      }
-      
       console.log('✅ Settings created successfully:', data);
       
-      // Transform to expected type
       const result: ChatInterfaceSettings = {
         ...data,
         suggested_messages: parseSuggestedMessages(data),
@@ -270,10 +211,8 @@ export const getChatSettings = async (agentId: string): Promise<ChatInterfaceSet
       throw error;
     }
     
-    // If no settings exist yet, return null
     if (!data) return null;
     
-    // Parse the suggested_messages JSON and ensure theme is valid
     const parsedData: ChatInterfaceSettings = {
       ...data,
       suggested_messages: parseSuggestedMessages(data),
@@ -296,13 +235,6 @@ export const uploadChatAsset = async (
   try {
     if (!agentId || agentId === "undefined") {
       console.error('Invalid agent ID for uploading chat asset');
-      return null;
-    }
-    
-    // Ensure storage bucket exists
-    const bucketReady = await ensureStorageBucket();
-    if (!bucketReady) {
-      console.error('Storage bucket not ready');
       return null;
     }
     
