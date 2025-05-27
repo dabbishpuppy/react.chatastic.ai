@@ -13,7 +13,8 @@ import {
 
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
-  isEmbedded: boolean = false
+  isEmbedded: boolean = false,
+  conversationId?: string
 ) => {
   const {
     message,
@@ -45,14 +46,15 @@ export const useMessageHandling = (
     }, 10);
   };
 
-  const proceedWithMessageWrapper = (text: string) => {
-    proceedWithMessage(
+  const proceedWithMessageWrapper = async (text: string) => {
+    await proceedWithMessage(
       text,
       setChatHistory,
       setUserHasMessaged,
       setIsTyping,
       inputRef,
-      isEmbedded
+      isEmbedded,
+      conversationId
     );
   };
 
@@ -81,7 +83,7 @@ export const useMessageHandling = (
     }
     
     // Add message to chat and proceed
-    proceedWithMessageWrapper(text);
+    await proceedWithMessageWrapper(text);
   };
 
   const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
@@ -107,18 +109,19 @@ export const useMessageHandling = (
     }, 10);
   };
 
-  const handleFeedbackWrapper = (timestamp: string, type: "like" | "dislike") => {
-    handleFeedback(timestamp, type, setChatHistory);
+  const handleFeedbackWrapper = async (timestamp: string, type: "like" | "dislike") => {
+    await handleFeedback(timestamp, type, setChatHistory);
   };
 
-  const regenerateResponseWrapper = (allowRegenerate: boolean) => {
-    regenerateResponse(
+  const regenerateResponseWrapper = async (allowRegenerate: boolean) => {
+    await regenerateResponse(
       allowRegenerate,
       chatHistory,
       isTyping,
       setChatHistory,
       setIsTyping,
-      inputRef
+      inputRef,
+      conversationId
     );
   };
 

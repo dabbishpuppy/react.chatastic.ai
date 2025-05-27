@@ -78,28 +78,39 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
 
   const handleFeedback = async (type: "like" | "dislike") => {
-    if (isUpdatingFeedback || !message.id) return;
+    if (isUpdatingFeedback) return;
 
     setIsUpdatingFeedback(true);
     try {
-      // Toggle feedback: if same type is clicked, remove it
-      const newFeedback = message.feedback === type ? null : type;
-      
-      const success = await analyticsService.updateMessageFeedback(message.id, newFeedback);
-      
-      if (success) {
-        // Call the original onFeedback for local state updates
+      // Use the analytics service for database updates, but also call local handler
+      if (message.id) {
+        // Toggle feedback: if same type is clicked, remove it
+        const newFeedback = message.feedback === type ? null : type;
+        
+        const success = await analyticsService.updateMessageFeedback(message.id, newFeedback);
+        
+        if (success) {
+          // Call the original onFeedback for local state updates
+          onFeedback(message.timestamp, type);
+          
+          toast({
+            description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
+            duration: 2000,
+          });
+        } else {
+          toast({
+            description: "Failed to update feedback",
+            duration: 2000,
+            variant: "destructive"
+          });
+        }
+      } else {
+        // Fallback for messages without IDs (local only)
         onFeedback(message.timestamp, type);
         
         toast({
-          description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
+          description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
           duration: 2000,
-        });
-      } else {
-        toast({
-          description: "Failed to update feedback",
-          duration: 2000,
-          variant: "destructive"
         });
       }
     } catch (error) {

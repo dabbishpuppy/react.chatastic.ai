@@ -1,18 +1,29 @@
-import { ChatMessage } from "@/types/chatInterface";
 
-export const proceedWithMessage = (
+import { ChatMessage } from "@/types/chatInterface";
+import { messageService } from "@/services/messageService";
+
+export const proceedWithMessage = async (
   text: string,
   setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void,
   setUserHasMessaged: (value: boolean) => void,
   setIsTyping: (value: boolean) => void,
   inputRef: React.RefObject<HTMLInputElement>,
-  isEmbedded: boolean = false
+  isEmbedded: boolean = false,
+  conversationId?: string
 ) => {
   const userMessage: ChatMessage = {
     content: text,
     isAgent: false,
     timestamp: new Date().toISOString(),
   };
+
+  // Save user message to database if conversation exists
+  if (conversationId) {
+    const savedUserMessage = await messageService.saveMessage(conversationId, text, false);
+    if (savedUserMessage) {
+      userMessage.id = savedUserMessage.id;
+    }
+  }
 
   // Add user message immediately
   setChatHistory(prev => {
@@ -23,12 +34,21 @@ export const proceedWithMessage = (
   setIsTyping(true);
 
   // Simulate AI response after a delay
-  setTimeout(() => {
+  setTimeout(async () => {
+    const aiResponseText = "Thank you for your message! This is a simulated response.";
     const aiMessage: ChatMessage = {
-      content: "Thank you for your message! This is a simulated response.",
+      content: aiResponseText,
       isAgent: true,
       timestamp: new Date().toISOString(),
     };
+
+    // Save AI message to database if conversation exists
+    if (conversationId) {
+      const savedAiMessage = await messageService.saveMessage(conversationId, aiResponseText, true);
+      if (savedAiMessage) {
+        aiMessage.id = savedAiMessage.id;
+      }
+    }
 
     setChatHistory(prev => {
       console.log('🤖 Adding AI response to chat history');
@@ -52,28 +72,40 @@ export const copyMessageToClipboard = (content: string) => {
   });
 };
 
-export const handleFeedback = (
+export const handleFeedback = async (
   timestamp: string,
   type: "like" | "dislike",
-  setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void
+  setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void,
+  messageId?: string
 ) => {
+  // Update local state immediately for responsiveness
   setChatHistory(prev => 
-    prev.map(msg => 
-      msg.timestamp === timestamp 
-        ? { ...msg, feedback: type }
-        : msg
-    )
+    prev.map(msg => {
+      if (msg.timestamp === timestamp) {
+        const newFeedback = msg.feedback === type ? undefined : type;
+        
+        // Update database if message has an ID
+        if (msg.id) {
+          messageService.updateMessageFeedback(msg.id, newFeedback || null);
+        }
+        
+        return { ...msg, feedback: newFeedback };
+      }
+      return msg;
+    })
   );
+  
   console.log(`Feedback ${type} for message at ${timestamp}`);
 };
 
-export const regenerateResponse = (
+export const regenerateResponse = async (
   allowRegenerate: boolean,
   chatHistory: ChatMessage[],
   isTyping: boolean,
   setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void,
   setIsTyping: (value: boolean) => void,
-  inputRef: React.RefObject<HTMLInputElement>
+  inputRef: React.RefObject<HTMLInputElement>,
+  conversationId?: string
 ) => {
   if (!allowRegenerate || isTyping || chatHistory.length === 0) return;
 
@@ -93,12 +125,21 @@ export const regenerateResponse = (
   setIsTyping(true);
 
   // Generate a new response
-  setTimeout(() => {
+  setTimeout(async () => {
+    const newResponseText = "This is a regenerated response with different content.";
     const newAiMessage: ChatMessage = {
-      content: "This is a regenerated response with different content.",
+      content: newResponseText,
       isAgent: true,
       timestamp: new Date().toISOString(),
     };
+
+    // Save regenerated message to database if conversation exists
+    if (conversationId) {
+      const savedMessage = await messageService.saveMessage(conversationId, newResponseText, true);
+      if (savedMessage) {
+        newAiMessage.id = savedMessage.id;
+      }
+    }
 
     setChatHistory(prev => [...prev, newAiMessage]);
     setIsTyping(false);

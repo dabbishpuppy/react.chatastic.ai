@@ -152,7 +152,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     insertEmoji,
     handleCountdownFinished,
     cleanup
-  } = useMessageHandling(displayMessages, isEmbedded);
+  } = useMessageHandling(displayMessages, isEmbedded, currentConversation?.id);
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded, chatHistory, isTyping);
 
