@@ -4,10 +4,183 @@ import { useParams } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import { ChatInterfaceSettings, defaultChatSettings, SuggestedMessage } from '@/types/chatInterface';
 import { getChatSettings, saveChatSettings, uploadChatAsset } from '@/services/chatSettingsService';
-import { loadSettingsFromEdgeFunction } from './edgeFunctionService';
-import { createTypedSettings, checkForChanges } from './types';
-import { createSettingsFromEdgeData } from './settingsHelpers';
-import { notifySettingsChange } from './notificationService';
+
+// Edge function service
+export const loadSettingsFromEdgeFunction = async (agentId: string, bustCache = false) => {
+  try {
+    console.log('📡 Loading settings from edge function for agent:', agentId);
+    const timestamp = bustCache ? `&_t=${Date.now()}` : '';
+    const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/chat-settings?agentId=${agentId}${timestamp}`, {
+      headers: {
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('Edge function response not ok:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('📡 Edge function response:', data);
+    
+    return data;
+  } catch (error) {
+    console.error('Error loading settings from edge function:', error);
+    return null;
+  }
+};
+
+// Helper function to ensure suggested_messages is always an array
+export const ensureSuggestedMessagesArray = (messages: any): SuggestedMessage[] => {
+  if (!messages) return [];
+  
+  if (Array.isArray(messages)) {
+    return messages.map((msg, index) => ({
+      id: msg.id || `msg-${index}`,
+      text: msg.text || (typeof msg === 'string' ? msg : '')
+    }));
+  }
+  
+  if (typeof messages === 'string') {
+    try {
+      const parsed = JSON.parse(messages);
+      if (Array.isArray(parsed)) {
+        return parsed.map((msg, index) => ({
+          id: msg.id || `msg-${index}`,
+          text: msg.text || (typeof msg === 'string' ? msg : '')
+        }));
+      }
+    } catch (error) {
+      console.error('Error parsing suggested_messages string:', error);
+    }
+  }
+  
+  return [];
+};
+
+// Helper function to ensure theme is properly typed
+export const ensureValidTheme = (theme: any): 'light' | 'dark' | 'system' => {
+  if (theme === 'light' || theme === 'dark' || theme === 'system') {
+    return theme;
+  }
+  return 'light'; // default fallback
+};
+
+// Helper function to ensure bubble_position is properly typed
+export const ensureValidBubblePosition = (position: any): 'left' | 'right' => {
+  if (position === 'left' || position === 'right') {
+    return position;
+  }
+  return 'right'; // default fallback
+};
+
+// Helper function to create properly typed ChatInterfaceSettings
+export const createTypedSettings = (data: any, agentId?: string): ChatInterfaceSettings => {
+  return {
+    ...defaultChatSettings,
+    ...data,
+    agent_id: agentId || data.agent_id,
+    theme: ensureValidTheme(data.theme),
+    bubble_position: ensureValidBubblePosition(data.bubble_position),
+    suggested_messages: ensureSuggestedMessagesArray(data.suggested_messages),
+    sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
+    primary_color: data.primary_color || defaultChatSettings.primary_color || '#3B82F6',
+    profile_picture: data.profile_picture || null,
+    chat_icon: data.chat_icon || null
+  };
+};
+
+// Helper function to check if settings have changed
+export const checkForChanges = (draft: ChatInterfaceSettings, saved: ChatInterfaceSettings): boolean => {
+  return JSON.stringify(draft) !== JSON.stringify(saved);
+};
+
+export const createSettingsFromEdgeData = (edgeData: any, agentId: string): ChatInterfaceSettings => {
+  return createTypedSettings({
+    display_name: edgeData.display_name || defaultChatSettings.display_name,
+    initial_message: edgeData.initial_message || defaultChatSettings.initial_message,
+    message_placeholder: edgeData.message_placeholder || defaultChatSettings.message_placeholder,
+    theme: edgeData.theme,
+    profile_picture: edgeData.profile_picture || null,
+    chat_icon: edgeData.chat_icon || null,
+    bubble_position: edgeData.bubble_position,
+    footer: edgeData.footer || null,
+    user_message_color: edgeData.user_message_color || null,
+    bubble_color: edgeData.bubble_color || null,
+    sync_colors: edgeData.sync_colors || false,
+    primary_color: edgeData.primary_color || null,
+    show_feedback: edgeData.show_feedback !== undefined ? edgeData.show_feedback : defaultChatSettings.show_feedback,
+    allow_regenerate: edgeData.allow_regenerate !== undefined ? edgeData.allow_regenerate : defaultChatSettings.allow_regenerate,
+    suggested_messages: edgeData.suggested_messages,
+    show_suggestions_after_chat: edgeData.show_suggestions_after_chat !== undefined ? edgeData.show_suggestions_after_chat : defaultChatSettings.show_suggestions_after_chat,
+    auto_show_delay: edgeData.auto_show_delay !== undefined ? edgeData.auto_show_delay : defaultChatSettings.auto_show_delay
+  }, agentId);
+};
+
+// Function to notify embedded components about settings changes
+export const notifySettingsChange = async (settingsToNotify: ChatInterfaceSettings, validAgentId: string | null) => {
+  console.log('📢 Notifying settings change to embedded components');
+  
+  // Create the message payload
+  const messagePayload = {
+    type: 'wonderwave-refresh-settings',
+    agentId: validAgentId,
+    settings: settingsToNotify
+  };
+  
+  console.log('📤 Message payload:', messagePayload);
+  
+  // Send message to all iframes on the page
+  const iframes = document.querySelectorAll('iframe[src*="/embed/"]');
+  console.log(`📤 Found ${iframes.length} iframes to notify`);
+  iframes.forEach((iframe, index) => {
+    const iframeElement = iframe as HTMLIFrameElement;
+    if (iframeElement.contentWindow) {
+      console.log(`📤 Sending settings update to iframe ${index + 1}`);
+      try {
+        iframeElement.contentWindow.postMessage(messagePayload, '*');
+        console.log(`✅ Message sent to iframe ${index + 1}`);
+      } catch (error) {
+        console.error(`❌ Failed to send message to iframe ${index + 1}:`, error);
+      }
+    }
+  });
+
+  // Send message to parent window (in case this settings page is embedded)
+  if (window.parent !== window) {
+    console.log('📤 Sending settings update to parent window');
+    try {
+      window.parent.postMessage(messagePayload, '*');
+      console.log('✅ Message sent to parent window');
+    } catch (error) {
+      console.error('❌ Failed to send message to parent window:', error);
+    }
+  }
+
+  // Send message to any wonderwave widgets on external sites
+  if (window.opener) {
+    console.log('📤 Sending settings update to opener window');
+    try {
+      window.opener.postMessage(messagePayload, '*');
+      console.log('✅ Message sent to opener window');
+    } catch (error) {
+      console.error('❌ Failed to send message to opener window:', error);
+    }
+  }
+  
+  // Also trigger a refresh of the edge function to update cache
+  if (validAgentId) {
+    console.log('🔄 Triggering edge function cache refresh');
+    loadSettingsFromEdgeFunction(validAgentId, true).then(() => {
+      console.log('✅ Edge function cache refreshed');
+    }).catch(error => {
+      console.error('❌ Failed to refresh edge function cache:', error);
+    });
+  }
+};
 
 export const useChatSettings = () => {
   const { agentId } = useParams();
