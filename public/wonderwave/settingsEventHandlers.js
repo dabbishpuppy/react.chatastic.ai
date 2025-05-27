@@ -1,3 +1,4 @@
+
 import { log } from './utils.js';
 import { fetchColorSettingsAndVisibility } from './colorSettings.js';
 
@@ -24,26 +25,12 @@ export function initializeSettingsEventHandlers() {
  * Handle refresh settings messages
  */
 function handleRefreshMessage(event) {
-  if (event.data && (
-    event.data.type === 'wonderwave-refresh-settings' || 
-    event.data.type === 'lead-settings-updated'
-  )) {
+  if (event.data && event.data.type === 'wonderwave-refresh-settings') {
     const agentId = event.data.agentId || window.wonderwaveConfig?.agentId;
     if (agentId) {
-      log('Received settings update message for agent:', agentId, 'type:', event.data.type);
+      log('Received refresh settings message for agent:', agentId);
       // Force re-check of agent visibility immediately
       fetchColorSettingsAndVisibility(agentId);
-      
-      // Also broadcast to any embedded iframes
-      if (event.data.type === 'lead-settings-updated') {
-        const iframes = document.querySelectorAll('iframe[src*="/embed/"]');
-        iframes.forEach(iframe => {
-          iframe.contentWindow?.postMessage({
-            type: 'lead-settings-updated',
-            agentId: agentId
-          }, '*');
-        });
-      }
     }
   }
 }

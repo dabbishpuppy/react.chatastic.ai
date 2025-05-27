@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,27 +39,6 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
     phone: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formKey, setFormKey] = useState(0); // Force re-render key
-
-  // Reset form data and force re-render when field visibility changes
-  useEffect(() => {
-    console.log('🔄 InlineLeadForm: Field settings changed', {
-      collectName,
-      collectEmail,
-      collectPhone,
-      title
-    });
-    
-    // Reset form data based on enabled fields
-    setFormData(prev => ({
-      name: collectName ? prev.name : '',
-      email: collectEmail ? prev.email : '',
-      phone: collectPhone ? prev.phone : ''
-    }));
-    
-    // Force component re-render
-    setFormKey(prev => prev + 1);
-  }, [collectName, collectEmail, collectPhone, title, namePlaceholder, emailPlaceholder, phonePlaceholder]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -89,7 +68,7 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields only if they are enabled
+    // Validate required fields
     if (collectEmail && !formData.email) {
       toast({
         title: "Email required",
@@ -152,21 +131,11 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
 
   // If no fields are enabled, don't render the form
   if (!hasAnyFields) {
-    console.log('🚫 InlineLeadForm: No fields enabled, not rendering');
     return null;
   }
 
-  console.log('📋 InlineLeadForm: Rendering with current settings:', {
-    collectName,
-    collectEmail,
-    collectPhone,
-    title,
-    hasAnyFields,
-    formKey
-  });
-
   return (
-    <div className="my-4" key={formKey}>
+    <div className="my-4">
       <Card className={`max-w-md mx-auto ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <CardHeader className="pb-3">
           <CardTitle className={`text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>

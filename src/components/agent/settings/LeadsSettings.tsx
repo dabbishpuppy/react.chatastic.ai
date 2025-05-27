@@ -22,32 +22,26 @@ const LeadsSettings: React.FC = () => {
   const handleReset = (field: string, defaultValue: any) => {
     saveSettings({ [field]: defaultValue }).then((success) => {
       if (success) {
-        broadcastSettingsUpdate();
+        // Trigger refresh for embedded widgets
+        setTimeout(() => {
+          window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+        }, 500);
       }
     });
   };
 
-  const broadcastSettingsUpdate = () => {
-    // Send multiple update messages for better reliability
-    const message = { type: 'lead-settings-updated', agentId };
-    
-    // Immediate broadcast
-    window.postMessage(message, '*');
-    
-    // Additional broadcasts with delays for embedded widgets
-    setTimeout(() => window.postMessage(message, '*'), 100);
-    setTimeout(() => window.postMessage(message, '*'), 500);
-    setTimeout(() => window.postMessage(message, '*'), 1000);
-    
-    console.log('📢 Broadcasting lead settings update for agent:', agentId);
-  };
-
   const updateField = async (field: string, value: any) => {
-    console.log(`🔄 Updating lead setting: ${field} = ${value}`);
     const success = await saveSettings({ [field]: value });
     if (success) {
       console.log(`✅ Lead setting updated: ${field} = ${value}`);
-      broadcastSettingsUpdate();
+      // Force multiple refresh messages to ensure embedded widgets get updated
+      setTimeout(() => {
+        window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+        // Send another message after a longer delay for good measure
+        setTimeout(() => {
+          window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+        }, 1000);
+      }, 500);
     }
   };
 
