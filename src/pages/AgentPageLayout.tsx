@@ -36,22 +36,30 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
   // Comprehensive scroll prevention for chat interface page
   useEffect(() => {
-    if (isChatInterfacePage && contentRef.current) {
-      // Prevent all automatic scrolling behaviors
-      contentRef.current.style.overscrollBehavior = 'contain';
-      contentRef.current.style.scrollBehavior = 'auto';
-      contentRef.current.style.scrollSnapType = 'none';
-      
-      // Ensure we start at the top when navigating to this page
-      contentRef.current.scrollTo(0, 0);
-      
-      // Prevent any scroll restoration
+    if (isChatInterfacePage) {
+      // Prevent scroll restoration
       if ('scrollRestoration' in history) {
         history.scrollRestoration = 'manual';
       }
       
-      // Add a class for CSS-based scroll prevention
-      contentRef.current.classList.add('chat-interface-no-scroll');
+      // Force scroll to top immediately
+      if (contentRef.current) {
+        contentRef.current.scrollTo(0, 0);
+      }
+      window.scrollTo(0, 0);
+      
+      // Apply scroll prevention styles
+      if (contentRef.current) {
+        contentRef.current.style.overscrollBehavior = 'contain';
+        contentRef.current.style.scrollBehavior = 'auto';
+        contentRef.current.style.scrollSnapType = 'none';
+        contentRef.current.classList.add('chat-interface-no-scroll');
+      }
+      
+      // Set document-level scroll prevention
+      document.body.style.overscrollBehavior = 'contain';
+      document.body.style.scrollBehavior = 'auto';
+      document.documentElement.style.scrollBehavior = 'auto';
     }
     
     // Cleanup function
@@ -61,6 +69,12 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
         contentRef.current.style.scrollBehavior = '';
         contentRef.current.style.scrollSnapType = '';
         contentRef.current.classList.remove('chat-interface-no-scroll');
+      }
+      
+      if (isChatInterfacePage) {
+        document.body.style.overscrollBehavior = '';
+        document.body.style.scrollBehavior = '';
+        document.documentElement.style.scrollBehavior = '';
         
         if ('scrollRestoration' in history) {
           history.scrollRestoration = 'auto';
@@ -71,13 +85,26 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
 
   // Handle route changes to ensure we start at top for chat interface
   useEffect(() => {
-    if (isChatInterfacePage && contentRef.current) {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
+    if (isChatInterfacePage) {
+      // Force immediate scroll to top on route change
+      const forceScrollTop = () => {
         if (contentRef.current) {
           contentRef.current.scrollTo(0, 0);
         }
-      }, 0);
+        window.scrollTo(0, 0);
+      };
+      
+      // Execute immediately and after a small delay to catch any async scrolling
+      forceScrollTop();
+      const timeoutId = setTimeout(forceScrollTop, 0);
+      const timeoutId2 = setTimeout(forceScrollTop, 10);
+      const timeoutId3 = setTimeout(forceScrollTop, 50);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        clearTimeout(timeoutId2);
+        clearTimeout(timeoutId3);
+      };
     }
   }, [location.pathname, isChatInterfacePage]);
 
@@ -145,29 +172,31 @@ const AgentPageLayout: React.FC<AgentPageLayoutProps> = ({
       
       {/* Add CSS for chat interface scroll prevention */}
       {isChatInterfacePage && (
-        <style jsx>{`
-          .chat-interface-container {
-            scroll-behavior: auto !important;
-            overscroll-behavior: contain !important;
-            scroll-snap-type: none !important;
-          }
-          
-          .chat-interface-container * {
-            scroll-behavior: auto !important;
-          }
-          
-          .chat-interface-no-scroll input:focus,
-          .chat-interface-no-scroll textarea:focus {
-            scroll-behavior: auto !important;
-          }
-          
-          .chat-interface-no-scroll input,
-          .chat-interface-no-scroll textarea {
-            scroll-margin: 0 !important;
-            scroll-margin-top: 0 !important;
-            scroll-margin-bottom: 0 !important;
-          }
-        `}</style>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            .chat-interface-container {
+              scroll-behavior: auto !important;
+              overscroll-behavior: contain !important;
+              scroll-snap-type: none !important;
+            }
+            
+            .chat-interface-container * {
+              scroll-behavior: auto !important;
+            }
+            
+            .chat-interface-no-scroll input:focus,
+            .chat-interface-no-scroll textarea:focus {
+              scroll-behavior: auto !important;
+            }
+            
+            .chat-interface-no-scroll input,
+            .chat-interface-no-scroll textarea {
+              scroll-margin: 0 !important;
+              scroll-margin-top: 0 !important;
+              scroll-margin-bottom: 0 !important;
+            }
+          `
+        }} />
       )}
     </div>
   );

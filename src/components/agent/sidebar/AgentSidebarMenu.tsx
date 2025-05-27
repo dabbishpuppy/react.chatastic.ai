@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -167,7 +168,23 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     
     onTabChange(parentTabId, submenuId);
     
-    if (parentTabId === "activity") {
+    // Special handling for chat-interface to prevent scroll restoration
+    if (submenuId === "chat-interface") {
+      // Disable scroll restoration before navigation
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+      
+      // Navigate with replace to prevent scroll restoration
+      navigate(`/agent/${agentId}/${submenuPath}`, { replace: true });
+      
+      // Force scroll to top immediately after navigation
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }, 0);
+    } else if (parentTabId === "activity") {
       if (submenuId === "chat-log") {
         navigate(`/agent/${agentId}/activity`, { replace: true });
       } else if (submenuId === "leads") {

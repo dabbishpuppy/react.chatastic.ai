@@ -54,11 +54,24 @@ const AgentSettingsPage: React.FC = () => {
         const originalScrollRestoration = history.scrollRestoration;
         history.scrollRestoration = 'manual';
         
-        // Ensure page starts at top
-        if (contentRef.current) {
-          contentRef.current.scrollTop = 0;
-        }
-        window.scrollTo(0, 0);
+        // Force scroll to top multiple times to override any automatic scrolling
+        const forceScrollTop = () => {
+          if (contentRef.current) {
+            contentRef.current.scrollTop = 0;
+          }
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        };
+        
+        // Execute immediately and with delays to catch async scrolling
+        forceScrollTop();
+        const timeouts = [
+          setTimeout(forceScrollTop, 0),
+          setTimeout(forceScrollTop, 10),
+          setTimeout(forceScrollTop, 50),
+          setTimeout(forceScrollTop, 100)
+        ];
         
         // Disable various scroll behaviors at document level
         document.body.style.overscrollBehavior = 'contain';
@@ -67,6 +80,7 @@ const AgentSettingsPage: React.FC = () => {
         
         return () => {
           // Cleanup
+          timeouts.forEach(clearTimeout);
           history.scrollRestoration = originalScrollRestoration;
           document.body.style.overscrollBehavior = '';
           document.body.style.scrollBehavior = '';
@@ -79,13 +93,30 @@ const AgentSettingsPage: React.FC = () => {
   // Handle route changes specifically for chat-interface
   useEffect(() => {
     if (activeTab === "chat-interface") {
-      // Force scroll to top on route change
-      setTimeout(() => {
+      // Force scroll to top on route change with multiple attempts
+      const forceScrollTop = () => {
         if (contentRef.current) {
           contentRef.current.scrollTop = 0;
         }
         window.scrollTo(0, 0);
-      }, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      };
+      
+      forceScrollTop();
+      const timeoutId1 = setTimeout(forceScrollTop, 0);
+      const timeoutId2 = setTimeout(forceScrollTop, 10);
+      const timeoutId3 = setTimeout(forceScrollTop, 50);
+      const timeoutId4 = setTimeout(forceScrollTop, 100);
+      const timeoutId5 = setTimeout(forceScrollTop, 200);
+      
+      return () => {
+        clearTimeout(timeoutId1);
+        clearTimeout(timeoutId2);
+        clearTimeout(timeoutId3);
+        clearTimeout(timeoutId4);
+        clearTimeout(timeoutId5);
+      };
     }
   }, [location.pathname, activeTab]);
 
@@ -123,28 +154,30 @@ const AgentSettingsPage: React.FC = () => {
         
         {/* Additional CSS for chat interface scroll prevention */}
         {activeTab === "chat-interface" && (
-          <style jsx>{`
-            .no-auto-scroll * {
-              scroll-behavior: auto !important;
-              scroll-margin: 0 !important;
-              scroll-margin-top: 0 !important;
-              scroll-margin-bottom: 0 !important;
-            }
-            
-            .no-auto-scroll input:focus,
-            .no-auto-scroll textarea:focus {
-              scroll-behavior: auto !important;
-            }
-            
-            .no-auto-scroll input,
-            .no-auto-scroll textarea,
-            .no-auto-scroll select,
-            .no-auto-scroll button {
-              scroll-margin: 0 !important;
-              scroll-margin-top: 0 !important;
-              scroll-margin-bottom: 0 !important;
-            }
-          `}</style>
+          <style dangerouslySetInnerHTML={{
+            __html: `
+              .no-auto-scroll * {
+                scroll-behavior: auto !important;
+                scroll-margin: 0 !important;
+                scroll-margin-top: 0 !important;
+                scroll-margin-bottom: 0 !important;
+              }
+              
+              .no-auto-scroll input:focus,
+              .no-auto-scroll textarea:focus {
+                scroll-behavior: auto !important;
+              }
+              
+              .no-auto-scroll input,
+              .no-auto-scroll textarea,
+              .no-auto-scroll select,
+              .no-auto-scroll button {
+                scroll-margin: 0 !important;
+                scroll-margin-top: 0 !important;
+                scroll-margin-bottom: 0 !important;
+              }
+            `
+          }} />
         )}
       </div>
     </AgentPageLayout>
