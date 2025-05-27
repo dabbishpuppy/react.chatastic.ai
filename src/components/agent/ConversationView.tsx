@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Copy, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Conversation } from "@/components/activity/ConversationData";
-import { analyticsService } from "@/services/analyticsService";
 import { getContrastColor } from "@/components/agent/chat/ThemeConfig";
 import {
   AlertDialog,
@@ -27,7 +26,6 @@ interface ConversationViewProps {
   displayName?: string;
   userMessageColor?: string;
   showDeleteButton?: boolean;
-  initialMessage?: string;
   conversationStatus?: string;
   conversationSource?: string;
 }
@@ -41,11 +39,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   displayName = 'AI Assistant',
   userMessageColor = '#000000',
   showDeleteButton = false,
-  initialMessage,
   conversationStatus,
   conversationSource
 }) => {
-  const [localMessages, setLocalMessages] = useState(conversation.messages);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleCopy = async (content: string) => {
@@ -69,27 +65,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     backgroundColor: userMessageColor,
     color: getContrastColor(userMessageColor)
   } : {};
-
-  // Display all messages in their exact database order, including initial message if needed
-  const messagesToDisplay = React.useMemo(() => {
-    const messages = [];
-    
-    // Only add initial message if there are no messages or if first message is not from assistant
-    if (initialMessage && (localMessages.length === 0 || localMessages[0]?.role !== 'assistant')) {
-      messages.push({
-        id: 'initial-message',
-        role: 'assistant' as const,
-        content: initialMessage,
-        timestamp: '',
-        feedback: undefined
-      });
-    }
-    
-    // Add all conversation messages in their exact order
-    messages.push(...localMessages);
-    
-    return messages;
-  }, [localMessages, initialMessage]);
 
   const handleDeleteConfirm = () => {
     onDelete();
@@ -139,68 +114,74 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messagesToDisplay.map((message, index) => (
-          <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {message.role === 'assistant' && (
-              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-                {profilePicture ? (
-                  <AvatarImage src={profilePicture} alt={displayName} />
-                ) : (
-                  <AvatarFallback className="bg-gray-100" />
-                )}
-              </Avatar>
-            )}
-            
-            <div className="flex flex-col max-w-[80%]">
-              {/* Message bubble */}
-              <div 
-                className={`rounded-lg p-3 text-sm ${
-                  message.role === 'user' 
-                    ? 'bg-blue-500 text-white ml-auto' 
-                    : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
-                }`}
-                style={message.role === 'user' ? userMessageStyle : {}}
-              >
-                {message.content}
-              </div>
-              
-              {/* Feedback buttons for assistant messages */}
-              {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
-                <div className="flex items-center space-x-1 mt-2">
-                  <div
-                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
-                      message.feedback === "like" 
-                        ? "bg-green-100 text-green-600" 
-                        : "bg-gray-100 text-gray-400"
-                    }`}
-                    title={message.feedback === "like" ? "Liked" : "Like"}
-                  >
-                    <ThumbsUp size={14} />
-                  </div>
-                  
-                  <div
-                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
-                      message.feedback === "dislike" 
-                        ? "bg-red-100 text-red-600" 
-                        : "bg-gray-100 text-gray-400"
-                    }`}
-                    title={message.feedback === "dislike" ? "Disliked" : "Dislike"}
-                  >
-                    <ThumbsDown size={14} />
-                  </div>
-                  
-                  <button
-                    onClick={() => handleCopy(message.content)}
-                    className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
-                    title="Copy"
-                  >
-                    <Copy size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+        {conversation.messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            No messages in this conversation
           </div>
-        ))}
+        ) : (
+          conversation.messages.map((message, index) => (
+            <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {message.role === 'assistant' && (
+                <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+                  {profilePicture ? (
+                    <AvatarImage src={profilePicture} alt={displayName} />
+                  ) : (
+                    <AvatarFallback className="bg-gray-100" />
+                  )}
+                </Avatar>
+              )}
+              
+              <div className="flex flex-col max-w-[80%]">
+                {/* Message bubble */}
+                <div 
+                  className={`rounded-lg p-3 text-sm ${
+                    message.role === 'user' 
+                      ? 'bg-blue-500 text-white ml-auto' 
+                      : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
+                  }`}
+                  style={message.role === 'user' ? userMessageStyle : {}}
+                >
+                  {message.content}
+                </div>
+                
+                {/* Feedback buttons for assistant messages */}
+                {message.role === 'assistant' && (
+                  <div className="flex items-center space-x-1 mt-2">
+                    <div
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
+                        message.feedback === "like" 
+                          ? "bg-green-100 text-green-600" 
+                          : "bg-gray-100 text-gray-400"
+                      }`}
+                      title={message.feedback === "like" ? "Liked" : "Like"}
+                    >
+                      <ThumbsUp size={14} />
+                    </div>
+                    
+                    <div
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
+                        message.feedback === "dislike" 
+                          ? "bg-red-100 text-red-600" 
+                          : "bg-gray-100 text-gray-400"
+                      }`}
+                      title={message.feedback === "dislike" ? "Disliked" : "Dislike"}
+                    >
+                      <ThumbsDown size={14} />
+                    </div>
+                    
+                    <button
+                      onClick={() => handleCopy(message.content)}
+                      className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+                      title="Copy"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}

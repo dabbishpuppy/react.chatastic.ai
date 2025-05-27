@@ -18,6 +18,7 @@ const ActivityPage: React.FC = () => {
   const [hasAnyConversations, setHasAnyConversations] = useState<boolean>(true);
   const [conversations, setConversations] = useState<DBConversation[]>([]);
   const [chatSettings, setChatSettings] = useState<ChatInterfaceSettings | null>(null);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
 
   // Helper function to ensure suggested_messages is properly typed
   const ensureSuggestedMessagesArray = (messages: any): SuggestedMessage[] => {
@@ -59,7 +60,7 @@ const ActivityPage: React.FC = () => {
     bubble_position: 'right',
     show_suggestions_after_chat: true,
     auto_show_delay: 1,
-    user_message_color: '#000000', // Default to black
+    user_message_color: '#000000',
     bubble_color: '#000000',
     sync_colors: false,
     primary_color: '#000000'
@@ -82,9 +83,7 @@ const ActivityPage: React.FC = () => {
       
       // Auto-select first conversation if available and no conversation is currently selected
       if (recentConversations.length > 0 && !selectedConversation) {
-        const firstConversation = await convertDBConversationToUI(recentConversations[0]);
-        setSelectedConversation(firstConversation);
-        setSelectedDBConversation(recentConversations[0]);
+        await handleConversationClick(recentConversations[0].id);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -109,11 +108,10 @@ const ActivityPage: React.FC = () => {
             ? settings.bubble_position
             : 'right',
           suggested_messages: ensureSuggestedMessagesArray(settings.suggested_messages),
-          user_message_color: settings.user_message_color || '#000000', // Ensure black default
+          user_message_color: settings.user_message_color || '#000000',
         };
         setChatSettings(typedSettings);
       } else {
-        // Use default settings if none found
         setChatSettings(defaultChatSettings);
       }
     } catch (error) {
@@ -133,9 +131,7 @@ const ActivityPage: React.FC = () => {
         
         if (selectedConversation?.id === conversationId) {
           if (updatedConversations.length > 0) {
-            const nextConversation = await convertDBConversationToUI(updatedConversations[0]);
-            setSelectedConversation(nextConversation);
-            setSelectedDBConversation(updatedConversations[0]);
+            await handleConversationClick(updatedConversations[0].id);
           } else {
             setSelectedConversation(null);
             setSelectedDBConversation(null);
@@ -195,15 +191,28 @@ const ActivityPage: React.FC = () => {
 
   const handleConversationClick = async (conversationId: string) => {
     console.log('Conversation clicked:', conversationId);
-    const dbConversation = conversations.find(c => c.id === conversationId);
-    if (dbConversation) {
-      console.log('Found DB conversation:', dbConversation);
-      const uiConversation = await convertDBConversationToUI(dbConversation);
-      console.log('Converted UI conversation:', uiConversation);
-      setSelectedConversation(uiConversation);
-      setSelectedDBConversation(dbConversation);
-    } else {
-      console.error('Conversation not found:', conversationId);
+    setIsLoadingConversation(true);
+    
+    try {
+      const dbConversation = conversations.find(c => c.id === conversationId);
+      if (dbConversation) {
+        console.log('Found DB conversation:', dbConversation);
+        const uiConversation = await convertDBConversationToUI(dbConversation);
+        console.log('Converted UI conversation:', uiConversation);
+        setSelectedConversation(uiConversation);
+        setSelectedDBConversation(dbConversation);
+      } else {
+        console.error('Conversation not found:', conversationId);
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load the conversation. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingConversation(false);
     }
   };
 
@@ -261,7 +270,11 @@ const ActivityPage: React.FC = () => {
               />
             </div>
             <div className="w-1/2 min-w-[400px]">
-              {selectedConversation && selectedDBConversation ? (
+              {isLoadingConversation ? (
+                <div className="flex items-center justify-center h-full bg-white rounded-lg border">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+                </div>
+              ) : selectedConversation && selectedDBConversation ? (
                 <ConversationView 
                   conversation={selectedConversation} 
                   onClose={() => {}}
@@ -271,7 +284,6 @@ const ActivityPage: React.FC = () => {
                   displayName={chatSettings?.display_name || 'AI Assistant'}
                   userMessageColor={chatSettings?.user_message_color || '#000000'}
                   showDeleteButton={true}
-                  initialMessage={chatSettings?.initial_message || '👋 Hi! How can I help you today?'}
                   conversationStatus={selectedDBConversation.status}
                   conversationSource={selectedDBConversation.source}
                 />
