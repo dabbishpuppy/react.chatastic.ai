@@ -110,6 +110,31 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
+  // Create a complete timeline including initial message if it exists
+  const fullConversationTimeline = React.useMemo(() => {
+    const timeline = [];
+    
+    // Add initial message if it exists and isn't already in the messages
+    if (initialMessage && localMessages.length > 0) {
+      const firstMessage = localMessages[0];
+      if (!firstMessage || firstMessage.role !== 'assistant' || firstMessage.content !== initialMessage) {
+        timeline.push({
+          id: 'initial-message',
+          role: 'assistant' as const,
+          content: initialMessage,
+          timestamp: new Date(Date.now() - 1000).toISOString(),
+          feedback: undefined
+        });
+      }
+    }
+    
+    // Add all actual conversation messages
+    timeline.push(...localMessages);
+    
+    // Sort by timestamp to ensure proper order
+    return timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  }, [localMessages, initialMessage]);
+
   return (
     <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
       {/* Header */}
@@ -156,7 +181,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {localMessages.map((message, index) => (
+        {fullConversationTimeline.map((message, index) => (
           <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {message.role === 'assistant' && (
               <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
@@ -182,7 +207,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
               </div>
               
               {/* Action buttons for assistant messages */}
-              {message.role === 'assistant' && message.id && (
+              {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
                 <div className="flex items-center space-x-1 mt-2">
                   {/* Like button */}
                   <button

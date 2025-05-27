@@ -164,11 +164,11 @@ const ActivityPage: React.FC = () => {
     
     // Convert database messages to UI messages with proper feedback handling
     const uiMessages = messages.map(msg => ({
-      id: msg.id, // Use the database message ID
+      id: msg.id,
       role: msg.is_agent ? 'assistant' : 'user' as 'assistant' | 'user',
       content: msg.content,
       timestamp: msg.timestamp,
-      feedback: msg.feedback as 'like' | 'dislike' | undefined // Include feedback state
+      feedback: msg.feedback as 'like' | 'dislike' | undefined
     }));
 
     const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });

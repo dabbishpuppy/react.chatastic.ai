@@ -155,7 +155,11 @@ export const conversationService = {
       return [];
     }
 
-    return data || [];
+    // Type the data properly to ensure feedback is correctly typed
+    return (data || []).map(msg => ({
+      ...msg,
+      feedback: msg.feedback as 'like' | 'dislike' | null
+    }));
   },
 
   // Update conversation title
