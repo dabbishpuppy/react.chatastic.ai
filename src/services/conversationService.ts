@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -156,23 +155,18 @@ export const conversationService = {
       return [];
     }
 
-    // Type the data properly to ensure feedback is correctly typed
+    // Properly type and transform the data with explicit type assertion
     return (data || []).map(msg => {
-      // Properly type-guard the feedback field
-      let feedback: 'like' | 'dislike' | null = null;
-      if (msg.feedback === 'like' || msg.feedback === 'dislike') {
-        feedback = msg.feedback;
-      }
-
-      return {
+      const message: Message = {
         id: msg.id,
         conversation_id: msg.conversation_id,
         content: msg.content,
         is_agent: msg.is_agent,
         timestamp: msg.timestamp,
         created_at: msg.created_at,
-        feedback: feedback
+        feedback: (msg.feedback === 'like' || msg.feedback === 'dislike') ? msg.feedback : null
       };
+      return message;
     });
   },
 

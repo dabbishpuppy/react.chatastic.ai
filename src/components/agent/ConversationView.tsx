@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { Copy, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Conversation } from "@/components/activity/ConversationData";
 import { analyticsService } from "@/services/analyticsService";
+import { getContrastColor } from "@/components/agent/chat/ThemeConfig";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,37 +65,27 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     }
   };
 
-  const getContrastColor = (backgroundColor: string): string => {
-    if (!backgroundColor) return '#000000';
-    const hex = backgroundColor.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-    return brightness > 128 ? '#000000' : '#ffffff';
-  };
-
   const userMessageStyle = userMessageColor ? {
     backgroundColor: userMessageColor,
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Simplified message display - trust the database order completely
+  // Display all messages in their exact database order, including initial message if needed
   const messagesToDisplay = React.useMemo(() => {
     const messages = [];
     
-    // Add initial message first if it exists and there are no messages or first message is not from assistant
+    // Only add initial message if there are no messages or if first message is not from assistant
     if (initialMessage && (localMessages.length === 0 || localMessages[0]?.role !== 'assistant')) {
       messages.push({
         id: 'initial-message',
         role: 'assistant' as const,
         content: initialMessage,
-        timestamp: '', // No timestamp manipulation
+        timestamp: '',
         feedback: undefined
       });
     }
     
-    // Add all conversation messages in their exact database order
+    // Add all conversation messages in their exact order
     messages.push(...localMessages);
     
     return messages;
@@ -172,10 +164,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                 {message.content}
               </div>
               
-              {/* Action buttons for assistant messages - display-only feedback buttons */}
+              {/* Feedback buttons for assistant messages */}
               {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
                 <div className="flex items-center space-x-1 mt-2">
-                  {/* Like button - display-only */}
                   <div
                     className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
                       message.feedback === "like" 
@@ -187,7 +178,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                     <ThumbsUp size={14} />
                   </div>
                   
-                  {/* Dislike button - display-only */}
                   <div
                     className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
                       message.feedback === "dislike" 
@@ -199,7 +189,6 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                     <ThumbsDown size={14} />
                   </div>
                   
-                  {/* Copy button - still functional */}
                   <button
                     onClick={() => handleCopy(message.content)}
                     className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
