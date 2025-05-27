@@ -1,9 +1,10 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { isAgentPrivate } from './settings.js';
 import { doesAgentExist } from './agentVisibility.js';
 import { getBubbleButton } from './ui.js';
 import { setRateLimitSettings } from './messageHandling.js';
-import { createChatIframe, handleIframeMessage as handleIframeMessageFromModule } from './chatIframe.js';
+import { createChatIframe, handleIframeMessage as handleIframeMessageFromChatIframe } from './chatIframe.js';
 import { 
   isOpen, 
   getIframe, 
@@ -18,7 +19,7 @@ import {
 export { setRateLimitSettings };
 
 // Export createChatIframe from chatIframe.js for use in index.js
-export { createChatIframe, handleIframeMessage as handleIframeMessageFromModule };
+export { createChatIframe };
 
 /**
  * Open the chat widget only if the agent is public and exists
@@ -148,3 +149,10 @@ export function setIframe(newIframe) {
  * Get chat state - exported for backward compatibility
  */
 export { isOpen };
+
+/**
+ * Handle iframe messages - exported for backward compatibility
+ */
+export function handleIframeMessage(event, iframe, closeChat) {
+  return handleIframeMessageFromChatIframe(event, iframe, closeChat);
+}
