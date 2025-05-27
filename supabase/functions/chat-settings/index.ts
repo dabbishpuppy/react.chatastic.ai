@@ -1,51 +1,40 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-};
+console.log("Chat settings function started");
 
-serve(async (req) => {
-  console.log('Request method:', req.method);
-  console.log('Request URL:', req.url);
-  console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+Deno.serve(async (req) => {
+  console.log(`Request method: ${req.method}`);
+  console.log(`Request URL: ${req.url}`);
+  console.log(`Request headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2)}`);
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      headers: corsHeaders,
-      status: 200 
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Extract agentId from query parameters
     const url = new URL(req.url);
     const agentId = url.searchParams.get('agentId');
     
-    console.log('Extracted agentId:', agentId);
+    console.log(`Extracted agentId: ${agentId}`);
     
     if (!agentId) {
-      return new Response(
-        JSON.stringify({ error: 'Agent ID is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Agent ID is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // Initialize Supabase client
+    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Checking agent visibility for:', agentId);
+    console.log(`Checking agent visibility for: ${agentId}`);
 
-    // Check agent visibility and get security settings
+    // Check if agent exists and get visibility
     const { data: agent, error: agentError } = await supabase
       .from('agents')
       .select('visibility, rate_limit_enabled, rate_limit_messages, rate_limit_time_window, rate_limit_message')
@@ -54,138 +43,91 @@ serve(async (req) => {
 
     if (agentError) {
       console.error('Error fetching agent:', agentError);
-      // Return a graceful response instead of 404 when agent doesn't exist
-      if (agentError.code === 'PGRST116') {
-        console.log(`Agent ${agentId} not found - returning agent_not_found response`);
-        return new Response(
-          JSON.stringify({ 
-            error: 'agent_not_found',
-            message: 'The requested agent does not exist or has been deleted'
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ error: 'Database error occurred' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ 
+        error: 'agent_not_found',
+        message: 'Agent not found'
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
+    console.log(`Agent ${agentId} not found - returning agent_not_found response`);
+
+    // If agent is private, return minimal response
     if (agent.visibility === 'private') {
-      console.log(`Agent ${agentId} is PRIVATE`);
-      return new Response(
-        JSON.stringify({ visibility: 'private' }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ 
+        visibility: 'private'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log(`Agent ${agentId} is PUBLIC, fetching chat interface settings and lead settings`);
 
-    // Get chat interface settings
-    const { data: settings, error: settingsError } = await supabase
+    // Fetch chat interface settings
+    const { data: chatSettings } = await supabase
       .from('chat_interface_settings')
       .select('*')
       .eq('agent_id', agentId)
       .single();
 
-    if (settingsError && settingsError.code !== 'PGRST116') {
-      console.error('Error fetching chat interface settings:', settingsError);
-    }
-
-    // Get lead settings
-    const { data: leadSettings, error: leadSettingsError } = await supabase
+    // Fetch lead settings
+    const { data: leadSettings } = await supabase
       .from('lead_settings')
       .select('*')
       .eq('agent_id', agentId)
       .single();
 
-    if (leadSettingsError && leadSettingsError.code !== 'PGRST116') {
-      console.error('Error fetching lead settings:', leadSettingsError);
-    }
+    console.log(`Lead settings fetched: ${leadSettings}`);
 
-    console.log('Lead settings fetched:', leadSettings);
-
-    // Parse suggested_messages if it exists and is a string
-    let parsedSuggestedMessages = [];
-    if (settings?.suggested_messages) {
-      try {
-        if (typeof settings.suggested_messages === 'string') {
-          parsedSuggestedMessages = JSON.parse(settings.suggested_messages);
-        } else if (Array.isArray(settings.suggested_messages)) {
-          parsedSuggestedMessages = settings.suggested_messages;
-        }
-      } catch (parseError) {
-        console.error('Error parsing suggested_messages:', parseError);
-        parsedSuggestedMessages = [];
-      }
-    }
-
-    // Construct response with all settings including rate limiting and lead settings
+    // Prepare response with defaults
     const response = {
       visibility: agent.visibility,
-      rate_limit_enabled: agent.rate_limit_enabled,
-      rate_limit_messages: agent.rate_limit_messages,
-      rate_limit_time_window: agent.rate_limit_time_window,
-      rate_limit_message: agent.rate_limit_message,
-      // Chat interface settings
-      display_name: settings?.display_name || 'AI Assistant',
-      initial_message: settings?.initial_message || '👋 Hi! How can I help you today?',
-      bubble_color: settings?.bubble_color,
-      user_message_color: settings?.user_message_color,
-      sync_colors: settings?.sync_colors || false,
-      theme: settings?.theme || 'light',
-      profile_picture: settings?.profile_picture,
-      chat_icon: settings?.chat_icon,
-      bubble_position: settings?.bubble_position || 'right',
-      footer: settings?.footer,
-      primary_color: settings?.primary_color,
-      show_feedback: settings?.show_feedback ?? true,
-      allow_regenerate: settings?.allow_regenerate ?? true,
-      suggested_messages: parsedSuggestedMessages,
-      show_suggestions_after_chat: settings?.show_suggestions_after_chat ?? true,
-      auto_show_delay: settings?.auto_show_delay ?? 1,
-      message_placeholder: settings?.message_placeholder || 'Write message here...',
-      // Lead settings
-      lead_settings: {
-        enabled: leadSettings?.enabled || false,
-        title: leadSettings?.title || 'Get in touch with us',
-        collect_name: leadSettings?.collect_name || false,
-        collect_email: leadSettings?.collect_email || false,
-        collect_phone: leadSettings?.collect_phone || false,
-        name_placeholder: leadSettings?.name_placeholder || 'Full name',
-        email_placeholder: leadSettings?.email_placeholder || 'Email',
-        phone_placeholder: leadSettings?.phone_placeholder || 'Phone'
+      rate_limit_enabled: agent.rate_limit_enabled || false,
+      rate_limit_messages: agent.rate_limit_messages || 20,
+      rate_limit_time_window: agent.rate_limit_time_window || 240,
+      rate_limit_message: agent.rate_limit_message || 'Too many messages in a row',
+      display_name: chatSettings?.display_name || 'AI Assistant',
+      initial_message: chatSettings?.initial_message || '👋 Hi! How can I help you today?',
+      bubble_color: chatSettings?.bubble_color || '#000000', // Default to black
+      user_message_color: chatSettings?.user_message_color || '#000000', // Default to black
+      sync_colors: chatSettings?.sync_colors || false,
+      theme: chatSettings?.theme || 'light',
+      profile_picture: chatSettings?.profile_picture || undefined,
+      chat_icon: chatSettings?.chat_icon || undefined,
+      bubble_position: chatSettings?.bubble_position || 'right',
+      footer: chatSettings?.footer || undefined,
+      primary_color: chatSettings?.primary_color || '#000000', // Default to black
+      show_feedback: chatSettings?.show_feedback !== undefined ? chatSettings.show_feedback : true,
+      allow_regenerate: chatSettings?.allow_regenerate !== undefined ? chatSettings.allow_regenerate : true,
+      suggested_messages: chatSettings?.suggested_messages || [],
+      show_suggestions_after_chat: chatSettings?.show_suggestions_after_chat !== undefined ? chatSettings.show_suggestions_after_chat : true,
+      auto_show_delay: chatSettings?.auto_show_delay !== undefined ? chatSettings.auto_show_delay : 1,
+      message_placeholder: chatSettings?.message_placeholder || 'Write message here...',
+      lead_settings: leadSettings || {
+        enabled: false,
+        title: 'Get in touch with us',
+        collect_name: false,
+        collect_email: false,
+        collect_phone: false,
+        name_placeholder: 'Full name',
+        email_placeholder: 'Email',
+        phone_placeholder: 'Phone'
       }
     };
 
-    console.log('Response with lead settings:', response);
+    console.log(`Response with lead settings: ${JSON.stringify(response, null, 2)}`);
 
-    return new Response(
-      JSON.stringify(response),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
-    console.error('Unexpected error in chat-settings function:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    console.error('Error in chat-settings function:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

@@ -39,7 +39,7 @@ export function getDebugMode() {
  */
 export const defaultConfig = {
   position: 'right',
-  bubbleColor: '#3B82F6', // Blue
+  bubbleColor: '#000000', // Changed from blue to black
   bubbleSize: '60px',
   zIndex: 999999,
   cdnDomain: 'query-spark-start.lovable.app',
