@@ -24,7 +24,23 @@ const EditableSuggestedMessage: React.FC<EditableSuggestedMessageProps> = ({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
+      // Prevent scroll when focusing
+      const input = inputRef.current;
+      
+      // Disable scrollIntoView
+      input.scrollIntoView = () => {};
+      
+      // Set scroll behavior to auto temporarily
+      const originalScrollBehavior = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = 'auto';
+      
+      // Focus without scrolling
+      input.focus({ preventScroll: true });
+      
+      // Restore scroll behavior
+      setTimeout(() => {
+        document.documentElement.style.scrollBehavior = originalScrollBehavior;
+      }, 0);
     }
   }, [isEditing]);
 
@@ -52,6 +68,11 @@ const EditableSuggestedMessage: React.FC<EditableSuggestedMessageProps> = ({
     }
   };
 
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.target.scrollIntoView = () => {}; // Disable scrollIntoView
+  };
+
   return (
     <div className="flex items-center justify-between gap-2 p-2 bg-white border rounded">
       {isEditing ? (
@@ -62,8 +83,10 @@ const EditableSuggestedMessage: React.FC<EditableSuggestedMessageProps> = ({
             value={editValue}
             onChange={(e) => setEditValue(e.target.value.slice(0, maxLength))}
             onKeyDown={handleKeyDown}
-            className="flex-1 px-2 outline-none"
+            onFocus={handleInputFocus}
+            className="flex-1 px-2 outline-none scroll-mt-0"
             maxLength={maxLength}
+            tabIndex={-1}
           />
           <div className="flex items-center">
             <span className="mr-2 text-xs text-gray-400">
