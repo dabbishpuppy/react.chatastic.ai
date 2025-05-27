@@ -32,6 +32,7 @@ interface ChatSectionProps {
   headerColor?: string | null;
   hideUserAvatar?: boolean;
   leadSettings?: any; // Lead settings from props (for embedded mode)
+  conversationSource?: 'iframe' | 'bubble'; // New prop to specify the source
 }
 
 const ChatSection: React.FC<ChatSectionProps> = ({ 
@@ -54,6 +55,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   headerColor = null,
   hideUserAvatar = false,
   leadSettings: propLeadSettings = null,
+  conversationSource, // New prop for source detection
 }) => {
   const { agentId: paramAgentId } = useParams();
   const agentId = propAgentId || paramAgentId;
@@ -70,7 +72,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     propLeadSettings,
     hookLeadSettings,
     effectiveLeadSettings,
-    isEmbedded
+    isEmbedded,
+    conversationSource
   });
   
   // Enhanced refresh logic for embedded mode with immediate updates
@@ -116,7 +119,29 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
   }, [isEmbedded, agentId, refreshSettings, propLeadSettings]);
   
-  // Conversation management
+  // Determine conversation source - use prop if provided, otherwise determine based on embedded state
+  const determineConversationSource = (): 'iframe' | 'bubble' => {
+    if (conversationSource) {
+      return conversationSource;
+    }
+    // Fallback logic - if embedded but no source specified, try to detect
+    if (isEmbedded) {
+      return window !== window.top ? 'iframe' : 'bubble';
+    }
+    // Not embedded - this is the main app interface
+    return 'iframe'; // Default for non-embedded usage
+  };
+  
+  const finalConversationSource = determineConversationSource();
+  
+  console.log('🔍 ChatSection - Source determination:', {
+    conversationSource,
+    isEmbedded,
+    windowCheck: window !== window.top,
+    finalConversationSource
+  });
+  
+  // Conversation management with correct source
   const {
     currentConversation,
     conversationEnded,
@@ -126,7 +151,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     loadConversation,
     saveMessage,
     getConversationMessages
-  } = useConversationManager(isEmbedded ? 'iframe' : 'bubble');
+  } = useConversationManager(finalConversationSource);
 
   const {
     message,

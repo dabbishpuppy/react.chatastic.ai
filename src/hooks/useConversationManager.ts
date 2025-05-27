@@ -18,7 +18,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
   const createConversationOnFirstMessage = async () => {
     if (!agentId || conversationCreated) return null;
 
-    console.log('Creating conversation on first message for agentId:', agentId);
+    console.log('Creating conversation on first message for agentId:', agentId, 'with source:', source);
     const newSessionId = generateSessionId();
     sessionIdRef.current = newSessionId;
 
@@ -30,7 +30,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       );
       
       if (conversation) {
-        console.log('Conversation created successfully:', conversation.id);
+        console.log('Conversation created successfully:', conversation.id, 'with source:', source);
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
@@ -48,7 +48,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       return;
     }
 
-    console.log('Starting new conversation for agentId:', agentId);
+    console.log('Starting new conversation for agentId:', agentId, 'with source:', source);
     const newSessionId = generateSessionId();
     sessionIdRef.current = newSessionId;
 
@@ -60,7 +60,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
       );
       
       if (conversation) {
-        console.log('New conversation started:', conversation.id);
+        console.log('New conversation started:', conversation.id, 'with source:', source);
         setCurrentConversation(conversation);
         setConversationEnded(false);
         setConversationCreated(true);
@@ -102,7 +102,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
     // Create conversation on first user message if it doesn't exist
     let conversation = currentConversation;
     if (!conversation && !isAgent) {
-      console.log('No conversation exists, creating one for first user message');
+      console.log('No conversation exists, creating one for first user message with source:', source);
       conversation = await createConversationOnFirstMessage();
       if (!conversation) {
         console.error('Failed to create conversation for message');
@@ -116,7 +116,7 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
     }
 
     try {
-      console.log('Saving message to conversation:', conversation.id, 'isAgent:', isAgent);
+      console.log('Saving message to conversation:', conversation.id, 'isAgent:', isAgent, 'source:', source);
       await conversationService.addMessage(conversation.id, content, isAgent);
       
       // Update conversation title with first user message

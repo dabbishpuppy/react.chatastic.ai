@@ -43,6 +43,19 @@ const EmbeddedChat: React.FC = () => {
   const headerColor = headerColorParam || 
     (settings?.sync_colors ? (settings?.user_message_color || '#000000') : null);
 
+  // Detect if this is running in an iframe vs bubble widget
+  // Check if we're in an iframe by looking at window context and referrer
+  const isInIframe = window !== window.top;
+  const conversationSource: 'iframe' | 'bubble' = isInIframe ? 'iframe' : 'bubble';
+  
+  console.log('🔍 EmbeddedChat - Source detection:', {
+    isInIframe,
+    conversationSource,
+    windowTop: window.top,
+    currentWindow: window,
+    referrer: document.referrer
+  });
+
   // Use custom hooks for embedded functionality
   useEmbeddedStyles();
   useEmbeddedResizeObserver(containerRef, agentId);
@@ -87,7 +100,8 @@ const EmbeddedChat: React.FC = () => {
     initialMessage: settings.initial_message || '👋 Hi! How can I help you today?',
     theme,
     userMessageColor,
-    headerColor
+    headerColor,
+    conversationSource
   });
 
   // Create initial messages with fallback
@@ -118,6 +132,7 @@ const EmbeddedChat: React.FC = () => {
           headerColor={headerColor}
           hideUserAvatar={true}
           leadSettings={leadSettings}
+          conversationSource={conversationSource}
         />
       </div>
     </div>
