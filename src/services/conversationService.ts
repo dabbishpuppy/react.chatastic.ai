@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "@/types/chatInterface";
 
@@ -62,11 +63,14 @@ export const conversationService = {
     return true;
   },
 
-  // Get recent conversations for an agent
+  // Get recent conversations for an agent (only those with messages)
   async getRecentConversations(agentId: string, limit: number = 10): Promise<Conversation[]> {
     const { data, error } = await supabase
       .from('conversations')
-      .select('*')
+      .select(`
+        *,
+        messages!inner(id)
+      `)
       .eq('agent_id', agentId)
       .order('updated_at', { ascending: false })
       .limit(limit);
@@ -76,7 +80,14 @@ export const conversationService = {
       return [];
     }
 
-    return (data || []) as Conversation[];
+    // Filter to only return conversations that have at least one message
+    const conversationsWithMessages = data?.filter(conv => conv.messages && conv.messages.length > 0) || [];
+    
+    // Remove the messages property from the result as we only needed it for filtering
+    return conversationsWithMessages.map(conv => {
+      const { messages, ...conversation } = conv;
+      return conversation as Conversation;
+    });
   },
 
   // Get conversation by ID

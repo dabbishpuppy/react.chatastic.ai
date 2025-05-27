@@ -16,6 +16,9 @@ interface ConversationViewProps {
   userMessageColor?: string;
   showDeleteButton?: boolean;
   initialMessage?: string;
+  // Add new props for dynamic status and source
+  conversationStatus?: 'active' | 'ended';
+  conversationSource?: 'iframe' | 'bubble';
 }
 
 const ConversationView: React.FC<ConversationViewProps> = ({
@@ -27,7 +30,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   displayName = "AI Assistant",
   userMessageColor,
   showDeleteButton = false,
-  initialMessage
+  initialMessage,
+  conversationStatus = 'active',
+  conversationSource = 'iframe'
 }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const isDark = theme === 'dark';
@@ -47,8 +52,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Determine status based on conversation data
-  const status = conversation.snippet.includes('Active') ? 'active' : 'ended';
+  // Use dynamic status and source
+  const status = conversationStatus;
+  const sourceLabel = conversationSource === 'bubble' ? 'Widget' : 'Iframe';
 
   const handleDeleteConfirm = () => {
     if (onDelete) {
@@ -100,7 +106,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
                 {status}
               </span>
               <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-                • {conversation.source}
+                • {sourceLabel}
               </span>
             </div>
           </div>

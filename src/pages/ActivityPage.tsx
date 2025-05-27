@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
@@ -13,6 +14,7 @@ import { toast } from "@/hooks/use-toast";
 const ActivityPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [selectedConversation, setSelectedConversation] = useState<UIConversation | null>(null);
+  const [selectedDBConversation, setSelectedDBConversation] = useState<DBConversation | null>(null);
   const [hasAnyConversations, setHasAnyConversations] = useState<boolean>(true);
   const [conversations, setConversations] = useState<DBConversation[]>([]);
   const [chatSettings, setChatSettings] = useState<ChatInterfaceSettings | null>(null);
@@ -64,6 +66,7 @@ const ActivityPage: React.FC = () => {
       if (recentConversations.length > 0 && !selectedConversation) {
         const firstConversation = await convertDBConversationToUI(recentConversations[0]);
         setSelectedConversation(firstConversation);
+        setSelectedDBConversation(recentConversations[0]);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -110,8 +113,10 @@ const ActivityPage: React.FC = () => {
           if (updatedConversations.length > 0) {
             const nextConversation = await convertDBConversationToUI(updatedConversations[0]);
             setSelectedConversation(nextConversation);
+            setSelectedDBConversation(updatedConversations[0]);
           } else {
             setSelectedConversation(null);
+            setSelectedDBConversation(null);
           }
         }
         
@@ -155,12 +160,15 @@ const ActivityPage: React.FC = () => {
       snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
     }
 
+    // Use the source from database to determine display source
+    const source = dbConversation.source === 'bubble' ? 'Widget' : 'Iframe';
+
     return {
       id: dbConversation.id,
       title,
       snippet,
       daysAgo,
-      source: dbConversation.source === 'bubble' ? 'Widget' : 'Iframe',
+      source,
       messages: uiMessages
     };
   };
@@ -170,6 +178,7 @@ const ActivityPage: React.FC = () => {
     if (dbConversation) {
       const uiConversation = await convertDBConversationToUI(dbConversation);
       setSelectedConversation(uiConversation);
+      setSelectedDBConversation(dbConversation);
     }
   };
 
@@ -228,7 +237,7 @@ const ActivityPage: React.FC = () => {
               />
             </div>
             <div className="w-1/2 min-w-[400px]">
-              {selectedConversation ? (
+              {selectedConversation && selectedDBConversation ? (
                 <ConversationView 
                   conversation={selectedConversation} 
                   onClose={() => {}}
@@ -239,6 +248,8 @@ const ActivityPage: React.FC = () => {
                   userMessageColor={chatSettings?.user_message_color}
                   showDeleteButton={true}
                   initialMessage={chatSettings?.initial_message}
+                  conversationStatus={selectedDBConversation.status}
+                  conversationSource={selectedDBConversation.source}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full bg-white rounded-lg border">
