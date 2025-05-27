@@ -24,6 +24,27 @@ const BasicChatSettings: React.FC<BasicChatSettingsProps> = ({
 }) => {
   const [newSuggestedMessage, setNewSuggestedMessage] = React.useState("");
 
+  // Custom focus handler for the initial message textarea
+  const handleInitialMessageFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    e.target.scrollIntoView = () => {}; // Disable scrollIntoView
+    
+    // Force scroll behavior to auto
+    const originalScrollBehavior = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.body.style.scrollBehavior = 'auto';
+    
+    // Force scroll to top
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    
+    setTimeout(() => {
+      document.documentElement.style.scrollBehavior = originalScrollBehavior;
+      document.body.style.scrollBehavior = '';
+    }, 0);
+  };
+
   return (
     <>
       <div className="space-y-2">
@@ -35,7 +56,12 @@ const BasicChatSettings: React.FC<BasicChatSettingsProps> = ({
           value={draftSettings.initial_message}
           onChange={(e) => updateSetting("initial_message", e.target.value)}
           className="h-24"
-          preventFocusScroll={true}
+          onFocus={handleInitialMessageFocus}
+          style={{
+            scrollMargin: '0',
+            scrollMarginTop: '0',
+            scrollMarginBottom: '0'
+          }}
         />
         <p className="text-xs text-gray-500">Enter each message in a new line.</p>
       </div>
