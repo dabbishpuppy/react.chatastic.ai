@@ -32,14 +32,40 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 }) => {
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
 
-  const handleCopy = (content: string) => {
-    onCopy(content);
-    setShowCopiedTooltip(true);
-    toast({
-      description: "Copied to clipboard!",
-      duration: 2000,
-    });
-    setTimeout(() => setShowCopiedTooltip(false), 2000);
+  const handleCopy = async (content: string) => {
+    try {
+      // Try the modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = content;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
+      
+      onCopy(content);
+      setShowCopiedTooltip(true);
+      toast({
+        description: "Copied to clipboard!",
+        duration: 2000,
+      });
+      setTimeout(() => setShowCopiedTooltip(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      toast({
+        description: "Failed to copy to clipboard",
+        duration: 2000,
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -57,7 +83,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       )}
       
       <div className="flex flex-col">
-        {/* Message bubble */}
+        {/* Message bubble - now contains ONLY the message content */}
         <div 
           className={`rounded-lg p-3 text-[0.875rem] max-w-[80%] ${
             message.isAgent ? agentBubbleClass : userBubbleClass
@@ -67,9 +93,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {message.content}
         </div>
         
-        {/* Feedback buttons - positioned outside the message bubble */}
+        {/* Feedback buttons - now COMPLETELY outside the message bubble */}
         {message.isAgent && showFeedback && (
-          <div className="flex items-center space-x-1 mt-2 ml-0">
+          <div className="flex items-center space-x-1 mt-2">
             {/* Copy button */}
             <div className="relative">
               <button
@@ -80,7 +106,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                 <Copy size={16} />
               </button>
               {showCopiedTooltip && (
-                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+                <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
                   Copied!
                 </div>
               )}
