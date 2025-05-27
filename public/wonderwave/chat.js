@@ -1,3 +1,4 @@
+
 import { log, logError, defaultConfig } from './utils.js';
 import { getColorSettings, isAgentPrivate } from './settings.js';
 import { getBubbleButton } from './ui.js';
@@ -74,13 +75,13 @@ export function createChatIframe(config) {
   const container = document.createElement('div');
   container.id = 'wonderwave-container';
   
-  // Apply container styles
+  // Apply container styles with fixed dimensions
   Object.assign(container.style, {
     position: 'fixed',
     bottom: '90px',
     [config.position]: '20px',
-    width: '380px',
-    height: '500px',
+    width: '450px',
+    height: '800px',
     maxHeight: 'calc(100vh - 120px)',
     borderRadius: '12px',
     overflow: 'hidden',
