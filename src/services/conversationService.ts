@@ -172,7 +172,7 @@ export const conversationService = {
         timestamp: msg.timestamp,
         created_at: msg.created_at,
         feedback: feedback
-      };
+      } as Message;
     });
   },
 
