@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -78,17 +77,20 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     
     if (!range) return;
     
-    // Update the selected range immediately for visual feedback
+    // Update the selected range for visual feedback
     setSelectedRange(range);
     
-    // Only apply the filter and close when both dates are selected
+    // Only close and apply filter when BOTH dates are selected
     if (range.from && range.to) {
-      console.log('Both dates selected, applying filter');
+      console.log('Both dates selected, applying filter and closing picker');
       onDateRangeChange(
         format(range.from, 'yyyy-MM-dd'),
         format(range.to, 'yyyy-MM-dd')
       );
       setIsOpen(false);
+    } else if (range.from && !range.to) {
+      console.log('Only from date selected, keeping picker open');
+      // Keep picker open when only "from" date is selected
     }
   };
 
