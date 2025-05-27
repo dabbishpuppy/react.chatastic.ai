@@ -20,17 +20,27 @@ const LeadsSettings: React.FC = () => {
   }
 
   const handleReset = (field: string, defaultValue: any) => {
-    saveSettings({ [field]: defaultValue });
+    saveSettings({ [field]: defaultValue }).then((success) => {
+      if (success) {
+        // Trigger refresh for embedded widgets
+        setTimeout(() => {
+          window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+        }, 500);
+      }
+    });
   };
 
   const updateField = async (field: string, value: any) => {
     const success = await saveSettings({ [field]: value });
     if (success) {
       console.log(`✅ Lead setting updated: ${field} = ${value}`);
-      // Force a small delay to ensure database is updated before embedded widgets refresh
+      // Force multiple refresh messages to ensure embedded widgets get updated
       setTimeout(() => {
-        // Send message to any embedded widgets to refresh their settings
         window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+        // Send another message after a longer delay for good measure
+        setTimeout(() => {
+          window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+        }, 1000);
       }, 500);
     }
   };

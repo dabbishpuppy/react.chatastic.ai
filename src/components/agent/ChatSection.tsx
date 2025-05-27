@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -64,14 +63,30 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Load lead settings with refresh capability
   const { settings: leadSettings, refreshSettings } = useLeadSettings(agentId || '');
   
-  // Add effect to refresh lead settings periodically for embedded mode
+  // Enhanced refresh logic for embedded mode
   useEffect(() => {
     if (isEmbedded && agentId) {
+      // Refresh settings more frequently for embedded mode
       const interval = setInterval(() => {
         refreshSettings();
-      }, 10000); // Refresh every 10 seconds
+      }, 5000); // Refresh every 5 seconds
       
-      return () => clearInterval(interval);
+      // Listen for settings update messages
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'lead-settings-updated' && event.data.agentId === agentId) {
+          console.log('📋 Received lead settings update message, refreshing...');
+          setTimeout(() => {
+            refreshSettings();
+          }, 1000); // Delay to ensure database is updated
+        }
+      };
+      
+      window.addEventListener('message', handleMessage);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('message', handleMessage);
+      };
     }
   }, [isEmbedded, agentId, refreshSettings]);
   
@@ -123,17 +138,26 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       isEmbedded,
       leadSettingsLoaded: !!leadSettings,
       leadSettingsEnabled: leadSettings?.enabled,
+      collectName: leadSettings?.collect_name,
+      collectEmail: leadSettings?.collect_email,
+      collectPhone: leadSettings?.collect_phone,
       hasShownLeadForm,
       userHasMessaged,
       chatHistoryLength: chatHistory.length,
-      isTyping,
-      chatHistory: chatHistory.map(msg => ({ isAgent: msg.isAgent, content: msg.content.substring(0, 50) + '...' }))
+      isTyping
     });
   }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
-  // Enhanced lead form trigger logic - integrate into chat instead of popup
+  // Enhanced lead form trigger logic - only show if settings are properly loaded and enabled
   useEffect(() => {
     if (!isEmbedded || !leadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
+      return;
+    }
+
+    // Check if at least one field is enabled
+    const hasAnyFields = leadSettings.collect_name || leadSettings.collect_email || leadSettings.collect_phone;
+    if (!hasAnyFields) {
+      console.log('🚫 No lead form fields enabled, skipping form display');
       return;
     }
 
@@ -144,7 +168,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     console.log('🚀 LEAD FORM TRIGGER CHECK:', {
       userMessagesCount: userMessages.length,
       aiMessagesCount: aiMessages.length,
-      shouldTrigger: userMessages.length >= 1 && aiMessages.length >= 1
+      shouldTrigger: userMessages.length >= 1 && aiMessages.length >= 1,
+      hasAnyFields
     });
 
     // Show lead form after first user message AND first AI response
@@ -165,7 +190,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
+  }, [isEmbedded, leadSettings?.enabled, leadSettings?.collect_name, leadSettings?.collect_email, leadSettings?.collect_phone, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {

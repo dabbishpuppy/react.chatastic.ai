@@ -126,6 +126,14 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
 
   const isDark = theme === 'dark';
 
+  // Check if at least one field is enabled
+  const hasAnyFields = collectName || collectEmail || collectPhone;
+
+  // If no fields are enabled, don't render the form
+  if (!hasAnyFields) {
+    return null;
+  }
+
   return (
     <div className="my-4">
       <Card className={`max-w-md mx-auto ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
