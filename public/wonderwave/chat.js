@@ -1,4 +1,3 @@
-
 import { log, logError, defaultConfig } from './utils.js';
 import { isAgentPrivate } from './settings.js';
 import { doesAgentExist } from './agentVisibility.js';
@@ -17,6 +16,9 @@ import {
 
 // Export rate limit settings function for backward compatibility
 export { setRateLimitSettings };
+
+// Export createChatIframe from chatIframe.js for use in index.js
+export { createChatIframe, handleIframeMessage as handleIframeMessageFromModule };
 
 /**
  * Open the chat widget only if the agent is public and exists
