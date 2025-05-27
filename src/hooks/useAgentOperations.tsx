@@ -1,3 +1,4 @@
+
 import { Agent, Team } from "@/types/dashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -149,8 +150,8 @@ export const useAgentOperations = (
 
       if (error) throw error;
 
-      // Type assertion for the response data
-      const deletionResult = data as AgentDeletionResponse;
+      // Type assertion for the response data - first cast to unknown, then to our interface
+      const deletionResult = data as unknown as AgentDeletionResponse;
 
       // Check if deletion was successful
       if (!deletionResult?.success) {
