@@ -154,7 +154,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   };
 
   return (
-    <>
+    <React.Fragment>
       <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
         {/* Header */}
         <div className={`flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
@@ -285,9 +285,9 @@ const ConversationView: React.FC<ConversationViewProps> = ({
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
-    </>
+    </React.Fragment>
   );
 };
 
