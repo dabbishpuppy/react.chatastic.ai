@@ -39,15 +39,21 @@ const DeleteAgentDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirmName !== agent.name) return;
     
     setIsSubmitting(true);
     
-    onAgentDeleted(agent.id);
-    setIsSubmitting(false);
-    onOpenChange(false);
-    setConfirmName("");
+    try {
+      await onAgentDeleted(agent.id);
+      onOpenChange(false);
+      setConfirmName("");
+    } catch (error) {
+      // Error handling is done in the onAgentDeleted function
+      console.error('Delete operation failed:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -60,7 +66,13 @@ const DeleteAgentDialog = ({
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the
             <span className="font-medium"> {agent.name} </span>
-            agent and remove its data from our servers.
+            agent and <strong>all related data</strong> including:
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Conversations and messages</li>
+              <li>Lead data</li>
+              <li>Chat interface settings</li>
+              <li>Notification settings</li>
+            </ul>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-2 py-4">

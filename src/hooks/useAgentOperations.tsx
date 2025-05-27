@@ -128,12 +128,16 @@ export const useAgentOperations = (
 
   const handleAgentDeleted = async (agentId: string) => {
     try {
-      const { error } = await supabase
-        .from('agents')
-        .delete()
-        .eq('id', agentId);
+      // Use the new database function for safe deletion with cascading
+      const { data, error } = await supabase
+        .rpc('delete_agent_and_related_data', { agent_id_param: agentId });
 
       if (error) throw error;
+
+      // Check if deletion was successful
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to delete agent');
+      }
 
       // Remove the agent from the teams data
       setTeamsData(prevTeams => prevTeams.map(team => ({
@@ -149,10 +153,16 @@ export const useAgentOperations = (
         });
       }
       
+      // Show detailed deletion summary
+      const deletedCounts = data.deleted_counts;
+      const totalDeleted = Object.values(deletedCounts).reduce((sum: number, count: any) => sum + count, 0);
+      
       toast({
-        title: "Agent deleted",
-        description: "Agent has been deleted successfully",
+        title: "Agent deleted successfully",
+        description: `"${data.agent_name}" and ${totalDeleted} related records have been deleted`,
       });
+      
+      console.log('Agent deletion summary:', data);
       
       return agentId;
     } catch (error: any) {

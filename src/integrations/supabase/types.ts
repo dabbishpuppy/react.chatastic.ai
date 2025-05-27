@@ -179,7 +179,15 @@ export type Database = {
           title?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_settings: {
         Row: {
@@ -224,7 +232,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lead_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
@@ -258,6 +274,13 @@ export type Database = {
           submitted_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -333,7 +356,15 @@ export type Database = {
           leads_emails?: string[]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notification_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_members: {
         Row: {
@@ -396,6 +427,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_agent_and_related_data: {
+        Args: { agent_id_param: string }
+        Returns: Json
+      }
       delete_conversation: {
         Args: { conversation_id: string }
         Returns: boolean
