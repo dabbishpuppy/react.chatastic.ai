@@ -144,7 +144,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .update(settingsData)
         .eq('id', settings.id)
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error updating settings:', error);
@@ -153,6 +153,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       }
       
       console.log('✅ Settings updated successfully:', data);
+      
+      if (!data) {
+        console.error('❌ No data returned from update');
+        return null;
+      }
       
       const result: ChatInterfaceSettings = {
         ...data,
@@ -168,7 +173,7 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
         .from("chat_interface_settings")
         .insert(settingsData)
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Error creating settings:', error);
@@ -177,6 +182,11 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings): Promise
       }
       
       console.log('✅ Settings created successfully:', data);
+      
+      if (!data) {
+        console.error('❌ No data returned from insert');
+        return null;
+      }
       
       const result: ChatInterfaceSettings = {
         ...data,
