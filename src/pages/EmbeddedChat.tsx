@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -60,6 +61,26 @@ const EmbeddedChat: React.FC = () => {
     };
     
     fetchAgentVisibility();
+  }, [agentId]);
+  
+  // Enhanced message listening for lead settings updates
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && (
+        event.data.type === 'lead-settings-updated' || 
+        event.data.type === 'wonderwave-refresh-settings'
+      ) && event.data.agentId === agentId) {
+        console.log('🔄 EmbeddedChat: Received settings update, forwarding to chat...');
+        // Forward the message to the chat component
+        window.postMessage(event.data, '*');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
   }, [agentId]);
   
   // Add effect to prevent parent page scrolling when interacting with the iframe

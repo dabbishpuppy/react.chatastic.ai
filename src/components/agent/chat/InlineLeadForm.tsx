@@ -39,21 +39,27 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
     phone: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formKey, setFormKey] = useState(0); // Force re-render key
 
   // Reset form data and force re-render when field visibility changes
   useEffect(() => {
-    console.log('🔄 InlineLeadForm: Field visibility changed', {
+    console.log('🔄 InlineLeadForm: Field settings changed', {
       collectName,
       collectEmail,
-      collectPhone
+      collectPhone,
+      title
     });
     
+    // Reset form data based on enabled fields
     setFormData(prev => ({
       name: collectName ? prev.name : '',
       email: collectEmail ? prev.email : '',
       phone: collectPhone ? prev.phone : ''
     }));
-  }, [collectName, collectEmail, collectPhone]);
+    
+    // Force component re-render
+    setFormKey(prev => prev + 1);
+  }, [collectName, collectEmail, collectPhone, title, namePlaceholder, emailPlaceholder, phonePlaceholder]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -155,11 +161,12 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
     collectEmail,
     collectPhone,
     title,
-    hasAnyFields
+    hasAnyFields,
+    formKey
   });
 
   return (
-    <div className="my-4">
+    <div className="my-4" key={formKey}>
       <Card className={`max-w-md mx-auto ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <CardHeader className="pb-3">
           <CardTitle className={`text-base ${isDark ? 'text-white' : 'text-gray-900'}`}>
