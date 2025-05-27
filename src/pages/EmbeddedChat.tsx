@@ -93,17 +93,16 @@ const EmbeddedChat: React.FC = () => {
         overflow: auto !important;
         position: relative !important;
         width: 100%;
-        height: 100vh;
+        height: 100%;
         margin: 0;
         padding: 0;
       }
       
-      /* Enhanced embedded chat container with full height */
+      /* Enhanced embedded chat container that fills available space */
       .embedded-chat-container {
-        height: 100vh;
-        width: 100vw;
-        max-width: 800px;
-        margin: 0 auto;
+        height: 100%;
+        min-height: 100vh;
+        width: 100%;
         overflow: auto;
         -webkit-overflow-scrolling: touch;
         display: flex;
@@ -135,14 +134,6 @@ const EmbeddedChat: React.FC = () => {
       
       ::-webkit-scrollbar-thumb:hover {
         background: #555;
-      }
-
-      /* Responsive sizing for mobile */
-      @media (max-width: 480px) {
-        .embedded-chat-container {
-          min-width: 100vw;
-          max-width: 100vw;
-        }
       }
     `;
     document.head.appendChild(style);
