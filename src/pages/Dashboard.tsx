@@ -30,12 +30,12 @@ const Dashboard = () => {
     selectedTeam, 
     setSelectedTeam
   );
-  const { handleAgentCreated, handleAgentEdited, handleAgentDeleted } = useAgentOperations(
+  const { handleAgentCreated, handleAgentEdited, handleAgentDeleted } = useAgentOperations({
     teamsData, 
     setTeamsData, 
     selectedTeam, 
     setSelectedTeam
-  );
+  });
 
   // Clear any WonderWave configurations when no agents exist
   useEffect(() => {
