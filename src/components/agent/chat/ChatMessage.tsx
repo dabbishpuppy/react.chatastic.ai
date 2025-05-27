@@ -76,8 +76,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
   };
 
-  // Don't show feedback buttons for initial message or user messages
-  const shouldShowFeedback = message.isAgent && showFeedback && !isInitialMessage;
+  // Show feedback buttons for all agent messages when showFeedback is true
+  const shouldShowFeedback = message.isAgent && showFeedback;
 
   return (
     <div className={`flex mb-4 ${message.isAgent ? '' : 'justify-end'}`}>
@@ -123,7 +123,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
               )}
             </div>
             
-            {/* Regenerate button - only show for last agent message */}
+            {/* Regenerate button - show for last agent message when allowed */}
             {allowRegenerate && isLastAgentMessage && onRegenerate && (
               <button
                 onClick={onRegenerate}

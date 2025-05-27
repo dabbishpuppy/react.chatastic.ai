@@ -38,7 +38,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   userMessageStyle,
   messagesEndRef
 }) => {
-  // Find the last agent message index
+  // Find the last agent message index (excluding special messages like LEAD_FORM_WIDGET)
   const lastAgentMessageIndex = chatHistory.reduceRight((lastIndex, msg, index) => {
     return lastIndex === -1 && msg.isAgent && msg.content !== "LEAD_FORM_WIDGET" ? index : lastIndex;
   }, -1);
