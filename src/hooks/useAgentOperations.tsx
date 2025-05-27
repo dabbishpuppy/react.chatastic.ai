@@ -1,7 +1,22 @@
-
 import { Agent, Team } from "@/types/dashboard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+// Interface for the delete_agent_and_related_data function response
+interface AgentDeletionResponse {
+  success: boolean;
+  error?: string;
+  agent_id?: string;
+  agent_name?: string;
+  deleted_counts?: {
+    conversations: number;
+    messages: number;
+    leads: number;
+    chat_interface_settings: number;
+    lead_settings: number;
+    notification_settings: number;
+  };
+}
 
 export const useAgentOperations = (
   teamsData: Team[], 
@@ -134,9 +149,12 @@ export const useAgentOperations = (
 
       if (error) throw error;
 
+      // Type assertion for the response data
+      const deletionResult = data as AgentDeletionResponse;
+
       // Check if deletion was successful
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to delete agent');
+      if (!deletionResult?.success) {
+        throw new Error(deletionResult?.error || 'Failed to delete agent');
       }
 
       // Remove the agent from the teams data
@@ -154,15 +172,15 @@ export const useAgentOperations = (
       }
       
       // Show detailed deletion summary
-      const deletedCounts = data.deleted_counts;
-      const totalDeleted = Object.values(deletedCounts).reduce((sum: number, count: any) => sum + count, 0);
+      const deletedCounts = deletionResult.deleted_counts;
+      const totalDeleted = deletedCounts ? Object.values(deletedCounts).reduce((sum: number, count: number) => sum + count, 0) : 0;
       
       toast({
         title: "Agent deleted successfully",
-        description: `"${data.agent_name}" and ${totalDeleted} related records have been deleted`,
+        description: `"${deletionResult.agent_name}" and ${totalDeleted} related records have been deleted`,
       });
       
-      console.log('Agent deletion summary:', data);
+      console.log('Agent deletion summary:', deletionResult);
       
       return agentId;
     } catch (error: any) {
