@@ -13,10 +13,21 @@ interface ColorPickerProps {
 
 const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, className }) => {
   const [currentColor, setCurrentColor] = React.useState(color);
+  const [hue, setHue] = React.useState(0);
+  const [saturation, setSaturation] = React.useState(1);
+  const [brightness, setBrightness] = React.useState(1);
+  const [isDraggingGradient, setIsDraggingGradient] = React.useState(false);
+  const [isDraggingHue, setIsDraggingHue] = React.useState(false);
   
   // Update color when prop changes
   React.useEffect(() => {
     setCurrentColor(color);
+    // Convert hex to HSV for internal state
+    const rgb = hexToRgb(color);
+    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    setHue(hsv.h);
+    setSaturation(hsv.s);
+    setBrightness(hsv.v);
   }, [color]);
 
   // Handle HEX input changes
@@ -33,56 +44,124 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
       setCurrentColor(value);
       if (value.length === 7) {
         onChange(value);
+        // Update HSV values
+        const rgb = hexToRgb(value);
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        setHue(hsv.h);
+        setSaturation(hsv.s);
+        setBrightness(hsv.v);
       }
     }
   };
 
-  // Handle clicks on the gradient picker
-  const handleGradientClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Handle clicks and dragging on the gradient picker
+  const handleGradientInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
     
     // Calculate relative position (0-1)
-    const relativeX = Math.max(0, Math.min(1, x / rect.width));
-    const relativeY = Math.max(0, Math.min(1, y / rect.height));
+    const newSaturation = Math.max(0, Math.min(1, x / rect.width));
+    const newBrightness = Math.max(0, Math.min(1, 1 - y / rect.height));
     
-    // Convert to HSV and then to RGB
-    const hue = relativeX * 360;
-    const saturation = 1 - relativeY;
-    const value = 1;
+    setSaturation(newSaturation);
+    setBrightness(newBrightness);
     
-    // HSV to RGB conversion
-    const c = value * saturation;
-    const x1 = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-    const m = value - c;
-    
-    let r = 0, g = 0, b = 0;
-    
-    if (hue >= 0 && hue < 60) {
-      r = c; g = x1; b = 0;
-    } else if (hue >= 60 && hue < 120) {
-      r = x1; g = c; b = 0;
-    } else if (hue >= 120 && hue < 180) {
-      r = 0; g = c; b = x1;
-    } else if (hue >= 180 && hue < 240) {
-      r = 0; g = x1; b = c;
-    } else if (hue >= 240 && hue < 300) {
-      r = x1; g = 0; b = c;
-    } else if (hue >= 300 && hue < 360) {
-      r = c; g = 0; b = x1;
-    }
-    
-    // Convert to 0-255 range and create hex
-    const red = Math.round((r + m) * 255);
-    const green = Math.round((g + m) * 255);
-    const blue = Math.round((b + m) * 255);
-    
-    const hex = `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
+    // Convert HSV to RGB and then to hex
+    const rgb = hsvToRgb(hue, newSaturation, newBrightness);
+    const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
     
     setCurrentColor(hex);
     onChange(hex);
   };
+
+  // Handle hue slider interaction
+  const handleHueInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const x = clientX - rect.left;
+    
+    const newHue = Math.max(0, Math.min(360, (x / rect.width) * 360));
+    setHue(newHue);
+    
+    // Convert HSV to RGB and then to hex
+    const rgb = hsvToRgb(newHue, saturation, brightness);
+    const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+    
+    setCurrentColor(hex);
+    onChange(hex);
+  };
+
+  // Mouse event handlers for dragging
+  const handleGradientMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDraggingGradient(true);
+    handleGradientInteraction(e);
+  };
+
+  const handleHueMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsDraggingHue(true);
+    handleHueInteraction(e);
+  };
+
+  // Global mouse move and up handlers
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDraggingGradient) {
+        const gradientElement = document.querySelector('.gradient-picker') as HTMLElement;
+        if (gradientElement) {
+          const rect = gradientElement.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          
+          const newSaturation = Math.max(0, Math.min(1, x / rect.width));
+          const newBrightness = Math.max(0, Math.min(1, 1 - y / rect.height));
+          
+          setSaturation(newSaturation);
+          setBrightness(newBrightness);
+          
+          const rgb = hsvToRgb(hue, newSaturation, newBrightness);
+          const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+          
+          setCurrentColor(hex);
+          onChange(hex);
+        }
+      }
+      
+      if (isDraggingHue) {
+        const hueElement = document.querySelector('.hue-slider') as HTMLElement;
+        if (hueElement) {
+          const rect = hueElement.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          
+          const newHue = Math.max(0, Math.min(360, (x / rect.width) * 360));
+          setHue(newHue);
+          
+          const rgb = hsvToRgb(newHue, saturation, brightness);
+          const hex = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
+          
+          setCurrentColor(hex);
+          onChange(hex);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingGradient(false);
+      setIsDraggingHue(false);
+    };
+
+    if (isDraggingGradient || isDraggingHue) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDraggingGradient, isDraggingHue, hue, saturation, brightness]);
 
   // Convert hex to RGB
   const hexToRgb = (hex: string) => {
@@ -94,10 +173,74 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
     } : { r: 0, g: 0, b: 0 };
   };
 
+  // Convert RGB to HSV
+  const rgbToHsv = (r: number, g: number, b: number) => {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const diff = max - min;
+
+    let h = 0;
+    if (diff !== 0) {
+      if (max === r) {
+        h = ((g - b) / diff) % 6;
+      } else if (max === g) {
+        h = (b - r) / diff + 2;
+      } else {
+        h = (r - g) / diff + 4;
+      }
+    }
+    h = Math.round(h * 60);
+    if (h < 0) h += 360;
+
+    const s = max === 0 ? 0 : diff / max;
+    const v = max;
+
+    return { h, s, v };
+  };
+
+  // Convert HSV to RGB
+  const hsvToRgb = (h: number, s: number, v: number) => {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+
+    let r = 0, g = 0, b = 0;
+
+    if (h >= 0 && h < 60) {
+      r = c; g = x; b = 0;
+    } else if (h >= 60 && h < 120) {
+      r = x; g = c; b = 0;
+    } else if (h >= 120 && h < 180) {
+      r = 0; g = c; b = x;
+    } else if (h >= 180 && h < 240) {
+      r = 0; g = x; b = c;
+    } else if (h >= 240 && h < 300) {
+      r = x; g = 0; b = c;
+    } else if (h >= 300 && h < 360) {
+      r = c; g = 0; b = x;
+    }
+
+    return {
+      r: Math.round((r + m) * 255),
+      g: Math.round((g + m) * 255),
+      b: Math.round((b + m) * 255)
+    };
+  };
+
   // Handle predefined color selection
   const handlePresetColorClick = (presetColor: string) => {
     setCurrentColor(presetColor);
     onChange(presetColor);
+    // Update HSV values
+    const rgb = hexToRgb(presetColor);
+    const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    setHue(hsv.h);
+    setSaturation(hsv.s);
+    setBrightness(hsv.v);
   };
 
   const rgb = hexToRgb(currentColor);
@@ -122,22 +265,53 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
           <div className="flex flex-col gap-3">
             {/* Main color picker area */}
             <div 
-              className="w-full h-32 relative rounded-lg overflow-hidden cursor-crosshair"
+              className="gradient-picker w-full h-32 relative rounded-lg overflow-hidden cursor-crosshair select-none"
               style={{
-                background: `linear-gradient(to right, 
-                  hsl(0, 100%, 50%), hsl(60, 100%, 50%), hsl(120, 100%, 50%), 
-                  hsl(180, 100%, 50%), hsl(240, 100%, 50%), hsl(300, 100%, 50%), 
-                  hsl(360, 100%, 50%)),
-                  linear-gradient(to bottom, rgba(255,255,255,0), rgba(0,0,0,1))`
+                backgroundColor: `hsl(${hue}, 100%, 50%)`
               }}
-              onClick={handleGradientClick}
+              onMouseDown={handleGradientMouseDown}
             >
+              {/* White to transparent gradient (for saturation) */}
+              <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: 'linear-gradient(to right, #fff, transparent)'
+                }}
+              />
+              {/* Transparent to black gradient (for brightness) */}
+              <div 
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: 'linear-gradient(to top, #000, transparent)'
+                }}
+              />
+              {/* Draggable dot */}
               <div 
                 className="absolute w-3 h-3 border-2 border-white rounded-full pointer-events-none shadow-md"
                 style={{
-                  left: '50%',
-                  top: '50%',
+                  left: `${saturation * 100}%`,
+                  top: `${(1 - brightness) * 100}%`,
                   transform: 'translate(-50%, -50%)'
+                }}
+              />
+            </div>
+
+            {/* Hue slider */}
+            <div 
+              className="hue-slider w-full h-4 relative rounded cursor-pointer select-none"
+              style={{
+                background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)'
+              }}
+              onMouseDown={handleHueMouseDown}
+            >
+              {/* Hue slider handle */}
+              <div 
+                className="absolute w-3 h-6 border-2 border-white rounded pointer-events-none shadow-md"
+                style={{
+                  left: `${(hue / 360) * 100}%`,
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  backgroundColor: `hsl(${hue}, 100%, 50%)`
                 }}
               />
             </div>
@@ -164,6 +338,10 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
                     const newColor = `#${r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
                     setCurrentColor(newColor);
                     onChange(newColor);
+                    const hsv = rgbToHsv(r, rgb.g, rgb.b);
+                    setHue(hsv.h);
+                    setSaturation(hsv.s);
+                    setBrightness(hsv.v);
                   }}
                   className="w-full px-1 py-1 text-xs text-center"
                   min="0"
@@ -180,6 +358,10 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
                     const newColor = `#${rgb.r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${rgb.b.toString(16).padStart(2, '0')}`;
                     setCurrentColor(newColor);
                     onChange(newColor);
+                    const hsv = rgbToHsv(rgb.r, g, rgb.b);
+                    setHue(hsv.h);
+                    setSaturation(hsv.s);
+                    setBrightness(hsv.v);
                   }}
                   className="w-full px-1 py-1 text-xs text-center"
                   min="0"
@@ -196,6 +378,10 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onReset, cla
                     const newColor = `#${rgb.r.toString(16).padStart(2, '0')}${rgb.g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
                     setCurrentColor(newColor);
                     onChange(newColor);
+                    const hsv = rgbToHsv(rgb.r, rgb.g, b);
+                    setHue(hsv.h);
+                    setSaturation(hsv.s);
+                    setBrightness(hsv.v);
                   }}
                   className="w-full px-1 py-1 text-xs text-center"
                   min="0"
