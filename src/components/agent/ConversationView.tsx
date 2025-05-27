@@ -118,25 +118,33 @@ const ConversationView: React.FC<ConversationViewProps> = ({
     color: getContrastColor(userMessageColor)
   } : {};
 
-  // Create a complete timeline starting with initial message
+  // Create the correct conversation timeline - only add initial message if there are no messages
+  // or if the first message is not from the assistant
   const fullConversationTimeline = React.useMemo(() => {
     const timeline = [];
     
-    // Add initial message first if it exists
-    if (initialMessage) {
+    // Only add initial message if:
+    // 1. We have an initial message
+    // 2. AND either no messages exist OR the first message is not from assistant
+    const shouldAddInitialMessage = initialMessage && (
+      localMessages.length === 0 || 
+      localMessages[0]?.role !== 'assistant'
+    );
+    
+    if (shouldAddInitialMessage) {
       timeline.push({
         id: 'initial-message',
         role: 'assistant' as const,
         content: initialMessage,
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day before to ensure it's first
+        timestamp: new Date(Date.now() - 1000).toISOString(), // Just slightly before to ensure it's first
         feedback: undefined
       });
     }
     
-    // Add all actual conversation messages
+    // Add all actual conversation messages in their original order
     timeline.push(...localMessages);
     
-    // Sort by timestamp to ensure proper order (initial message should be first)
+    // Sort by timestamp to maintain chronological order
     return timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [localMessages, initialMessage]);
 
@@ -277,7 +285,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </AlertDialogFooter>
       </AlertDialog>
     </>
   );
