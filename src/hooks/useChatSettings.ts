@@ -42,6 +42,34 @@ export const useChatSettings = () => {
     }
   };
 
+  // Helper function to ensure suggested_messages is always an array
+  const ensureSuggestedMessagesArray = (messages: any): SuggestedMessage[] => {
+    if (!messages) return [];
+    
+    if (Array.isArray(messages)) {
+      return messages.map((msg, index) => ({
+        id: msg.id || `msg-${index}`,
+        text: msg.text || (typeof msg === 'string' ? msg : '')
+      }));
+    }
+    
+    if (typeof messages === 'string') {
+      try {
+        const parsed = JSON.parse(messages);
+        if (Array.isArray(parsed)) {
+          return parsed.map((msg, index) => ({
+            id: msg.id || `msg-${index}`,
+            text: msg.text || (typeof msg === 'string' ? msg : '')
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing suggested_messages string:', error);
+      }
+    }
+    
+    return [];
+  };
+
   useEffect(() => {
     const loadSettings = async () => {
       setIsLoading(true);
@@ -53,7 +81,7 @@ export const useChatSettings = () => {
         if (edgeData && edgeData.visibility !== 'private') {
           console.log('✅ Using edge function data:', edgeData);
           
-          // Set chat settings
+          // Set chat settings with proper suggested_messages handling
           setSettings({
             ...defaultChatSettings,
             agent_id: validAgentId,
@@ -71,7 +99,7 @@ export const useChatSettings = () => {
             primary_color: edgeData.primary_color,
             show_feedback: edgeData.show_feedback,
             allow_regenerate: edgeData.allow_regenerate,
-            suggested_messages: edgeData.suggested_messages || [],
+            suggested_messages: ensureSuggestedMessagesArray(edgeData.suggested_messages),
             show_suggestions_after_chat: edgeData.show_suggestions_after_chat,
             auto_show_delay: edgeData.auto_show_delay
           });
@@ -89,6 +117,7 @@ export const useChatSettings = () => {
             setSettings({
               ...defaultChatSettings,
               ...data,
+              suggested_messages: ensureSuggestedMessagesArray(data.suggested_messages),
               sync_colors: data.sync_colors !== undefined ? data.sync_colors : false,
               primary_color: data.primary_color || '#3B82F6'
             });

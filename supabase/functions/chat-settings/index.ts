@@ -100,6 +100,21 @@ serve(async (req) => {
 
     console.log('Lead settings fetched:', leadSettings);
 
+    // Parse suggested_messages if it exists and is a string
+    let parsedSuggestedMessages = [];
+    if (settings?.suggested_messages) {
+      try {
+        if (typeof settings.suggested_messages === 'string') {
+          parsedSuggestedMessages = JSON.parse(settings.suggested_messages);
+        } else if (Array.isArray(settings.suggested_messages)) {
+          parsedSuggestedMessages = settings.suggested_messages;
+        }
+      } catch (parseError) {
+        console.error('Error parsing suggested_messages:', parseError);
+        parsedSuggestedMessages = [];
+      }
+    }
+
     // Construct response with all settings including rate limiting and lead settings
     const response = {
       visibility: agent.visibility,
@@ -121,7 +136,7 @@ serve(async (req) => {
       primary_color: settings?.primary_color,
       show_feedback: settings?.show_feedback ?? true,
       allow_regenerate: settings?.allow_regenerate ?? true,
-      suggested_messages: settings?.suggested_messages || [],
+      suggested_messages: parsedSuggestedMessages,
       show_suggestions_after_chat: settings?.show_suggestions_after_chat ?? true,
       auto_show_delay: settings?.auto_show_delay ?? 1,
       message_placeholder: settings?.message_placeholder || 'Write message here...',
