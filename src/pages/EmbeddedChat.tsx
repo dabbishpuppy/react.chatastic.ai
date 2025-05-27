@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -99,12 +98,11 @@ const EmbeddedChat: React.FC = () => {
         padding: 0;
       }
       
-      /* Enhanced embedded chat container with better sizing */
+      /* Enhanced embedded chat container with full height */
       .embedded-chat-container {
         height: 100vh;
         width: 100vw;
-        max-width: 500px;
-        min-width: 400px;
+        max-width: 800px;
         margin: 0 auto;
         overflow: auto;
         -webkit-overflow-scrolling: touch;
