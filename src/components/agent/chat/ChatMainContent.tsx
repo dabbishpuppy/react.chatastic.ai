@@ -13,7 +13,7 @@ interface ChatMainContentProps {
   profilePicture?: string;
   showFeedback: boolean;
   hideUserAvatar: boolean;
-  onFeedback: (messageIndex: number, isPositive: boolean) => void;
+  onFeedback: (timestamp: string, type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
   themeClasses: any;
   userMessageStyle: React.CSSProperties;

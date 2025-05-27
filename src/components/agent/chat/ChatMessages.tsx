@@ -6,7 +6,7 @@ import ChatMessageComponent from "./ChatMessage";
 import LoadingDots from "./LoadingDots";
 
 interface ChatMessagesProps {
-  chatHistory: ChatMessage[];
+  messages: ChatMessage[];
   isTyping: boolean;
   agentName: string;
   profilePicture?: string;
@@ -14,14 +14,14 @@ interface ChatMessagesProps {
   hideUserAvatar: boolean;
   onFeedback: (timestamp: string, type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
-  agentBubbleClass: string;
-  userBubbleClass: string;
+  themeClasses: any;
   userMessageStyle: React.CSSProperties;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef?: React.RefObject<HTMLDivElement>;
+  customMessageRenderer?: (message: ChatMessage, index: number) => React.ReactNode;
 }
 
 const ChatMessages: React.FC<ChatMessagesProps> = ({
-  chatHistory,
+  messages,
   isTyping,
   agentName,
   profilePicture,
@@ -29,27 +29,37 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
   hideUserAvatar,
   onFeedback,
   onCopy,
-  agentBubbleClass,
-  userBubbleClass,
+  themeClasses,
   userMessageStyle,
-  messagesEndRef
+  messagesEndRef,
+  customMessageRenderer
 }) => (
   <>
-    {chatHistory.map((msg, idx) => (
-      <ChatMessageComponent
-        key={idx}
-        message={msg}
-        agentName={agentName}
-        profilePicture={profilePicture}
-        showFeedback={showFeedback}
-        hideUserAvatar={hideUserAvatar}
-        onFeedback={onFeedback}
-        onCopy={onCopy}
-        agentBubbleClass={agentBubbleClass}
-        userBubbleClass={userBubbleClass}
-        userMessageStyle={userMessageStyle}
-      />
-    ))}
+    {messages.map((msg, idx) => {
+      // Check if there's a custom renderer for this message
+      if (customMessageRenderer) {
+        const customContent = customMessageRenderer(msg, idx);
+        if (customContent) {
+          return <div key={idx}>{customContent}</div>;
+        }
+      }
+
+      return (
+        <ChatMessageComponent
+          key={idx}
+          message={msg}
+          agentName={agentName}
+          profilePicture={profilePicture}
+          showFeedback={showFeedback}
+          hideUserAvatar={hideUserAvatar}
+          onFeedback={onFeedback}
+          onCopy={onCopy}
+          agentBubbleClass={themeClasses.agentMessage}
+          userBubbleClass={themeClasses.userMessage}
+          userMessageStyle={userMessageStyle}
+        />
+      );
+    })}
     
     {isTyping && (
       <div className="flex mb-4">
@@ -62,13 +72,13 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             </AvatarFallback>
           )}
         </Avatar>
-        <div className={`rounded-lg p-3 max-w-[80%] ${agentBubbleClass}`}>
+        <div className={`rounded-lg p-3 max-w-[80%] ${themeClasses.agentMessage}`}>
           <LoadingDots />
         </div>
       </div>
     )}
     
-    <div ref={messagesEndRef} />
+    {messagesEndRef && <div ref={messagesEndRef} />}
   </>
 );
 
