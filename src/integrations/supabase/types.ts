@@ -295,6 +295,7 @@ export type Database = {
           content: string
           conversation_id: string
           created_at: string
+          feedback: string | null
           id: string
           is_agent: boolean
           timestamp: string
@@ -303,6 +304,7 @@ export type Database = {
           content: string
           conversation_id: string
           created_at?: string
+          feedback?: string | null
           id?: string
           is_agent?: boolean
           timestamp?: string
@@ -311,6 +313,7 @@ export type Database = {
           content?: string
           conversation_id?: string
           created_at?: string
+          feedback?: string | null
           id?: string
           is_agent?: boolean
           timestamp?: string

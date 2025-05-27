@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChatMessage as ChatMessageType } from "@/types/chatInterface";
 import { Copy, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { analyticsService } from "@/services/analyticsService";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -39,6 +40,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   isLastAgentMessage = false
 }) => {
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
+  const [isUpdatingFeedback, setIsUpdatingFeedback] = useState(false);
 
   const handleCopy = async (content: string) => {
     try {
@@ -46,7 +48,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(content);
       } else {
-        // Fallback for older browsers or non-secure contexts
         const textArea = document.createElement('textarea');
         textArea.value = content;
         textArea.style.position = 'fixed';
@@ -73,6 +74,43 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         duration: 2000,
         variant: "destructive"
       });
+    }
+  };
+
+  const handleFeedback = async (type: "like" | "dislike") => {
+    if (isUpdatingFeedback || !message.id) return;
+
+    setIsUpdatingFeedback(true);
+    try {
+      // Toggle feedback: if same type is clicked, remove it
+      const newFeedback = message.feedback === type ? null : type;
+      
+      const success = await analyticsService.updateMessageFeedback(message.id, newFeedback);
+      
+      if (success) {
+        // Call the original onFeedback for local state updates
+        onFeedback(message.timestamp, type);
+        
+        toast({
+          description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
+          duration: 2000,
+        });
+      } else {
+        toast({
+          description: "Failed to update feedback",
+          duration: 2000,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+      toast({
+        description: "Failed to update feedback",
+        duration: 2000,
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdatingFeedback(false);
     }
   };
 
@@ -107,12 +145,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           <div className="flex items-center space-x-1 mt-2">
             {/* Like button - FIRST */}
             <button
-              onClick={() => onFeedback(message.timestamp, "like")}
+              onClick={() => handleFeedback("like")}
+              disabled={isUpdatingFeedback}
               className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
                 message.feedback === "like" 
                   ? "bg-green-100 text-green-600 hover:bg-green-200" 
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-              }`}
+              } disabled:opacity-50`}
               title="Like"
             >
               <ThumbsUp size={14} />
@@ -120,12 +159,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             
             {/* Dislike button - SECOND */}
             <button
-              onClick={() => onFeedback(message.timestamp, "dislike")}
+              onClick={() => handleFeedback("dislike")}
+              disabled={isUpdatingFeedback}
               className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
                 message.feedback === "dislike" 
                   ? "bg-red-100 text-red-600 hover:bg-red-200" 
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
-              }`}
+              } disabled:opacity-50`}
               title="Dislike"
             >
               <ThumbsDown size={14} />

@@ -15,8 +15,10 @@ const AnalyticsTab: React.FC = () => {
   });
 
   const clearDateRange = () => {
-    // In a real app, you would reset to default dates or remove the filter
-    console.log("Clear date range");
+    setDateRange({
+      startDate: "",
+      endDate: ""
+    });
   };
 
   return (
@@ -49,7 +51,11 @@ const AnalyticsTab: React.FC = () => {
         </div>
       </div>
 
-      <AnalyticsOverviewCards />
+      <AnalyticsOverviewCards 
+        selectedAgent={selectedAgent}
+        startDate={dateRange.startDate}
+        endDate={dateRange.endDate}
+      />
       <ChatsAreaChart />
       <ChatsChannelChart />
       <ChatsMapChart />

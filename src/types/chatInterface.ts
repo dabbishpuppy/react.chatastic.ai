@@ -1,4 +1,3 @@
-
 export interface SuggestedMessage {
   id: string;
   text: string;
@@ -27,8 +26,9 @@ export interface ChatInterfaceSettings {
 }
 
 export interface ChatMessage {
-  isAgent: boolean;
+  id?: string; // Add id field for database operations
   content: string;
+  isAgent: boolean;
   timestamp: string;
   feedback?: "like" | "dislike" | null;
 }
