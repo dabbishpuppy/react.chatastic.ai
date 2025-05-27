@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   };
 
   const handleCalendarSelect = (range: { from: Date | undefined; to: Date | undefined } | undefined) => {
-    console.log('Calendar select:', range, 'Current mode:', selectionMode);
+    console.log('Calendar select:', range, 'Current mode:', selectionMode, 'Current selected:', selectedRange);
     
     if (!range || !range.from) {
       // Reset if no valid selection
@@ -95,18 +96,29 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
       setSelectionMode('end');
       // Do NOT close the picker or apply filter yet
     } else if (selectionMode === 'end') {
-      // Second click: we're in end mode, check if we have a complete range
-      if (range.from && range.to) {
-        // Both dates are present - complete the selection
-        console.log('Both dates selected, applying filter and closing picker');
+      // We're in end mode - check multiple conditions for completion
+      const hasCompletedRange = range.from && range.to && range.from !== range.to;
+      const hasNewEndDate = selectedRange.from && range.from && 
+                           selectedRange.from.getTime() === range.from.getTime() && 
+                           range.to;
+      
+      console.log('End mode check:', { hasCompletedRange, hasNewEndDate, range });
+      
+      if (hasCompletedRange || hasNewEndDate) {
+        // Complete range detected - apply filter and close
+        console.log('Complete range detected, applying filter and closing picker');
         setSelectionMode('complete');
+        
+        const fromDate = range.from;
+        const toDate = range.to || range.from; // Fallback to same date if to is undefined
+        
         onDateRangeChange(
-          format(range.from, 'yyyy-MM-dd'),
-          format(range.to, 'yyyy-MM-dd')
+          format(fromDate, 'yyyy-MM-dd'),
+          format(toDate, 'yyyy-MM-dd')
         );
         setIsOpen(false);
-      } else if (range.from && !range.to) {
-        // User clicked a new start date while in end mode - restart selection
+      } else if (range.from && selectedRange.from && range.from.getTime() !== selectedRange.from.getTime()) {
+        // User clicked a different start date while in end mode - restart selection
         console.log('New start date selected, resetting to end mode');
         setSelectionMode('end');
       }
