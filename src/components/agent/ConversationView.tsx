@@ -105,115 +105,113 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   };
 
   return (
-    <React.Fragment>
-      <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
-        {/* Header */}
-        <div className={`flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-8 w-8">
-              {profilePicture ? (
-                <AvatarImage src={profilePicture} alt={displayName} />
-              ) : (
-                <AvatarFallback className="bg-gray-100" />
-              )}
-            </Avatar>
-            <div>
-              <h2 className="text-lg font-semibold">{conversation.title}</h2>
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <span>{conversation.daysAgo}</span>
-                <span>•</span>
-                <span>{conversation.source}</span>
-                {conversationStatus && (
-                  <>
-                    <span>•</span>
-                    <span className="capitalize">{conversationStatus}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            {showDeleteButton && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDeleteDialog(true)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 size={16} />
-              </Button>
+    <div className={`flex flex-col h-full ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-black'} rounded-lg border`}>
+      {/* Header */}
+      <div className={`flex items-center justify-between p-4 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="flex items-center space-x-3">
+          <Avatar className="h-8 w-8">
+            {profilePicture ? (
+              <AvatarImage src={profilePicture} alt={displayName} />
+            ) : (
+              <AvatarFallback className="bg-gray-100" />
             )}
+          </Avatar>
+          <div>
+            <h2 className="text-lg font-semibold">{conversation.title}</h2>
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <span>{conversation.daysAgo}</span>
+              <span>•</span>
+              <span>{conversation.source}</span>
+              {conversationStatus && (
+                <>
+                  <span>•</span>
+                  <span className="capitalize">{conversationStatus}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messagesToDisplay.map((message, index) => (
-            <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {message.role === 'assistant' && (
-                <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
-                  {profilePicture ? (
-                    <AvatarImage src={profilePicture} alt={displayName} />
-                  ) : (
-                    <AvatarFallback className="bg-gray-100" />
-                  )}
-                </Avatar>
-              )}
-              
-              <div className="flex flex-col max-w-[80%]">
-                {/* Message bubble */}
-                <div 
-                  className={`rounded-lg p-3 text-sm ${
-                    message.role === 'user' 
-                      ? 'bg-blue-500 text-white ml-auto' 
-                      : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
-                  }`}
-                  style={message.role === 'user' ? userMessageStyle : {}}
-                >
-                  {message.content}
-                </div>
-                
-                {/* Action buttons for assistant messages - display-only feedback buttons */}
-                {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
-                  <div className="flex items-center space-x-1 mt-2">
-                    {/* Like button - display-only */}
-                    <div
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
-                        message.feedback === "like" 
-                          ? "bg-green-100 text-green-600" 
-                          : "bg-gray-100 text-gray-400"
-                      }`}
-                      title={message.feedback === "like" ? "Liked" : "Like"}
-                    >
-                      <ThumbsUp size={14} />
-                    </div>
-                    
-                    {/* Dislike button - display-only */}
-                    <div
-                      className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
-                        message.feedback === "dislike" 
-                          ? "bg-red-100 text-red-600" 
-                          : "bg-gray-100 text-gray-400"
-                      }`}
-                      title={message.feedback === "dislike" ? "Disliked" : "Dislike"}
-                    >
-                      <ThumbsDown size={14} />
-                    </div>
-                    
-                    {/* Copy button - still functional */}
-                    <button
-                      onClick={() => handleCopy(message.content)}
-                      className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
-                      title="Copy"
-                    >
-                      <Copy size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center space-x-2">
+          {showDeleteButton && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
         </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messagesToDisplay.map((message, index) => (
+          <div key={message.id || index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {message.role === 'assistant' && (
+              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+                {profilePicture ? (
+                  <AvatarImage src={profilePicture} alt={displayName} />
+                ) : (
+                  <AvatarFallback className="bg-gray-100" />
+                )}
+              </Avatar>
+            )}
+            
+            <div className="flex flex-col max-w-[80%]">
+              {/* Message bubble */}
+              <div 
+                className={`rounded-lg p-3 text-sm ${
+                  message.role === 'user' 
+                    ? 'bg-blue-500 text-white ml-auto' 
+                    : theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'
+                }`}
+                style={message.role === 'user' ? userMessageStyle : {}}
+              >
+                {message.content}
+              </div>
+              
+              {/* Action buttons for assistant messages - display-only feedback buttons */}
+              {message.role === 'assistant' && message.id && message.id !== 'initial-message' && (
+                <div className="flex items-center space-x-1 mt-2">
+                  {/* Like button - display-only */}
+                  <div
+                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
+                      message.feedback === "like" 
+                        ? "bg-green-100 text-green-600" 
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                    title={message.feedback === "like" ? "Liked" : "Like"}
+                  >
+                    <ThumbsUp size={14} />
+                  </div>
+                  
+                  {/* Dislike button - display-only */}
+                  <div
+                    className={`inline-flex items-center justify-center h-8 w-8 rounded-md cursor-default ${
+                      message.feedback === "dislike" 
+                        ? "bg-red-100 text-red-600" 
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                    title={message.feedback === "dislike" ? "Disliked" : "Dislike"}
+                  >
+                    <ThumbsDown size={14} />
+                  </div>
+                  
+                  {/* Copy button - still functional */}
+                  <button
+                    onClick={() => handleCopy(message.content)}
+                    className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+                    title="Copy"
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -236,7 +234,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </React.Fragment>
+    </div>
   );
 };
 
