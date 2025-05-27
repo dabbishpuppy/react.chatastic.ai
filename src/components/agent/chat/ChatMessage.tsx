@@ -86,9 +86,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           {profilePicture ? (
             <AvatarImage src={profilePicture} alt={agentName} />
           ) : (
-            <AvatarFallback className="bg-gray-200 text-gray-600">
-              {agentName.charAt(0)}
-            </AvatarFallback>
+            <AvatarFallback className="bg-gray-100" />
           )}
         </Avatar>
       )}
@@ -165,7 +163,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       
       {!message.isAgent && !hideUserAvatar && (
         <Avatar className="h-8 w-8 ml-2 mt-1 border-0">
-          <AvatarFallback className="bg-gray-200 text-gray-600">U</AvatarFallback>
+          <AvatarFallback className="bg-gray-100" />
         </Avatar>
       )}
     </div>

@@ -73,7 +73,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             {profilePicture && (
               <Avatar className="h-8 w-8 border-0">
                 <AvatarImage src={profilePicture} alt={agentName} />
-                <AvatarFallback className="bg-transparent" />
+                <AvatarFallback className="bg-gray-100" />
               </Avatar>
             )}
             <div>

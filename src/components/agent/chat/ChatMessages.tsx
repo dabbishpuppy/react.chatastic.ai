@@ -71,9 +71,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             {profilePicture ? (
               <AvatarImage src={profilePicture} alt={agentName} />
             ) : (
-              <AvatarFallback className="bg-gray-200 text-gray-600">
-                {agentName.charAt(0)}
-              </AvatarFallback>
+              <AvatarFallback className="bg-gray-100" />
             )}
           </Avatar>
           <div className={`rounded-lg p-3 max-w-[80%] ${agentBubbleClass}`}>

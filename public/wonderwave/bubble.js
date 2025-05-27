@@ -91,7 +91,7 @@ export function updateBubbleContent(config) {
     } else if (config.bubbleColor) {
       bubbleColor = config.bubbleColor;
     } else {
-      bubbleColor = defaultConfig.bubbleColor;
+      bubbleColor = '#000000'; // Default to black instead of blue
     }
     
     bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
@@ -122,14 +122,14 @@ export function updateBubbleContent(config) {
       bubbleButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>`;
       bubbleButton.style.backgroundImage = 'none';
       
-      // Determine bubble color for default icon
+      // Determine bubble color for default icon - use black as default
       let bubbleColor;
       if (colorSettings && colorSettings.bubble_color) {
         bubbleColor = colorSettings.bubble_color;
       } else if (config.bubbleColor) {
         bubbleColor = config.bubbleColor;
       } else {
-        bubbleColor = defaultConfig.bubbleColor;
+        bubbleColor = '#000000'; // Default to black instead of blue
       }
       bubbleButton.style.backgroundColor = bubbleColor;
       bubbleButton.style.color = '#FFFFFF';
@@ -143,7 +143,7 @@ export function updateBubbleContent(config) {
 export function updateBubbleAppearance() {
   const existingBubble = document.getElementById('wonderwave-bubble');
   const colorSettings = getColorSettings();
-  const config = window.wonderwaveConfig || defaultConfig;
+  const config = window.wonderwaveConfig || { bubbleColor: '#000000' }; // Default to black
   
   if (!existingBubble || !colorSettings) return;
   
