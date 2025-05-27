@@ -63,62 +63,50 @@ const EmbeddedChat: React.FC = () => {
     fetchAgentVisibility();
   }, [agentId]);
   
-  // Add effect to prevent parent page scrolling when interacting with the iframe
+  // Enhanced styles for proper scrolling in embedded mode
   useEffect(() => {
-    const preventParentScrolling = (e: Event) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    // Prevent scrolling of parent window when inside iframe
-    document.addEventListener('wheel', preventParentScrolling, { passive: false });
-    document.addEventListener('touchmove', preventParentScrolling, { passive: false });
-    document.addEventListener('keydown', (e) => {
-      // Check if the event target is an input field, textarea, or contenteditable element
-      const target = e.target as HTMLElement;
-      const isInputField = target.tagName === 'INPUT' || 
-                          target.tagName === 'TEXTAREA' || 
-                          target.contentEditable === 'true' ||
-                          target.getAttribute('contenteditable') === 'true';
-      
-      // Only prevent scrolling keys when not in an input field
-      if (!isInputField && [32, 37, 38, 39, 40].includes(e.keyCode)) {
-        e.preventDefault();
-      }
-    });
-
-    // Add styles to ensure proper focus behavior
+    // Add enhanced styles to ensure proper scrolling behavior
     const style = document.createElement('style');
     style.textContent = `
       html, body {
-        overflow: hidden;
-        position: fixed;
+        overflow: auto !important;
+        position: relative !important;
         width: 100%;
         height: 100%;
         margin: 0;
         padding: 0;
       }
       
-      /* Ensure focus doesn't cause scrolling */
-      *:focus {
-        outline: none;
+      /* Enable proper scrolling for embedded content */
+      .embedded-chat-container {
+        height: 100vh;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
       }
       
-      /* Hide scrollbars but allow scrolling in contained areas */
-      .scroll-container {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
+      /* Ensure scrollbars are visible and functional */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
       }
       
-      .scroll-container::-webkit-scrollbar {
-        display: none;
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 10px;
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: #555;
       }
     `;
     document.head.appendChild(style);
 
     return () => {
-      document.removeEventListener('wheel', preventParentScrolling);
-      document.removeEventListener('touchmove', preventParentScrolling);
       document.head.removeChild(style);
     };
   }, []);
@@ -208,8 +196,8 @@ const EmbeddedChat: React.FC = () => {
 
   // Use the chat settings from the agent but don't pass the chat icon
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden" ref={containerRef}>
-      <div className="w-full h-full overflow-hidden">
+    <div className="embedded-chat-container w-full h-screen flex flex-col" ref={containerRef}>
+      <div className="w-full h-full">
         <ChatSection 
           agentId={agentId} // Pass agentId as prop
           initialMessages={[{

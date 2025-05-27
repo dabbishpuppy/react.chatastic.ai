@@ -41,13 +41,18 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formKey, setFormKey] = useState(0); // Force re-render when settings change
 
-  // React to settings changes by forcing form re-render and clearing data
+  // Enhanced reactivity to settings changes
   useEffect(() => {
-    console.log('📋 Lead form settings changed:', {
+    console.log('📋 Lead form settings changed (ENHANCED):', {
       collectName,
       collectEmail,
       collectPhone,
-      title
+      title,
+      placeholders: {
+        name: namePlaceholder,
+        email: emailPlaceholder,
+        phone: phonePlaceholder
+      }
     });
     
     // Clear form data when field visibility changes
@@ -57,9 +62,9 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
       phone: collectPhone ? prev.phone : ''
     }));
     
-    // Force re-render to ensure UI updates
+    // Force re-render to ensure UI updates immediately
     setFormKey(prev => prev + 1);
-  }, [collectName, collectEmail, collectPhone, title]);
+  }, [collectName, collectEmail, collectPhone, title, namePlaceholder, emailPlaceholder, phonePlaceholder]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -110,6 +115,8 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
         phone: collectPhone ? formData.phone || null : null
       };
 
+      console.log('📋 Submitting lead data:', leadData);
+
       const { error } = await supabase
         .from('leads')
         .insert([leadData]);
@@ -156,11 +163,13 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
     return null;
   }
 
-  console.log('📋 Rendering lead form with fields:', {
+  console.log('📋 Rendering lead form with fields (ENHANCED):', {
     collectName,
     collectEmail,
     collectPhone,
-    hasAnyFields
+    hasAnyFields,
+    formKey,
+    title
   });
 
   return (

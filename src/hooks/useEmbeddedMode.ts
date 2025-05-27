@@ -39,10 +39,11 @@ export const useEmbeddedMode = (
   useEffect(() => {
     if (isEmbedded && window.self !== window.top) {
       const handleMessage = (event: MessageEvent) => {
-        console.log('Received message from parent:', event.data);
+        console.log('📨 useEmbeddedMode received message from parent:', event.data);
         
+        // Handle rate limit messages
         if (event.data?.type === 'message-allowed') {
-          console.log('Message allowed by parent');
+          console.log('✅ Message allowed by parent');
           
           // Clear timeout since parent responded
           if (timeoutRef.current) {
@@ -59,7 +60,7 @@ export const useEmbeddedMode = (
           }
           pendingMessageRef.current = null;
         } else if (event.data?.type === 'rate-limit-error') {
-          console.log('Rate limit error from parent:', event.data);
+          console.log('❌ Rate limit error from parent:', event.data);
           
           // Clear timeout since parent responded
           if (timeoutRef.current) {
@@ -75,6 +76,12 @@ export const useEmbeddedMode = (
           }
           
           pendingMessageRef.current = null;
+        }
+        
+        // Handle settings refresh messages
+        else if (event.data?.type === 'lead-settings-updated' || event.data?.type === 'wonderwave-refresh-settings') {
+          console.log('🔄 Settings refresh message received in useEmbeddedMode:', event.data);
+          // These are handled by ChatSection, just log for debugging
         }
       };
 
@@ -98,17 +105,17 @@ export const useEmbeddedMode = (
 
   // Function to send message to parent and set up timeout with local rate limiting
   const sendMessageToParent = async (messageContent: string, agentId?: string) => {
-    console.log('sendMessageToParent called with:', messageContent);
+    console.log('📤 sendMessageToParent called with:', messageContent);
     
     if (!isEmbedded || window.self === window.top) {
       // Not in iframe, check rate limit locally and proceed
-      console.log('Not in iframe, checking rate limit locally');
+      console.log('🏠 Not in iframe, checking rate limit locally');
       
       if (agentId) {
         const rateLimitStatus = await checkRateLimit(agentId);
         
         if (rateLimitStatus.exceeded) {
-          console.log('Rate limit exceeded locally');
+          console.log('⏰ Rate limit exceeded locally');
           setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
           if (rateLimitStatus.timeUntilReset) {
             startCountdown(rateLimitStatus.timeUntilReset);
@@ -124,7 +131,7 @@ export const useEmbeddedMode = (
       return;
     }
 
-    console.log('Sending message to parent for rate limit check:', messageContent);
+    console.log('📡 Sending message to parent for rate limit check:', messageContent);
     
     // Store the message for fallback
     pendingMessageRef.current = messageContent;
@@ -146,7 +153,7 @@ export const useEmbeddedMode = (
     }
     
     timeoutRef.current = setTimeout(() => {
-      console.log('Parent window did not respond to rate limit check within 3 seconds, proceeding with message');
+      console.log('⏱️ Parent window did not respond to rate limit check within 3 seconds, proceeding with message');
       setIsWaitingForRateLimit(false);
       setRateLimitError(null);
       

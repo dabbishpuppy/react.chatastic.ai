@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./chat/ChatHeader";
@@ -63,31 +64,35 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   // Load lead settings with refresh capability
   const { settings: leadSettings, refreshSettings } = useLeadSettings(agentId || '');
   
-  // Enhanced refresh logic for embedded mode with faster polling
+  // Enhanced refresh logic for embedded mode with immediate updates
   useEffect(() => {
     if (isEmbedded && agentId) {
-      // Faster refresh interval for embedded mode (2 seconds instead of 5)
-      const interval = setInterval(() => {
-        console.log('🔄 Refreshing lead settings for embedded mode');
-        refreshSettings();
-      }, 2000);
+      console.log('🔄 Setting up enhanced settings refresh for embedded mode');
       
-      // Listen for settings update messages with enhanced logging
+      // Immediate refresh on mount
+      refreshSettings();
+      
+      // Faster refresh interval for embedded mode (1 second instead of 2)
+      const interval = setInterval(() => {
+        console.log('⏰ Periodic settings refresh for embedded mode');
+        refreshSettings();
+      }, 1000);
+      
+      // Listen for settings update messages with immediate response
       const handleMessage = (event: MessageEvent) => {
         console.log('📨 Received message in ChatSection:', event.data);
         
-        if (event.data && event.data.type === 'lead-settings-updated' && event.data.agentId === agentId) {
-          console.log('📋 Received lead settings update message, refreshing immediately...');
+        if (event.data && (
+          event.data.type === 'lead-settings-updated' || 
+          event.data.type === 'wonderwave-refresh-settings'
+        ) && event.data.agentId === agentId) {
+          console.log('📋 Received lead settings update message, triggering immediate refresh...');
           
-          // Immediate refresh on settings update
-          setTimeout(() => {
-            refreshSettings();
-          }, 100); // Very fast refresh
-          
-          // Also trigger a second refresh after a brief delay for good measure
-          setTimeout(() => {
-            refreshSettings();
-          }, 1000);
+          // Multiple immediate refreshes to ensure update
+          refreshSettings();
+          setTimeout(() => refreshSettings(), 100);
+          setTimeout(() => refreshSettings(), 500);
+          setTimeout(() => refreshSettings(), 1000);
         }
       };
       
@@ -155,7 +160,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       userHasMessaged,
       chatHistoryLength: chatHistory.length,
       isTyping,
-      title: leadSettings?.title
+      title: leadSettings?.title,
+      leadSettingsObject: leadSettings
     });
   }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
@@ -173,8 +179,8 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     }
 
     // Count user messages and AI responses
-    const userMessages = chatHistory.filter(msg => !msg.isAgent);
-    const aiMessages = chatHistory.filter(msg => msg.isAgent);
+    const userMessages = chatHistory.filter(msg => !msg.isAgent && msg.content !== "LEAD_FORM_WIDGET");
+    const aiMessages = chatHistory.filter(msg => msg.isAgent && msg.content !== "LEAD_FORM_WIDGET");
     
     console.log('🚀 LEAD FORM TRIGGER CHECK:', {
       userMessagesCount: userMessages.length,
