@@ -50,30 +50,30 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         {message.content}
       </div>
       
-      {/* Message actions for agent messages - reverted to simple emoji buttons */}
+      {/* Message actions for agent messages - grey flag icons under AI response */}
       {message.isAgent && showFeedback && (
-        <div className="flex items-center space-x-2 mt-2">
+        <div className="flex items-center space-x-3 mt-1 text-xs text-gray-400">
           <button
             onClick={() => onFeedback(message.timestamp, "like")}
-            className={`text-xs hover:text-gray-700 ${
-              message.feedback === "like" ? "text-green-600" : "text-gray-500"
+            className={`hover:text-gray-600 transition-colors ${
+              message.feedback === "like" ? "text-green-600" : ""
             }`}
           >
-            👍
+            🚩
           </button>
           <button
             onClick={() => onFeedback(message.timestamp, "dislike")}
-            className={`text-xs hover:text-gray-700 ${
-              message.feedback === "dislike" ? "text-red-600" : "text-gray-500"
+            className={`hover:text-gray-600 transition-colors ${
+              message.feedback === "dislike" ? "text-red-600" : ""
             }`}
           >
-            👎
+            🚩
           </button>
           <button
             onClick={() => onCopy(message.content)}
-            className="text-xs text-gray-500 hover:text-gray-700"
+            className="hover:text-gray-600 transition-colors"
           >
-            Copy
+            📋
           </button>
         </div>
       )}

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -53,7 +52,7 @@ export const useLeadSettings = (agentId: string) => {
           enabled: true, // Changed from false to true
           title: 'Get in touch with us',
           collect_name: true,
-          name_placeholder: 'Name', // Changed from 'Full name' to 'Name'
+          name_placeholder: 'Name', // Keep as 'Name' not 'Full name'
           collect_email: true,
           email_placeholder: 'Email',
           collect_phone: false,
