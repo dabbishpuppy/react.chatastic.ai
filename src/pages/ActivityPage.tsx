@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
@@ -6,7 +5,7 @@ import ConversationView from "@/components/agent/ConversationView";
 import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
 import { getChatSettings } from "@/services/chatSettingsService";
 import { Conversation as UIConversation } from "@/components/activity/ConversationData";
-import { ChatInterfaceSettings } from "@/types/chatInterface";
+import { ChatInterfaceSettings, SuggestedMessage } from "@/types/chatInterface";
 import { useParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "@/hooks/use-toast";
@@ -49,7 +48,24 @@ const ActivityPage: React.FC = () => {
     
     try {
       const settings = await getChatSettings(agentId);
-      setChatSettings(settings);
+      if (settings) {
+        // Ensure proper typing for the settings
+        const typedSettings: ChatInterfaceSettings = {
+          ...settings,
+          theme: (settings.theme === 'light' || settings.theme === 'dark' || settings.theme === 'system') 
+            ? settings.theme 
+            : 'light',
+          bubble_position: (settings.bubble_position === 'left' || settings.bubble_position === 'right')
+            ? settings.bubble_position
+            : 'right',
+          suggested_messages: Array.isArray(settings.suggested_messages) 
+            ? settings.suggested_messages as SuggestedMessage[]
+            : (typeof settings.suggested_messages === 'string' 
+               ? JSON.parse(settings.suggested_messages) 
+               : [])
+        };
+        setChatSettings(typedSettings);
+      }
     } catch (error) {
       console.error('Error loading chat settings:', error);
     }

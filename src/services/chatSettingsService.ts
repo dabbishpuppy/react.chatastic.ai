@@ -53,9 +53,16 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings) => {
         console.log('Update failed, attempting insert:', updateError.message);
       } else if (updateData) {
         console.log('✅ Settings updated successfully:', updateData);
+        // Parse suggested_messages back to array and ensure proper typing
+        const parsedMessages = updateData.suggested_messages 
+          ? (typeof updateData.suggested_messages === 'string' 
+             ? JSON.parse(updateData.suggested_messages) 
+             : updateData.suggested_messages)
+          : [];
+        
         return {
           ...updateData,
-          suggested_messages: JSON.parse(updateData.suggested_messages || '[]')
+          suggested_messages: Array.isArray(parsedMessages) ? parsedMessages : []
         };
       }
     }
@@ -73,9 +80,16 @@ export const saveChatSettings = async (settings: ChatInterfaceSettings) => {
     }
 
     console.log('✅ Settings inserted successfully:', insertData);
+    // Parse suggested_messages back to array and ensure proper typing
+    const parsedMessages = insertData.suggested_messages 
+      ? (typeof insertData.suggested_messages === 'string' 
+         ? JSON.parse(insertData.suggested_messages) 
+         : insertData.suggested_messages)
+      : [];
+    
     return {
       ...insertData,
-      suggested_messages: JSON.parse(insertData.suggested_messages || '[]')
+      suggested_messages: Array.isArray(parsedMessages) ? parsedMessages : []
     };
   } catch (error) {
     console.error('❌ Unexpected error saving chat settings:', error);
