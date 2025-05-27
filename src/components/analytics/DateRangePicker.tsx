@@ -12,6 +12,8 @@ interface DateRangePickerProps {
   onClear: () => void;
 }
 
+type SelectionMode = 'start' | 'end' | 'complete';
+
 const DateRangePicker: React.FC<DateRangePickerProps> = ({ 
   startDate, 
   endDate, 
@@ -19,6 +21,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onClear 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<SelectionMode>('start');
   const [selectedRange, setSelectedRange] = useState<{
     from: Date | undefined;
     to: Date | undefined;
@@ -65,6 +68,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const handlePresetClick = (preset: typeof presetRanges[0]) => {
     const range = preset.range();
     setSelectedRange(range);
+    setSelectionMode('complete');
     onDateRangeChange(
       format(range.from!, 'yyyy-MM-dd'),
       format(range.to!, 'yyyy-MM-dd')
@@ -73,33 +77,65 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
   };
 
   const handleCalendarSelect = (range: { from: Date | undefined; to: Date | undefined } | undefined) => {
-    console.log('Calendar select:', range);
+    console.log('Calendar select:', range, 'Current mode:', selectionMode);
     
-    if (!range) return;
+    if (!range || !range.from) {
+      // Reset if no valid selection
+      setSelectedRange({ from: undefined, to: undefined });
+      setSelectionMode('start');
+      return;
+    }
     
     // Update the selected range for visual feedback
     setSelectedRange(range);
     
-    // Only close and apply filter when BOTH dates are selected
-    if (range.from && range.to) {
+    if (selectionMode === 'start' || !selectedRange.from) {
+      // First click: selecting start date
+      console.log('Setting start date, keeping picker open');
+      setSelectionMode('end');
+      // Do NOT close the picker or apply filter yet
+    } else if (selectionMode === 'end' && range.to) {
+      // Second click: selecting end date - complete the selection
       console.log('Both dates selected, applying filter and closing picker');
+      setSelectionMode('complete');
       onDateRangeChange(
         format(range.from, 'yyyy-MM-dd'),
         format(range.to, 'yyyy-MM-dd')
       );
       setIsOpen(false);
-    } else if (range.from && !range.to) {
-      console.log('Only from date selected, keeping picker open');
-      // Keep picker open when only "from" date is selected
+    } else if (selectionMode === 'end' && !range.to) {
+      // User clicked a new start date while in end mode - restart selection
+      console.log('New start date selected, resetting to end mode');
+      setSelectionMode('end');
     }
+  };
+
+  const handlePopoverOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      // Reset selection mode when opening
+      setSelectionMode(selectedRange.from && selectedRange.to ? 'complete' : 'start');
+    }
+  };
+
+  const handleClear = () => {
+    onClear();
+    setSelectedRange({ from: undefined, to: undefined });
+    setSelectionMode('start');
   };
 
   const displayText = startDate && endDate 
     ? `${startDate} ~ ${endDate}`
     : "Select date range";
 
+  const getSelectionHint = () => {
+    if (selectionMode === 'start') return "Select start date";
+    if (selectionMode === 'end') return "Select end date";
+    return "";
+  };
+
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handlePopoverOpenChange}>
       <PopoverTrigger asChild>
         <Button 
           variant="outline" 
@@ -114,8 +150,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
               className="h-4 w-4 text-muted-foreground cursor-pointer" 
               onClick={(e) => {
                 e.stopPropagation();
-                onClear();
-                setSelectedRange({ from: undefined, to: undefined });
+                handleClear();
               }}
             />
           )}
@@ -141,6 +176,11 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
           
           {/* Calendar */}
           <div className="p-3">
+            {selectionMode !== 'complete' && (
+              <div className="text-xs text-gray-500 mb-2 text-center">
+                {getSelectionHint()}
+              </div>
+            )}
             <Calendar
               mode="range"
               defaultMonth={selectedRange?.from}
