@@ -19,16 +19,20 @@ const LeadsSettings: React.FC = () => {
     );
   }
 
-  const handleSave = () => {
-    saveSettings(settings);
-  };
-
   const handleReset = (field: string, defaultValue: any) => {
     saveSettings({ [field]: defaultValue });
   };
 
-  const updateField = (field: string, value: any) => {
-    saveSettings({ [field]: value });
+  const updateField = async (field: string, value: any) => {
+    const success = await saveSettings({ [field]: value });
+    if (success) {
+      console.log(`✅ Lead setting updated: ${field} = ${value}`);
+      // Force a small delay to ensure database is updated before embedded widgets refresh
+      setTimeout(() => {
+        // Send message to any embedded widgets to refresh their settings
+        window.postMessage({ type: 'lead-settings-updated', agentId }, '*');
+      }, 500);
+    }
   };
 
   return (
@@ -149,38 +153,40 @@ const LeadsSettings: React.FC = () => {
                 )}
               </div>
               
-              <div className="flex items-center justify-between">
-                <div>
-                  <label htmlFor="collectPhone" className="text-sm font-medium">
-                    Phone
-                  </label>
-                </div>
-                <Switch
-                  id="collectPhone"
-                  checked={settings.collect_phone}
-                  onCheckedChange={(checked) => updateField('collect_phone', checked)}
-                />
-              </div>
-
-              {settings.collect_phone && (
-                <div className="pl-6">
-                  <Input
-                    value={settings.phone_placeholder}
-                    onChange={(e) => updateField('phone_placeholder', e.target.value)}
-                    placeholder="Phone placeholder"
-                    className="max-w-md"
-                  />
-                  <div className="mt-2 flex justify-end">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleReset('phone_placeholder', 'Phone')}
-                    >
-                      Reset
-                    </Button>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label htmlFor="collectPhone" className="text-sm font-medium">
+                      Phone
+                    </label>
                   </div>
+                  <Switch
+                    id="collectPhone"
+                    checked={settings.collect_phone}
+                    onCheckedChange={(checked) => updateField('collect_phone', checked)}
+                  />
                 </div>
-              )}
+
+                {settings.collect_phone && (
+                  <div className="pl-6">
+                    <Input
+                      value={settings.phone_placeholder}
+                      onChange={(e) => updateField('phone_placeholder', e.target.value)}
+                      placeholder="Phone placeholder"
+                      className="max-w-md"
+                    />
+                    <div className="mt-2 flex justify-end">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleReset('phone_placeholder', 'Phone')}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </CardContent>

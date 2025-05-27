@@ -5,7 +5,6 @@ import ChatHeader from "./chat/ChatHeader";
 import ChatMainContent from "./chat/ChatMainContent";
 import ChatFooter from "./chat/ChatFooter";
 import ChatContainer from "./chat/ChatContainer";
-import LeadFormWidget from "./chat/LeadFormWidget";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { useChatHandlers } from "@/hooks/useChatHandlers";
@@ -62,8 +61,19 @@ const ChatSection: React.FC<ChatSectionProps> = ({
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
   
-  // Load lead settings
-  const { settings: leadSettings } = useLeadSettings(agentId || '');
+  // Load lead settings with refresh capability
+  const { settings: leadSettings, refreshSettings } = useLeadSettings(agentId || '');
+  
+  // Add effect to refresh lead settings periodically for embedded mode
+  useEffect(() => {
+    if (isEmbedded && agentId) {
+      const interval = setInterval(() => {
+        refreshSettings();
+      }, 10000); // Refresh every 10 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [isEmbedded, agentId, refreshSettings]);
   
   // Conversation management
   const {
@@ -121,7 +131,7 @@ const ChatSection: React.FC<ChatSectionProps> = ({
     });
   }, [agentId, isEmbedded, leadSettings, hasShownLeadForm, userHasMessaged, chatHistory.length, isTyping]);
 
-  // Enhanced lead form trigger logic
+  // Enhanced lead form trigger logic - integrate into chat instead of popup
   useEffect(() => {
     if (!isEmbedded || !leadSettings?.enabled || hasShownLeadForm || !userHasMessaged || isTyping) {
       return;
@@ -139,15 +149,23 @@ const ChatSection: React.FC<ChatSectionProps> = ({
 
     // Show lead form after first user message AND first AI response
     if (userMessages.length >= 1 && aiMessages.length >= 1) {
-      console.log('✅ TRIGGERING LEAD FORM NOW');
+      console.log('✅ TRIGGERING LEAD FORM NOW - Adding to chat');
       const timer = setTimeout(() => {
-        setShowLeadForm(true);
-        console.log('📋 LEAD FORM DISPLAYED');
+        // Add lead form message to chat history instead of showing popup
+        const leadFormMessage: ChatMessage = {
+          isAgent: true,
+          content: "LEAD_FORM_WIDGET",
+          timestamp: new Date().toISOString()
+        };
+        
+        setChatHistory(prev => [...prev, leadFormMessage]);
+        setHasShownLeadForm(true);
+        console.log('📋 LEAD FORM ADDED TO CHAT');
       }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory, isTyping]);
+  }, [isEmbedded, leadSettings?.enabled, hasShownLeadForm, userHasMessaged, chatHistory, isTyping, setChatHistory]);
 
   // Enhanced message submission with proper conversation and lead form management
   const handleSubmitWithConversation = async (e: React.FormEvent) => {
@@ -193,18 +211,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
       setChatHistory(messages);
       setDisplayMessages(messages);
     }
-  };
-
-  const handleLeadFormSubmit = () => {
-    console.log('📋 Lead form submitted');
-    setShowLeadForm(false);
-    setHasShownLeadForm(true);
-  };
-
-  const handleLeadFormClose = () => {
-    console.log('❌ Lead form closed');
-    setShowLeadForm(false);
-    setHasShownLeadForm(true);
   };
 
   // Cleanup on unmount
@@ -277,6 +283,15 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         themeClasses={themeClasses}
         userMessageStyle={userMessageStyle}
         messagesEndRef={messagesEndRef}
+        leadSettings={leadSettings}
+        agentId={agentId || ''}
+        conversationId={currentConversation?.id}
+        theme={resolvedTheme}
+        onLeadFormSubmit={() => {
+          console.log('📋 Lead form submitted from chat integration');
+          // Remove the lead form message from chat
+          setChatHistory(prev => prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET"));
+        }}
       />
 
       {/* Fixed footer section */}
@@ -303,24 +318,6 @@ const ChatSection: React.FC<ChatSectionProps> = ({
         isConversationEnded={conversationEnded}
         onStartNewChat={handleStartNewChat}
       />
-
-      {/* Lead Form Widget */}
-      {showLeadForm && leadSettings && (
-        <LeadFormWidget
-          agentId={agentId || ''}
-          conversationId={currentConversation?.id}
-          title={leadSettings.title}
-          collectName={leadSettings.collect_name}
-          namePlaceholder={leadSettings.name_placeholder}
-          collectEmail={leadSettings.collect_email}
-          emailPlaceholder={leadSettings.email_placeholder}
-          collectPhone={leadSettings.collect_phone}
-          phonePlaceholder={leadSettings.phone_placeholder}
-          onSubmit={handleLeadFormSubmit}
-          onClose={handleLeadFormClose}
-          theme={resolvedTheme}
-        />
-      )}
     </ChatContainer>
   );
 };
