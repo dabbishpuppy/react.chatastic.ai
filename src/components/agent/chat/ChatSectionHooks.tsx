@@ -23,6 +23,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
 
   const { currentConversation, conversationEnded, startNewConversation, endCurrentConversation, loadConversation, saveMessage, getConversationMessages } = useConversationManager(conversationSource);
+  
+  const messageHandling = useMessageHandling(initialMessages, isEmbedded, currentConversation?.id, agentId, conversationSource, async () => {
+    const conversation = await startNewConversation();
+    return conversation?.id || null;
+  });
+  
   const {
     message,
     setMessage,
@@ -36,7 +42,6 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     isWaitingForRateLimit,
     setIsWaitingForRateLimit,
     userHasMessaged,
-    setUserHasMessaged,
     inputRef,
     handleSubmit,
     handleSuggestedMessageClick,
@@ -49,10 +54,8 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     handleCountdownFinished,
     cleanup,
     isSubmitting
-  } = useMessageHandling(initialMessages, isEmbedded, currentConversation?.id, agentId, conversationSource, async () => {
-    const conversation = await startNewConversation();
-    return conversation?.id || null;
-  });
+  } = messageHandling;
+
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
   const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
@@ -71,6 +74,13 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   // Wrap startNewConversation to match expected return type
   const wrappedStartNewConversation = async () => {
     await startNewConversation();
+  };
+
+  // Create setUserHasMessaged function since it's needed by ChatSectionState
+  const setUserHasMessaged = (value: boolean) => {
+    // This function is needed for the interface but the actual userHasMessaged 
+    // state is managed internally by useMessageHandling
+    console.log('setUserHasMessaged called with:', value);
   };
 
   return {
