@@ -13,6 +13,12 @@ export const useChatMessageHandlers = (
 ) => {
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
   const [isUpdatingFeedback, setIsUpdatingFeedback] = useState(false);
+  const [localFeedback, setLocalFeedback] = useState<'like' | 'dislike' | undefined>(messageFeedback);
+
+  // Update local feedback when prop changes (for real-time sync)
+  useState(() => {
+    setLocalFeedback(messageFeedback);
+  }, [messageFeedback]);
 
   const handleCopy = async (content: string) => {
     if (readOnly) return;
@@ -59,15 +65,15 @@ export const useChatMessageHandlers = (
         messageId, 
         messageTimestamp, 
         type, 
-        messageFeedback,
+        messageFeedback: localFeedback,
         hasMessageId: !!messageId,
         messageIdType: typeof messageId
       });
       
       // Determine new feedback value (toggle if same, set if different)
-      const newFeedback = messageFeedback === type ? null : type;
+      const newFeedback = localFeedback === type ? null : type;
       
-      // If we have a messageId, save to database directly and skip the onFeedback callback
+      // If we have a messageId, save to database directly and update local state
       if (messageId && messageId !== 'initial-message') {
         console.log('💾 useChatMessageHandlers - Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
         
@@ -75,7 +81,10 @@ export const useChatMessageHandlers = (
         
         if (success) {
           console.log('✅ useChatMessageHandlers - Feedback saved to database successfully');
-          // DON'T call onFeedback here - it would trigger messageFeedbackUtils and cause double-save
+          
+          // Update local state immediately for UI responsiveness
+          setLocalFeedback(newFeedback as 'like' | 'dislike' | undefined);
+          
           toast({
             description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
             duration: 2000,
@@ -91,6 +100,10 @@ export const useChatMessageHandlers = (
       } else {
         // No messageId available, use local state only via onFeedback callback
         console.log('⚠️ useChatMessageHandlers - No messageId provided, updating local state only. MessageId:', messageId);
+        
+        // Update local state
+        setLocalFeedback(newFeedback as 'like' | 'dislike' | undefined);
+        
         if (onFeedback) {
           onFeedback(messageTimestamp, type);
         }
@@ -115,6 +128,7 @@ export const useChatMessageHandlers = (
     showCopiedTooltip,
     isUpdatingFeedback,
     handleCopy,
-    handleFeedback
+    handleFeedback,
+    currentFeedback: localFeedback // Return the local feedback state
   };
 };

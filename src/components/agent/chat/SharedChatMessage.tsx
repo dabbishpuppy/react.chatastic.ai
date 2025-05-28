@@ -54,7 +54,8 @@ const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
     showCopiedTooltip,
     isUpdatingFeedback,
     handleCopy,
-    handleFeedback
+    handleFeedback,
+    currentFeedback
   } = useChatMessageHandlers(
     message.id,
     message.timestamp,
@@ -67,7 +68,10 @@ const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
   return (
     <MessageContainer isAgent={isAgent}>
       <MessageLayout
-        message={message}
+        message={{
+          ...message,
+          feedback: currentFeedback // Use the local feedback state for immediate UI updates
+        }}
         agentName={agentName}
         profilePicture={profilePicture}
         hideUserAvatar={hideUserAvatar}
