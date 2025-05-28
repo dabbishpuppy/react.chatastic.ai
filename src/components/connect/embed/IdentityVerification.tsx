@@ -1,13 +1,14 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface IdentityVerificationProps {
   agentId?: string;
 }
 
 export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ agentId }) => {
+  const { toast } = useToast();
+
   const handleCopyVerification = () => {
     const verificationCode = document.querySelector(".verification-code code")?.textContent;
     if (verificationCode) {
