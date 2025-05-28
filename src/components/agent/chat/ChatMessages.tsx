@@ -45,25 +45,30 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 
   return (
     <>
-      {chatHistory.map((msg, idx) => (
-        <ChatMessageComponent
-          key={idx}
-          message={msg}
-          agentName={agentName}
-          profilePicture={profilePicture}
-          showFeedback={showFeedback}
-          hideUserAvatar={hideUserAvatar}
-          onFeedback={onFeedback}
-          onCopy={onCopy}
-          onRegenerate={onRegenerate}
-          allowRegenerate={allowRegenerate}
-          agentBubbleClass={agentBubbleClass}
-          userBubbleClass={userBubbleClass}
-          userMessageStyle={userMessageStyle}
-          isInitialMessage={idx === 0 && msg.isAgent}
-          isLastAgentMessage={idx === lastAgentMessageIndex}
-        />
-      ))}
+      {chatHistory.map((msg, idx) => {
+        // Detect if this is the initial message - use same logic as ConversationMessages.tsx
+        const isInitialMessage = (idx === 0 && msg.isAgent) || msg.id === 'initial-message';
+        
+        return (
+          <ChatMessageComponent
+            key={idx}
+            message={msg}
+            agentName={agentName}
+            profilePicture={profilePicture}
+            showFeedback={showFeedback}
+            hideUserAvatar={hideUserAvatar}
+            onFeedback={onFeedback}
+            onCopy={onCopy}
+            onRegenerate={onRegenerate}
+            allowRegenerate={allowRegenerate}
+            agentBubbleClass={agentBubbleClass}
+            userBubbleClass={userBubbleClass}
+            userMessageStyle={userMessageStyle}
+            isInitialMessage={isInitialMessage}
+            isLastAgentMessage={idx === lastAgentMessageIndex}
+          />
+        );
+      })}
       
       {isTyping && (
         <div className="flex mb-4">
