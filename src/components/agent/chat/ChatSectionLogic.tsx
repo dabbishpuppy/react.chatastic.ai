@@ -1,219 +1,124 @@
 
 import React from "react";
-import ChatHeader from "./ChatHeader";
-import ChatMainContent from "./ChatMainContent";
-import ChatFooter from "./ChatFooter";
-import ChatContainer from "./ChatContainer";
+import ChatLayout from "./ChatLayout";
 import { ChatSectionProps } from "./ChatSectionProps";
-import { useChatSectionHooks } from "./ChatSectionHooks";
-import { useChatSectionEffects } from "./ChatSectionEffects";
-import { useChatSectionHandlers } from "./ChatSectionHandlers";
-import { getChatSectionHelpers } from "./ChatSectionHelpers";
+import { useChatDataPreparation } from "@/hooks/useChatDataPreparation";
 
 const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
   const {
-    agentName = "AI Customer Service",
-    placeholder = "Write message here...",
-    suggestedMessages = [],
-    showSuggestions = true,
-    showFeedback = true,
-    allowRegenerate = true,
-    theme = 'light',
+    // Props
+    agentName,
+    placeholder,
+    suggestedMessages,
+    showFeedback,
+    allowRegenerate,
     profilePicture,
     chatIcon,
     footer,
-    footerClassName = "",
-    userMessageColor = null,
-    headerColor = null,
-    hideUserAvatar = false,
-    toggleSettings
-  } = props;
+    footerClassName,
+    hideUserAvatar,
+    toggleSettings,
 
-  const hooks = useChatSectionHooks(props);
-  
-  const {
+    // Hook data
     agentId,
-    displayMessages,
-    setDisplayMessages,
-    hasShownLeadForm,
-    setHasShownLeadForm,
-    effectiveLeadSettings,
-    refreshSettings,
-    currentConversation,
-    conversationEnded,
-    startNewConversation,
-    endCurrentConversation,
-    loadConversation,
-    getConversationMessages,
-    message,
-    setMessage,
     chatHistory,
-    setChatHistory,
     isTyping,
     rateLimitError,
     timeUntilReset,
-    userHasMessaged,
+    message,
+    setMessage,
     inputRef,
     copyMessageToClipboard,
     handleFeedback,
     insertEmoji,
     handleCountdownFinished,
-    cleanup,
     isSubmitting,
     messagesEndRef,
     chatContainerRef,
-    scrollToBottom,
-    handleSubmitWithAgentId,
-    handleSuggestedMessageClickWithAgentId,
-    handleRegenerateWithAgentId
-  } = hooks;
+    effectiveLeadSettings,
+    currentConversation,
+    conversationEnded,
 
-  // Wrap startNewConversation to match expected return type
-  const wrappedStartNewConversation = async () => {
-    await startNewConversation();
-  };
-
-  const {
+    // Handlers
     handleSubmitWithConversation,
     handleStartNewChat,
     handleEndChat,
-    handleLoadConversation
-  } = useChatSectionHandlers(
-    currentConversation,
-    props.conversationSource || 'iframe',
-    agentId,
-    props.isEmbedded || false,
-    message,
-    isTyping,
-    rateLimitError,
-    isSubmitting,
-    wrappedStartNewConversation,
-    handleSubmitWithAgentId,
-    setChatHistory,
-    setHasShownLeadForm,
-    endCurrentConversation,
-    loadConversation,
-    getConversationMessages,
-    setDisplayMessages,
-    props.initialMessages || []
-  );
+    handleLoadConversation,
+    handleRegenerateWithAgentId,
+    handleSuggestedMessageClickWithAgentId,
 
-  // Apply all effects
-  useChatSectionEffects(
-    props.isEmbedded || false,
-    agentId,
-    props.leadSettings,
-    refreshSettings,
-    effectiveLeadSettings,
-    hasShownLeadForm,
-    userHasMessaged,
-    chatHistory,
-    isTyping,
-    setChatHistory,
-    setHasShownLeadForm,
-    scrollToBottom,
-    currentConversation,
-    setDisplayMessages,
-    props.initialMessages || [],
-    cleanup
-  );
-
-  // Get computed values and styles
-  const {
+    // Computed values
     themeClasses,
     shouldShowSuggestions,
     userMessageStyle,
     isInputDisabled,
     resolvedTheme
-  } = getChatSectionHelpers(
-    theme,
-    suggestedMessages,
-    userHasMessaged,
-    showSuggestions,
-    userMessageColor,
-    isTyping,
-    rateLimitError,
-    isSubmitting
-  );
+  } = useChatDataPreparation(props);
 
   return (
-    <ChatContainer
+    <ChatLayout
+      // Header props
+      agentName={agentName}
+      profilePicture={profilePicture}
+      allowRegenerate={allowRegenerate}
+      toggleSettings={toggleSettings}
+      onRegenerate={() => handleRegenerateWithAgentId(allowRegenerate)}
+      headerColor={props.headerColor}
+      backgroundColor={themeClasses.background}
+      iconButtonClass={themeClasses.iconButton}
+      onStartNewChat={handleStartNewChat}
+      onEndChat={handleEndChat}
+      onLoadConversation={handleLoadConversation}
+      agentId={agentId || ''}
+      isConversationEnded={conversationEnded}
       isEmbedded={props.isEmbedded || false}
+
+      // Main content props
+      chatHistory={chatHistory}
+      isTyping={isTyping}
+      showFeedback={showFeedback}
+      hideUserAvatar={hideUserAvatar}
+      onFeedback={handleFeedback}
+      onCopy={copyMessageToClipboard}
       themeClasses={themeClasses}
+      userMessageStyle={userMessageStyle}
+      messagesEndRef={messagesEndRef}
+      leadSettings={effectiveLeadSettings}
+      conversationId={currentConversation?.id}
+      theme={resolvedTheme}
+      onLeadFormSubmit={() => {
+        console.log('📋 Lead form submitted from chat integration');
+        // Remove the lead form message from chat and add any new messages that were pending
+        setMessage(prev => {
+          const filteredHistory = prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
+          console.log('📋 Chat history after lead form removal:', filteredHistory);
+          return filteredHistory;
+        });
+      }}
+
+      // Footer props
+      rateLimitError={rateLimitError}
+      timeUntilReset={timeUntilReset}
+      onCountdownFinished={handleCountdownFinished}
+      shouldShowSuggestions={shouldShowSuggestions}
+      suggestedMessages={suggestedMessages}
+      handleSuggestedMessageClick={handleSuggestedMessageClickWithAgentId}
+      isInputDisabled={isInputDisabled}
+      theme={props.theme || 'light'}
+      message={message}
+      setMessage={setMessage}
+      onSubmit={handleSubmitWithConversation}
+      placeholder={placeholder}
+      inputRef={inputRef}
+      chatIcon={chatIcon}
+      footer={footer}
+      footerClassName={footerClassName}
+      onEmojiInsert={insertEmoji}
+      isSubmitting={isSubmitting}
+
+      // Container props
       chatContainerRef={chatContainerRef}
-    >
-      {/* Chat Header */}
-      <ChatHeader
-        agentName={agentName}
-        profilePicture={profilePicture}
-        allowRegenerate={allowRegenerate}
-        toggleSettings={toggleSettings}
-        onRegenerate={() => handleRegenerateWithAgentId(allowRegenerate)}
-        headerColor={headerColor}
-        backgroundColor={themeClasses.background}
-        iconButtonClass={themeClasses.iconButton}
-        onStartNewChat={handleStartNewChat}
-        onEndChat={handleEndChat}
-        onLoadConversation={handleLoadConversation}
-        agentId={agentId || ''}
-        isConversationEnded={conversationEnded}
-        isEmbedded={props.isEmbedded || false}
-      />
-
-      {/* Chat Messages - Scrollable area */}
-      <ChatMainContent
-        chatHistory={chatHistory}
-        isTyping={isTyping}
-        agentName={agentName}
-        profilePicture={profilePicture}
-        showFeedback={showFeedback}
-        hideUserAvatar={hideUserAvatar}
-        onFeedback={handleFeedback}
-        onCopy={copyMessageToClipboard}
-        themeClasses={themeClasses}
-        userMessageStyle={userMessageStyle}
-        messagesEndRef={messagesEndRef}
-        leadSettings={effectiveLeadSettings}
-        agentId={agentId || ''}
-        conversationId={currentConversation?.id}
-        theme={resolvedTheme}
-        onLeadFormSubmit={() => {
-          console.log('📋 Lead form submitted from chat integration');
-          // Remove the lead form message from chat and add any new messages that were pending
-          setChatHistory(prev => {
-            const filteredHistory = prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
-            console.log('📋 Chat history after lead form removal:', filteredHistory);
-            return filteredHistory;
-          });
-        }}
-      />
-
-      {/* Fixed footer section */}
-      <ChatFooter
-        rateLimitError={rateLimitError}
-        timeUntilReset={timeUntilReset}
-        onCountdownFinished={handleCountdownFinished}
-        shouldShowSuggestions={shouldShowSuggestions}
-        suggestedMessages={suggestedMessages}
-        handleSuggestedMessageClick={handleSuggestedMessageClickWithAgentId}
-        isInputDisabled={isInputDisabled}
-        theme={theme}
-        themeClasses={themeClasses}
-        message={message}
-        setMessage={setMessage}
-        onSubmit={handleSubmitWithConversation}
-        placeholder={placeholder}
-        inputRef={inputRef}
-        chatIcon={chatIcon}
-        isEmbedded={props.isEmbedded || false}
-        footer={footer}
-        footerClassName={footerClassName}
-        onEmojiInsert={insertEmoji}
-        isConversationEnded={conversationEnded}
-        onStartNewChat={handleStartNewChat}
-        isSubmitting={isSubmitting}
-      />
-    </ChatContainer>
+    />
   );
 };
 

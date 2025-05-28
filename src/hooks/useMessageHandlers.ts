@@ -47,7 +47,7 @@ export const useMessageHandlers = ({
   };
 
   const insertEmojiWrapper = (emoji: string) => {
-    insertEmoji(emoji, isTyping, !!setRateLimitError, setMessage, inputRef);
+    insertEmoji(emoji, isTyping, !!rateLimitError, setMessage, inputRef);
   };
 
   // Handle countdown finish - clear rate limit error
