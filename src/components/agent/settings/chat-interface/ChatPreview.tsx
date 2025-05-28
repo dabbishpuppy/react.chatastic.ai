@@ -2,6 +2,7 @@
 import React from 'react';
 import ChatSection from '@/components/agent/ChatSection';
 import { ChatInterfaceSettings } from '@/types/chatInterface';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface ChatPreviewProps {
   draftSettings: ChatInterfaceSettings;
@@ -33,7 +34,18 @@ const ChatPreview: React.FC<ChatPreviewProps> = ({
           <div className={`text-center py-2 text-sm border-b ${
             currentTheme === 'dark' ? 'text-gray-400 border-gray-700' : 'text-gray-500 border-gray-200'
           }`}>
-            Chat Preview {hasUnsavedChanges && <span className="text-yellow-600">(Draft)</span>}
+            <div className="flex items-center justify-center gap-2">
+              <Avatar className="h-6 w-6">
+                {draftSettings.profile_picture ? (
+                  <AvatarImage src={draftSettings.profile_picture} alt={draftSettings.display_name} />
+                ) : (
+                  <AvatarFallback className="bg-gray-100 text-xs">
+                    {draftSettings.display_name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <span>Chat Preview {hasUnsavedChanges && <span className="text-yellow-600">(Draft)</span>}</span>
+            </div>
           </div>
           <div className="flex-1 overflow-hidden">
             <ChatSection 
