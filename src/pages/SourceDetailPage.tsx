@@ -133,7 +133,15 @@ const SourceDetailPage: React.FC = () => {
         description: "Source deleted successfully"
       });
       
-      navigate(`/agent/${agentId}/sources?tab=text`);
+      // Navigate back to the correct tab based on source type
+      const tabMap = {
+        'text': 'text',
+        'file': 'files',
+        'website': 'website',
+        'qa': 'qa'
+      };
+      const tab = tabMap[source.source_type] || 'text';
+      navigate(`/agent/${agentId}/sources?tab=${tab}`);
     } catch (error) {
       console.error('Error deleting source:', error);
       toast({
@@ -148,7 +156,20 @@ const SourceDetailPage: React.FC = () => {
   };
 
   const handleBackClick = () => {
-    navigate(`/agent/${agentId}/sources?tab=text`);
+    if (!source) {
+      navigate(`/agent/${agentId}/sources?tab=text`);
+      return;
+    }
+
+    // Navigate back to the correct tab based on source type
+    const tabMap = {
+      'text': 'text',
+      'file': 'files',
+      'website': 'website',
+      'qa': 'qa'
+    };
+    const tab = tabMap[source.source_type] || 'text';
+    navigate(`/agent/${agentId}/sources?tab=${tab}`);
   };
 
   const getSourceIcon = (type: SourceType) => {
