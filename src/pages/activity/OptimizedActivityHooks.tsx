@@ -1,0 +1,203 @@
+
+import { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
+import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
+import { getChatSettings } from "@/services/chatSettingsService";
+import { conversationLoader } from "@/services/conversationLoader";
+import { ChatInterfaceSettings } from "@/types/chatInterface";
+import { formatDistanceToNow } from "date-fns";
+import { toast } from "@/hooks/use-toast";
+
+export interface ConversationWithSnippet extends DBConversation {
+  snippet: string;
+  title: string;
+  daysAgo: string;
+}
+
+export const useOptimizedActivityData = () => {
+  const { agentId } = useParams<{ agentId: string }>();
+  const [conversations, setConversations] = useState<ConversationWithSnippet[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<any>(null);
+  const [selectedDBConversation, setSelectedDBConversation] = useState<DBConversation | null>(null);
+  const [chatSettings, setChatSettings] = useState<ChatInterfaceSettings | null>(null);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [hasAnyConversations, setHasAnyConversations] = useState(true);
+
+  // Default chat settings
+  const defaultChatSettings: ChatInterfaceSettings = {
+    initial_message: '👋 Hi! How can I help you today?',
+    suggested_messages: [],
+    message_placeholder: 'Write message here...',
+    show_feedback: true,
+    allow_regenerate: true,
+    theme: 'light',
+    display_name: 'AI Assistant',
+    bubble_position: 'right',
+    show_suggestions_after_chat: true,
+    auto_show_delay: 1,
+    user_message_color: '#000000',
+    bubble_color: '#000000',
+    sync_colors: false,
+    primary_color: '#000000'
+  };
+
+  // Generate snippet from conversation without loading all messages
+  const generateSnippet = useCallback((conversation: DBConversation): string => {
+    if (conversation.title) {
+      return conversation.title.length > 60 ? conversation.title.substring(0, 60) + '...' : conversation.title;
+    }
+    return 'New conversation';
+  }, []);
+
+  // Load conversations with optimized snippet generation
+  const loadConversations = useCallback(async () => {
+    if (!agentId) return;
+
+    setIsLoadingConversations(true);
+    try {
+      const [conversationsData, settingsData] = await Promise.all([
+        conversationService.getRecentConversations(agentId, 50),
+        getChatSettings(agentId)
+      ]);
+
+      // Process conversations with lightweight snippets
+      const conversationsWithSnippets: ConversationWithSnippet[] = conversationsData.map(conv => {
+        const daysAgo = formatDistanceToNow(new Date(conv.created_at), { addSuffix: true });
+        const title = conv.title || `Chat from ${daysAgo}`;
+        const snippet = generateSnippet(conv);
+
+        return {
+          ...conv,
+          title,
+          snippet,
+          daysAgo
+        };
+      });
+
+      setConversations(conversationsWithSnippets);
+      setHasAnyConversations(conversationsWithSnippets.length > 0);
+      setChatSettings(settingsData || defaultChatSettings);
+
+      // Auto-select first conversation if available
+      if (conversationsWithSnippets.length > 0 && !selectedConversationId) {
+        const firstConversation = conversationsWithSnippets[0];
+        setSelectedConversationId(firstConversation.id);
+        loadConversationMessages(firstConversation);
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setHasAnyConversations(false);
+      setChatSettings(defaultChatSettings);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }, [agentId, selectedConversationId, generateSnippet, defaultChatSettings]);
+
+  // Load conversation messages
+  const loadConversationMessages = useCallback(async (dbConversation: DBConversation) => {
+    if (!agentId) return;
+
+    setIsLoadingConversation(true);
+    try {
+      const messages = await conversationLoader.loadConversationWithGreeting(
+        dbConversation.id,
+        agentId
+      );
+
+      const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
+      const title = dbConversation.title || `Chat from ${daysAgo}`;
+      const source = dbConversation.source === 'bubble' ? 'Widget' : 'Iframe';
+
+      let snippet = 'No messages';
+      if (messages.length > 1) {
+        const lastMessage = messages[messages.length - 1];
+        snippet = lastMessage.content.length > 50 ? lastMessage.content.substring(0, 50) + '...' : lastMessage.content;
+      } else if (messages.length === 1) {
+        snippet = messages[0].content.length > 50 ? messages[0].content.substring(0, 50) + '...' : messages[0].content;
+      }
+
+      const uiConversation = {
+        id: dbConversation.id,
+        title,
+        snippet,
+        daysAgo,
+        source,
+        messages
+      };
+
+      setSelectedConversation(uiConversation);
+      setSelectedDBConversation(dbConversation);
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversation data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingConversation(false);
+    }
+  }, [agentId]);
+
+  // Handle conversation click
+  const handleConversationClick = useCallback(async (conversationId: string) => {
+    setSelectedConversationId(conversationId);
+    
+    const dbConversation = conversations.find(c => c.id === conversationId);
+    if (dbConversation) {
+      await loadConversationMessages(dbConversation);
+    }
+  }, [conversations, loadConversationMessages]);
+
+  // Delete conversation
+  const deleteConversation = useCallback(async (conversationId: string) => {
+    try {
+      const success = await conversationService.deleteConversation(conversationId);
+      
+      if (success) {
+        const updatedConversations = conversations.filter(conv => conv.id !== conversationId);
+        setConversations(updatedConversations);
+        setHasAnyConversations(updatedConversations.length > 0);
+        
+        if (selectedConversationId === conversationId) {
+          if (updatedConversations.length > 0) {
+            await handleConversationClick(updatedConversations[0].id);
+          } else {
+            setSelectedConversation(null);
+            setSelectedDBConversation(null);
+            setSelectedConversationId(null);
+          }
+        }
+        
+        toast({
+          title: "Conversation deleted",
+          description: "The conversation has been successfully deleted.",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the conversation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [conversations, selectedConversationId, handleConversationClick]);
+
+  return {
+    agentId,
+    conversations,
+    selectedConversation,
+    selectedDBConversation,
+    selectedConversationId,
+    chatSettings,
+    hasAnyConversations,
+    isLoadingConversations,
+    isLoadingConversation,
+    loadConversations,
+    handleConversationClick,
+    deleteConversation
+  };
+};

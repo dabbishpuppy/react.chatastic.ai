@@ -3,24 +3,26 @@ import React, { useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
-import { useActivityPageData } from "./activity/ActivityPageHooks";
+import ConversationViewSkeleton from "@/components/activity/ConversationViewSkeleton";
+import { useOptimizedActivityData } from "./activity/OptimizedActivityHooks";
 import { useActivityRealtime } from "./activity/ActivityPageRealtime";
 import { getConversationTheme, EmptyState } from "./activity/ActivityPageUtils";
 
 const ActivityPage: React.FC = () => {
   const {
     agentId,
+    conversations,
     selectedConversation,
     selectedDBConversation,
-    hasAnyConversations,
-    conversations,
+    selectedConversationId,
     chatSettings,
+    hasAnyConversations,
+    isLoadingConversations,
     isLoadingConversation,
     loadConversations,
-    loadChatSettings,
     handleConversationClick,
     deleteConversation
-  } = useActivityPageData();
+  } = useOptimizedActivityData();
 
   // Set up real-time subscriptions
   useActivityRealtime({
@@ -32,9 +34,8 @@ const ActivityPage: React.FC = () => {
   useEffect(() => {
     if (agentId) {
       loadConversations();
-      loadChatSettings();
     }
-  }, [agentId]);
+  }, [agentId, loadConversations]);
 
   const handleDeleteConversation = (conversationId: string) => {
     deleteConversation(conversationId);
@@ -53,7 +54,7 @@ const ActivityPage: React.FC = () => {
             <ChatLogsTab.ActionButtons />
           </div>
         </div>
-        {!hasAnyConversations ? (
+        {!hasAnyConversations && !isLoadingConversations ? (
           <EmptyState />
         ) : (
           <div className="flex flex-1 pr-4 overflow-hidden gap-4">
@@ -64,14 +65,13 @@ const ActivityPage: React.FC = () => {
                 hideTitle
                 conversations={conversations}
                 onRefresh={loadConversations}
-                selectedConversationId={selectedConversation?.id}
+                selectedConversationId={selectedConversationId}
+                isLoading={isLoadingConversations}
               />
             </div>
             <div className="w-1/2 min-w-[400px]">
               {isLoadingConversation ? (
-                <div className="flex items-center justify-center h-full bg-white rounded-lg border">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
-                </div>
+                <ConversationViewSkeleton />
               ) : selectedConversation && selectedDBConversation ? (
                 <div className="h-[calc(100vh-240px)] bg-white rounded-lg border overflow-hidden" style={{ scrollbarWidth: 'thin' }}>
                   <ConversationView 

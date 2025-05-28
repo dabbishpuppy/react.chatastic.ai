@@ -7,14 +7,16 @@ import { toast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
 import { conversationService, Conversation } from "@/services/conversationService";
 import { formatDistanceToNow } from "date-fns";
+import ChatLogsTabSkeleton from "./ChatLogsTabSkeleton";
 
 interface ChatLogsTabProps {
   onConversationClick: (conversationId: string) => void;
   onConversationDelete?: (conversationId: string) => void;
   hideTitle?: boolean;
-  conversations?: Conversation[];
+  conversations?: any[];
   onRefresh?: () => void;
   selectedConversationId?: string;
+  isLoading?: boolean;
 }
 
 const handleExport = () => {
@@ -50,23 +52,23 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
   hideTitle = false,
   conversations = [],
   onRefresh,
-  selectedConversationId
+  selectedConversationId,
+  isLoading = false
 }) => {
   const { agentId } = useParams<{ agentId: string }>();
-  const [chatLogs, setChatLogs] = useState<Conversation[]>(conversations);
+  const [chatLogs, setChatLogs] = useState<any[]>(conversations);
   const [isEmpty, setIsEmpty] = useState(conversations.length === 0);
-  const [loading, setLoading] = useState(false);
-  const [snippets, setSnippets] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(isLoading);
 
   useEffect(() => {
     if (conversations.length > 0) {
       setChatLogs(conversations);
       setIsEmpty(false);
-      loadSnippets();
-    } else if (agentId && conversations.length === 0) {
+    } else if (agentId && conversations.length === 0 && !isLoading) {
       loadConversations();
     }
-  }, [conversations, agentId]);
+    setLoading(isLoading);
+  }, [conversations, agentId, isLoading]);
 
   const loadConversations = async () => {
     if (!agentId) return;
@@ -76,37 +78,12 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
       const recentConversations = await conversationService.getRecentConversations(agentId, 50);
       setChatLogs(recentConversations);
       setIsEmpty(recentConversations.length === 0);
-      await loadSnippets(recentConversations);
     } catch (error) {
       console.error('Error loading conversations:', error);
       setIsEmpty(true);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadSnippets = async (conversationsToLoad = chatLogs) => {
-    const newSnippets: Record<string, string> = {};
-    
-    await Promise.all(
-      conversationsToLoad.map(async (conversation) => {
-        try {
-          const messages = await conversationService.getMessages(conversation.id);
-          if (messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            const content = lastMessage.content;
-            newSnippets[conversation.id] = content.length > 60 ? content.substring(0, 60) + '...' : content;
-          } else {
-            newSnippets[conversation.id] = 'No messages';
-          }
-        } catch (error) {
-          console.error('Error fetching messages for snippet:', error);
-          newSnippets[conversation.id] = 'No messages';
-        }
-      })
-    );
-    
-    setSnippets(newSnippets);
   };
 
   const handleRefresh = () => {
@@ -117,7 +94,7 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
     }
   };
 
-  const getConversationTitle = (conversation: Conversation) => {
+  const getConversationTitle = (conversation: any) => {
     return conversation.title || `Chat from ${formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}`;
   };
 
@@ -143,61 +120,61 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
         </div>
       )}
 
-      <div className="bg-white rounded-lg border">
-        <div className="h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
-          {loading ? (
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
-            </div>
-          ) : isEmpty ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <div className="rounded-full bg-gray-100 p-3 mb-4">
-                <Trash2 size={24} className="text-gray-400" />
+      {loading ? (
+        <ChatLogsTabSkeleton />
+      ) : (
+        <div className="bg-white rounded-lg border">
+          <div className="h-[calc(100vh-240px)] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
+            {isEmpty ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center">
+                <div className="rounded-full bg-gray-100 p-3 mb-4">
+                  <Trash2 size={24} className="text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium mb-2">No conversations yet</h3>
+                <p className="text-gray-500 max-w-sm">
+                  When someone chats with this agent, conversations will appear here.
+                </p>
               </div>
-              <h3 className="text-lg font-medium mb-2">No conversations yet</h3>
-              <p className="text-gray-500 max-w-sm">
-                When someone chats with this agent, conversations will appear here.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-full">Conversation</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {chatLogs.map((log) => {
-                  const isSelected = selectedConversationId === log.id;
-                  const snippet = snippets[log.id] || 'Loading...';
-                  
-                  return (
-                    <TableRow 
-                      key={log.id}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-                      }`}
-                      onClick={() => onConversationClick(log.id)}
-                    >
-                      <TableCell className="py-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="font-medium">{getConversationTitle(log)}</div>
-                            <div className="text-sm text-gray-500 mt-1">{snippet}</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-full">Conversation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {chatLogs.map((log) => {
+                    const isSelected = selectedConversationId === log.id;
+                    const snippet = log.snippet || 'Loading...';
+                    
+                    return (
+                      <TableRow 
+                        key={log.id}
+                        className={`cursor-pointer transition-colors ${
+                          isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => onConversationClick(log.id)}
+                      >
+                        <TableCell className="py-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium">{getConversationTitle(log)}</div>
+                              <div className="text-sm text-gray-500 mt-1">{snippet}</div>
+                            </div>
+                            <div className="text-xs text-gray-400 ml-4 flex-shrink-0">
+                              {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                            </div>
                           </div>
-                          <div className="text-xs text-gray-400 ml-4 flex-shrink-0">
-                            {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
-                          </div>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
