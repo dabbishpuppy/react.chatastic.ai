@@ -11,7 +11,7 @@ interface UseMessageHandlersProps {
   isTyping: boolean;
   setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void;
   setIsTyping: (value: boolean) => void;
-  setMessage: (message: string) => void;
+  setMessage: React.Dispatch<React.SetStateAction<string>>;
   inputRef: React.RefObject<HTMLInputElement>;
   conversationId?: string;
   setRateLimitError: (error: string | null) => void;
@@ -49,7 +49,12 @@ export const useMessageHandlers = ({
   };
 
   const insertEmojiWrapper = (emoji: string) => {
-    insertEmoji(emoji, isTyping, rateLimitError, setMessage, inputRef);
+    // Create a simple setter function that insertEmoji expects
+    const directSetMessage = (message: string) => {
+      setMessage(message);
+    };
+    
+    insertEmoji(emoji, isTyping, rateLimitError, directSetMessage, inputRef);
   };
 
   // Handle countdown finish - clear rate limit error
