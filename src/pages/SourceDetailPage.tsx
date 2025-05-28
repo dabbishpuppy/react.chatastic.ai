@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +15,13 @@ import {
   FileText,
   File,
   Link,
-  MessageCircleQuestion
+  MessageCircleQuestion,
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Link2,
+  Smile
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -140,6 +147,10 @@ const SourceDetailPage: React.FC = () => {
     }
   };
 
+  const handleBackClick = () => {
+    navigate(`/agent/${agentId}/sources?tab=text`);
+  };
+
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
       case 'text':
@@ -215,17 +226,16 @@ const SourceDetailPage: React.FC = () => {
           {/* Main content */}
           <div className="flex-1">
             <div className="mb-6">
-              <Button
-                variant="ghost"
-                onClick={() => navigate(`/agent/${agentId}/sources?tab=text`)}
-                className="mb-4"
-              >
-                <ArrowLeft size={16} className="mr-2" />
-                Back to Sources
-              </Button>
-              
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleBackClick}
+                    className="flex-shrink-0"
+                  >
+                    <ArrowLeft size={20} />
+                  </Button>
                   {getSourceIcon(source.source_type)}
                   <h1 className="text-3xl font-bold">
                     {isEditing ? 'Edit Source' : source.title}
@@ -291,12 +301,36 @@ const SourceDetailPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Content
                       </label>
-                      <Textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        placeholder="Enter source content"
-                        className="min-h-[400px]"
-                      />
+                      <Card className="border border-gray-200">
+                        <CardContent className="p-0">
+                          <div className="flex items-center p-2 border-b border-gray-200">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Bold size={16} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Italic size={16} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <ListOrdered size={16} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <List size={16} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Link2 size={16} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Smile size={16} />
+                            </Button>
+                          </div>
+                          <Textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            placeholder="Enter source content"
+                            className="border-0 focus-visible:ring-0 min-h-[400px]"
+                          />
+                        </CardContent>
+                      </Card>
                     </div>
                     
                     <div className="flex justify-end space-x-2 pt-4">

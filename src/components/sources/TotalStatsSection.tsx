@@ -10,6 +10,8 @@ const TotalStatsSection: React.FC<TotalStatsSectionProps> = React.memo(({
   totalSources, 
   totalSize 
 }) => {
+  const maxSize = "400KB"; // Free user limit
+
   return (
     <>
       <div className="flex justify-between items-center text-sm">
@@ -19,7 +21,7 @@ const TotalStatsSection: React.FC<TotalStatsSectionProps> = React.memo(({
       
       <div className="flex justify-between items-center text-sm">
         <span className="text-gray-600">Total size:</span>
-        <span className="font-medium">{totalSize}</span>
+        <span className="font-medium">{totalSize} / {maxSize}</span>
       </div>
     </>
   );
