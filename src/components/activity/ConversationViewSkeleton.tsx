@@ -25,10 +25,10 @@ const ConversationViewSkeleton: React.FC = () => {
           <div key={index} className={`flex ${index % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
             <div className={`max-w-[80%] ${index % 2 === 0 ? 'flex items-start space-x-2' : ''}`}>
               {index % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />}
-              <div className={`p-3 rounded-lg ${index % 2 === 0 ? 'bg-gray-100' : 'bg-blue-500'}`}>
-                <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-48' : 'w-32'} ${index % 2 === 1 ? 'bg-blue-400' : ''}`} />
+              <div className={`p-3 rounded-lg ${index % 2 === 0 ? 'bg-gray-100' : 'bg-gray-200'}`}>
+                <Skeleton className={`h-4 ${index % 3 === 0 ? 'w-48' : index % 3 === 1 ? 'w-32' : 'w-40'}`} />
                 {Math.random() > 0.5 && (
-                  <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-32' : 'w-24'} mt-2 ${index % 2 === 1 ? 'bg-blue-400' : ''}`} />
+                  <Skeleton className={`h-4 ${index % 2 === 0 ? 'w-32' : 'w-24'} mt-2`} />
                 )}
               </div>
             </div>
