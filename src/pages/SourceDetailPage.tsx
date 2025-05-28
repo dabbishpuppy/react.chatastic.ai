@@ -240,9 +240,6 @@ const SourceDetailPage: React.FC = () => {
                   <h1 className="text-3xl font-bold">
                     {isEditing ? 'Edit Source' : source.title}
                   </h1>
-                  <Badge variant="secondary">
-                    {getSourceTypeLabel(source.source_type)}
-                  </Badge>
                 </div>
                 
                 <div className="flex items-center space-x-2">
