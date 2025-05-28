@@ -13,9 +13,25 @@ export class AgentSourceService {
     file_path?: string;
     url?: string;
   }): Promise<AgentSource> {
+    // First, get the team_id from the agent
+    const { data: agent, error: agentError } = await supabase
+      .from('agents')
+      .select('team_id')
+      .eq('id', data.agent_id)
+      .single();
+
+    if (agentError) throw new Error(`Failed to fetch agent: ${agentError.message}`);
+    if (!agent) throw new Error('Agent not found');
+
+    // Create the source with team_id included
+    const sourceData = {
+      ...data,
+      team_id: agent.team_id
+    };
+
     const { data: source, error } = await supabase
       .from('agent_sources')
-      .insert(data)
+      .insert(sourceData)
       .select()
       .single();
 
@@ -42,7 +58,6 @@ export class AgentSourceService {
     }));
   }
 
-  // Get sources by type for an agent
   static async getSourcesByType(agentId: string, sourceType: SourceType): Promise<AgentSource[]> {
     const { data: sources, error } = await supabase
       .from('agent_sources')
@@ -59,7 +74,6 @@ export class AgentSourceService {
     }));
   }
 
-  // Update a source
   static async updateSource(id: string, updates: Partial<AgentSource>): Promise<AgentSource> {
     const { data: source, error } = await supabase
       .from('agent_sources')
@@ -75,7 +89,6 @@ export class AgentSourceService {
     };
   }
 
-  // Soft delete a source (mark as inactive)
   static async deactivateSource(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('agent_sources')
@@ -86,7 +99,6 @@ export class AgentSourceService {
     return true;
   }
 
-  // Hard delete a source and all related data
   static async deleteSource(id: string): Promise<boolean> {
     const { error } = await supabase
       .from('agent_sources')
@@ -97,7 +109,6 @@ export class AgentSourceService {
     return true;
   }
 
-  // Get source with chunks count
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
     const { data, error } = await supabase
       .from('agent_sources')
