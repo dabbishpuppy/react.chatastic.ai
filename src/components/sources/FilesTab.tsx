@@ -28,7 +28,7 @@ const FilesTab: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const { sources } = useRAGServices();
-  const { sources: fileSources, loading, error, removeSourceFromState } = useAgentSources('file');
+  const { sources: fileSources, loading, error, removeSourceFromState, refetch } = useAgentSources('file');
 
   const supportedTypes = getSupportedFileTypes();
   const maxFileSize = 10; // MB
@@ -62,7 +62,7 @@ const FilesTab: React.FC = () => {
       }
 
       // Create the source in the database
-      await sources.createSource({
+      const newSource = await sources.createSource({
         agent_id: agentId,
         source_type: 'file',
         title: uploadedFile.file.name,
@@ -76,6 +76,8 @@ const FilesTab: React.FC = () => {
         }
       });
 
+      console.log('✅ New source created:', newSource);
+
       setUploadedFiles(prev => 
         prev.map(f => f.id === uploadedFile.id ? { ...f, status: 'complete', progress: 100 } : f)
       );
@@ -84,6 +86,11 @@ const FilesTab: React.FC = () => {
         title: "File uploaded successfully",
         description: `${uploadedFile.file.name} has been processed and added to your sources`
       });
+
+      // Manually refetch sources to ensure UI updates immediately
+      setTimeout(() => {
+        refetch();
+      }, 500);
 
     } catch (error) {
       console.error('Error processing file:', error);
@@ -156,7 +163,7 @@ const FilesTab: React.FC = () => {
       setUploadedFiles(prev => prev.filter(f => f.status !== 'complete'));
     }, 3000);
 
-  }, [agentId, sources]);
+  }, [agentId, sources, refetch]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();

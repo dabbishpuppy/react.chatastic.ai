@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -74,11 +75,23 @@ const SourceDetailPage: React.FC = () => {
       setEditContent(sourceData.content || '');
     } catch (error) {
       console.error('Error fetching source:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load source details",
-        variant: "destructive"
-      });
+      
+      // Check if it's a 404 error (source not found)
+      if (error instanceof Error && error.message.includes('not found')) {
+        toast({
+          title: "Source Not Found",
+          description: "This source may have been deleted or moved. Redirecting to sources page.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to load source details",
+          variant: "destructive"
+        });
+      }
+      
+      // Redirect to sources page without tab parameter, let the page handle the default
       navigate(`/agent/${agentId}/sources?tab=text`);
     } finally {
       setLoading(false);
