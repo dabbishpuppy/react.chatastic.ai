@@ -17,6 +17,7 @@ import ActivityPage from "./pages/ActivityPage";
 import LeadsPage from "./pages/LeadsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SourcesPage from "./pages/SourcesPage";
+import SourceDetailPage from "./pages/SourceDetailPage";
 import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
@@ -48,6 +49,7 @@ function App() {
               <Route path="/agent/:agentId/activity/leads" element={<ProtectedRoute><LeadsPage /></ProtectedRoute>} />
               <Route path="/agent/:agentId/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
               <Route path="/agent/:agentId/sources" element={<ProtectedRoute><SourcesPage /></ProtectedRoute>} />
+              <Route path="/agent/:agentId/sources/:sourceId" element={<ProtectedRoute><SourceDetailPage /></ProtectedRoute>} />
               <Route path="/agent/:agentId/actions" element={<ProtectedRoute><ActionsPage /></ProtectedRoute>} />
               <Route path="/agent/:agentId/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
               <Route path="/agent/:agentId/settings/*" element={<ProtectedRoute><AgentSettingsPage /></ProtectedRoute>} />

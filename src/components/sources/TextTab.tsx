@@ -158,7 +158,8 @@ const TextTab: React.FC = () => {
         <SourcesList 
           sources={textSources} 
           loading={loading} 
-          error={error} 
+          error={error}
+          onSourceDeleted={refetch}
         />
       </div>
     </div>

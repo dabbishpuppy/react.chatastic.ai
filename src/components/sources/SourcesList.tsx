@@ -1,19 +1,50 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, ChevronRight, FileText, Link, MessageCircleQuestion, File } from 'lucide-react';
+import { 
+  MoreHorizontal, 
+  ChevronRight, 
+  FileText, 
+  Link, 
+  MessageCircleQuestion, 
+  File 
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { AgentSource, SourceType } from '@/types/rag';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useRAGServices } from '@/hooks/useRAGServices';
+import { toast } from '@/hooks/use-toast';
+import DeleteSourceDialog from './DeleteSourceDialog';
 
 interface SourcesListProps {
   sources: AgentSource[];
   loading: boolean;
   error: string | null;
+  onSourceDeleted?: () => void;
 }
 
-const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) => {
+const SourcesList: React.FC<SourcesListProps> = ({ 
+  sources, 
+  loading, 
+  error, 
+  onSourceDeleted 
+}) => {
+  const navigate = useNavigate();
+  const { agentId } = useParams();
+  const { sources: sourceService } = useRAGServices();
+  
+  const [deleteSource, setDeleteSource] = useState<AgentSource | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
       case 'text':
@@ -50,6 +81,48 @@ const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) =>
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${Math.round(bytes / (1024 * 1024))} MB`;
+  };
+
+  const handleDeleteClick = (source: AgentSource, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setDeleteSource(source);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteSource) return;
+
+    try {
+      setIsDeleting(true);
+      await sourceService.deleteSource(deleteSource.id);
+      
+      toast({
+        title: "Success",
+        description: "Source deleted successfully"
+      });
+      
+      if (onSourceDeleted) {
+        onSourceDeleted();
+      }
+    } catch (error) {
+      console.error('Error deleting source:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete source",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteSource(null);
+    }
+  };
+
+  const handleRowClick = (source: AgentSource) => {
+    navigate(`/agent/${agentId}/sources/${source.id}`);
+  };
+
+  const handleNavigateClick = (source: AgentSource, event: React.MouseEvent) => {
+    event.stopPropagation();
+    navigate(`/agent/${agentId}/sources/${source.id}`);
   };
 
   if (loading) {
@@ -99,7 +172,11 @@ const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) =>
           </TableHeader>
           <TableBody>
             {sources.map((source) => (
-              <TableRow key={source.id} className="cursor-pointer hover:bg-gray-50">
+              <TableRow 
+                key={source.id} 
+                className="cursor-pointer hover:bg-gray-50"
+                onClick={() => handleRowClick(source)}
+              >
                 <TableCell className="font-medium">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 mr-3">
@@ -126,10 +203,32 @@ const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) =>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end space-x-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreHorizontal size={18} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal size={18} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem 
+                          onClick={(e) => handleDeleteClick(source, e)}
+                          className="text-red-600"
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={(e) => handleNavigateClick(source, e)}
+                    >
                       <ChevronRight size={18} />
                     </Button>
                   </div>
@@ -139,6 +238,14 @@ const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) =>
           </TableBody>
         </Table>
       </Card>
+
+      <DeleteSourceDialog
+        open={!!deleteSource}
+        onOpenChange={(open) => !open && setDeleteSource(null)}
+        onConfirm={handleDeleteConfirm}
+        sourceTitle={deleteSource?.title || ''}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };
