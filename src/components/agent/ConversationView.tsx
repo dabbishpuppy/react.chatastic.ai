@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -166,17 +165,13 @@ const ConversationView: React.FC<ConversationViewProps> = ({
   }, [conversation.id]);
 
   const handleFeedback = (timestamp: string, type: "like" | "dislike") => {
-    setMessages(prev => prev.map(msg => {
-      if (msg.timestamp === timestamp) {
-        const newFeedback = msg.feedback === type ? undefined : type;
-        return { ...msg, feedback: newFeedback };
-      }
-      return msg;
-    }));
+    // In read-only mode, don't allow feedback changes
+    console.log('Feedback display only - not updating in view mode');
   };
 
   const handleCopy = (content: string) => {
-    // Copy functionality is handled in SharedChatMessage
+    // Copy functionality is disabled in read-only mode
+    console.log('Copy disabled in view mode');
   };
 
   const userMessageStyle = userMessageColor ? {
@@ -254,6 +249,7 @@ const ConversationView: React.FC<ConversationViewProps> = ({
               profilePicture={profilePicture}
               showFeedback={true}
               hideUserAvatar={false}
+              readOnly={true}
               onFeedback={handleFeedback}
               onCopy={handleCopy}
               allowRegenerate={false}

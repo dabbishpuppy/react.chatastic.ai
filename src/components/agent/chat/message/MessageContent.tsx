@@ -14,6 +14,7 @@ interface MessageContentProps {
   showFeedback: boolean;
   allowRegenerate?: boolean;
   isLastAgentMessage?: boolean;
+  readOnly?: boolean;
   onFeedback: (type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
   onRegenerate?: () => void;
@@ -32,6 +33,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
   showFeedback,
   allowRegenerate = false,
   isLastAgentMessage = false,
+  readOnly = false,
   onFeedback,
   onCopy,
   onRegenerate,
@@ -58,6 +60,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
           showFeedback={showFeedback}
           allowRegenerate={allowRegenerate}
           isLastAgentMessage={isLastAgentMessage}
+          readOnly={readOnly}
           isUpdatingFeedback={isUpdatingFeedback}
           showCopiedTooltip={showCopiedTooltip}
           onFeedback={onFeedback}

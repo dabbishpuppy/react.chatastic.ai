@@ -17,6 +17,7 @@ export interface SharedChatMessageProps {
   profilePicture?: string;
   showFeedback: boolean;
   hideUserAvatar?: boolean;
+  readOnly?: boolean;
   onFeedback?: (timestamp: string, type: "like" | "dislike") => void;
   onCopy?: (content: string) => void;
   onRegenerate?: () => void;
@@ -35,6 +36,7 @@ const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
   profilePicture,
   showFeedback,
   hideUserAvatar = false,
+  readOnly = false,
   onFeedback,
   onCopy,
   onRegenerate,
@@ -58,7 +60,8 @@ const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
     message.timestamp,
     message.feedback,
     onFeedback,
-    onCopy
+    onCopy,
+    readOnly
   );
 
   return (
@@ -74,6 +77,7 @@ const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
         showFeedback={showFeedback}
         allowRegenerate={allowRegenerate}
         isLastAgentMessage={isLastAgentMessage}
+        readOnly={readOnly}
         onFeedback={handleFeedback}
         onCopy={handleCopy}
         onRegenerate={onRegenerate}

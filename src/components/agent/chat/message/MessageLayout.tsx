@@ -21,6 +21,7 @@ interface MessageLayoutProps {
   showFeedback: boolean;
   allowRegenerate?: boolean;
   isLastAgentMessage?: boolean;
+  readOnly?: boolean;
   onFeedback: (type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
   onRegenerate?: () => void;
@@ -39,6 +40,7 @@ const MessageLayout: React.FC<MessageLayoutProps> = ({
   showFeedback,
   allowRegenerate = false,
   isLastAgentMessage = false,
+  readOnly = false,
   onFeedback,
   onCopy,
   onRegenerate,
@@ -69,6 +71,7 @@ const MessageLayout: React.FC<MessageLayoutProps> = ({
         showFeedback={showFeedback}
         allowRegenerate={allowRegenerate}
         isLastAgentMessage={isLastAgentMessage}
+        readOnly={readOnly}
         onFeedback={onFeedback}
         onCopy={onCopy}
         onRegenerate={onRegenerate}
