@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,7 +20,8 @@ import {
   List,
   ListOrdered,
   Link2,
-  Smile
+  Smile,
+  Trash2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -232,7 +232,7 @@ const SourceDetailPage: React.FC = () => {
                     variant="ghost"
                     size="icon"
                     onClick={handleBackClick}
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 bg-white hover:bg-gray-50"
                   >
                     <ArrowLeft size={20} />
                   </Button>
@@ -249,7 +249,7 @@ const SourceDetailPage: React.FC = () => {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className="bg-white hover:bg-gray-50">
                           <Info size={18} />
                         </Button>
                       </TooltipTrigger>
@@ -263,21 +263,14 @@ const SourceDetailPage: React.FC = () => {
                     </Tooltip>
                   </TooltipProvider>
                   
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal size={18} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem 
-                        onClick={() => setShowDeleteDialog(true)}
-                        className="text-red-600"
-                      >
-                        Delete Source
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="bg-white hover:bg-gray-50"
+                  >
+                    <Trash2 size={18} className="text-red-600" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -299,7 +292,7 @@ const SourceDetailPage: React.FC = () => {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Content
+                        Text
                       </label>
                       <Card className="border border-gray-200">
                         <CardContent className="p-0">
