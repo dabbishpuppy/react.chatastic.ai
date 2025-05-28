@@ -41,7 +41,7 @@ export const useAgentSources = (sourceType?: SourceType) => {
     fetchSources();
   }, [fetchSources]);
 
-  // Set up real-time subscription for sources
+  // Set up real-time subscription for sources with optimized updates
   useEffect(() => {
     if (!agentId) return;
 
@@ -59,8 +59,43 @@ export const useAgentSources = (sourceType?: SourceType) => {
         },
         (payload) => {
           console.log('Source change detected by hook:', payload);
-          // Immediately refetch sources when changes occur
-          fetchSources();
+          
+          // Handle different types of changes more efficiently
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const newSource = {
+              ...payload.new,
+              metadata: payload.new.metadata as Record<string, any> || {}
+            } as AgentSource;
+            
+            // Only add if it matches our filter (if any)
+            if (!sourceType || newSource.source_type === sourceType) {
+              setSources(prevSources => {
+                // Check if the source already exists to avoid duplicates
+                const exists = prevSources.some(s => s.id === newSource.id);
+                if (exists) return prevSources;
+                
+                return [newSource, ...prevSources];
+              });
+            }
+          } else if (payload.eventType === 'UPDATE' && payload.new) {
+            const updatedSource = {
+              ...payload.new,
+              metadata: payload.new.metadata as Record<string, any> || {}
+            } as AgentSource;
+            
+            setSources(prevSources => 
+              prevSources.map(source => 
+                source.id === updatedSource.id ? updatedSource : source
+              )
+            );
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            setSources(prevSources => 
+              prevSources.filter(source => source.id !== payload.old.id)
+            );
+          } else {
+            // Fallback to full refetch for other cases
+            fetchSources();
+          }
         }
       )
       .subscribe((status) => {
@@ -71,7 +106,7 @@ export const useAgentSources = (sourceType?: SourceType) => {
       console.log('Cleaning up hook subscription');
       supabase.removeChannel(channel);
     };
-  }, [agentId, fetchSources]);
+  }, [agentId, sourceType, fetchSources]);
 
   return {
     sources,
