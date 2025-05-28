@@ -16,6 +16,7 @@ interface UseMessageHandlersProps {
   conversationId?: string;
   setRateLimitError: (error: string | null) => void;
   setTimeUntilReset: (time: number | null) => void;
+  rateLimitError: string | null;
 }
 
 export const useMessageHandlers = ({
@@ -27,7 +28,8 @@ export const useMessageHandlers = ({
   inputRef,
   conversationId,
   setRateLimitError,
-  setTimeUntilReset
+  setTimeUntilReset,
+  rateLimitError
 }: UseMessageHandlersProps) => {
 
   const handleFeedbackWrapper = async (timestamp: string, type: "like" | "dislike") => {
@@ -47,7 +49,7 @@ export const useMessageHandlers = ({
   };
 
   const insertEmojiWrapper = (emoji: string) => {
-    insertEmoji(emoji, isTyping, !!rateLimitError, setMessage, inputRef);
+    insertEmoji(emoji, isTyping, rateLimitError, setMessage, inputRef);
   };
 
   // Handle countdown finish - clear rate limit error

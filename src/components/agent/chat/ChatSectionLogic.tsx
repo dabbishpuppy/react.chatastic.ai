@@ -89,11 +89,7 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
       onLeadFormSubmit={() => {
         console.log('📋 Lead form submitted from chat integration');
         // Remove the lead form message from chat and add any new messages that were pending
-        setMessage(prev => {
-          const filteredHistory = prev.filter(msg => msg.content !== "LEAD_FORM_WIDGET");
-          console.log('📋 Chat history after lead form removal:', filteredHistory);
-          return filteredHistory;
-        });
+        setMessage('');
       }}
 
       // Footer props
@@ -104,7 +100,7 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
       suggestedMessages={suggestedMessages}
       handleSuggestedMessageClick={handleSuggestedMessageClickWithAgentId}
       isInputDisabled={isInputDisabled}
-      theme={props.theme || 'light'}
+      theme={resolvedTheme}
       message={message}
       setMessage={setMessage}
       onSubmit={handleSubmitWithConversation}
