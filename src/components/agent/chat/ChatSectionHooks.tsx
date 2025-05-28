@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useConversationManager } from "@/hooks/useConversationManager";
@@ -7,6 +8,7 @@ import { useChatScroll } from "@/hooks/useChatScroll";
 import { useChatHandlers } from "@/hooks/useChatHandlers";
 import { ChatSectionProps } from "./ChatSectionProps";
 import { ChatSectionState } from "./ChatSectionState";
+import { useState } from "react";
 
 export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState => {
   const { agentId: routeAgentId } = useParams();
@@ -14,7 +16,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   const agentId = propAgentId || routeAgentId;
 
   const { settings, refreshSettings } = useChatSettings(agentId);
-  const { effectiveLeadSettings, hasShownLeadForm, setHasShownLeadForm } = useLeadSettings(leadSettings, settings);
+  
+  // Use the leadSettings from props if provided, otherwise use the hook
+  const leadSettingsHook = useLeadSettings(agentId || '');
+  const effectiveLeadSettings = leadSettings || leadSettingsHook.settings;
+  const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
+
   const { currentConversation, conversationEnded, startNewConversation, endCurrentConversation, loadConversation, saveMessage, getConversationMessages } = useConversationManager(conversationSource);
   const {
     message,
@@ -61,6 +68,11 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     setChatHistory(prevHistory => [...prevHistory, newMessage]);
   };
 
+  // Wrap startNewConversation to match expected return type
+  const wrappedStartNewConversation = async () => {
+    await startNewConversation();
+  };
+
   return {
     agentId,
     displayMessages: chatHistory,
@@ -71,7 +83,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     refreshSettings,
     currentConversation,
     conversationEnded,
-    startNewConversation,
+    startNewConversation: wrappedStartNewConversation,
     endCurrentConversation,
     loadConversation,
     getConversationMessages,
