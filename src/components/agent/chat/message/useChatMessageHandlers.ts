@@ -42,7 +42,6 @@ export const useChatMessageHandlers = (
       if (onCopy) onCopy(content);
       setShowCopiedTooltip(true);
       
-      // Use toast consistently
       toast({
         description: "Copied to clipboard!",
         duration: 2000,
@@ -52,7 +51,6 @@ export const useChatMessageHandlers = (
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
       
-      // Use toast consistently
       toast({
         description: "Failed to copy to clipboard",
         duration: 2000,
@@ -64,6 +62,11 @@ export const useChatMessageHandlers = (
   const handleFeedback = useCallback(async (type: "like" | "dislike") => {
     if (isUpdatingFeedback || !messageTimestamp || readOnly) return;
 
+    // 🎯 IMMEDIATE UI FEEDBACK - Update local state first for instant visual response
+    const newFeedback = localFeedback === type ? undefined : type;
+    console.log('🚀 Immediate UI Update - Setting local feedback to:', newFeedback);
+    setLocalFeedback(newFeedback);
+
     setIsUpdatingFeedback(true);
     
     try {
@@ -71,35 +74,31 @@ export const useChatMessageHandlers = (
         messageId, 
         messageTimestamp, 
         type, 
-        messageFeedback: localFeedback,
+        currentLocalFeedback: localFeedback,
+        newFeedback,
         hasMessageId: !!messageId,
         messageIdType: typeof messageId
       });
       
-      // Determine new feedback value (toggle if same, set if different)
-      const newFeedback = localFeedback === type ? null : type;
-      
-      // If we have a messageId, save to database directly and update local state
+      // If we have a messageId, save to database
       if (messageId && messageId !== 'initial-message') {
         console.log('💾 useChatMessageHandlers - Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
         
-        const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
+        const success = await analyticsService.updateMessageFeedback(messageId, newFeedback || null);
         
         if (success) {
           console.log('✅ useChatMessageHandlers - Feedback saved to database successfully');
           
-          // Update local state immediately for UI responsiveness
-          setLocalFeedback(newFeedback as 'like' | 'dislike' | undefined);
-          
-          // Use toast consistently
           toast({
             description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
             duration: 2000,
           });
         } else {
-          console.error('❌ useChatMessageHandlers - Failed to save feedback to database');
+          console.error('❌ useChatMessageHandlers - Failed to save feedback to database - REVERTING UI');
           
-          // Use toast consistently
+          // Revert the optimistic update if database save failed
+          setLocalFeedback(localFeedback);
+          
           toast({
             description: "Failed to update feedback",
             duration: 2000,
@@ -110,23 +109,21 @@ export const useChatMessageHandlers = (
         // No messageId available, use local state only via onFeedback callback
         console.log('⚠️ useChatMessageHandlers - No messageId provided, updating local state only. MessageId:', messageId);
         
-        // Update local state
-        setLocalFeedback(newFeedback as 'like' | 'dislike' | undefined);
-        
         if (onFeedback) {
           onFeedback(messageTimestamp, type);
         }
         
-        // Use toast consistently
         toast({
           description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
           duration: 2000,
         });
       }
     } catch (error) {
-      console.error('❌ useChatMessageHandlers - Error updating feedback:', error);
+      console.error('❌ useChatMessageHandlers - Error updating feedback - REVERTING UI:', error);
       
-      // Use toast consistently
+      // Revert the optimistic update if there was an error
+      setLocalFeedback(localFeedback);
+      
       toast({
         description: "Failed to update feedback",
         duration: 2000,
@@ -142,6 +139,6 @@ export const useChatMessageHandlers = (
     isUpdatingFeedback,
     handleCopy,
     handleFeedback,
-    currentFeedback: localFeedback // Return the local feedback state
+    currentFeedback: localFeedback // Return the local feedback state for immediate UI updates
   };
 };
