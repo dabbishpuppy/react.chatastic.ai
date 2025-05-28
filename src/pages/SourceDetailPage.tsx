@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { AgentSource, SourceType } from '@/types/rag';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
 import AgentPageLayout from './AgentPageLayout';
@@ -40,6 +40,7 @@ const SourceDetailPage: React.FC = () => {
   const { agentId, sourceId } = useParams();
   const navigate = useNavigate();
   const { sources } = useRAGServices();
+  const { toast } = useToast();
   
   const [source, setSource] = useState<AgentSource | null>(null);
   const [loading, setLoading] = useState(true);
@@ -243,7 +244,6 @@ const SourceDetailPage: React.FC = () => {
                     <div className="space-y-1 text-xs">
                       <div><strong>Created:</strong> {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}</div>
                       <div><strong>Size:</strong> {formatFileSize(source.content)}</div>
-                      <div><strong>Chunks:</strong> {source.chunks_count || 0}</div>
                       <div><strong>Type:</strong> {getSourceTypeLabel(source.source_type)}</div>
                     </div>
                   </TooltipContent>
