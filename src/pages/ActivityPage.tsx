@@ -97,13 +97,30 @@ const ActivityPage: React.FC = () => {
           if (payload.new && typeof payload.new === 'object' && 'conversation_id' in payload.new) {
             const messageConversationId = payload.new.conversation_id;
             
-            // Only refresh if this conversation belongs to our current conversations
-            const belongsToCurrentAgent = conversations.some(conv => conv.id === messageConversationId);
-            if (belongsToCurrentAgent) {
+            // First check if this conversation belongs to our current conversations
+            const belongsToCurrentConversations = conversations.some(conv => conv.id === messageConversationId);
+            
+            if (belongsToCurrentConversations) {
+              console.log('Message belongs to current conversations, refreshing list');
               await loadConversations();
+              return;
+            }
+            
+            // If not in current list, verify it belongs to the current agent before processing
+            try {
+              const conversation = await conversationService.getConversationById(messageConversationId);
+              if (conversation && conversation.agent_id === agentId) {
+                console.log('New conversation detected for current agent, refreshing list');
+                await loadConversations();
+              } else {
+                console.log('Message belongs to different agent or conversation not found, ignoring');
+              }
+            } catch (error) {
+              console.warn('Could not verify conversation ownership for real-time message:', error);
             }
           } else {
             // For other changes, just refresh the conversations list
+            console.log('Non-message change detected, refreshing conversations');
             await loadConversations();
           }
         }
@@ -258,39 +275,49 @@ const ActivityPage: React.FC = () => {
         console.warn('Conversation not found in current conversations list:', conversationId);
         
         // Try to fetch the conversation directly from the database
-        const fetchedConversation = await conversationService.getConversationById(conversationId);
-        if (!fetchedConversation) {
-          console.error('Conversation not found in database:', conversationId);
+        try {
+          const fetchedConversation = await conversationService.getConversationById(conversationId);
+          if (!fetchedConversation) {
+            console.error('Conversation not found in database:', conversationId);
+            toast({
+              title: "Conversation not found",
+              description: "This conversation may have been deleted or you don't have access to it.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // If found, check if it belongs to the current agent
+          if (fetchedConversation.agent_id !== agentId) {
+            console.warn('Conversation belongs to different agent:', {
+              conversationId,
+              conversationAgentId: fetchedConversation.agent_id,
+              currentAgentId: agentId
+            });
+            toast({
+              title: "Access denied",
+              description: "This conversation doesn't belong to the current agent.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Use the fetched conversation
+          const uiConversation = await convertDBConversationToUI(fetchedConversation);
+          if (uiConversation) {
+            setSelectedConversation(uiConversation);
+            setSelectedDBConversation(fetchedConversation);
+          }
+          return;
+        } catch (fetchError) {
+          console.error('Error fetching conversation from database:', fetchError);
           toast({
-            title: "Conversation not found",
-            description: "This conversation may have been deleted or you don't have access to it.",
+            title: "Error",
+            description: "Failed to load conversation data.",
             variant: "destructive",
           });
           return;
         }
-        
-        // If found, check if it belongs to the current agent
-        if (fetchedConversation.agent_id !== agentId) {
-          console.warn('Conversation belongs to different agent:', {
-            conversationId,
-            conversationAgentId: fetchedConversation.agent_id,
-            currentAgentId: agentId
-          });
-          toast({
-            title: "Access denied",
-            description: "This conversation doesn't belong to the current agent.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        // Use the fetched conversation
-        const uiConversation = await convertDBConversationToUI(fetchedConversation);
-        if (uiConversation) {
-          setSelectedConversation(uiConversation);
-          setSelectedDBConversation(fetchedConversation);
-        }
-        return;
       }
 
       console.log('Found DB conversation:', dbConversation);
