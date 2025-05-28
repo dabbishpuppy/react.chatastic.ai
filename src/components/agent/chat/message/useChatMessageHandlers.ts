@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { analyticsService } from "@/services/analyticsService";
 
@@ -20,7 +20,7 @@ export const useChatMessageHandlers = (
     setLocalFeedback(messageFeedback);
   }, [messageFeedback]);
 
-  const handleCopy = async (content: string) => {
+  const handleCopy = useCallback(async (content: string) => {
     if (readOnly) return;
     
     try {
@@ -41,25 +41,31 @@ export const useChatMessageHandlers = (
       
       if (onCopy) onCopy(content);
       setShowCopiedTooltip(true);
+      
+      // Use toast consistently
       toast({
         description: "Copied to clipboard!",
         duration: 2000,
       });
+      
       setTimeout(() => setShowCopiedTooltip(false), 2000);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
+      
+      // Use toast consistently
       toast({
         description: "Failed to copy to clipboard",
         duration: 2000,
         variant: "destructive"
       });
     }
-  };
+  }, [readOnly, onCopy]);
 
-  const handleFeedback = async (type: "like" | "dislike") => {
+  const handleFeedback = useCallback(async (type: "like" | "dislike") => {
     if (isUpdatingFeedback || !messageTimestamp || readOnly) return;
 
     setIsUpdatingFeedback(true);
+    
     try {
       console.log('🔥 useChatMessageHandlers - Handling feedback:', { 
         messageId, 
@@ -85,12 +91,15 @@ export const useChatMessageHandlers = (
           // Update local state immediately for UI responsiveness
           setLocalFeedback(newFeedback as 'like' | 'dislike' | undefined);
           
+          // Use toast consistently
           toast({
             description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
             duration: 2000,
           });
         } else {
           console.error('❌ useChatMessageHandlers - Failed to save feedback to database');
+          
+          // Use toast consistently
           toast({
             description: "Failed to update feedback",
             duration: 2000,
@@ -107,6 +116,8 @@ export const useChatMessageHandlers = (
         if (onFeedback) {
           onFeedback(messageTimestamp, type);
         }
+        
+        // Use toast consistently
         toast({
           description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
           duration: 2000,
@@ -114,6 +125,8 @@ export const useChatMessageHandlers = (
       }
     } catch (error) {
       console.error('❌ useChatMessageHandlers - Error updating feedback:', error);
+      
+      // Use toast consistently
       toast({
         description: "Failed to update feedback",
         duration: 2000,
@@ -122,7 +135,7 @@ export const useChatMessageHandlers = (
     } finally {
       setIsUpdatingFeedback(false);
     }
-  };
+  }, [isUpdatingFeedback, messageTimestamp, readOnly, messageId, localFeedback, onFeedback]);
 
   return {
     showCopiedTooltip,
