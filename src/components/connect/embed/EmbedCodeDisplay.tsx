@@ -1,45 +1,67 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EmbedCodeDisplayProps {
-  getEmbedCode: () => string;
+  title: string;
+  description: string;
+  code: string;
+  language?: string;
 }
 
-export const EmbedCodeDisplay: React.FC<EmbedCodeDisplayProps> = ({ getEmbedCode }) => {
-  const [copyText, setCopyText] = useState("Copy");
+const EmbedCodeDisplay: React.FC<EmbedCodeDisplayProps> = ({
+  title,
+  description,
+  code,
+  language = "html"
+}) => {
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const handleCopy = () => {
-    const embedCode = getEmbedCode();
-    if (embedCode) {
-      navigator.clipboard.writeText(embedCode);
-      setCopyText("Copied!");
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
       toast({
-        title: "Code copied",
-        description: "The embed code has been copied to your clipboard."
+        title: "Copied!",
+        description: "Code copied to clipboard"
       });
-      setTimeout(() => setCopyText("Copy"), 2000);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Please copy the code manually",
+        variant: "destructive"
+      });
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Embed code</h3>
-        <Button variant="outline" size="sm" onClick={handleCopy}>
-          {copyText}
-        </Button>
-      </div>
-      
-      <div className="relative border rounded-md bg-gray-50 p-4">
-        <pre className="text-xs overflow-x-auto max-h-60">
-          <code className="block whitespace-pre">
-            {getEmbedCode()}
-          </code>
-        </pre>
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="relative">
+          <pre className="bg-gray-100 p-4 rounded-md overflow-x-auto text-sm">
+            <code>{code}</code>
+          </pre>
+          <Button
+            onClick={copyToClipboard}
+            variant="outline"
+            size="sm"
+            className="absolute top-2 right-2"
+          >
+            {copied ? <Check size={16} /> : <Copy size={16} />}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
+
+export default EmbedCodeDisplay;

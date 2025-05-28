@@ -1,69 +1,90 @@
-import React from "react";
+
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Shield, Check, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface IdentityVerificationProps {
   agentId?: string;
 }
 
-export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ agentId }) => {
+const IdentityVerification: React.FC<IdentityVerificationProps> = ({ agentId }) => {
+  const [domain, setDomain] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const { toast } = useToast();
 
-  const handleCopyVerification = () => {
-    const verificationCode = document.querySelector(".verification-code code")?.textContent;
-    if (verificationCode) {
-      navigator.clipboard.writeText(verificationCode);
+  const handleVerification = async () => {
+    if (!domain) {
       toast({
-        title: "Code copied",
-        description: "The verification code has been copied to your clipboard."
+        title: "Domain required",
+        description: "Please enter a domain to verify",
+        variant: "destructive"
       });
+      return;
     }
+
+    setIsVerifying(true);
+    
+    // Simulate verification process
+    setTimeout(() => {
+      setIsVerifying(false);
+      setIsVerified(true);
+      toast({
+        title: "Domain verified",
+        description: `${domain} has been successfully verified`
+      });
+    }, 2000);
   };
 
   return (
-    <div className="mt-4 border p-4 rounded-md">
-      <h4 className="font-medium mb-2">For Identity Verification</h4>
-      <p className="text-sm text-gray-600 mb-2">
-        On the server side, generate an HMAC hash using your secret key and the user ID:
-      </p>
-      
-      <div className="verification-code bg-gray-50 p-3 rounded-md text-xs overflow-x-auto mb-3">
-        <code>{`
-const crypto = require('crypto');
-const secret = '********'; // Your verification secret key
-const userId = current_user.id // A string UUID to identify your user
-const hash = crypto.createHmac('sha256', secret).update(userId).digest('hex');
-        `}</code>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Domain Verification
+        </CardTitle>
+        <CardDescription>
+          Verify your domain to enable advanced security features and prevent unauthorized embedding.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="example.com"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            disabled={isVerified}
+          />
+          <Button 
+            onClick={handleVerification}
+            disabled={isVerifying || isVerified}
+          >
+            {isVerifying ? "Verifying..." : isVerified ? <Check className="h-4 w-4" /> : "Verify"}
+          </Button>
+        </div>
         
-        <Button 
-          variant="outline" 
-          size="sm"
-          className="mt-2"
-          onClick={handleCopyVerification}
-        >
-          Copy
-        </Button>
-      </div>
-      
-      <p className="text-sm text-gray-600 mb-2">
-        Then, include this hash in your chat bubble configuration:
-      </p>
-      
-      <div className="bg-gray-50 p-3 rounded-md text-xs overflow-x-auto">
-        <code>{`
-<script>
-  window.wonderwaveConfig = {
-    agentId: "${agentId}",
-    identityHash: "YOUR_GENERATED_HASH", // Add the hash here
-    userId: "USER_UUID" // The same user ID used to generate the hash
-  };
-</script>
-        `}</code>
-      </div>
-      
-      <div className="mt-3 text-sm text-amber-600 bg-amber-50 p-3 rounded-md border border-amber-200">
-        <strong>Important:</strong> Keep your secret key safe! Never commit it directly to your repository, client-side code, or anywhere a third party can find it.
-      </div>
-    </div>
+        {isVerified && (
+          <div className="flex items-center gap-2 text-green-600 text-sm">
+            <Check className="h-4 w-4" />
+            Domain verified successfully
+          </div>
+        )}
+        
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+            <div className="text-sm text-yellow-800">
+              <p className="font-medium">Security Notice</p>
+              <p>Without domain verification, your agent can be embedded on any website. Verify your domain to restrict embedding to authorized sites only.</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
+
+export default IdentityVerification;

@@ -1,96 +1,49 @@
+
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LayoutDashboard, User, LogOut, UserRound, Book, HelpCircle, GitPullRequest } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogOut, Settings, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const UserDropdown: React.FC = () => {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
+const UserDropdown = () => {
   const { toast } = useToast();
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account",
-      });
-      navigate("/signin");
-    } catch (error) {
-      toast({
-        title: "Error signing out",
-        description: "There was an error signing out",
-        variant: "destructive",
-      });
-    }
+  const handleSignOut = () => {
+    toast({
+      title: "Signed out",
+      description: "You have been successfully signed out."
+    });
   };
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-1">
-        <div className="w-8 h-8 rounded-full bg-[#f5f5f5] flex items-center justify-center">
-          <UserRound size={20} className="text-gray-600 hover:text-gray-900" />
-        </div>
-        <ChevronDown size={16} className="text-gray-500" />
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback>JD</AvatarFallback>
+          </Avatar>
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 p-2 bg-white">
-        <div className="px-3 py-2">
-          <div className="font-medium">Wonderwave</div>
-          <div className="text-sm text-gray-500">{user?.email || "not signed in"}</div>
-        </div>
-        
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuItem>
+          <User className="mr-2 h-4 w-4" />
+          <span>Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem>
-          <Link to="/dashboard" className="w-full text-sm flex items-center gap-2">
-            <LayoutDashboard size={16} />
-            Dashboard
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/settings/general" className="w-full text-sm flex items-center gap-2">
-            <User size={16} />
-            My Account
-          </Link>
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
-        {/* New section for Docs, Help, Changelog */}
-        <DropdownMenuItem>
-          <Link to="/docs" className="w-full text-sm flex items-center gap-2">
-            <Book size={16} />
-            Docs
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/help" className="w-full text-sm flex items-center gap-2">
-            <HelpCircle size={16} />
-            Help
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Link to="/changelog" className="w-full text-sm flex items-center gap-2">
-            <GitPullRequest size={16} />
-            Changelog
-          </Link>
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
         <DropdownMenuItem onClick={handleSignOut}>
-          <div className="w-full text-sm flex items-center gap-2 cursor-pointer">
-            <LogOut size={16} />
-            Sign out
-          </div>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Sign out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

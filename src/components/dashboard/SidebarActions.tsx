@@ -1,84 +1,73 @@
-import React from "react";
+
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { DollarSign, User, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { PlusIcon, Users, Settings } from "lucide-react";
+import CreateAgentDialog from "./CreateAgentDialog";
+import CreateTeamDialog from "./CreateTeamDialog";
 import { useToast } from "@/hooks/use-toast";
 
-const SidebarActions = () => {
-  const navigate = useNavigate();
-  const { signOut } = useAuth();
+interface SidebarActionsProps {
+  onAgentCreated?: () => void;
+  onTeamCreated?: () => void;
+}
+
+const SidebarActions: React.FC<SidebarActionsProps> = ({
+  onAgentCreated,
+  onTeamCreated
+}) => {
+  const [showCreateAgent, setShowCreateAgent] = useState(false);
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
   const { toast } = useToast();
-  
-  const handleUpgradeClick = () => {
-    navigate("/settings/plans");
+
+  const handleAgentCreated = () => {
+    setShowCreateAgent(false);
+    onAgentCreated?.();
+    toast({
+      title: "Agent Created",
+      description: "Your new agent has been created successfully."
+    });
   };
 
-  const handleMyAccountClick = () => {
-    navigate("/settings/general");
+  const handleTeamCreated = () => {
+    setShowCreateTeam(false);
+    onTeamCreated?.();
+    toast({
+      title: "Team Created",
+      description: "Your new team has been created successfully."
+    });
   };
 
-  const handleLogoutClick = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Signed out successfully",
-        description: "You have been signed out of your account",
-      });
-      navigate("/signin");
-    } catch (error) {
-      toast({
-        title: "Error signing out",
-        description: "There was an error signing out",
-        variant: "destructive",
-      });
-    }
-  };
-  
   return (
-    <div className="border-t p-4 space-y-4">
-      {/* Usage Credits */}
-      <div className="bg-gray-50 rounded-md p-3">
-        <div className="text-sm font-medium text-gray-800">Usage Credits</div>
-        <div className="flex justify-between items-center mt-1">
-          <div className="text-xs text-gray-500">Free Plan</div>
-          <div className="text-xs font-medium text-purple-600">5 left</div>
-        </div>
-        <div className="text-xs text-gray-500 mt-0.5">0 of 5 used</div>
-      </div>
-      
-      {/* Upgrade button */}
-      <Button 
-        onClick={handleUpgradeClick}
-        className="w-full flex items-center justify-center"
-        size="sm"
+    <div className="space-y-2">
+      <Button
+        onClick={() => setShowCreateAgent(true)}
+        className="w-full justify-start"
+        variant="ghost"
       >
-        <DollarSign size={16} className="mr-1" />
-        Upgrade
+        <PlusIcon className="mr-2 h-4 w-4" />
+        Create Agent
       </Button>
       
-      {/* My Account and Logout */}
-      <div className="space-y-2">
-        <Button 
-          variant="ghost" 
-          className="w-full flex items-center justify-start text-gray-700"
-          size="sm"
-          onClick={handleMyAccountClick}
-        >
-          <User size={16} className="mr-2" />
-          My Account
-        </Button>
-        
-        <Button 
-          variant="ghost" 
-          className="w-full flex items-center justify-start text-gray-700"
-          size="sm"
-          onClick={handleLogoutClick}
-        >
-          <LogOut size={16} className="mr-2" />
-          Logout
-        </Button>
-      </div>
+      <Button
+        onClick={() => setShowCreateTeam(true)}
+        className="w-full justify-start"
+        variant="ghost"
+      >
+        <Users className="mr-2 h-4 w-4" />
+        Create Team
+      </Button>
+
+      <CreateAgentDialog
+        open={showCreateAgent}
+        onOpenChange={setShowCreateAgent}
+        onAgentCreated={handleAgentCreated}
+      />
+
+      <CreateTeamDialog
+        open={showCreateTeam}
+        onOpenChange={setShowCreateTeam}
+        onTeamCreated={handleTeamCreated}
+      />
     </div>
   );
 };
