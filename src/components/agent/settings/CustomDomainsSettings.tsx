@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ const CustomDomainsSettings: React.FC = () => {
   const [domain, setDomain] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [domains, setDomains] = useState<string[]>([]);
-  const toast = useToast();
+  const { toast } = useToast();
 
   const handleAdd = () => {
     if (domain && !domains.includes(domain)) {

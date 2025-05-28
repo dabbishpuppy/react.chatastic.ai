@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ const GeneralSettings = () => {
   const [teamName, setTeamName] = useState("Wonderwave");
   const [teamUrl, setTeamUrl] = useState("wonderwave");
   const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   const handleSave = () => {
     setIsSaving(true);

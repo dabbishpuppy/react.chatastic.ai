@@ -1,9 +1,7 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { ChatInterfaceSettings, defaultChatSettings, SuggestedMessage } from '@/types/chatInterface';
-import { getChatSettings, saveChatSettings, uploadChatAsset } from '@/services/chatSettingsService';
 
 // Edge function service
 export const loadSettingsFromEdgeFunction = async (agentId: string, bustCache = false) => {

@@ -25,6 +25,7 @@ const MembersSettings: React.FC = () => {
 
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const { toast } = useToast();
 
   const handleInvite = () => {
     if (!inviteEmail) {
