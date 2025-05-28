@@ -1,10 +1,9 @@
 
 import React from "react";
-import { useChatMessageHandlers } from "./message/useChatMessageHandlers";
-import MessageContainer from "./message/MessageContainer";
-import MessageLayout from "./message/MessageLayout";
+import ChatMessageAvatar from "./ChatMessageAvatar";
+import MessageContent from "./MessageContent";
 
-export interface SharedChatMessageProps {
+interface MessageLayoutProps {
   message: {
     id?: string;
     content: string;
@@ -15,73 +14,76 @@ export interface SharedChatMessageProps {
   };
   agentName: string;
   profilePicture?: string;
-  showFeedback: boolean;
   hideUserAvatar?: boolean;
-  onFeedback?: (timestamp: string, type: "like" | "dislike") => void;
-  onCopy?: (content: string) => void;
-  onRegenerate?: () => void;
-  allowRegenerate?: boolean;
   agentBubbleClass: string;
   userBubbleClass: string;
   userMessageStyle?: React.CSSProperties;
-  isInitialMessage?: boolean;
+  showFeedback: boolean;
+  allowRegenerate?: boolean;
   isLastAgentMessage?: boolean;
-  theme?: 'light' | 'dark';
+  onFeedback: (type: "like" | "dislike") => void;
+  onCopy: (content: string) => void;
+  onRegenerate?: () => void;
+  isUpdatingFeedback: boolean;
+  showCopiedTooltip: boolean;
 }
 
-const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
+const MessageLayout: React.FC<MessageLayoutProps> = ({
   message,
   agentName,
   profilePicture,
-  showFeedback,
   hideUserAvatar = false,
-  onFeedback,
-  onCopy,
-  onRegenerate,
-  allowRegenerate = false,
   agentBubbleClass,
   userBubbleClass,
   userMessageStyle = {},
-  isInitialMessage = false,
+  showFeedback,
+  allowRegenerate = false,
   isLastAgentMessage = false,
-  theme = 'light'
+  onFeedback,
+  onCopy,
+  onRegenerate,
+  isUpdatingFeedback,
+  showCopiedTooltip
 }) => {
   const isAgent = message.isAgent !== undefined ? message.isAgent : message.role === 'assistant';
-  
-  const {
-    showCopiedTooltip,
-    isUpdatingFeedback,
-    handleCopy,
-    handleFeedback
-  } = useChatMessageHandlers(
-    message.id,
-    message.timestamp,
-    message.feedback,
-    onFeedback,
-    onCopy
-  );
 
   return (
-    <MessageContainer isAgent={isAgent}>
-      <MessageLayout
-        message={message}
-        agentName={agentName}
+    <>
+      <ChatMessageAvatar
         profilePicture={profilePicture}
+        agentName={agentName}
+        isAgent={isAgent}
         hideUserAvatar={hideUserAvatar}
+      />
+      
+      <MessageContent
+        content={message.content}
+        isAgent={isAgent}
         agentBubbleClass={agentBubbleClass}
         userBubbleClass={userBubbleClass}
         userMessageStyle={userMessageStyle}
+        messageId={message.id}
+        feedback={message.feedback}
         showFeedback={showFeedback}
         allowRegenerate={allowRegenerate}
         isLastAgentMessage={isLastAgentMessage}
-        onFeedback={handleFeedback}
-        onCopy={handleCopy}
+        onFeedback={onFeedback}
+        onCopy={onCopy}
         onRegenerate={onRegenerate}
         isUpdatingFeedback={isUpdatingFeedback}
         showCopiedTooltip={showCopiedTooltip}
       />
-    </MessageContainer>
+      
+      {!isAgent && (
+        <ChatMessageAvatar
+          profilePicture={profilePicture}
+          agentName={agentName}
+          isAgent={false}
+          hideUserAvatar={hideUserAvatar}
+        />
+      )}
+    </>
   );
 };
 
-export default SharedChatMessage;
+export default MessageLayout;
