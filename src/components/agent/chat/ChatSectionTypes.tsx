@@ -1,9 +1,7 @@
 
-import React from "react";
 import { ChatMessage } from "@/types/chatInterface";
-import ChatSectionLogic from "./chat/ChatSectionLogic";
 
-interface ChatSectionProps {
+export interface ChatSectionProps {
   agentId?: string;
   initialMessages?: ChatMessage[];
   toggleSettings?: () => void;
@@ -25,9 +23,3 @@ interface ChatSectionProps {
   leadSettings?: any;
   conversationSource?: 'iframe' | 'bubble';
 }
-
-const ChatSection: React.FC<ChatSectionProps> = (props) => {
-  return <ChatSectionLogic {...props} />;
-};
-
-export default ChatSection;
