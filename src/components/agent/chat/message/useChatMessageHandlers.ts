@@ -55,19 +55,26 @@ export const useChatMessageHandlers = (
 
     setIsUpdatingFeedback(true);
     try {
-      console.log('🔥 Handling feedback:', { messageId, messageTimestamp, type, messageFeedback });
+      console.log('🔥 useChatMessageHandlers - Handling feedback:', { 
+        messageId, 
+        messageTimestamp, 
+        type, 
+        messageFeedback,
+        hasMessageId: !!messageId,
+        messageIdType: typeof messageId
+      });
       
       // Determine new feedback value (toggle if same, set if different)
       const newFeedback = messageFeedback === type ? null : type;
       
       // Always try to save to database first if messageId exists
       if (messageId && messageId !== 'initial-message') {
-        console.log('💾 Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
+        console.log('💾 useChatMessageHandlers - Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
         
         const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
         
         if (success) {
-          console.log('✅ Feedback saved to database successfully');
+          console.log('✅ useChatMessageHandlers - Feedback saved to database successfully');
           // Call the onFeedback callback to update local state
           onFeedback(messageTimestamp, type);
           toast({
@@ -75,7 +82,7 @@ export const useChatMessageHandlers = (
             duration: 2000,
           });
         } else {
-          console.error('❌ Failed to save feedback to database');
+          console.error('❌ useChatMessageHandlers - Failed to save feedback to database');
           toast({
             description: "Failed to update feedback",
             duration: 2000,
@@ -83,7 +90,7 @@ export const useChatMessageHandlers = (
           });
         }
       } else {
-        console.log('⚠️ No messageId provided, updating local state only');
+        console.log('⚠️ useChatMessageHandlers - No messageId provided, updating local state only. MessageId:', messageId);
         onFeedback(messageTimestamp, type);
         toast({
           description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
@@ -91,7 +98,7 @@ export const useChatMessageHandlers = (
         });
       }
     } catch (error) {
-      console.error('❌ Error updating feedback:', error);
+      console.error('❌ useChatMessageHandlers - Error updating feedback:', error);
       toast({
         description: "Failed to update feedback",
         duration: 2000,

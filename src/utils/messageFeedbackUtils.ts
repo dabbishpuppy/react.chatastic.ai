@@ -20,25 +20,32 @@ export const handleFeedback = async (
           messageId: msg.id, 
           timestamp, 
           oldFeedback: msg.feedback, 
-          newFeedback 
+          newFeedback,
+          providedMessageId: messageId
         });
         
-        // Update database if message has an ID
-        if (msg.id) {
-          console.log('💾 Calling analyticsService to update feedback in database');
-          analyticsService.updateMessageFeedback(msg.id, newFeedback || null)
+        // Use the provided messageId if available, otherwise fall back to msg.id
+        const dbMessageId = messageId || msg.id;
+        
+        // Update database if we have a message ID
+        if (dbMessageId && dbMessageId !== 'initial-message') {
+          console.log('💾 Calling analyticsService to update feedback in database with ID:', dbMessageId);
+          analyticsService.updateMessageFeedback(dbMessageId, newFeedback || null)
             .then(success => {
               if (success) {
-                console.log('✅ Database feedback update successful');
+                console.log('✅ Database feedback update successful for message:', dbMessageId);
               } else {
-                console.error('❌ Database feedback update failed');
+                console.error('❌ Database feedback update failed for message:', dbMessageId);
               }
             })
             .catch(error => {
-              console.error('❌ Error updating feedback in database:', error);
+              console.error('❌ Error updating feedback in database for message:', dbMessageId, error);
             });
         } else {
-          console.warn('⚠️ Message has no ID, cannot save to database');
+          console.warn('⚠️ No valid message ID available, cannot save to database:', { 
+            providedMessageId: messageId, 
+            msgId: msg.id 
+          });
         }
         
         return { ...msg, feedback: newFeedback };
