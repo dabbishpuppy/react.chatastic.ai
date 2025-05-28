@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -223,6 +224,7 @@ const SourceDetailPage: React.FC = () => {
   };
 
   const isHtmlContent = source?.metadata?.isHtml === true;
+  const isFileSource = source?.source_type === 'file';
 
   if (loading) {
     return (
@@ -309,7 +311,7 @@ const SourceDetailPage: React.FC = () => {
 
             <Card>
               <CardContent className="p-6">
-                {isEditing ? (
+                {isEditing && !isFileSource ? (
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -384,12 +386,14 @@ const SourceDetailPage: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between items-start">
                       <h2 className="text-xl font-semibold">{source.title}</h2>
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsEditing(true)}
-                      >
-                        Edit
-                      </Button>
+                      {!isFileSource && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          Edit
+                        </Button>
+                      )}
                     </div>
                     
                     <div className="prose max-w-none">
