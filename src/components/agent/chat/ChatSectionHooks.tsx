@@ -18,7 +18,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   const { settings, refreshSettings } = useChatSettings(agentId);
   
   // Use the leadSettings from props if provided, otherwise use the hook
-  const leadSettingsHook = useLeadSettings(agentId || '');
+  const leadSettingsHook = useLeadSettings();
   const effectiveLeadSettings = leadSettings || leadSettingsHook.settings;
   const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
 
