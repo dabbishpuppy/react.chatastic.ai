@@ -52,25 +52,31 @@ const ConversationMessages: React.FC<ConversationMessagesProps> = ({
 
   return (
     <div className="space-y-4">
-      {messages.map((message, index) => (
-        <SharedChatMessage
-          key={message.id || index}
-          message={message}
-          agentName={displayName}
-          profilePicture={profilePicture}
-          showFeedback={true}
-          hideUserAvatar={false}
-          readOnly={false}
-          onFeedback={onFeedback}
-          onCopy={onCopy}
-          allowRegenerate={false}
-          agentBubbleClass={theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}
-          userBubbleClass="bg-blue-500 text-white ml-auto"
-          userMessageStyle={userMessageStyle}
-          isLastAgentMessage={index === lastAgentMessageIndex}
-          theme={theme}
-        />
-      ))}
+      {messages.map((message, index) => {
+        // Detect if this is the initial message
+        const isInitialMessage = index === 0 && message.role === 'assistant' || message.id === 'initial-message';
+        
+        return (
+          <SharedChatMessage
+            key={message.id || index}
+            message={message}
+            agentName={displayName}
+            profilePicture={profilePicture}
+            showFeedback={true}
+            hideUserAvatar={false}
+            readOnly={false}
+            onFeedback={onFeedback}
+            onCopy={onCopy}
+            allowRegenerate={false}
+            agentBubbleClass={theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-black'}
+            userBubbleClass="bg-blue-500 text-white ml-auto"
+            userMessageStyle={userMessageStyle}
+            isInitialMessage={isInitialMessage}
+            isLastAgentMessage={index === lastAgentMessageIndex}
+            theme={theme}
+          />
+        );
+      })}
     </div>
   );
 };
