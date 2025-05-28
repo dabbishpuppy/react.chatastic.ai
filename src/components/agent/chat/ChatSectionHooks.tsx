@@ -49,6 +49,13 @@ export const useChatSectionHooks = (props: ChatSectionProps) => {
     getConversationMessages
   } = useConversationManager(conversationSource);
 
+  // Create a callback for conversation creation that can be passed to useMessageHandling
+  const createConversationCallback = async (): Promise<string | null> => {
+    console.log('🆕 Creating conversation via callback for message handling');
+    const conversation = await startNewConversation();
+    return conversation?.id || null;
+  };
+
   const {
     message,
     setMessage,
@@ -74,7 +81,8 @@ export const useChatSectionHooks = (props: ChatSectionProps) => {
     isEmbedded, 
     currentConversation?.id, 
     agentId, 
-    conversationSource
+    conversationSource,
+    createConversationCallback
   );
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded, chatHistory, isTyping);
