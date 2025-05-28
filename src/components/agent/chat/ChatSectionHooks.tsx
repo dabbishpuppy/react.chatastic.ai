@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useConversationManager } from "@/hooks/useConversationManager";
@@ -70,6 +71,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     setChatHistory(prevHistory => [...prevHistory, newMessage]);
   };
 
+  // Enhanced getConversationMessages that uses the agentId
+  const getConversationMessagesWithAgent = async (conversationId: string) => {
+    console.log('🔄 Getting conversation messages with agent ID:', agentId, 'for conversation:', conversationId);
+    return await getConversationMessages(conversationId);
+  };
+
   // Wrap startNewConversation to match expected return type
   const wrappedStartNewConversation = async () => {
     await startNewConversation();
@@ -88,7 +95,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     startNewConversation: wrappedStartNewConversation,
     endCurrentConversation,
     loadConversation,
-    getConversationMessages,
+    getConversationMessages: getConversationMessagesWithAgent,
     message,
     setMessage,
     chatHistory,

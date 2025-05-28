@@ -1,8 +1,8 @@
-
 import { useState, useEffect, useRef } from "react";
 import { conversationService, Conversation, Message } from "@/services/conversationService";
 import { ChatMessage } from "@/types/chatInterface";
 import { useParams } from "react-router-dom";
+import { conversationLoader } from "@/services/conversationLoader";
 
 export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -141,14 +141,21 @@ export const useConversationManager = (source: 'iframe' | 'bubble' = 'iframe') =
 
   const getConversationMessages = async (conversationId: string): Promise<ChatMessage[]> => {
     try {
-      const messages = await conversationService.getMessages(conversationId);
+      console.log('🔄 Loading conversation messages with initial greeting for conversation:', conversationId);
+      
+      // Use conversationLoader to get messages with initial greeting
+      const messages = await conversationLoader.loadConversationWithGreeting(conversationId, agentId || '');
+      
+      // Convert to ChatMessage format
       return messages.map(msg => ({
-        isAgent: msg.is_agent,
+        isAgent: msg.role === 'assistant',
         content: msg.content,
-        timestamp: msg.timestamp
+        timestamp: msg.timestamp,
+        id: msg.id,
+        feedback: msg.feedback
       }));
     } catch (error) {
-      console.error('Error fetching conversation messages:', error);
+      console.error('Error fetching conversation messages with initial greeting:', error);
       return [];
     }
   };
