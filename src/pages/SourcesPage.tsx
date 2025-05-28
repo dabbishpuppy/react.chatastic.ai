@@ -22,16 +22,6 @@ const SourcesPage: React.FC = () => {
     }
   }, []);
 
-  // Mock source statistics
-  const sourceStats = {
-    files: 1,
-    textFiles: 1,
-    links: 6,
-    qa: 1,
-    totalSize: 4 * 1024, // 4 KB
-    maxSize: 400 * 1024, // 400 KB
-  };
-
   // Get the current tab title for display
   const getTabTitle = () => {
     switch (tab) {
@@ -73,7 +63,7 @@ const SourcesPage: React.FC = () => {
             {renderTabContent()}
           </div>
           <div className="w-80 flex-shrink-0">
-            <SourcesWidget stats={sourceStats} />
+            <SourcesWidget />
           </div>
         </div>
       </div>
