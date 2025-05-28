@@ -95,6 +95,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     rateLimitError,
     timeUntilReset,
     userHasMessaged,
+    setUserHasMessaged,
     inputRef,
     copyMessageToClipboard,
     handleFeedback,
