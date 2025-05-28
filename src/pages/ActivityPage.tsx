@@ -4,7 +4,7 @@ import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
 import ConversationView from "@/components/agent/ConversationView";
 import ConversationViewSkeleton from "@/components/activity/ConversationViewSkeleton";
-import { useOptimizedActivityData } from "./activity/OptimizedActivityHooks";
+import { useOptimizedActivityData } from "./activity/OptimizedActivityHooksV2";
 import { useActivityRealtime } from "./activity/ActivityPageRealtime";
 import { getConversationTheme, EmptyState } from "./activity/ActivityPageUtils";
 
@@ -33,6 +33,7 @@ const ActivityPage: React.FC = () => {
 
   useEffect(() => {
     if (agentId) {
+      console.log('🎬 ActivityPage: Starting to load conversations for agent:', agentId);
       loadConversations();
     }
   }, [agentId, loadConversations]);
@@ -90,7 +91,9 @@ const ActivityPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full bg-white rounded-lg border">
-                  <p className="text-gray-500">Select a conversation to view details</p>
+                  <p className="text-gray-500">
+                    {isLoadingConversations ? "Loading conversations..." : "Select a conversation to view details"}
+                  </p>
                 </div>
               )}
             </div>

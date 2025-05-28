@@ -60,12 +60,18 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
   const [isEmpty, setIsEmpty] = useState(conversations.length === 0);
   const [loading, setLoading] = useState(isLoading);
 
+  // Update local state when props change, with instant UI updates
   useEffect(() => {
+    console.log('📊 ChatLogsTab: Updating with conversations:', conversations.length);
+    
     if (conversations.length > 0) {
       setChatLogs(conversations);
       setIsEmpty(false);
     } else if (agentId && conversations.length === 0 && !isLoading) {
-      loadConversations();
+      // Only show empty state if we're not loading and have no conversations from props
+      if (!isLoading) {
+        setIsEmpty(true);
+      }
     }
     setLoading(isLoading);
   }, [conversations, agentId, isLoading]);
@@ -87,6 +93,7 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
   };
 
   const handleRefresh = () => {
+    console.log('🔄 ChatLogsTab: Refresh requested');
     if (onRefresh) {
       onRefresh();
     } else {
@@ -96,6 +103,11 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
 
   const getConversationTitle = (conversation: any) => {
     return conversation.title || `Chat from ${formatDistanceToNow(new Date(conversation.created_at), { addSuffix: true })}`;
+  };
+
+  const handleConversationRowClick = (conversationId: string) => {
+    console.log('👆 ChatLogsTab: Row clicked for conversation:', conversationId);
+    onConversationClick(conversationId);
   };
 
   return (
@@ -153,7 +165,7 @@ const ChatLogsTab: React.FC<ChatLogsTabProps> & { ActionButtons: typeof ActionBu
                         className={`cursor-pointer transition-colors ${
                           isSelected ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
                         }`}
-                        onClick={() => onConversationClick(log.id)}
+                        onClick={() => handleConversationRowClick(log.id)}
                       >
                         <TableCell className="py-4">
                           <div className="flex justify-between items-start">

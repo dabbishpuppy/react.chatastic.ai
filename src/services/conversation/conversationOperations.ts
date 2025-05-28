@@ -52,7 +52,33 @@ export const conversationOperations = {
     }
   },
 
-  // Get recent conversations for an agent (only those with messages)
+  // Optimized method to get conversations with message counts and previews in a single query
+  async getRecentConversationsOptimized(agentId: string, limit: number = 10): Promise<Conversation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          *,
+          messages(count)
+        `)
+        .eq('agent_id', agentId)
+        .gt('messages.count', 0)
+        .order('updated_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error('Error fetching optimized conversations:', error);
+        return [];
+      }
+
+      return (data || []).filter(conv => conv.messages && conv.messages.length > 0) as Conversation[];
+    } catch (error) {
+      console.error('Error fetching optimized conversations:', error);
+      return [];
+    }
+  },
+
+  // Get recent conversations for an agent (only those with messages) - legacy method
   async getRecentConversations(agentId: string, limit: number = 10): Promise<Conversation[]> {
     try {
       // First get all conversations for the agent
