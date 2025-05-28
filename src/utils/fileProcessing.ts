@@ -1,4 +1,5 @@
 
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set up PDF.js worker
@@ -83,15 +84,39 @@ Processing error: ${error instanceof Error ? error.message : 'Unknown error'}`;
 };
 
 export const processDocumentFile = async (file: File): Promise<FileProcessingResult> => {
+  console.log('🔍 Processing document file:', file.name, 'Type:', file.type);
+  
   try {
     const arrayBuffer = await file.arrayBuffer();
+    console.log('📄 ArrayBuffer size:', arrayBuffer.byteLength);
     
     if (file.name.toLowerCase().endsWith('.docx')) {
+      console.log('🔄 Attempting to process DOCX file...');
+      
       try {
-        // Dynamic import of mammoth to handle cases where it might not be available
-        const mammoth = await import('mammoth');
+        console.log('📦 Attempting to import mammoth...');
+        // Try dynamic import with explicit error handling
+        const mammothModule = await import('mammoth');
+        console.log('✅ Successfully imported mammoth:', mammothModule);
+        
+        // Access the default export or the extractRawText function
+        const mammoth = mammothModule.default || mammothModule;
+        console.log('🔧 Mammoth object:', mammoth);
+        
+        if (!mammoth.extractRawText) {
+          throw new Error('mammoth.extractRawText is not available');
+        }
+        
+        console.log('📖 Extracting text from DOCX...');
         const result = await mammoth.extractRawText({ arrayBuffer });
+        console.log('📝 Text extraction result:', result);
+        
         const content = result.value;
+        console.log('✅ Successfully extracted content, length:', content.length);
+        
+        if (!content || content.trim().length === 0) {
+          throw new Error('Extracted content is empty');
+        }
         
         return {
           content,
@@ -103,12 +128,17 @@ export const processDocumentFile = async (file: File): Promise<FileProcessingRes
           }
         };
       } catch (mammothError) {
-        console.error('Error loading mammoth:', mammothError);
+        console.error('❌ Error with mammoth processing:', mammothError);
+        console.error('Mammoth error details:', {
+          message: mammothError instanceof Error ? mammothError.message : 'Unknown error',
+          stack: mammothError instanceof Error ? mammothError.stack : 'No stack trace'
+        });
         // Fall through to the general document handling below
       }
     }
 
     // For .doc files or when mammoth fails, provide a helpful message
+    console.log('⚠️ Falling back to placeholder content');
     const content = `[Document: ${file.name}]
       
 This document format requires text extraction libraries. 
@@ -129,7 +159,7 @@ For better text extraction, please convert the document to .docx format or uploa
       }
     };
   } catch (error) {
-    console.error('Error processing document:', error);
+    console.error('❌ Error processing document:', error);
     
     // Fallback to placeholder if document processing fails
     const content = `[Document: ${file.name}]
@@ -181,3 +211,4 @@ export const validateFileType = (file: File): boolean => {
 export const validateFileSize = (file: File, maxSizeMB: number = 10): boolean => {
   return file.size <= maxSizeMB * 1024 * 1024;
 };
+
