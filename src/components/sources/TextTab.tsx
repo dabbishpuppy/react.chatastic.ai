@@ -43,7 +43,7 @@ const TextTab: React.FC = () => {
     try {
       console.log('Creating text source with content length:', content.length);
       
-      await sources.createSource({
+      const newSource = await sources.createSource({
         agent_id: agentId,
         source_type: 'text',
         title: title.trim(),
@@ -55,7 +55,7 @@ const TextTab: React.FC = () => {
         }
       });
 
-      console.log('Text source created successfully');
+      console.log('Text source created successfully:', newSource);
 
       toast({
         title: "Text snippet added",
@@ -66,8 +66,14 @@ const TextTab: React.FC = () => {
       setTitle("");
       setContent("");
       
-      // Refresh the sources list
-      refetch();
+      // Force refresh the sources list immediately
+      await refetch();
+      
+      // Small delay to ensure database changes are propagated
+      setTimeout(() => {
+        refetch();
+      }, 500);
+      
     } catch (error) {
       console.error("Error creating text snippet:", error);
       toast({

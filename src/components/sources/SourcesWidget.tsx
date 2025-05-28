@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,29 +27,33 @@ const SourcesWidget: React.FC = () => {
   const [sourcesData, setSourcesData] = useState<AgentSource[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchSources = async () => {
+  const fetchSources = useCallback(async () => {
     if (!agentId) return;
     
     try {
+      console.log('Fetching sources for widget...');
       const data = await sources.getSourcesByAgent(agentId);
+      console.log('Sources fetched:', data.length);
       setSourcesData(data);
     } catch (error) {
       console.error('Error fetching sources:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [agentId, sources]);
 
   useEffect(() => {
     fetchSources();
-  }, [agentId]);
+  }, [fetchSources]);
 
   // Set up real-time subscription for sources
   useEffect(() => {
     if (!agentId) return;
 
+    console.log('Setting up real-time subscription for sources widget');
+    
     const channel = supabase
-      .channel('sources-widget-changes')
+      .channel(`sources-widget-${agentId}`)
       .on(
         'postgres_changes',
         {
@@ -60,15 +64,19 @@ const SourcesWidget: React.FC = () => {
         },
         (payload) => {
           console.log('Source change detected in widget:', payload);
-          fetchSources(); // Refetch sources when changes occur
+          // Immediately refetch sources when any change occurs
+          fetchSources();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Widget subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up widget subscription');
       supabase.removeChannel(channel);
     };
-  }, [agentId]);
+  }, [agentId, fetchSources]);
 
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
