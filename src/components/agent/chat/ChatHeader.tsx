@@ -52,7 +52,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
             <AvatarImage src={profilePicture} alt={agentName} />
           ) : (
             <AvatarFallback className="bg-gray-100">
-              {agentName.charAt(0).toUpperCase()}
             </AvatarFallback>
           )}
         </Avatar>
@@ -76,7 +75,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         <ChatMenuDropdown
           onStartNewChat={onStartNewChat}
           onEndChat={onEndChat}
-          onLoadConversation={onLoadConversation}
           agentId={agentId}
           isConversationEnded={isConversationEnded}
           isEmbedded={isEmbedded}

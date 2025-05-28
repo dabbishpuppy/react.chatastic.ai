@@ -39,8 +39,7 @@ const ChatPreview: React.FC<ChatPreviewProps> = ({
                 {draftSettings.profile_picture ? (
                   <AvatarImage src={draftSettings.profile_picture} alt={draftSettings.display_name} />
                 ) : (
-                  <AvatarFallback className="bg-gray-100 text-xs">
-                    {draftSettings.display_name.charAt(0).toUpperCase()}
+                  <AvatarFallback className="bg-gray-100">
                   </AvatarFallback>
                 )}
               </Avatar>
