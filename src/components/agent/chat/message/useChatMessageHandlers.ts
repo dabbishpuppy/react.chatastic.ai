@@ -8,12 +8,15 @@ export const useChatMessageHandlers = (
   messageTimestamp?: string,
   messageFeedback?: 'like' | 'dislike',
   onFeedback?: (timestamp: string, type: "like" | "dislike") => void,
-  onCopy?: (content: string) => void
+  onCopy?: (content: string) => void,
+  readOnly?: boolean
 ) => {
   const [showCopiedTooltip, setShowCopiedTooltip] = useState(false);
   const [isUpdatingFeedback, setIsUpdatingFeedback] = useState(false);
 
   const handleCopy = async (content: string) => {
+    if (readOnly) return;
+    
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(content);
@@ -48,7 +51,7 @@ export const useChatMessageHandlers = (
   };
 
   const handleFeedback = async (type: "like" | "dislike") => {
-    if (isUpdatingFeedback || !onFeedback || !messageTimestamp) return;
+    if (isUpdatingFeedback || !onFeedback || !messageTimestamp || readOnly) return;
 
     setIsUpdatingFeedback(true);
     try {
