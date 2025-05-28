@@ -41,6 +41,8 @@ const TextTab: React.FC = () => {
     setIsSubmitting(true);
 
     try {
+      console.log('Creating text source with content length:', content.length);
+      
       await sources.createSource({
         agent_id: agentId,
         source_type: 'text',
@@ -52,6 +54,8 @@ const TextTab: React.FC = () => {
           created_via: 'text_tab'
         }
       });
+
+      console.log('Text source created successfully');
 
       toast({
         title: "Text snippet added",

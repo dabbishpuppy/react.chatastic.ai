@@ -1,152 +1,240 @@
-import React from "react";
-import { Card } from "@/components/ui/card";
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Link2, FileArchive, MessageCircleQuestion, AlertCircle } from "lucide-react";
-import { useAgentSources } from "@/hooks/useAgentSources";
+import { 
+  FileText, 
+  File, 
+  Link, 
+  MessageCircleQuestion,
+  Info
+} from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useParams } from "react-router-dom";
+import { useRAGServices } from "@/hooks/useRAGServices";
+import { AgentSource, SourceType } from "@/types/rag";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from "date-fns";
 
 const SourcesWidget: React.FC = () => {
-  const { sources, loading } = useAgentSources();
+  const { agentId } = useParams();
+  const { sources } = useRAGServices();
+  const [sourcesData, setSourcesData] = useState<AgentSource[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const formattedSize = (size: number) => {
-    if (size < 1024) {
-      return `${size} B`;
-    } else if (size < 1024 * 1024) {
-      return `${Math.round(size / 1024)} KB`;
-    } else {
-      return `${Math.round(size / (1024 * 1024))} MB`;
+  const fetchSources = async () => {
+    if (!agentId) return;
+    
+    try {
+      const data = await sources.getSourcesByAgent(agentId);
+      setSourcesData(data);
+    } catch (error) {
+      console.error('Error fetching sources:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const calculateStats = () => {
-    if (!sources.length) {
-      return {
-        files: 0,
-        textFiles: 0,
-        links: 0,
-        qa: 0,
-        totalSize: 0
-      };
+  useEffect(() => {
+    fetchSources();
+  }, [agentId]);
+
+  // Set up real-time subscription for sources
+  useEffect(() => {
+    if (!agentId) return;
+
+    const channel = supabase
+      .channel('sources-widget-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `agent_id=eq.${agentId}`
+        },
+        (payload) => {
+          console.log('Source change detected in widget:', payload);
+          fetchSources(); // Refetch sources when changes occur
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [agentId]);
+
+  const getSourceIcon = (type: SourceType) => {
+    switch (type) {
+      case 'text':
+        return <FileText size={16} className="text-blue-600" />;
+      case 'file':
+        return <File size={16} className="text-green-600" />;
+      case 'website':
+        return <Link size={16} className="text-purple-600" />;
+      case 'qa':
+        return <MessageCircleQuestion size={16} className="text-orange-600" />;
+      default:
+        return <FileText size={16} className="text-gray-600" />;
     }
-
-    const stats = sources.reduce((acc, source) => {
-      const size = source.content ? new Blob([source.content]).size : 0;
-      
-      switch (source.source_type) {
-        case 'file':
-          acc.files += 1;
-          break;
-        case 'text':
-          acc.textFiles += 1;
-          break;
-        case 'website':
-          acc.links += 1;
-          break;
-        case 'qa':
-          acc.qa += 1;
-          break;
-      }
-      
-      acc.totalSize += size;
-      return acc;
-    }, {
-      files: 0,
-      textFiles: 0,
-      links: 0,
-      qa: 0,
-      totalSize: 0
-    });
-
-    return stats;
   };
 
-  const stats = calculateStats();
-  const maxSize = 400 * 1024; // 400 KB
-  const retrainingRequired = sources.length > 0; // Simple logic for now
+  const getSourceTypeLabel = (type: SourceType) => {
+    switch (type) {
+      case 'text':
+        return 'Text';
+      case 'file':
+        return 'File';
+      case 'website':
+        return 'Website';
+      case 'qa':
+        return 'Q&A';
+      default:
+        return type;
+    }
+  };
+
+  const formatFileSize = (content?: string) => {
+    if (!content) return '0 B';
+    const bytes = new Blob([content]).size;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
+  };
+
+  const getTotalSize = () => {
+    if (sourcesData.length === 0) return '0 B';
+    
+    const totalBytes = sourcesData.reduce((total, source) => {
+      if (!source.content) return total;
+      return total + new Blob([source.content]).size;
+    }, 0);
+    
+    if (totalBytes < 1024) return `${totalBytes} B`;
+    if (totalBytes < 1024 * 1024) return `${Math.round(totalBytes / 1024)} KB`;
+    return `${Math.round(totalBytes / (1024 * 1024))} MB`;
+  };
+
+  const getSourcesByType = (type: SourceType) => {
+    return sourcesData.filter(source => source.source_type === type);
+  };
+
+  const sourceTypes: SourceType[] = ['text', 'file', 'website', 'qa'];
 
   if (loading) {
     return (
-      <Card className="p-6 border border-gray-200 shadow-sm bg-white">
-        <div className="text-center text-gray-500">Loading...</div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sources</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-gray-500">Loading...</div>
+        </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="p-6 border border-gray-200 shadow-sm bg-white">
-      <div className="space-y-4">
-        <h3 className="font-semibold uppercase tracking-wide text-gray-600 text-xs">Sources</h3>
-
-        <div className="space-y-2">
-          {stats.files > 0 && (
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <FileArchive size={16} className="text-gray-500" />
-                <span>{stats.files} {stats.files === 1 ? "File" : "Files"}</span>
-              </div>
-              <span className="text-gray-600">{formattedSize(stats.files * 1024)}</span>
-            </div>
-          )}
-          
-          {stats.textFiles > 0 && (
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-gray-500" />
-                <span>{stats.textFiles} Text {stats.textFiles === 1 ? "File" : "Files"}</span>
-              </div>
-              <span className="text-gray-600">{formattedSize(stats.textFiles)}</span>
-            </div>
-          )}
-          
-          {stats.links > 0 && (
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Link2 size={16} className="text-gray-500" />
-                <span>{stats.links} {stats.links === 1 ? "Link" : "Links"}</span>
-              </div>
-              <span className="text-gray-600">{formattedSize(stats.links)}</span>
-            </div>
-          )}
-          
-          {stats.qa > 0 && (
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <MessageCircleQuestion size={16} className="text-gray-500" />
-                <span>{stats.qa} Q&A</span>
-              </div>
-              <span className="text-gray-600">{formattedSize(stats.qa)}</span>
-            </div>
-          )}
-
-          {stats.files === 0 && stats.textFiles === 0 && stats.links === 0 && stats.qa === 0 && (
-            <div className="text-center text-gray-500 py-4">
-              <p>No sources yet</p>
-              <p className="text-sm">Add your first source</p>
-            </div>
-          )}
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Sources</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-600">Total sources:</span>
+          <span className="font-medium">{sourcesData.length}</span>
+        </div>
+        
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-600">Total size:</span>
+          <span className="font-medium">{getTotalSize()}</span>
         </div>
 
-        <div className="pt-2 border-t border-gray-100">
-          <div className="flex justify-between text-sm mb-1">
-            <span className="font-medium">Total size:</span>
-            <span className="text-right">
-              {formattedSize(stats.totalSize)}
-              <br />
-              <span className="text-gray-500">/ {formattedSize(maxSize)}</span>
-            </span>
+        <div className="space-y-3">
+          {sourceTypes.map((type) => {
+            const typeSourcesData = getSourcesByType(type);
+            if (typeSourcesData.length === 0) return null;
+
+            return (
+              <div key={type} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    {getSourceIcon(type)}
+                    <span className="font-medium">{getSourceTypeLabel(type)}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {typeSourcesData.length}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  {typeSourcesData.slice(0, 3).map((source) => (
+                    <div key={source.id} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <span className="truncate">{source.title}</span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                              <Info size={12} className="text-gray-400" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64" align="end">
+                            <div className="space-y-2 text-xs">
+                              <div>
+                                <span className="font-medium">Created:</span>
+                                <div className="text-gray-600">
+                                  {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium">Last updated:</span>
+                                <div className="text-gray-600">
+                                  {formatDistanceToNow(new Date(source.updated_at), { addSuffix: true })}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="font-medium">Size:</span>
+                                <div className="text-gray-600">{formatFileSize(source.content)}</div>
+                              </div>
+                              <div>
+                                <span className="font-medium">Status:</span>
+                                <div className="text-gray-600">
+                                  {source.is_active ? 'Active' : 'Inactive'}
+                                </div>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <span className="text-gray-500 text-xs">
+                        {formatFileSize(source.content)}
+                      </span>
+                    </div>
+                  ))}
+                  
+                  {typeSourcesData.length > 3 && (
+                    <div className="text-xs text-gray-500 text-center">
+                      +{typeSourcesData.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {sourcesData.length === 0 && (
+          <div className="text-center text-gray-500 text-sm py-4">
+            No sources added yet
           </div>
-          
-          <Button className="w-full bg-black hover:bg-gray-800 mt-4">
-            Retrain agent
-          </Button>
-          
-          {retrainingRequired && (
-            <div className="mt-4 text-amber-700 bg-amber-50 p-3 rounded-md flex items-start gap-2 text-sm">
-              <AlertCircle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
-              <p>Retraining is required for changes to apply</p>
-            </div>
-          )}
-        </div>
-      </div>
+        )}
+      </CardContent>
     </Card>
   );
 };
