@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,96 @@ import { SourceType } from "@/types/rag";
 import { formatDistanceToNow } from "date-fns";
 import { useAgentSources } from "@/hooks/useAgentSources";
 
+// Memoized component for source type section to prevent unnecessary re-renders
+const SourceTypeSection = React.memo(({ 
+  type, 
+  sources, 
+  getSourceIcon, 
+  getSourceTypeLabel, 
+  formatFileSize 
+}: {
+  type: SourceType;
+  sources: any[];
+  getSourceIcon: (type: SourceType) => React.ReactNode;
+  getSourceTypeLabel: (type: SourceType) => string;
+  formatFileSize: (content?: string) => string;
+}) => {
+  if (sources.length === 0) return null;
+
+  return (
+    <div className="border rounded-lg p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-2">
+          {getSourceIcon(type)}
+          <span className="font-medium">{getSourceTypeLabel(type)}</span>
+          <Badge variant="secondary" className="text-xs">
+            {sources.length}
+          </Badge>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        {sources.slice(0, 3).map((source) => (
+          <div key={source.id} className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2 flex-1 min-w-0">
+              <span className="truncate">{source.title}</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                    <Info size={12} className="text-gray-400" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64" align="end">
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <span className="font-medium">Created:</span>
+                      <div className="text-gray-600">
+                        {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Last updated:</span>
+                      <div className="text-gray-600">
+                        {formatDistanceToNow(new Date(source.updated_at), { addSuffix: true })}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Size:</span>
+                      <div className="text-gray-600">{formatFileSize(source.content)}</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Status:</span>
+                      <div className="text-gray-600">
+                        {source.is_active ? 'Active' : 'Inactive'}
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <span className="text-gray-500 text-xs">
+              {formatFileSize(source.content)}
+            </span>
+          </div>
+        ))}
+        
+        {sources.length > 3 && (
+          <div className="text-xs text-gray-500 text-center">
+            +{sources.length - 3} more
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+SourceTypeSection.displayName = 'SourceTypeSection';
+
 const SourcesWidget: React.FC = () => {
-  // Use the consolidated hook instead of managing state separately
   const { sources: sourcesData, loading } = useAgentSources();
 
-  const getSourceIcon = (type: SourceType) => {
+  // Memoize static functions to prevent re-creation on every render
+  const getSourceIcon = useMemo(() => (type: SourceType) => {
     switch (type) {
       case 'text':
         return <FileText size={16} className="text-blue-600" />;
@@ -36,9 +121,9 @@ const SourcesWidget: React.FC = () => {
       default:
         return <FileText size={16} className="text-gray-600" />;
     }
-  };
+  }, []);
 
-  const getSourceTypeLabel = (type: SourceType) => {
+  const getSourceTypeLabel = useMemo(() => (type: SourceType) => {
     switch (type) {
       case 'text':
         return 'Text';
@@ -51,34 +136,39 @@ const SourcesWidget: React.FC = () => {
       default:
         return type;
     }
-  };
+  }, []);
 
-  const formatFileSize = (content?: string) => {
+  const formatFileSize = useMemo(() => (content?: string) => {
     if (!content) return '0 B';
     const bytes = new Blob([content]).size;
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${Math.round(bytes / (1024 * 1024))} MB`;
-  };
+  }, []);
 
-  const getTotalSize = () => {
-    if (sourcesData.length === 0) return '0 B';
-    
+  // Memoize computed values that depend on sourcesData
+  const { totalSize, sourcesByType } = useMemo(() => {
     const totalBytes = sourcesData.reduce((total, source) => {
       if (!source.content) return total;
       return total + new Blob([source.content]).size;
     }, 0);
     
-    if (totalBytes < 1024) return `${totalBytes} B`;
-    if (totalBytes < 1024 * 1024) return `${Math.round(totalBytes / 1024)} KB`;
-    return `${Math.round(totalBytes / (1024 * 1024))} MB`;
-  };
+    let formattedTotalSize;
+    if (totalBytes < 1024) formattedTotalSize = `${totalBytes} B`;
+    else if (totalBytes < 1024 * 1024) formattedTotalSize = `${Math.round(totalBytes / 1024)} KB`;
+    else formattedTotalSize = `${Math.round(totalBytes / (1024 * 1024))} MB`;
 
-  const getSourcesByType = (type: SourceType) => {
-    return sourcesData.filter(source => source.source_type === type);
-  };
+    const sourceTypes: SourceType[] = ['text', 'file', 'website', 'qa'];
+    const computedSourcesByType = sourceTypes.map(type => ({
+      type,
+      sources: sourcesData.filter(source => source.source_type === type)
+    }));
 
-  const sourceTypes: SourceType[] = ['text', 'file', 'website', 'qa'];
+    return {
+      totalSize: formattedTotalSize,
+      sourcesByType: computedSourcesByType
+    };
+  }, [sourcesData]);
 
   if (loading) {
     return (
@@ -106,80 +196,20 @@ const SourcesWidget: React.FC = () => {
         
         <div className="flex justify-between items-center text-sm">
           <span className="text-gray-600">Total size:</span>
-          <span className="font-medium">{getTotalSize()}</span>
+          <span className="font-medium">{totalSize}</span>
         </div>
 
         <div className="space-y-3">
-          {sourceTypes.map((type) => {
-            const typeSourcesData = getSourcesByType(type);
-            if (typeSourcesData.length === 0) return null;
-
-            return (
-              <div key={type} className="border rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    {getSourceIcon(type)}
-                    <span className="font-medium">{getSourceTypeLabel(type)}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {typeSourcesData.length}
-                    </Badge>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  {typeSourcesData.slice(0, 3).map((source) => (
-                    <div key={source.id} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        <span className="truncate">{source.title}</span>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
-                              <Info size={12} className="text-gray-400" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-64" align="end">
-                            <div className="space-y-2 text-xs">
-                              <div>
-                                <span className="font-medium">Created:</span>
-                                <div className="text-gray-600">
-                                  {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
-                                </div>
-                              </div>
-                              <div>
-                                <span className="font-medium">Last updated:</span>
-                                <div className="text-gray-600">
-                                  {formatDistanceToNow(new Date(source.updated_at), { addSuffix: true })}
-                                </div>
-                              </div>
-                              <div>
-                                <span className="font-medium">Size:</span>
-                                <div className="text-gray-600">{formatFileSize(source.content)}</div>
-                              </div>
-                              <div>
-                                <span className="font-medium">Status:</span>
-                                <div className="text-gray-600">
-                                  {source.is_active ? 'Active' : 'Inactive'}
-                                </div>
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                      <span className="text-gray-500 text-xs">
-                        {formatFileSize(source.content)}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {typeSourcesData.length > 3 && (
-                    <div className="text-xs text-gray-500 text-center">
-                      +{typeSourcesData.length - 3} more
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {sourcesByType.map(({ type, sources }) => (
+            <SourceTypeSection
+              key={type}
+              type={type}
+              sources={sources}
+              getSourceIcon={getSourceIcon}
+              getSourceTypeLabel={getSourceTypeLabel}
+              formatFileSize={formatFileSize}
+            />
+          ))}
         </div>
 
         {sourcesData.length === 0 && (
