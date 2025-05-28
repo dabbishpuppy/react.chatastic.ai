@@ -20,7 +20,10 @@ export class AgentSourceService {
       .single();
 
     if (error) throw new Error(`Failed to create source: ${error.message}`);
-    return source;
+    return {
+      ...source,
+      metadata: source.metadata as Record<string, any> || {}
+    };
   }
 
   // Get all sources for an agent
@@ -33,7 +36,10 @@ export class AgentSourceService {
       .order('created_at', { ascending: false });
 
     if (error) throw new Error(`Failed to fetch sources: ${error.message}`);
-    return sources || [];
+    return (sources || []).map(source => ({
+      ...source,
+      metadata: source.metadata as Record<string, any> || {}
+    }));
   }
 
   // Get sources by type for an agent
@@ -47,7 +53,10 @@ export class AgentSourceService {
       .order('created_at', { ascending: false });
 
     if (error) throw new Error(`Failed to fetch sources by type: ${error.message}`);
-    return sources || [];
+    return (sources || []).map(source => ({
+      ...source,
+      metadata: source.metadata as Record<string, any> || {}
+    }));
   }
 
   // Update a source
@@ -60,7 +69,10 @@ export class AgentSourceService {
       .single();
 
     if (error) throw new Error(`Failed to update source: ${error.message}`);
-    return source;
+    return {
+      ...source,
+      metadata: source.metadata as Record<string, any> || {}
+    };
   }
 
   // Soft delete a source (mark as inactive)
@@ -100,6 +112,7 @@ export class AgentSourceService {
     
     return {
       ...data,
+      metadata: data.metadata as Record<string, any> || {},
       chunks_count: data.source_chunks?.[0]?.count || 0
     };
   }

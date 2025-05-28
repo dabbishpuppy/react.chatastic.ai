@@ -23,7 +23,11 @@ export class AuditService {
       .single();
 
     if (error) throw new Error(`Failed to log action: ${error.message}`);
-    return log;
+    return {
+      ...log,
+      old_values: log.old_values as Record<string, any> || undefined,
+      new_values: log.new_values as Record<string, any> || undefined
+    };
   }
 
   // Get audit logs for a team
@@ -40,7 +44,11 @@ export class AuditService {
       .range(offset, offset + limit - 1);
 
     if (error) throw new Error(`Failed to fetch team logs: ${error.message}`);
-    return logs || [];
+    return (logs || []).map(log => ({
+      ...log,
+      old_values: log.old_values as Record<string, any> || undefined,
+      new_values: log.new_values as Record<string, any> || undefined
+    }));
   }
 
   // Get audit logs for an agent
@@ -57,7 +65,11 @@ export class AuditService {
       .range(offset, offset + limit - 1);
 
     if (error) throw new Error(`Failed to fetch agent logs: ${error.message}`);
-    return logs || [];
+    return (logs || []).map(log => ({
+      ...log,
+      old_values: log.old_values as Record<string, any> || undefined,
+      new_values: log.new_values as Record<string, any> || undefined
+    }));
   }
 
   // Get logs by action type
@@ -80,7 +92,11 @@ export class AuditService {
       .limit(limit);
 
     if (error) throw new Error(`Failed to fetch logs by action: ${error.message}`);
-    return logs || [];
+    return (logs || []).map(log => ({
+      ...log,
+      old_values: log.old_values as Record<string, any> || undefined,
+      new_values: log.new_values as Record<string, any> || undefined
+    }));
   }
 
   // Export audit logs for GDPR compliance
@@ -100,7 +116,11 @@ export class AuditService {
       resource_id: teamId
     });
 
-    return logs || [];
+    return (logs || []).map(log => ({
+      ...log,
+      old_values: log.old_values as Record<string, any> || undefined,
+      new_values: log.new_values as Record<string, any> || undefined
+    }));
   }
 
   // Helper to get client IP (simplified for now)

@@ -9,13 +9,24 @@ export class EmbeddingService {
     embedding: number[];
     model_name: string;
   }>): Promise<SourceEmbedding[]> {
+    // Convert number arrays to strings for database storage
+    const embeddingsForDb = embeddings.map(e => ({
+      ...e,
+      embedding: `[${e.embedding.join(',')}]` // Convert to string format
+    }));
+
     const { data: stored, error } = await supabase
       .from('source_embeddings')
-      .insert(embeddings)
+      .insert(embeddingsForDb)
       .select();
 
     if (error) throw new Error(`Failed to store embeddings: ${error.message}`);
-    return stored || [];
+    
+    // Convert back to number arrays
+    return (stored || []).map(e => ({
+      ...e,
+      embedding: JSON.parse(e.embedding || '[]') as number[]
+    }));
   }
 
   // Search similar embeddings using vector similarity

@@ -73,12 +73,19 @@ export class DataRetentionService {
     count: number;
     oldest_date: string;
   }[]> {
-    const { data, error } = await supabase.rpc('preview_cleanup_data', {
-      team_id: teamId
-    });
+    // Since the RPC function doesn't exist yet, return empty array for now
+    // This will be implemented when we add the preview_cleanup_data function
+    try {
+      const { data, error } = await supabase.rpc('preview_cleanup_data', {
+        team_id: teamId
+      });
 
-    if (error) throw new Error(`Failed to preview cleanup: ${error.message}`);
-    return data || [];
+      if (error) throw new Error(`Failed to preview cleanup: ${error.message}`);
+      return data || [];
+    } catch (error) {
+      console.warn('Preview cleanup function not yet implemented:', error);
+      return [];
+    }
   }
 
   // Set default retention policies for a new team

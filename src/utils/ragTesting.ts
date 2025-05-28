@@ -152,7 +152,7 @@ export class RAGTesting {
           working: true,
           result: `Found ${sources.length} sources`
         };
-      } catch (error) {
+      } catch (error: any) {
         serviceResults.AgentSourceService = {
           working: false,
           error: error.message
@@ -166,7 +166,7 @@ export class RAGTesting {
           working: true,
           result: `Found ${chunks.length} chunks`
         };
-      } catch (error) {
+      } catch (error: any) {
         serviceResults.SourceChunkService = {
           working: false,
           error: error.message
@@ -180,7 +180,7 @@ export class RAGTesting {
           working: true,
           result: `Found ${jobs.length} training jobs`
         };
-      } catch (error) {
+      } catch (error: any) {
         serviceResults.TrainingJobService = {
           working: false,
           error: error.message
@@ -194,7 +194,7 @@ export class RAGTesting {
           working: true,
           result: `Found ${logs.length} audit logs`
         };
-      } catch (error) {
+      } catch (error: any) {
         serviceResults.AuditService = {
           working: false,
           error: error.message
