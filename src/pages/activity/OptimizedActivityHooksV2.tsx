@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
@@ -7,16 +6,17 @@ import { conversationLoader } from "@/services/conversationLoader";
 import { ChatInterfaceSettings } from "@/types/chatInterface";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { CheckCircle } from "lucide-react";
+
+// Cache for loaded conversations
+const conversationCache = new Map<string, any>();
+const messagesCache = new Map<string, any>();
 
 export interface ConversationWithSnippet extends DBConversation {
   snippet: string;
   title: string;
   daysAgo: string;
 }
-
-// Cache for loaded conversations
-const conversationCache = new Map<string, any>();
-const messagesCache = new Map<string, any>();
 
 export const useOptimizedActivityData = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -289,7 +289,12 @@ export const useOptimizedActivityData = () => {
         }
         
         toast({
-          title: "Conversation deleted",
+          title: (
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              Conversation deleted
+            </div>
+          ),
           description: "The conversation has been successfully deleted.",
         });
       }
