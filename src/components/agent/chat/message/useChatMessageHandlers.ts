@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { analyticsService } from "@/services/analyticsService";
 
@@ -16,7 +16,7 @@ export const useChatMessageHandlers = (
   const [localFeedback, setLocalFeedback] = useState<'like' | 'dislike' | undefined>(messageFeedback);
 
   // Update local feedback when prop changes (for real-time sync)
-  useState(() => {
+  useEffect(() => {
     setLocalFeedback(messageFeedback);
   }, [messageFeedback]);
 
