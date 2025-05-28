@@ -1,8 +1,8 @@
 
-import { useEffect, useRef, useState } from "react";
 import { ChatMessage } from "@/types/chatInterface";
 import { useChatState } from "./useChatState";
-import { checkRateLimit, recordMessage } from "@/utils/rateLimitUtils";
+import { useSubmissionState } from "./useSubmissionState";
+import { useMessageSubmission } from "./useMessageSubmission";
 import { 
   proceedWithMessage, 
   copyMessageToClipboard, 
@@ -38,21 +38,12 @@ export const useMessageHandling = (
     countdownIntervalRef
   } = useChatState(initialMessages, isEmbedded);
 
-  // Enhanced submission tracking with longer deduplication window
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const lastSubmissionRef = useRef<string>("");
-  const lastSubmissionTimeRef = useRef<number>(0);
-
-  // Handle countdown finish - clear rate limit error
-  const handleCountdownFinished = () => {
-    setRateLimitError(null);
-    setTimeUntilReset(null);
-    
-    // Focus input field when rate limit is cleared
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 10);
-  };
+  const {
+    isSubmitting,
+    isSubmissionBlocked,
+    recordSubmission,
+    resetSubmission
+  } = useSubmissionState();
 
   const proceedWithMessageWrapper = async (text: string) => {
     // Ensure we have a conversation ID before proceeding
@@ -104,77 +95,15 @@ export const useMessageHandling = (
     );
   };
 
-  // Enhanced message submission with stronger deduplication
-  const submitMessage = async (text: string, submitAgentId?: string) => {
-    const trimmedText = text.trim();
-    const now = Date.now();
-    const effectiveAgentId = submitAgentId || agentId;
-    
-    // Enhanced duplicate prevention with 2-second window
-    if (isSubmitting || 
-        !trimmedText || 
-        lastSubmissionRef.current === trimmedText ||
-        (now - lastSubmissionTimeRef.current < 2000)) {
-      console.log('🚫 Submission blocked:', {
-        isSubmitting,
-        emptyText: !trimmedText,
-        duplicateText: lastSubmissionRef.current === trimmedText,
-        tooSoon: now - lastSubmissionTimeRef.current < 2000,
-        timeSinceLastSubmission: now - lastSubmissionTimeRef.current
-      });
-      return;
-    }
-
-    console.log('📤 Starting message submission:', {
-      text: trimmedText.substring(0, 50) + '...',
-      agentId: effectiveAgentId,
-      conversationId,
-      source
-    });
-
-    setIsSubmitting(true);
-    lastSubmissionRef.current = trimmedText;
-    lastSubmissionTimeRef.current = now;
-    
-    try {
-      // Clear input immediately
-      setMessage("");
-      
-      // Check rate limit if agentId is provided
-      if (effectiveAgentId) {
-        const rateLimitStatus = await checkRateLimit(effectiveAgentId);
-        
-        if (rateLimitStatus.exceeded) {
-          console.log('🚫 Rate limit exceeded');
-          setRateLimitError(rateLimitStatus.message || 'Too many messages in a row');
-          if (rateLimitStatus.timeUntilReset) {
-            setTimeUntilReset(rateLimitStatus.timeUntilReset);
-          }
-          return;
-        }
-        
-        // Record the message
-        await recordMessage(effectiveAgentId);
-      }
-      
-      // Add message to chat and proceed (this will handle the database save)
-      await proceedWithMessageWrapper(trimmedText);
-      
-      console.log('✅ Message submission completed successfully');
-    } catch (error) {
-      console.error('❌ Error during message submission:', error);
-    } finally {
-      // Extended reset delay to prevent rapid resubmission
-      setTimeout(() => {
-        setIsSubmitting(false);
-        // Clear the last submission after 2 seconds to allow legitimate resubmissions
-        setTimeout(() => {
-          lastSubmissionRef.current = "";
-          lastSubmissionTimeRef.current = 0;
-        }, 2000);
-      }, 1000);
-    }
-  };
+  const { submitMessage } = useMessageSubmission({
+    proceedWithMessage: proceedWithMessageWrapper,
+    setMessage,
+    setRateLimitError,
+    setTimeUntilReset,
+    isSubmissionBlocked,
+    recordSubmission,
+    resetSubmission
+  });
 
   const handleSubmit = async (e: React.FormEvent, submitAgentId?: string) => {
     e.preventDefault();
@@ -190,7 +119,7 @@ export const useMessageHandling = (
     }
 
     const messageToSend = message.trim();
-    await submitMessage(messageToSend, submitAgentId);
+    await submitMessage(messageToSend, submitAgentId || agentId);
     
     if (isEmbedded) {
       e.stopPropagation();
@@ -207,9 +136,20 @@ export const useMessageHandling = (
       return;
     }
     
-    await submitMessage(text, submitAgentId);
+    await submitMessage(text, submitAgentId || agentId);
     
     // Focus input field after suggested message click
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
+  };
+
+  // Handle countdown finish - clear rate limit error
+  const handleCountdownFinished = () => {
+    setRateLimitError(null);
+    setTimeUntilReset(null);
+    
+    // Focus input field when rate limit is cleared
     setTimeout(() => {
       inputRef.current?.focus();
     }, 10);
