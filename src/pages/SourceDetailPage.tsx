@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -34,6 +33,7 @@ import { AgentSource, SourceType } from '@/types/rag';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
+import SourcesWidget from '@/components/sources/SourcesWidget';
 import AgentPageLayout from './AgentPageLayout';
 
 const SourceDetailPage: React.FC = () => {
@@ -211,134 +211,144 @@ const SourceDetailPage: React.FC = () => {
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Source Details" showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] min-h-screen">
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(`/agent/${agentId}/sources?tab=text`)}
-            className="mb-4"
-          >
-            <ArrowLeft size={16} className="mr-2" />
-            Back to Sources
-          </Button>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {getSourceIcon(source.source_type)}
-              <h1 className="text-3xl font-bold">
-                {isEditing ? 'Edit Source' : source.title}
-              </h1>
-              <Badge variant="secondary">
-                {getSourceTypeLabel(source.source_type)}
-              </Badge>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Info size={18} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="space-y-1 text-xs">
-                      <div><strong>Created:</strong> {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}</div>
-                      <div><strong>Size:</strong> {formatFileSize(source.content)}</div>
-                      <div><strong>Type:</strong> {getSourceTypeLabel(source.source_type)}</div>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+        <div className="flex gap-8">
+          {/* Main content */}
+          <div className="flex-1">
+            <div className="mb-6">
+              <Button
+                variant="ghost"
+                onClick={() => navigate(`/agent/${agentId}/sources?tab=text`)}
+                className="mb-4"
+              >
+                <ArrowLeft size={16} className="mr-2" />
+                Back to Sources
+              </Button>
               
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreHorizontal size={18} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem 
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600"
-                  >
-                    Delete Source
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {getSourceIcon(source.source_type)}
+                  <h1 className="text-3xl font-bold">
+                    {isEditing ? 'Edit Source' : source.title}
+                  </h1>
+                  <Badge variant="secondary">
+                    {getSourceTypeLabel(source.source_type)}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <Info size={18} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="space-y-1 text-xs">
+                          <div><strong>Created:</strong> {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}</div>
+                          <div><strong>Size:</strong> {formatFileSize(source.content)}</div>
+                          <div><strong>Type:</strong> {getSourceTypeLabel(source.source_type)}</div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal size={18} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem 
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="text-red-600"
+                      >
+                        Delete Source
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             </div>
+
+            <Card>
+              <CardContent className="p-6">
+                {isEditing ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Title
+                      </label>
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Enter source title"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Content
+                      </label>
+                      <Textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        placeholder="Enter source content"
+                        className="min-h-[400px]"
+                      />
+                    </div>
+                    
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditTitle(source.title);
+                          setEditContent(source.content || '');
+                        }}
+                        disabled={isSaving}
+                      >
+                        <X size={16} className="mr-2" />
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSave}
+                        disabled={isSaving || !editTitle.trim()}
+                      >
+                        <Save size={16} className="mr-2" />
+                        {isSaving ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <h2 className="text-xl font-semibold">{source.title}</h2>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                    
+                    <div className="prose max-w-none">
+                      <pre className="whitespace-pre-wrap font-sans text-gray-700">
+                        {source.content || 'No content available'}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sources widget sidebar */}
+          <div className="w-80 flex-shrink-0">
+            <SourcesWidget />
           </div>
         </div>
-
-        <Card>
-          <CardContent className="p-6">
-            {isEditing ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title
-                  </label>
-                  <Input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    placeholder="Enter source title"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Content
-                  </label>
-                  <Textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    placeholder="Enter source content"
-                    className="min-h-[400px]"
-                  />
-                </div>
-                
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditTitle(source.title);
-                      setEditContent(source.content || '');
-                    }}
-                    disabled={isSaving}
-                  >
-                    <X size={16} className="mr-2" />
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSave}
-                    disabled={isSaving || !editTitle.trim()}
-                  >
-                    <Save size={16} className="mr-2" />
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex justify-between items-start">
-                  <h2 className="text-xl font-semibold">{source.title}</h2>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit
-                  </Button>
-                </div>
-                
-                <div className="prose max-w-none">
-                  <pre className="whitespace-pre-wrap font-sans text-gray-700">
-                    {source.content || 'No content available'}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <DeleteSourceDialog
           open={showDeleteDialog}
