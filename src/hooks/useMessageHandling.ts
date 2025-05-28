@@ -3,13 +3,10 @@ import { ChatMessage } from "@/types/chatInterface";
 import { useChatState } from "./useChatState";
 import { useSubmissionState } from "./useSubmissionState";
 import { useMessageSubmission } from "./useMessageSubmission";
-import { 
-  proceedWithMessage, 
-  copyMessageToClipboard, 
-  handleFeedback, 
-  regenerateResponse, 
-  insertEmoji 
-} from "@/utils/messageUtils";
+import { useMessageOperations } from "./useMessageOperations";
+import { useMessageHandlers } from "./useMessageHandlers";
+import { useFormSubmissionHandlers } from "./useFormSubmissionHandlers";
+import { copyMessageToClipboard } from "@/utils/messageUtils";
 
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
@@ -45,58 +42,18 @@ export const useMessageHandling = (
     resetSubmission
   } = useSubmissionState();
 
-  const proceedWithMessageWrapper = async (text: string) => {
-    // Ensure we have a conversation ID before proceeding
-    let activeConversationId = conversationId;
-    
-    if (!activeConversationId && createConversationCallback) {
-      console.log('🆕 No conversation ID, creating new conversation before processing message');
-      activeConversationId = await createConversationCallback();
-      
-      if (!activeConversationId) {
-        console.error('❌ Failed to create conversation, cannot process message');
-        // Still add message to UI for user experience but show error
-        const userMessage: ChatMessage = {
-          content: text.trim(),
-          isAgent: false,
-          timestamp: new Date().toISOString(),
-        };
-        setChatHistory(prev => [...prev, userMessage]);
-        setUserHasMessaged(true);
-        setIsTyping(true);
-        
-        // Add error message
-        setTimeout(() => {
-          const errorMessage: ChatMessage = {
-            content: "I'm sorry, there was an issue starting the conversation. Please try refreshing the page.",
-            isAgent: true,
-            timestamp: new Date().toISOString(),
-          };
-          setChatHistory(prev => [...prev, errorMessage]);
-          setIsTyping(false);
-        }, 1000);
-        return;
-      }
-    }
-
-    if (!activeConversationId) {
-      console.error('❌ No conversation ID available and no callback to create one');
-      return;
-    }
-
-    await proceedWithMessage(
-      text,
-      setChatHistory,
-      setUserHasMessaged,
-      setIsTyping,
-      inputRef,
-      isEmbedded,
-      activeConversationId
-    );
-  };
+  const { proceedWithMessage } = useMessageOperations({
+    setChatHistory,
+    setUserHasMessaged,
+    setIsTyping,
+    inputRef,
+    isEmbedded,
+    conversationId,
+    createConversationCallback
+  });
 
   const { submitMessage } = useMessageSubmission({
-    proceedWithMessage: proceedWithMessageWrapper,
+    proceedWithMessage,
     setMessage,
     setRateLimitError,
     setTimeUntilReset,
@@ -105,75 +62,35 @@ export const useMessageHandling = (
     resetSubmission
   });
 
-  const handleSubmit = async (e: React.FormEvent, submitAgentId?: string) => {
-    e.preventDefault();
-    
-    if (!message.trim() || isTyping || rateLimitError || isSubmitting) {
-      console.log('🚫 Submit blocked:', {
-        emptyMessage: !message.trim(),
-        isTyping,
-        rateLimitError: !!rateLimitError,
-        isSubmitting
-      });
-      return;
-    }
+  const {
+    handleFeedback,
+    regenerateResponse,
+    insertEmoji,
+    handleCountdownFinished
+  } = useMessageHandlers({
+    chatHistory,
+    isTyping,
+    setChatHistory,
+    setIsTyping,
+    setMessage,
+    inputRef,
+    conversationId,
+    setRateLimitError,
+    setTimeUntilReset
+  });
 
-    const messageToSend = message.trim();
-    await submitMessage(messageToSend, submitAgentId || agentId);
-    
-    if (isEmbedded) {
-      e.stopPropagation();
-    }
-  };
-
-  const handleSuggestedMessageClick = async (text: string, submitAgentId?: string) => {
-    if (isTyping || rateLimitError || isSubmitting) {
-      console.log('🚫 Suggested message click blocked:', {
-        isTyping,
-        rateLimitError: !!rateLimitError,
-        isSubmitting
-      });
-      return;
-    }
-    
-    await submitMessage(text, submitAgentId || agentId);
-    
-    // Focus input field after suggested message click
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 10);
-  };
-
-  // Handle countdown finish - clear rate limit error
-  const handleCountdownFinished = () => {
-    setRateLimitError(null);
-    setTimeUntilReset(null);
-    
-    // Focus input field when rate limit is cleared
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 10);
-  };
-
-  const handleFeedbackWrapper = async (timestamp: string, type: "like" | "dislike") => {
-    await handleFeedback(timestamp, type, setChatHistory);
-  };
-
-  const regenerateResponseWrapper = async (allowRegenerate: boolean) => {
-    await regenerateResponse(
-      allowRegenerate,
-      chatHistory,
-      isTyping,
-      setChatHistory,
-      setIsTyping,
-      inputRef,
-      conversationId
-    );
-  };
-
-  const insertEmojiWrapper = (emoji: string) => {
-    insertEmoji(emoji, isTyping, rateLimitError, setMessage, inputRef);
-  };
+  const {
+    handleSubmit,
+    handleSuggestedMessageClick
+  } = useFormSubmissionHandlers({
+    message,
+    isTyping,
+    rateLimitError,
+    isSubmitting,
+    submitMessage,
+    inputRef,
+    isEmbedded
+  });
 
   // Cleanup countdown on unmount
   const cleanup = () => {
@@ -200,10 +117,10 @@ export const useMessageHandling = (
     handleSubmit,
     handleSuggestedMessageClick,
     copyMessageToClipboard,
-    handleFeedback: handleFeedbackWrapper,
-    regenerateResponse: regenerateResponseWrapper,
-    insertEmoji: insertEmojiWrapper,
-    proceedWithMessage: proceedWithMessageWrapper,
+    handleFeedback,
+    regenerateResponse,
+    insertEmoji,
+    proceedWithMessage,
     submitMessage,
     handleCountdownFinished,
     cleanup,
