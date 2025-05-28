@@ -41,6 +41,11 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
   const headerStyle = headerColor ? { backgroundColor: headerColor } : {};
   const textColor = headerColor ? 'text-white' : 'text-gray-900';
 
+  const handleViewRecentChats = () => {
+    // This can be implemented to show recent chats functionality
+    console.log('View recent chats clicked');
+  };
+
   return (
     <div 
       className="flex items-center justify-between p-4 border-b"
@@ -75,11 +80,9 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({
         <ChatMenuDropdown
           onStartNewChat={onStartNewChat}
           onEndChat={onEndChat}
-          agentId={agentId}
+          onViewRecentChats={handleViewRecentChats}
           isConversationEnded={isConversationEnded}
           isEmbedded={isEmbedded}
-          toggleSettings={toggleSettings}
-          iconButtonClass={iconButtonClass}
         />
       </div>
     </div>
