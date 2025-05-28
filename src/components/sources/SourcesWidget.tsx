@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,68 +15,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useParams } from "react-router-dom";
-import { useRAGServices } from "@/hooks/useRAGServices";
-import { AgentSource, SourceType } from "@/types/rag";
-import { supabase } from "@/integrations/supabase/client";
+import { SourceType } from "@/types/rag";
 import { formatDistanceToNow } from "date-fns";
+import { useAgentSources } from "@/hooks/useAgentSources";
 
 const SourcesWidget: React.FC = () => {
-  const { agentId } = useParams();
-  const { sources } = useRAGServices();
-  const [sourcesData, setSourcesData] = useState<AgentSource[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchSources = useCallback(async () => {
-    if (!agentId) return;
-    
-    try {
-      console.log('Fetching sources for widget...');
-      const data = await sources.getSourcesByAgent(agentId);
-      console.log('Sources fetched:', data.length);
-      setSourcesData(data);
-    } catch (error) {
-      console.error('Error fetching sources:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [agentId, sources]);
-
-  useEffect(() => {
-    fetchSources();
-  }, [fetchSources]);
-
-  // Set up real-time subscription for sources
-  useEffect(() => {
-    if (!agentId) return;
-
-    console.log('Setting up real-time subscription for sources widget');
-    
-    const channel = supabase
-      .channel(`sources-widget-${agentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sources',
-          filter: `agent_id=eq.${agentId}`
-        },
-        (payload) => {
-          console.log('Source change detected in widget:', payload);
-          // Immediately refetch sources when any change occurs
-          fetchSources();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Widget subscription status:', status);
-      });
-
-    return () => {
-      console.log('Cleaning up widget subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [agentId, fetchSources]);
+  // Use the consolidated hook instead of managing state separately
+  const { sources: sourcesData, loading } = useAgentSources();
 
   const getSourceIcon = (type: SourceType) => {
     switch (type) {

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRAGServices } from './useRAGServices';
 import { AgentSource, SourceType } from '@/types/rag';
@@ -12,13 +12,14 @@ export const useAgentSources = (sourceType?: SourceType) => {
   const [error, setError] = useState<string | null>(null);
   const { sources: sourceService } = useRAGServices();
 
-  const fetchSources = async () => {
+  const fetchSources = useCallback(async () => {
     if (!agentId) return;
 
     try {
       setLoading(true);
       setError(null);
       
+      console.log('Fetching sources with useAgentSources hook...');
       let data: AgentSource[];
       if (sourceType) {
         data = await sourceService.getSourcesByType(agentId, sourceType);
@@ -26,6 +27,7 @@ export const useAgentSources = (sourceType?: SourceType) => {
         data = await sourceService.getSourcesByAgent(agentId);
       }
       
+      console.log('Sources fetched by hook:', data.length);
       setSources(data);
     } catch (err) {
       console.error('Error fetching sources:', err);
@@ -33,18 +35,20 @@ export const useAgentSources = (sourceType?: SourceType) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [agentId, sourceType, sourceService]);
 
   useEffect(() => {
     fetchSources();
-  }, [agentId, sourceType]);
+  }, [fetchSources]);
 
   // Set up real-time subscription for sources
   useEffect(() => {
     if (!agentId) return;
 
+    console.log('Setting up real-time subscription for agent sources');
+    
     const channel = supabase
-      .channel('agent-sources-changes')
+      .channel(`agent-sources-${agentId}`)
       .on(
         'postgres_changes',
         {
@@ -54,16 +58,20 @@ export const useAgentSources = (sourceType?: SourceType) => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          console.log('Source change detected:', payload);
-          fetchSources(); // Refetch sources when changes occur
+          console.log('Source change detected by hook:', payload);
+          // Immediately refetch sources when changes occur
+          fetchSources();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Hook subscription status:', status);
+      });
 
     return () => {
+      console.log('Cleaning up hook subscription');
       supabase.removeChannel(channel);
     };
-  }, [agentId]);
+  }, [agentId, fetchSources]);
 
   return {
     sources,

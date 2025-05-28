@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,13 +65,8 @@ const TextTab: React.FC = () => {
       setTitle("");
       setContent("");
       
-      // Force refresh the sources list immediately
-      await refetch();
-      
-      // Small delay to ensure database changes are propagated
-      setTimeout(() => {
-        refetch();
-      }, 500);
+      // The real-time subscription will handle the updates automatically
+      // No need for manual refetch calls
       
     } catch (error) {
       console.error("Error creating text snippet:", error);
