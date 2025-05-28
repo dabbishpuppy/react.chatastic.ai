@@ -1,184 +1,64 @@
 
 import { ChatSectionProps } from "@/components/agent/chat/ChatSectionProps";
-import { useChatSectionHooks } from "@/components/agent/chat/ChatSectionHooks";
-import { useChatSectionHandlers } from "@/components/agent/chat/ChatSectionHandlers";
 import { useChatSectionEffects } from "@/components/agent/chat/ChatSectionEffects";
-import { getChatSectionHelpers } from "@/components/agent/chat/ChatSectionHelpers";
+import { useChatDataProps } from "./useChatDataProps";
+import { useChatDataHooks } from "./useChatDataHooks";
+import { useChatDataHandlers } from "./useChatDataHandlers";
+import { useChatDataComputed } from "./useChatDataComputed";
 
 export const useChatDataPreparation = (props: ChatSectionProps) => {
-  const {
-    agentName = "AI Customer Service",
-    placeholder = "Write message here...",
-    suggestedMessages = [],
-    showSuggestions = true,
-    showFeedback = true,
-    allowRegenerate = true,
-    theme = 'light',
-    profilePicture,
-    chatIcon,
-    footer,
-    footerClassName = "",
-    userMessageColor = null,
-    headerColor = null,
-    hideUserAvatar = false,
-    toggleSettings
-  } = props;
+  // Extract and normalize props
+  const normalizedProps = useChatDataProps(props);
 
-  const hooks = useChatSectionHooks(props);
-  
-  const {
-    agentId,
-    displayMessages,
-    setDisplayMessages,
-    hasShownLeadForm,
-    setHasShownLeadForm,
-    effectiveLeadSettings,
-    refreshSettings,
-    currentConversation,
-    conversationEnded,
-    startNewConversation,
-    endCurrentConversation,
-    loadConversation,
-    getConversationMessages,
-    message,
-    setMessage,
-    chatHistory,
-    setChatHistory,
-    isTyping,
-    rateLimitError,
-    timeUntilReset,
-    userHasMessaged,
-    inputRef,
-    copyMessageToClipboard,
-    handleFeedback,
-    insertEmoji,
-    handleCountdownFinished,
-    cleanup,
-    isSubmitting,
-    messagesEndRef,
-    chatContainerRef,
-    scrollToBottom,
-    handleSubmitWithAgentId,
-    handleSuggestedMessageClickWithAgentId,
-    handleRegenerateWithAgentId
-  } = hooks;
+  // Get all hook data
+  const hooks = useChatDataHooks(props);
 
-  // Wrap startNewConversation to match expected return type
-  const wrappedStartNewConversation = async () => {
-    await startNewConversation();
-  };
-
-  const {
-    handleSubmitWithConversation,
-    handleStartNewChat,
-    handleEndChat,
-    handleLoadConversation
-  } = useChatSectionHandlers(
-    currentConversation,
-    props.conversationSource || 'iframe',
-    agentId,
-    props.isEmbedded || false,
-    message,
-    isTyping,
-    rateLimitError,
-    isSubmitting,
-    wrappedStartNewConversation,
-    handleSubmitWithAgentId,
-    setChatHistory,
-    setHasShownLeadForm,
-    endCurrentConversation,
-    loadConversation,
-    getConversationMessages,
-    setDisplayMessages,
-    props.initialMessages || []
-  );
+  // Get handlers
+  const handlers = useChatDataHandlers(props, hooks);
 
   // Apply all effects
   useChatSectionEffects(
     props.isEmbedded || false,
-    agentId,
+    hooks.agentId,
     props.leadSettings,
-    refreshSettings,
-    effectiveLeadSettings,
-    hasShownLeadForm,
-    userHasMessaged,
-    chatHistory,
-    isTyping,
-    setChatHistory,
-    setHasShownLeadForm,
-    scrollToBottom,
-    currentConversation,
-    setDisplayMessages,
+    hooks.refreshSettings,
+    hooks.effectiveLeadSettings,
+    hooks.hasShownLeadForm,
+    hooks.userHasMessaged,
+    hooks.chatHistory,
+    hooks.isTyping,
+    hooks.setChatHistory,
+    hooks.setHasShownLeadForm,
+    hooks.scrollToBottom,
+    hooks.currentConversation,
+    hooks.setDisplayMessages,
     props.initialMessages || [],
-    cleanup
+    hooks.cleanup
   );
 
   // Get computed values and styles
-  const {
-    themeClasses,
-    shouldShowSuggestions,
-    userMessageStyle,
-    isInputDisabled,
-    resolvedTheme
-  } = getChatSectionHelpers(
-    theme,
-    suggestedMessages,
-    userHasMessaged,
-    showSuggestions,
-    userMessageColor,
-    isTyping,
-    rateLimitError,
-    isSubmitting
+  const computed = useChatDataComputed(
+    normalizedProps.theme,
+    normalizedProps.suggestedMessages,
+    hooks.userHasMessaged,
+    normalizedProps.showSuggestions,
+    normalizedProps.userMessageColor,
+    hooks.isTyping,
+    hooks.rateLimitError,
+    hooks.isSubmitting
   );
 
   return {
     // Props
-    agentName,
-    placeholder,
-    suggestedMessages,
-    showFeedback,
-    allowRegenerate,
-    theme,
-    profilePicture,
-    chatIcon,
-    footer,
-    footerClassName,
-    hideUserAvatar,
-    toggleSettings,
+    ...normalizedProps,
 
     // Hook data
-    agentId,
-    chatHistory,
-    isTyping,
-    rateLimitError,
-    timeUntilReset,
-    message,
-    setMessage,
-    inputRef,
-    copyMessageToClipboard,
-    handleFeedback,
-    insertEmoji,
-    handleCountdownFinished,
-    isSubmitting,
-    messagesEndRef,
-    chatContainerRef,
-    effectiveLeadSettings,
-    currentConversation,
-    conversationEnded,
+    ...hooks,
 
     // Handlers
-    handleSubmitWithConversation,
-    handleStartNewChat,
-    handleEndChat,
-    handleLoadConversation,
-    handleRegenerateWithAgentId,
-    handleSuggestedMessageClickWithAgentId,
+    ...handlers,
 
     // Computed values
-    themeClasses,
-    shouldShowSuggestions,
-    userMessageStyle,
-    isInputDisabled,
-    resolvedTheme
+    ...computed
   };
 };
