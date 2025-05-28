@@ -27,6 +27,7 @@ interface MessageLayoutProps {
   onRegenerate?: () => void;
   isUpdatingFeedback: boolean;
   showCopiedTooltip: boolean;
+  isInitialMessage?: boolean;
 }
 
 const MessageLayout: React.FC<MessageLayoutProps> = ({
@@ -45,7 +46,8 @@ const MessageLayout: React.FC<MessageLayoutProps> = ({
   onCopy,
   onRegenerate,
   isUpdatingFeedback,
-  showCopiedTooltip
+  showCopiedTooltip,
+  isInitialMessage = false
 }) => {
   const isAgent = message.isAgent !== undefined ? message.isAgent : message.role === 'assistant';
 
@@ -77,6 +79,7 @@ const MessageLayout: React.FC<MessageLayoutProps> = ({
         onRegenerate={onRegenerate}
         isUpdatingFeedback={isUpdatingFeedback}
         showCopiedTooltip={showCopiedTooltip}
+        isInitialMessage={isInitialMessage}
       />
     </>
   );

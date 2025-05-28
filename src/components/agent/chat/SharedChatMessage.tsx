@@ -87,6 +87,7 @@ const SharedChatMessage: React.FC<SharedChatMessageProps> = ({
         onRegenerate={onRegenerate}
         isUpdatingFeedback={isUpdatingFeedback}
         showCopiedTooltip={showCopiedTooltip}
+        isInitialMessage={isInitialMessage}
       />
     </MessageContainer>
   );

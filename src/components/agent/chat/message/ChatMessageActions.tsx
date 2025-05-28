@@ -15,6 +15,7 @@ interface ChatMessageActionsProps {
   onFeedback: (type: "like" | "dislike") => void;
   onCopy: (content: string) => void;
   onRegenerate?: () => void;
+  isInitialMessage?: boolean;
 }
 
 const ChatMessageActions: React.FC<ChatMessageActionsProps> = ({
@@ -28,9 +29,17 @@ const ChatMessageActions: React.FC<ChatMessageActionsProps> = ({
   readOnly = false,
   onFeedback,
   onCopy,
-  onRegenerate
+  onRegenerate,
+  isInitialMessage = false
 }) => {
-  if (!showFeedback) return null;
+  // Don't show actions for initial messages or when feedback is disabled
+  if (!showFeedback || isInitialMessage) {
+    console.log('🚫 ChatMessageActions - Not showing actions:', {
+      showFeedback,
+      isInitialMessage
+    });
+    return null;
+  }
 
   const handleFeedbackClick = (type: "like" | "dislike") => {
     onFeedback(type);

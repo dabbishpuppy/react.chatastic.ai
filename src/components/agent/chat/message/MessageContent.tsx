@@ -20,6 +20,7 @@ interface MessageContentProps {
   onRegenerate?: () => void;
   isUpdatingFeedback: boolean;
   showCopiedTooltip: boolean;
+  isInitialMessage?: boolean;
 }
 
 const MessageContent: React.FC<MessageContentProps> = ({
@@ -38,9 +39,19 @@ const MessageContent: React.FC<MessageContentProps> = ({
   onCopy,
   onRegenerate,
   isUpdatingFeedback,
-  showCopiedTooltip
+  showCopiedTooltip,
+  isInitialMessage = false
 }) => {
-  const shouldShowFeedback = isAgent && showFeedback;
+  // Hide actions for initial messages - they should not have Like/Dislike/Copy buttons
+  const shouldShowFeedback = isAgent && showFeedback && !isInitialMessage;
+
+  console.log('🎯 MessageContent - Should show feedback?', {
+    isAgent,
+    showFeedback,
+    isInitialMessage,
+    shouldShowFeedback,
+    messageId
+  });
 
   return (
     <div className="flex flex-col max-w-[80%]">
@@ -66,6 +77,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
           onFeedback={onFeedback}
           onCopy={onCopy}
           onRegenerate={onRegenerate}
+          isInitialMessage={isInitialMessage}
         />
       )}
     </div>
