@@ -69,7 +69,13 @@ export const useChatSectionHooks = (props: ChatSectionProps) => {
     handleCountdownFinished,
     cleanup,
     isSubmitting
-  } = useMessageHandling(displayMessages, isEmbedded, currentConversation?.id);
+  } = useMessageHandling(
+    displayMessages, 
+    isEmbedded, 
+    currentConversation?.id, 
+    agentId, 
+    conversationSource
+  );
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded, chatHistory, isTyping);
 

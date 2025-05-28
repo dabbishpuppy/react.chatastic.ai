@@ -1,5 +1,6 @@
 import { ChatMessage } from "@/types/chatInterface";
 import { messageService } from "@/services/messageService";
+import { conversationService } from "@/services/conversationService";
 
 // Track recent messages to prevent duplicates - expanded to 2 seconds
 const recentMessages = new Map<string, number>();
@@ -32,6 +33,34 @@ const isDuplicateMessage = (content: string, conversationId?: string): boolean =
   return false;
 };
 
+// Helper function to ensure conversation exists before saving messages
+const ensureConversationExists = async (agentId?: string, source: 'iframe' | 'bubble' = 'iframe'): Promise<string | null> => {
+  if (!agentId) {
+    console.warn('⚠️ No agentId provided for conversation creation');
+    return null;
+  }
+
+  try {
+    // Generate a session ID
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log('🆕 Creating conversation for message with agentId:', agentId, 'source:', source);
+    
+    const conversation = await conversationService.createConversation(agentId, sessionId, source);
+    
+    if (conversation) {
+      console.log('✅ Conversation created successfully:', conversation.id);
+      return conversation.id;
+    } else {
+      console.error('❌ Failed to create conversation');
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Error creating conversation:', error);
+    return null;
+  }
+};
+
 export const proceedWithMessage = async (
   text: string,
   setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void,
@@ -39,13 +68,17 @@ export const proceedWithMessage = async (
   setIsTyping: (value: boolean) => void,
   inputRef: React.RefObject<HTMLInputElement>,
   isEmbedded: boolean = false,
-  conversationId?: string
+  conversationId?: string,
+  agentId?: string,
+  source: 'iframe' | 'bubble' = 'iframe'
 ) => {
   const trimmedText = text.trim();
   
   console.log('📤 Processing user message:', {
     content: trimmedText.substring(0, 50) + '...',
     conversationId,
+    agentId,
+    source,
     isEmbedded
   });
   
@@ -61,10 +94,37 @@ export const proceedWithMessage = async (
     timestamp: new Date().toISOString(),
   };
 
+  // Ensure conversation exists if we don't have one
+  let activeConversationId = conversationId;
+  if (!activeConversationId && agentId) {
+    console.log('🆕 No conversation ID, creating new conversation');
+    activeConversationId = await ensureConversationExists(agentId, source);
+    
+    if (!activeConversationId) {
+      console.error('❌ Failed to create conversation, cannot save messages');
+      // Still add message to UI for user experience
+      setChatHistory(prev => [...prev, userMessage]);
+      setUserHasMessaged(true);
+      setIsTyping(true);
+      
+      // Simulate AI response without saving
+      setTimeout(() => {
+        const aiMessage: ChatMessage = {
+          content: "I'm sorry, there was an issue starting the conversation. Please try refreshing the page.",
+          isAgent: true,
+          timestamp: new Date().toISOString(),
+        };
+        setChatHistory(prev => [...prev, aiMessage]);
+        setIsTyping(false);
+      }, 1000);
+      return;
+    }
+  }
+
   // Save user message to database if conversation exists
-  if (conversationId) {
-    console.log('💾 Saving user message to conversation:', conversationId);
-    const savedUserMessage = await messageService.saveMessage(conversationId, trimmedText, false);
+  if (activeConversationId) {
+    console.log('💾 Saving user message to conversation:', activeConversationId);
+    const savedUserMessage = await messageService.saveMessage(activeConversationId, trimmedText, false);
     if (savedUserMessage) {
       userMessage.id = savedUserMessage.id;
       console.log('✅ User message saved with ID:', savedUserMessage.id);
@@ -86,7 +146,7 @@ export const proceedWithMessage = async (
     const aiResponseText = "Thank you for your message! This is a simulated response.";
     
     // Check for duplicate AI response with expanded window
-    const aiKey = `${conversationId || 'no-conv'}-ai-${aiResponseText}`;
+    const aiKey = `${activeConversationId || 'no-conv'}-ai-${aiResponseText}`;
     const now = Date.now();
     const lastAiResponse = recentMessages.get(aiKey);
     
@@ -105,9 +165,9 @@ export const proceedWithMessage = async (
     };
 
     // Save AI message to database if conversation exists
-    if (conversationId) {
-      console.log('💾 Saving AI response to conversation:', conversationId);
-      const savedAiMessage = await messageService.saveMessage(conversationId, aiResponseText, true);
+    if (activeConversationId) {
+      console.log('💾 Saving AI response to conversation:', activeConversationId);
+      const savedAiMessage = await messageService.saveMessage(activeConversationId, aiResponseText, true);
       if (savedAiMessage) {
         aiMessage.id = savedAiMessage.id;
         console.log('✅ AI response saved successfully with ID:', savedAiMessage.id);

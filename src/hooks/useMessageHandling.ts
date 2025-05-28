@@ -14,7 +14,9 @@ import {
 export const useMessageHandling = (
   initialMessages: ChatMessage[] = [],
   isEmbedded: boolean = false,
-  conversationId?: string
+  conversationId?: string,
+  agentId?: string,
+  source: 'iframe' | 'bubble' = 'iframe'
 ) => {
   const {
     message,
@@ -59,14 +61,17 @@ export const useMessageHandling = (
       setIsTyping,
       inputRef,
       isEmbedded,
-      conversationId
+      conversationId,
+      agentId,
+      source
     );
   };
 
   // Enhanced message submission with stronger deduplication
-  const submitMessage = async (text: string, agentId?: string) => {
+  const submitMessage = async (text: string, submitAgentId?: string) => {
     const trimmedText = text.trim();
     const now = Date.now();
+    const effectiveAgentId = submitAgentId || agentId;
     
     // Enhanced duplicate prevention with 2-second window
     if (isSubmitting || 
@@ -85,8 +90,9 @@ export const useMessageHandling = (
 
     console.log('📤 Starting message submission:', {
       text: trimmedText.substring(0, 50) + '...',
-      agentId,
-      conversationId
+      agentId: effectiveAgentId,
+      conversationId,
+      source
     });
 
     setIsSubmitting(true);
@@ -98,8 +104,8 @@ export const useMessageHandling = (
       setMessage("");
       
       // Check rate limit if agentId is provided
-      if (agentId) {
-        const rateLimitStatus = await checkRateLimit(agentId);
+      if (effectiveAgentId) {
+        const rateLimitStatus = await checkRateLimit(effectiveAgentId);
         
         if (rateLimitStatus.exceeded) {
           console.log('🚫 Rate limit exceeded');
@@ -111,7 +117,7 @@ export const useMessageHandling = (
         }
         
         // Record the message
-        await recordMessage(agentId);
+        await recordMessage(effectiveAgentId);
       }
       
       // Add message to chat and proceed (this will handle the database save)
@@ -133,7 +139,7 @@ export const useMessageHandling = (
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent, agentId?: string) => {
+  const handleSubmit = async (e: React.FormEvent, submitAgentId?: string) => {
     e.preventDefault();
     
     if (!message.trim() || isTyping || rateLimitError || isSubmitting) {
@@ -147,14 +153,14 @@ export const useMessageHandling = (
     }
 
     const messageToSend = message.trim();
-    await submitMessage(messageToSend, agentId);
+    await submitMessage(messageToSend, submitAgentId);
     
     if (isEmbedded) {
       e.stopPropagation();
     }
   };
 
-  const handleSuggestedMessageClick = async (text: string, agentId?: string) => {
+  const handleSuggestedMessageClick = async (text: string, submitAgentId?: string) => {
     if (isTyping || rateLimitError || isSubmitting) {
       console.log('🚫 Suggested message click blocked:', {
         isTyping,
@@ -164,7 +170,7 @@ export const useMessageHandling = (
       return;
     }
     
-    await submitMessage(text, agentId);
+    await submitMessage(text, submitAgentId);
     
     // Focus input field after suggested message click
     setTimeout(() => {
