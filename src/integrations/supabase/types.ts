@@ -20,6 +20,7 @@ export type Database = {
           is_active: boolean
           metadata: Json | null
           source_type: Database["public"]["Enums"]["source_type"]
+          team_id: string
           title: string
           updated_at: string
           url: string | null
@@ -34,6 +35,7 @@ export type Database = {
           is_active?: boolean
           metadata?: Json | null
           source_type: Database["public"]["Enums"]["source_type"]
+          team_id: string
           title: string
           updated_at?: string
           url?: string | null
@@ -48,6 +50,7 @@ export type Database = {
           is_active?: boolean
           metadata?: Json | null
           source_type?: Database["public"]["Enums"]["source_type"]
+          team_id?: string
           title?: string
           updated_at?: string
           url?: string | null
@@ -58,6 +61,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_sources_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]

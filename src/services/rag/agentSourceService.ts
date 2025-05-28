@@ -13,7 +13,7 @@ export class AgentSourceService {
     file_path?: string;
     url?: string;
   }): Promise<AgentSource> {
-    // First, get the team_id from the agent
+    // Get the team_id from the agent
     const { data: agent, error: agentError } = await supabase
       .from('agents')
       .select('team_id')
