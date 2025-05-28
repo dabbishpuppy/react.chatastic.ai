@@ -37,6 +37,11 @@ export const useAgentSources = (sourceType?: SourceType) => {
     }
   }, [agentId, sourceType, sourceService]);
 
+  // Helper function to remove source from local state
+  const removeSourceFromState = useCallback((sourceId: string) => {
+    setSources(prevSources => prevSources.filter(source => source.id !== sourceId));
+  }, []);
+
   useEffect(() => {
     fetchSources();
   }, [fetchSources]);
@@ -89,6 +94,7 @@ export const useAgentSources = (sourceType?: SourceType) => {
               )
             );
           } else if (payload.eventType === 'DELETE' && payload.old) {
+            // Remove the deleted source from state
             setSources(prevSources => 
               prevSources.filter(source => source.id !== payload.old.id)
             );
@@ -112,6 +118,7 @@ export const useAgentSources = (sourceType?: SourceType) => {
     sources,
     loading,
     error,
-    refetch: fetchSources
+    refetch: fetchSources,
+    removeSourceFromState
   };
 };

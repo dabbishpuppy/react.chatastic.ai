@@ -10,7 +10,8 @@ import {
   FileText, 
   Link, 
   MessageCircleQuestion, 
-  File 
+  File,
+  Trash2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -29,7 +30,7 @@ interface SourcesListProps {
   sources: AgentSource[];
   loading: boolean;
   error: string | null;
-  onSourceDeleted?: () => void;
+  onSourceDeleted?: (sourceId: string) => void;
 }
 
 const SourcesList: React.FC<SourcesListProps> = ({ 
@@ -44,6 +45,12 @@ const SourcesList: React.FC<SourcesListProps> = ({
   
   const [deleteSource, setDeleteSource] = useState<AgentSource | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [optimisticSources, setOptimisticSources] = useState<AgentSource[]>(sources);
+
+  // Update optimistic sources when props change
+  React.useEffect(() => {
+    setOptimisticSources(sources);
+  }, [sources]);
 
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
@@ -93,6 +100,11 @@ const SourcesList: React.FC<SourcesListProps> = ({
 
     try {
       setIsDeleting(true);
+      
+      // Optimistically remove the source from the list
+      setOptimisticSources(prev => prev.filter(s => s.id !== deleteSource.id));
+      
+      // Call the API to delete the source
       await sourceService.deleteSource(deleteSource.id);
       
       toast({
@@ -100,11 +112,16 @@ const SourcesList: React.FC<SourcesListProps> = ({
         description: "Source deleted successfully"
       });
       
+      // Notify parent component with the source ID for efficient state updates
       if (onSourceDeleted) {
-        onSourceDeleted();
+        onSourceDeleted(deleteSource.id);
       }
     } catch (error) {
       console.error('Error deleting source:', error);
+      
+      // Revert optimistic update on error
+      setOptimisticSources(sources);
+      
       toast({
         title: "Error",
         description: "Failed to delete source",
@@ -145,7 +162,7 @@ const SourcesList: React.FC<SourcesListProps> = ({
     );
   }
 
-  if (sources.length === 0) {
+  if (optimisticSources.length === 0) {
     return (
       <Card className="p-6">
         <div className="text-center text-gray-500">
@@ -158,7 +175,7 @@ const SourcesList: React.FC<SourcesListProps> = ({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium">Sources ({sources.length})</h3>
+      <h3 className="text-lg font-medium">Sources ({optimisticSources.length})</h3>
       <Card>
         <Table>
           <TableHeader>
@@ -171,10 +188,10 @@ const SourcesList: React.FC<SourcesListProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sources.map((source) => (
+            {optimisticSources.map((source) => (
               <TableRow 
                 key={source.id} 
-                className="cursor-pointer hover:bg-gray-50"
+                className="cursor-pointer hover:bg-gray-50 transition-opacity duration-200"
                 onClick={() => handleRowClick(source)}
               >
                 <TableCell className="font-medium">
@@ -217,8 +234,9 @@ const SourcesList: React.FC<SourcesListProps> = ({
                       <DropdownMenuContent>
                         <DropdownMenuItem 
                           onClick={(e) => handleDeleteClick(source, e)}
-                          className="text-red-600"
+                          className="text-red-600 text-sm"
                         >
+                          <Trash2 size={16} className="mr-2" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

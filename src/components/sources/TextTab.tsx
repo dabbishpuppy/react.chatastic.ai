@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +17,7 @@ const TextTab: React.FC = () => {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { sources } = useRAGServices();
-  const { sources: textSources, loading, error, refetch } = useAgentSources('text');
+  const { sources: textSources, loading, error, removeSourceFromState } = useAgentSources('text');
 
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) {
@@ -163,7 +164,7 @@ const TextTab: React.FC = () => {
           sources={textSources} 
           loading={loading} 
           error={error}
-          onSourceDeleted={refetch}
+          onSourceDeleted={removeSourceFromState}
         />
       </div>
     </div>
