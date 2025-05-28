@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,7 @@ const SourcesWidget: React.FC = () => {
         case 'text':
           acc.textFiles += 1;
           break;
-        case 'url':
+        case 'website':
           acc.links += 1;
           break;
         case 'qa':

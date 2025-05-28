@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,7 @@ const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) =>
         return <FileText size={16} className="text-blue-600" />;
       case 'file':
         return <File size={16} className="text-green-600" />;
-      case 'url':
+      case 'website':
         return <Link size={16} className="text-purple-600" />;
       case 'qa':
         return <MessageCircleQuestion size={16} className="text-orange-600" />;
@@ -36,7 +35,7 @@ const SourcesList: React.FC<SourcesListProps> = ({ sources, loading, error }) =>
         return 'Text';
       case 'file':
         return 'File';
-      case 'url':
+      case 'website':
         return 'Website';
       case 'qa':
         return 'Q&A';
