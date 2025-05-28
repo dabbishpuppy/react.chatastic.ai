@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
@@ -125,11 +126,17 @@ export const useOptimizedActivityData = () => {
       const mappedSettings = mapDatabaseSettings(settingsData);
       setChatSettings(mappedSettings);
 
-      // Auto-select first conversation if available
-      if (conversationsWithSnippets.length > 0 && !selectedConversationId) {
+      // Always auto-select and load the first conversation if available
+      if (conversationsWithSnippets.length > 0) {
         const firstConversation = conversationsWithSnippets[0];
         setSelectedConversationId(firstConversation.id);
+        // Load the first conversation immediately
         loadConversationMessages(firstConversation);
+      } else {
+        // Clear selection if no conversations
+        setSelectedConversationId(null);
+        setSelectedConversation(null);
+        setSelectedDBConversation(null);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -138,7 +145,7 @@ export const useOptimizedActivityData = () => {
     } finally {
       setIsLoadingConversations(false);
     }
-  }, [agentId, selectedConversationId, generateSnippet]);
+  }, [agentId, generateSnippet]);
 
   // Load conversation messages
   const loadConversationMessages = useCallback(async (dbConversation: DBConversation) => {
