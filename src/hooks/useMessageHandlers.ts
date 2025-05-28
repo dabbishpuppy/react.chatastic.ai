@@ -49,12 +49,12 @@ export const useMessageHandlers = ({
   };
 
   const insertEmojiWrapper = (emoji: string) => {
-    // Create a proper updater function wrapper for the state setter
-    const updaterSetMessage = (update: (prev: string) => string) => {
+    // Create a proper wrapper that matches what insertEmoji expects
+    const wrappedSetMessage = (update: (prev: string) => string) => {
       setMessage(update);
     };
     
-    insertEmoji(emoji, isTyping, rateLimitError, updaterSetMessage, inputRef);
+    insertEmoji(emoji, isTyping, rateLimitError, wrappedSetMessage, inputRef);
   };
 
   // Handle countdown finish - clear rate limit error
