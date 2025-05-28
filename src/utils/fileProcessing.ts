@@ -1,4 +1,3 @@
-
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set up PDF.js worker
@@ -108,32 +107,31 @@ export const processDocumentFile = async (file: File): Promise<FileProcessingRes
         console.log('📖 Converting DOCX to HTML with enhanced options...');
         
         // Enhanced conversion options to preserve more formatting
-        const result = await mammoth.convertToHtml({ 
-          arrayBuffer,
-          options: {
-            // Preserve heading styles
-            styleMap: [
-              "p[style-name='Heading 1'] => h1:fresh",
-              "p[style-name='Heading 2'] => h2:fresh", 
-              "p[style-name='Heading 3'] => h3:fresh",
-              "p[style-name='Heading 4'] => h4:fresh",
-              "p[style-name='Heading 5'] => h5:fresh",
-              "p[style-name='Heading 6'] => h6:fresh",
-              "p[style-name='Title'] => h1.title:fresh",
-              "p[style-name='Subtitle'] => h2.subtitle:fresh"
-            ],
-            // Include default styles for formatting
-            includeDefaultStyleMap: true,
-            // Convert embedded styles
-            convertImage: mammoth.images.imgElement(function(image: any) {
-              return image.read("base64").then(function(imageBuffer: any) {
-                return {
-                  src: "data:" + image.contentType + ";base64," + imageBuffer
-                };
-              });
-            })
-          }
-        });
+        const options = {
+          // Preserve heading styles
+          styleMap: [
+            "p[style-name='Heading 1'] => h1:fresh",
+            "p[style-name='Heading 2'] => h2:fresh", 
+            "p[style-name='Heading 3'] => h3:fresh",
+            "p[style-name='Heading 4'] => h4:fresh",
+            "p[style-name='Heading 5'] => h5:fresh",
+            "p[style-name='Heading 6'] => h6:fresh",
+            "p[style-name='Title'] => h1.title:fresh",
+            "p[style-name='Subtitle'] => h2.subtitle:fresh"
+          ],
+          // Include default styles for formatting
+          includeDefaultStyleMap: true,
+          // Convert embedded styles
+          convertImage: mammoth.images.imgElement(function(image: any) {
+            return image.read("base64").then(function(imageBuffer: any) {
+              return {
+                src: "data:" + image.contentType + ";base64," + imageBuffer
+              };
+            });
+          })
+        };
+        
+        const result = await mammoth.convertToHtml({ arrayBuffer }, options);
         
         console.log('📝 HTML conversion result:', result);
         
@@ -264,4 +262,3 @@ export const validateFileType = (file: File): boolean => {
 export const validateFileSize = (file: File, maxSizeMB: number = 10): boolean => {
   return file.size <= maxSizeMB * 1024 * 1024;
 };
-
