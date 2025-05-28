@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { conversationService, Conversation as DBConversation } from "@/services/conversationService";
@@ -43,6 +42,49 @@ export const useOptimizedActivityData = () => {
     primary_color: '#000000'
   };
 
+  // Helper function to validate and map settings from database
+  const mapDatabaseSettings = (dbSettings: any): ChatInterfaceSettings => {
+    if (!dbSettings) return defaultChatSettings;
+
+    // Ensure theme is a valid value
+    const validTheme = ['light', 'dark', 'system'].includes(dbSettings.theme) 
+      ? dbSettings.theme as 'light' | 'dark' | 'system'
+      : 'light';
+
+    // Parse suggested_messages if it's a string
+    let suggestedMessages = [];
+    if (dbSettings.suggested_messages) {
+      try {
+        suggestedMessages = typeof dbSettings.suggested_messages === 'string' 
+          ? JSON.parse(dbSettings.suggested_messages) 
+          : dbSettings.suggested_messages;
+      } catch (error) {
+        console.warn('Failed to parse suggested_messages:', error);
+        suggestedMessages = [];
+      }
+    }
+
+    return {
+      initial_message: dbSettings.initial_message || defaultChatSettings.initial_message,
+      suggested_messages: Array.isArray(suggestedMessages) ? suggestedMessages : [],
+      message_placeholder: dbSettings.message_placeholder || defaultChatSettings.message_placeholder,
+      show_feedback: dbSettings.show_feedback ?? defaultChatSettings.show_feedback,
+      allow_regenerate: dbSettings.allow_regenerate ?? defaultChatSettings.allow_regenerate,
+      theme: validTheme,
+      display_name: dbSettings.display_name || defaultChatSettings.display_name,
+      bubble_position: dbSettings.bubble_position || defaultChatSettings.bubble_position,
+      show_suggestions_after_chat: dbSettings.show_suggestions_after_chat ?? defaultChatSettings.show_suggestions_after_chat,
+      auto_show_delay: dbSettings.auto_show_delay ?? defaultChatSettings.auto_show_delay,
+      user_message_color: dbSettings.user_message_color || defaultChatSettings.user_message_color,
+      bubble_color: dbSettings.bubble_color || defaultChatSettings.bubble_color,
+      sync_colors: dbSettings.sync_colors ?? defaultChatSettings.sync_colors,
+      primary_color: dbSettings.primary_color || defaultChatSettings.primary_color,
+      profile_picture: dbSettings.profile_picture || undefined,
+      chat_icon: dbSettings.chat_icon || undefined,
+      footer: dbSettings.footer || undefined
+    };
+  };
+
   // Generate snippet from conversation without loading all messages
   const generateSnippet = useCallback((conversation: DBConversation): string => {
     if (conversation.title) {
@@ -78,7 +120,10 @@ export const useOptimizedActivityData = () => {
 
       setConversations(conversationsWithSnippets);
       setHasAnyConversations(conversationsWithSnippets.length > 0);
-      setChatSettings(settingsData || defaultChatSettings);
+      
+      // Use helper function to properly map settings
+      const mappedSettings = mapDatabaseSettings(settingsData);
+      setChatSettings(mappedSettings);
 
       // Auto-select first conversation if available
       if (conversationsWithSnippets.length > 0 && !selectedConversationId) {
@@ -93,7 +138,7 @@ export const useOptimizedActivityData = () => {
     } finally {
       setIsLoadingConversations(false);
     }
-  }, [agentId, selectedConversationId, generateSnippet, defaultChatSettings]);
+  }, [agentId, selectedConversationId, generateSnippet]);
 
   // Load conversation messages
   const loadConversationMessages = useCallback(async (dbConversation: DBConversation) => {
