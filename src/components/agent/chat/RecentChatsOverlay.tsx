@@ -42,6 +42,7 @@ const RecentChatsOverlay: React.FC<RecentChatsOverlayProps> = ({
   };
 
   const handleConversationClick = (conversationId: string) => {
+    console.log('🔄 Loading conversation from recent chats with initial message:', conversationId);
     onSelectConversation(conversationId);
     onClose();
   };

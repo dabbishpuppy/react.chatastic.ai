@@ -73,19 +73,21 @@ const ActivityPage: React.FC = () => {
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
                 </div>
               ) : selectedConversation && selectedDBConversation ? (
-                <ConversationView 
-                  conversation={selectedConversation} 
-                  onClose={() => {}}
-                  onDelete={() => handleDeleteConversation(selectedConversation.id)}
-                  theme={getConversationTheme(chatSettings?.theme || 'light')}
-                  profilePicture={chatSettings?.profile_picture || undefined}
-                  displayName={chatSettings?.display_name || 'AI Assistant'}
-                  userMessageColor={chatSettings?.user_message_color || '#000000'}
-                  showDeleteButton={true}
-                  conversationStatus={selectedDBConversation.status}
-                  conversationSource={selectedDBConversation.source}
-                  agentId={agentId}
-                />
+                <div className="h-[calc(100vh-240px)] bg-white rounded-lg border overflow-hidden" style={{ scrollbarWidth: 'thin' }}>
+                  <ConversationView 
+                    conversation={selectedConversation} 
+                    onClose={() => {}}
+                    onDelete={() => handleDeleteConversation(selectedConversation.id)}
+                    theme={getConversationTheme(chatSettings?.theme || 'light')}
+                    profilePicture={chatSettings?.profile_picture || undefined}
+                    displayName={chatSettings?.display_name || 'AI Assistant'}
+                    userMessageColor={chatSettings?.user_message_color || '#000000'}
+                    showDeleteButton={true}
+                    conversationStatus={selectedDBConversation.status}
+                    conversationSource={selectedDBConversation.source}
+                    agentId={agentId}
+                  />
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full bg-white rounded-lg border">
                   <p className="text-gray-500">Select a conversation to view details</p>

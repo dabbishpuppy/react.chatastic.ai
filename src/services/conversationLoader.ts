@@ -53,7 +53,7 @@ export const conversationLoader = {
       // Sort by timestamp to ensure proper order
       messages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       
-      console.log('✅ Final merged messages:', messages);
+      console.log('✅ Final merged messages with initial greeting:', messages);
       return messages;
     } catch (error) {
       console.warn('⚠️ Error loading conversation messages:', error);

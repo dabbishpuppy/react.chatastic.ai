@@ -49,12 +49,14 @@ const MessageLayout: React.FC<MessageLayoutProps> = ({
 
   return (
     <>
-      <ChatMessageAvatar
-        profilePicture={profilePicture}
-        agentName={agentName}
-        isAgent={isAgent}
-        hideUserAvatar={hideUserAvatar}
-      />
+      {isAgent && (
+        <ChatMessageAvatar
+          profilePicture={profilePicture}
+          agentName={agentName}
+          isAgent={true}
+          hideUserAvatar={hideUserAvatar}
+        />
+      )}
       
       <MessageContent
         content={message.content}
@@ -73,15 +75,6 @@ const MessageLayout: React.FC<MessageLayoutProps> = ({
         isUpdatingFeedback={isUpdatingFeedback}
         showCopiedTooltip={showCopiedTooltip}
       />
-      
-      {!isAgent && (
-        <ChatMessageAvatar
-          profilePicture={profilePicture}
-          agentName={agentName}
-          isAgent={false}
-          hideUserAvatar={hideUserAvatar}
-        />
-      )}
     </>
   );
 };
