@@ -55,18 +55,23 @@ export const useChatMessageHandlers = (
 
     setIsUpdatingFeedback(true);
     try {
+      // Always try to save to database first if messageId exists
       if (messageId && messageId !== 'initial-message') {
+        console.log('💾 Saving feedback to database for message:', messageId);
+        
         const newFeedback = messageFeedback === type ? null : type;
         
         const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
         
         if (success) {
+          console.log('✅ Feedback saved to database successfully');
           onFeedback(messageTimestamp, type);
           toast({
             description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
             duration: 2000,
           });
         } else {
+          console.error('❌ Failed to save feedback to database');
           toast({
             description: "Failed to update feedback",
             duration: 2000,
@@ -74,6 +79,7 @@ export const useChatMessageHandlers = (
           });
         }
       } else {
+        console.log('⚠️ No messageId provided, updating local state only');
         onFeedback(messageTimestamp, type);
         toast({
           description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
@@ -81,7 +87,7 @@ export const useChatMessageHandlers = (
         });
       }
     } catch (error) {
-      console.error('Error updating feedback:', error);
+      console.error('❌ Error updating feedback:', error);
       toast({
         description: "Failed to update feedback",
         duration: 2000,

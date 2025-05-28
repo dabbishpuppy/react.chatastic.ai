@@ -4,6 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { conversationLoader, ConversationMessage } from "@/services/conversationLoader";
 import { getContrastColor } from "@/components/agent/chat/ThemeConfig";
+import { analyticsService } from "@/services/analyticsService";
 
 interface UseConversationViewProps {
   conversation: {
@@ -52,7 +53,7 @@ export const useConversationView = ({ conversation, agentId, userMessageColor }:
     loadMessages();
   }, [conversation.id, conversation.messages, agentId]);
 
-  // Real-time subscription for new messages
+  // Real-time subscription for new messages and feedback updates
   useEffect(() => {
     if (!conversation.id) return;
 
@@ -128,9 +129,52 @@ export const useConversationView = ({ conversation, agentId, userMessageColor }:
     };
   }, [conversation.id]);
 
-  const handleFeedback = (timestamp: string, type: "like" | "dislike") => {
-    // In read-only mode, don't allow feedback changes
-    console.log('Feedback display only - not updating in view mode');
+  const handleFeedback = async (timestamp: string, type: "like" | "dislike") => {
+    console.log('💬 Handling feedback in conversation view:', { timestamp, type });
+    
+    // Find the message by timestamp
+    const message = messages.find(msg => msg.timestamp === timestamp);
+    if (!message || !message.id) {
+      console.log('⚠️ Message not found or no ID available');
+      return;
+    }
+
+    try {
+      const newFeedback = message.feedback === type ? null : type;
+      
+      console.log('💾 Updating feedback in database:', { messageId: message.id, newFeedback });
+      const success = await analyticsService.updateMessageFeedback(message.id, newFeedback);
+      
+      if (success) {
+        console.log('✅ Feedback updated successfully in database');
+        
+        // Update local state immediately for better UX
+        setMessages(prev => prev.map(msg => 
+          msg.id === message.id 
+            ? { ...msg, feedback: newFeedback as 'like' | 'dislike' | undefined }
+            : msg
+        ));
+        
+        toast({
+          description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
+          duration: 2000,
+        });
+      } else {
+        console.error('❌ Failed to update feedback in database');
+        toast({
+          description: "Failed to update feedback",
+          duration: 2000,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error updating feedback:', error);
+      toast({
+        description: "Failed to update feedback",
+        duration: 2000,
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCopy = (content: string) => {

@@ -33,7 +33,6 @@ const ChatMessageActions: React.FC<ChatMessageActionsProps> = ({
   if (!showFeedback) return null;
 
   const handleFeedbackClick = (type: "like" | "dislike") => {
-    if (readOnly) return;
     onFeedback(type);
   };
 
@@ -51,30 +50,26 @@ const ChatMessageActions: React.FC<ChatMessageActionsProps> = ({
     <div className="flex items-center space-x-1 mt-2">
       <button
         onClick={() => handleFeedbackClick("like")}
-        disabled={isUpdatingFeedback || readOnly}
+        disabled={isUpdatingFeedback}
         className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
           feedback === "like" 
-            ? "bg-green-100 text-green-600" + (readOnly ? "" : " hover:bg-green-200")
-            : readOnly 
-              ? "bg-gray-100 text-gray-400 cursor-default"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 cursor-pointer"
+            ? "bg-green-100 text-green-600 hover:bg-green-200"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 cursor-pointer"
         } disabled:opacity-50`}
-        title={readOnly ? "User liked this message" : "Like"}
+        title="Like"
       >
         <ThumbsUp size={14} />
       </button>
       
       <button
         onClick={() => handleFeedbackClick("dislike")}
-        disabled={isUpdatingFeedback || readOnly}
+        disabled={isUpdatingFeedback}
         className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
           feedback === "dislike" 
-            ? "bg-red-100 text-red-600" + (readOnly ? "" : " hover:bg-red-200")
-            : readOnly 
-              ? "bg-gray-100 text-gray-400 cursor-default"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 cursor-pointer"
+            ? "bg-red-100 text-red-600 hover:bg-red-200"
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 cursor-pointer"
         } disabled:opacity-50`}
-        title={readOnly ? "User disliked this message" : "Dislike"}
+        title="Dislike"
       >
         <ThumbsDown size={14} />
       </button>
