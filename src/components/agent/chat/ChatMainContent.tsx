@@ -1,8 +1,6 @@
 
 import React from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import ChatMessageList from "./message/ChatMessageList";
-import TypingIndicator from "./message/TypingIndicator";
+import ChatScrollArea from "./message/ChatScrollArea";
 import { ChatMessage } from "@/types/chatInterface";
 
 interface ChatMainContentProps {
@@ -26,60 +24,10 @@ interface ChatMainContentProps {
   onLeadFormSubmit?: () => void;
 }
 
-const ChatMainContent: React.FC<ChatMainContentProps> = ({
-  chatHistory,
-  isTyping,
-  agentName,
-  profilePicture,
-  showFeedback,
-  hideUserAvatar,
-  onFeedback,
-  onCopy,
-  onRegenerate,
-  allowRegenerate = false,
-  themeClasses,
-  userMessageStyle,
-  messagesEndRef,
-  leadSettings,
-  agentId,
-  conversationId,
-  theme = 'light',
-  onLeadFormSubmit
-}) => {
+const ChatMainContent: React.FC<ChatMainContentProps> = (props) => {
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <ScrollArea className="flex-1 overflow-auto">
-        <div className="px-4 py-2 min-h-full">
-          <ChatMessageList
-            chatHistory={chatHistory}
-            agentName={agentName}
-            profilePicture={profilePicture}
-            showFeedback={showFeedback}
-            hideUserAvatar={hideUserAvatar}
-            onFeedback={onFeedback}
-            onCopy={onCopy}
-            onRegenerate={onRegenerate}
-            allowRegenerate={allowRegenerate}
-            themeClasses={themeClasses}
-            userMessageStyle={userMessageStyle}
-            messagesEndRef={messagesEndRef}
-            leadSettings={leadSettings}
-            agentId={agentId}
-            conversationId={conversationId}
-            theme={theme}
-            onLeadFormSubmit={onLeadFormSubmit}
-          />
-          
-          {/* Show typing indicator at the end */}
-          <TypingIndicator
-            isTyping={isTyping}
-            agentName={agentName}
-            profilePicture={profilePicture}
-            agentBubbleClass={themeClasses.agentMessage}
-            messagesEndRef={messagesEndRef}
-          />
-        </div>
-      </ScrollArea>
+      <ChatScrollArea {...props} />
     </div>
   );
 };
