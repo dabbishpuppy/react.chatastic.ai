@@ -82,7 +82,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     hasShownLeadForm,
     setHasShownLeadForm,
     effectiveLeadSettings,
-    refreshSettings,
+    refreshSettings: leadSettingsHook.refreshSettings,
     currentConversation,
     conversationEnded,
     startNewConversation: wrappedStartNewConversation,
