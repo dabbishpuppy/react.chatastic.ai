@@ -1,4 +1,5 @@
 
+import React from "react";
 import { ChatMessage } from "@/types/chatInterface";
 
 export interface ChatSectionProps {

@@ -1,15 +1,14 @@
 
 import React from "react";
-import { ChatMessage } from "@/types/chatInterface";
 import ChatHeader from "./ChatHeader";
 import ChatMainContent from "./ChatMainContent";
 import ChatFooter from "./ChatFooter";
 import ChatContainer from "./ChatContainer";
-import { getThemeClasses, getContrastColor } from "./ThemeConfig";
-import { ChatSectionProps } from "./ChatSectionTypes";
+import { ChatSectionProps } from "./ChatSectionProps";
 import { useChatSectionHooks } from "./ChatSectionHooks";
 import { useChatSectionEffects } from "./ChatSectionEffects";
 import { useChatSectionHandlers } from "./ChatSectionHandlers";
+import { getChatSectionHelpers } from "./ChatSectionHelpers";
 
 const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
   const {
@@ -119,23 +118,23 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
     cleanup
   );
 
-  // Apply theme based on settings
-  const themeClasses = getThemeClasses(theme);
-
-  // Should we show suggested messages?
-  const shouldShowSuggestions = suggestedMessages.length > 0 && (!userHasMessaged || showSuggestions);
-
-  // User message style with custom color
-  const userMessageStyle = userMessageColor ? {
-    backgroundColor: userMessageColor,
-    color: getContrastColor(userMessageColor)
-  } : {};
-
-  // Check if input should be disabled - only for rate limit and typing, not conversation ended
-  const isInputDisabled = isTyping || !!rateLimitError || isSubmitting;
-
-  // Convert 'system' theme to 'light' or 'dark' for components that don't support 'system'
-  const resolvedTheme: 'light' | 'dark' = theme === 'system' ? 'light' : theme;
+  // Get computed values and styles
+  const {
+    themeClasses,
+    shouldShowSuggestions,
+    userMessageStyle,
+    isInputDisabled,
+    resolvedTheme
+  } = getChatSectionHelpers(
+    theme,
+    suggestedMessages,
+    userHasMessaged,
+    showSuggestions,
+    userMessageColor,
+    isTyping,
+    rateLimitError,
+    isSubmitting
+  );
 
   return (
     <ChatContainer
