@@ -51,7 +51,7 @@ export const useChatMessageHandlers = (
   };
 
   const handleFeedback = async (type: "like" | "dislike") => {
-    if (isUpdatingFeedback || !onFeedback || !messageTimestamp || readOnly) return;
+    if (isUpdatingFeedback || !messageTimestamp || readOnly) return;
 
     setIsUpdatingFeedback(true);
     try {
@@ -67,7 +67,7 @@ export const useChatMessageHandlers = (
       // Determine new feedback value (toggle if same, set if different)
       const newFeedback = messageFeedback === type ? null : type;
       
-      // Always try to save to database first if messageId exists
+      // If we have a messageId, save to database directly and skip the onFeedback callback
       if (messageId && messageId !== 'initial-message') {
         console.log('💾 useChatMessageHandlers - Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
         
@@ -75,8 +75,7 @@ export const useChatMessageHandlers = (
         
         if (success) {
           console.log('✅ useChatMessageHandlers - Feedback saved to database successfully');
-          // Call the onFeedback callback to update local state
-          onFeedback(messageTimestamp, type);
+          // DON'T call onFeedback here - it would trigger messageFeedbackUtils and cause double-save
           toast({
             description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
             duration: 2000,
@@ -90,8 +89,11 @@ export const useChatMessageHandlers = (
           });
         }
       } else {
+        // No messageId available, use local state only via onFeedback callback
         console.log('⚠️ useChatMessageHandlers - No messageId provided, updating local state only. MessageId:', messageId);
-        onFeedback(messageTimestamp, type);
+        if (onFeedback) {
+          onFeedback(messageTimestamp, type);
+        }
         toast({
           description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
           duration: 2000,
