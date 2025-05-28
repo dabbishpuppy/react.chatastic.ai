@@ -1,0 +1,89 @@
+
+import React from "react";
+import { Copy, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
+
+interface ChatMessageActionsProps {
+  messageId?: string;
+  messageContent: string;
+  feedback?: 'like' | 'dislike';
+  showFeedback: boolean;
+  allowRegenerate: boolean;
+  isLastAgentMessage: boolean;
+  isUpdatingFeedback: boolean;
+  showCopiedTooltip: boolean;
+  onFeedback: (type: "like" | "dislike") => void;
+  onCopy: (content: string) => void;
+  onRegenerate?: () => void;
+}
+
+const ChatMessageActions: React.FC<ChatMessageActionsProps> = ({
+  messageContent,
+  feedback,
+  showFeedback,
+  allowRegenerate,
+  isLastAgentMessage,
+  isUpdatingFeedback,
+  showCopiedTooltip,
+  onFeedback,
+  onCopy,
+  onRegenerate
+}) => {
+  if (!showFeedback) return null;
+
+  return (
+    <div className="flex items-center space-x-1 mt-2">
+      <button
+        onClick={() => onFeedback("like")}
+        disabled={isUpdatingFeedback}
+        className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+          feedback === "like" 
+            ? "bg-green-100 text-green-600 hover:bg-green-200" 
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+        } disabled:opacity-50`}
+        title="Like"
+      >
+        <ThumbsUp size={14} />
+      </button>
+      
+      <button
+        onClick={() => onFeedback("dislike")}
+        disabled={isUpdatingFeedback}
+        className={`inline-flex items-center justify-center h-8 w-8 rounded-md transition-all duration-200 ${
+          feedback === "dislike" 
+            ? "bg-red-100 text-red-600 hover:bg-red-200" 
+            : "bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300"
+        } disabled:opacity-50`}
+        title="Dislike"
+      >
+        <ThumbsDown size={14} />
+      </button>
+      
+      <div className="relative">
+        <button
+          onClick={() => onCopy(messageContent)}
+          className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+          title="Copy"
+        >
+          <Copy size={14} />
+        </button>
+        {showCopiedTooltip && (
+          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+            Copied!
+          </div>
+        )}
+      </div>
+      
+      {allowRegenerate && isLastAgentMessage && onRegenerate && (
+        <button
+          onClick={onRegenerate}
+          className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 active:bg-gray-300 transition-all duration-200"
+          title="Regenerate"
+        >
+          <RotateCcw size={14} />
+        </button>
+      )}
+    </div>
+  );
+};
+
+export default ChatMessageActions;

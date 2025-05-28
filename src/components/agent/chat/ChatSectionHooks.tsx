@@ -1,61 +1,21 @@
-
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ChatMessage } from "@/types/chatInterface";
 import { useMessageHandling } from "@/hooks/useMessageHandling";
-import { useChatScroll } from "@/hooks/useChatScroll";
-import { useChatHandlers } from "@/hooks/useChatHandlers";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
-import { ChatSectionProps } from "./ChatSectionTypes";
+import { useChatSettings } from "@/hooks/useChatSettings";
+import { useChatScroll } from "@/hooks/useChatScroll";
+import { useChatHandlers } from "@/hooks/useChatHandlers";
+import { ChatSectionProps } from "./ChatSectionProps";
+import { ChatSectionState } from "./ChatSectionState";
 
-export const useChatSectionHooks = (props: ChatSectionProps) => {
-  const {
-    agentId: propAgentId,
-    initialMessages = [],
-    isEmbedded = false,
-    conversationSource = 'iframe',
-    leadSettings: propLeadSettings = null
-  } = props;
+export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState => {
+  const { agentId: routeAgentId } = useParams();
+  const { agentId: propAgentId, initialMessages, isEmbedded, conversationSource, leadSettings } = props;
+  const agentId = propAgentId || routeAgentId;
 
-  const { agentId: paramAgentId } = useParams();
-  const agentId = propAgentId || paramAgentId;
-  
-  const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>(initialMessages);
-  const [showLeadForm, setShowLeadForm] = useState(false);
-  const [hasShownLeadForm, setHasShownLeadForm] = useState(false);
-  
-  // Load lead settings - use prop leadSettings if available (for embedded mode), otherwise use hook
-  const { settings: hookLeadSettings, refreshSettings } = useLeadSettings(agentId || '');
-  const effectiveLeadSettings = propLeadSettings || hookLeadSettings;
-  
-  console.log('📋 ChatSection - Using lead settings:', {
-    propLeadSettings,
-    hookLeadSettings,
-    effectiveLeadSettings,
-    isEmbedded,
-    conversationSource
-  });
-
-  // Conversation management with the correct source
-  const {
-    currentConversation,
-    conversationEnded,
-    agentId: conversationAgentId,
-    startNewConversation,
-    endCurrentConversation,
-    loadConversation,
-    saveMessage,
-    getConversationMessages
-  } = useConversationManager(conversationSource);
-
-  // Create a callback for conversation creation that can be passed to useMessageHandling
-  const createConversationCallback = async (): Promise<string | null> => {
-    console.log('🆕 Creating conversation via callback for message handling');
-    const conversation = await startNewConversation();
-    return conversation?.id || null;
-  };
-
+  const { settings, refreshSettings } = useChatSettings(agentId);
+  const { effectiveLeadSettings, hasShownLeadForm, setHasShownLeadForm } = useLeadSettings(leadSettings, settings);
+  const { currentConversation, conversationEnded, startNewConversation, endCurrentConversation, loadConversation, saveMessage, getConversationMessages } = useConversationManager(conversationSource);
   const {
     message,
     setMessage,
@@ -63,9 +23,13 @@ export const useChatSectionHooks = (props: ChatSectionProps) => {
     setChatHistory,
     isTyping,
     rateLimitError,
+    setRateLimitError,
     timeUntilReset,
+    setTimeUntilReset,
     isWaitingForRateLimit,
+    setIsWaitingForRateLimit,
     userHasMessaged,
+    setUserHasMessaged,
     inputRef,
     handleSubmit,
     handleSuggestedMessageClick,
@@ -73,43 +37,43 @@ export const useChatSectionHooks = (props: ChatSectionProps) => {
     handleFeedback,
     regenerateResponse,
     insertEmoji,
+    proceedWithMessage,
+    submitMessage,
     handleCountdownFinished,
     cleanup,
     isSubmitting
-  } = useMessageHandling(
-    displayMessages, 
-    isEmbedded, 
-    currentConversation?.id, 
-    agentId, 
-    conversationSource,
-    createConversationCallback
-  );
+  } = useMessageHandling(initialMessages, isEmbedded, currentConversation?.id, agentId, conversationSource, async () => {
+    const conversation = await startNewConversation();
+    return conversation?.id || null;
+  });
+  const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
+  const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
 
-  const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded, chatHistory, isTyping);
+  // Function to add a message to the chat history and save it
+  const addMessageToChatHistory = async (content: string, isAgent: boolean) => {
+    const timestamp = new Date().toISOString();
+    const newMessage = { content, isAgent, timestamp };
 
-  const {
-    handleSubmitWithAgentId,
-    handleSuggestedMessageClickWithAgentId,
-    handleRegenerateWithAgentId
-  } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
+    // Save the message to the database
+    await saveMessage(content, isAgent);
+
+    // Update the local chat history
+    setChatHistory(prevHistory => [...prevHistory, newMessage]);
+  };
 
   return {
     agentId,
-    displayMessages,
-    setDisplayMessages,
-    showLeadForm,
-    setShowLeadForm,
+    displayMessages: chatHistory,
+    setDisplayMessages: setChatHistory,
     hasShownLeadForm,
     setHasShownLeadForm,
     effectiveLeadSettings,
     refreshSettings,
     currentConversation,
     conversationEnded,
-    conversationAgentId,
     startNewConversation,
     endCurrentConversation,
     loadConversation,
-    saveMessage,
     getConversationMessages,
     message,
     setMessage,
@@ -118,14 +82,10 @@ export const useChatSectionHooks = (props: ChatSectionProps) => {
     isTyping,
     rateLimitError,
     timeUntilReset,
-    isWaitingForRateLimit,
     userHasMessaged,
     inputRef,
-    handleSubmit,
-    handleSuggestedMessageClick,
     copyMessageToClipboard,
     handleFeedback,
-    regenerateResponse,
     insertEmoji,
     handleCountdownFinished,
     cleanup,
