@@ -289,13 +289,13 @@ export const useOptimizedActivityData = () => {
         }
         
         toast({
-          title: (
+          title: "Conversation deleted",
+          description: (
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              Conversation deleted
+              The conversation has been successfully deleted.
             </div>
           ),
-          description: "The conversation has been successfully deleted.",
         });
       }
     } catch (error) {
