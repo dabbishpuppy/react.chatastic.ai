@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AgentPageLayout from "./AgentPageLayout";
 import ChatLogsTab from "@/components/activity/ChatLogsTab";
@@ -92,9 +93,19 @@ const ActivityPage: React.FC = () => {
         async (payload) => {
           console.log('Real-time message update:', payload);
           
-          // If we have a selected conversation, it will handle its own updates
-          // We just need to refresh the conversations list to update snippets
-          await loadConversations();
+          // Check if this message belongs to a conversation for our current agent
+          if (payload.new && typeof payload.new === 'object' && 'conversation_id' in payload.new) {
+            const messageConversationId = payload.new.conversation_id;
+            
+            // Only refresh if this conversation belongs to our current conversations
+            const belongsToCurrentAgent = conversations.some(conv => conv.id === messageConversationId);
+            if (belongsToCurrentAgent) {
+              await loadConversations();
+            }
+          } else {
+            // For other changes, just refresh the conversations list
+            await loadConversations();
+          }
         }
       )
       .subscribe();
@@ -102,7 +113,7 @@ const ActivityPage: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [agentId]);
+  }, [agentId, conversations]);
 
   useEffect(() => {
     if (agentId) {
@@ -193,41 +204,47 @@ const ActivityPage: React.FC = () => {
     }
   };
 
-  const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation> => {
+  const convertDBConversationToUI = async (dbConversation: DBConversation): Promise<UIConversation | null> => {
     if (!agentId) {
-      throw new Error('Agent ID is required');
+      console.error('Agent ID is required for conversation conversion');
+      return null;
     }
 
-    // Use the conversation loader to get messages with greeting
-    const messages = await conversationLoader.loadConversationWithGreeting(
-      dbConversation.id, 
-      agentId
-    );
+    try {
+      // Use the conversation loader to get messages with greeting
+      const messages = await conversationLoader.loadConversationWithGreeting(
+        dbConversation.id, 
+        agentId
+      );
 
-    const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
-    const title = dbConversation.title || `Chat from ${daysAgo}`;
-    
-    let snippet = 'No messages';
-    if (messages.length > 1) { // Skip initial greeting for snippet
-      const lastMessage = messages[messages.length - 1];
-      const content = lastMessage.content;
-      snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
-    } else if (messages.length === 1) {
-      // Only initial greeting exists
-      const content = messages[0].content;
-      snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
+      const daysAgo = formatDistanceToNow(new Date(dbConversation.created_at), { addSuffix: true });
+      const title = dbConversation.title || `Chat from ${daysAgo}`;
+      
+      let snippet = 'No messages';
+      if (messages.length > 1) { // Skip initial greeting for snippet
+        const lastMessage = messages[messages.length - 1];
+        const content = lastMessage.content;
+        snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
+      } else if (messages.length === 1) {
+        // Only initial greeting exists
+        const content = messages[0].content;
+        snippet = content.length > 50 ? content.substring(0, 50) + '...' : content;
+      }
+
+      const source = dbConversation.source === 'bubble' ? 'Widget' : 'Iframe';
+
+      return {
+        id: dbConversation.id,
+        title,
+        snippet,
+        daysAgo,
+        source,
+        messages
+      };
+    } catch (error) {
+      console.error('Error converting conversation:', error);
+      return null;
     }
-
-    const source = dbConversation.source === 'bubble' ? 'Widget' : 'Iframe';
-
-    return {
-      id: dbConversation.id,
-      title,
-      snippet,
-      daysAgo,
-      source,
-      messages
-    };
   };
 
   const handleConversationClick = async (conversationId: string) => {
@@ -235,15 +252,60 @@ const ActivityPage: React.FC = () => {
     setIsLoadingConversation(true);
     
     try {
+      // First check if the conversation exists in our current list
       const dbConversation = conversations.find(c => c.id === conversationId);
-      if (dbConversation) {
-        console.log('Found DB conversation:', dbConversation);
-        const uiConversation = await convertDBConversationToUI(dbConversation);
+      if (!dbConversation) {
+        console.warn('Conversation not found in current conversations list:', conversationId);
+        
+        // Try to fetch the conversation directly from the database
+        const fetchedConversation = await conversationService.getConversationById(conversationId);
+        if (!fetchedConversation) {
+          console.error('Conversation not found in database:', conversationId);
+          toast({
+            title: "Conversation not found",
+            description: "This conversation may have been deleted or you don't have access to it.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // If found, check if it belongs to the current agent
+        if (fetchedConversation.agent_id !== agentId) {
+          console.warn('Conversation belongs to different agent:', {
+            conversationId,
+            conversationAgentId: fetchedConversation.agent_id,
+            currentAgentId: agentId
+          });
+          toast({
+            title: "Access denied",
+            description: "This conversation doesn't belong to the current agent.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Use the fetched conversation
+        const uiConversation = await convertDBConversationToUI(fetchedConversation);
+        if (uiConversation) {
+          setSelectedConversation(uiConversation);
+          setSelectedDBConversation(fetchedConversation);
+        }
+        return;
+      }
+
+      console.log('Found DB conversation:', dbConversation);
+      const uiConversation = await convertDBConversationToUI(dbConversation);
+      if (uiConversation) {
         console.log('Converted UI conversation:', uiConversation);
         setSelectedConversation(uiConversation);
         setSelectedDBConversation(dbConversation);
       } else {
-        console.error('Conversation not found:', conversationId);
+        console.error('Failed to convert conversation to UI format');
+        toast({
+          title: "Error",
+          description: "Failed to load conversation data.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error('Error loading conversation:', error);
