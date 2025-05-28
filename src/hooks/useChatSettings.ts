@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { ChatInterfaceSettings, defaultChatSettings, SuggestedMessage } from '@/types/chatInterface';
+import { getChatSettings, saveChatSettings, uploadChatAsset } from '@/services/chatSettingsService';
 
 // Edge function service
 export const loadSettingsFromEdgeFunction = async (agentId: string, bustCache = false) => {
@@ -189,6 +190,7 @@ export const useChatSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const { toast } = useToast();
 
   // Check if agentId is valid (not undefined or the string "undefined")
   const validAgentId = agentId && agentId !== "undefined" ? agentId : null;
