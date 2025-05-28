@@ -160,6 +160,7 @@ const EmbeddedChat: React.FC = () => {
 
   // Create initial messages with fallback
   const initialMessages = [{
+    id: 'initial-message', // Add specific ID for proper detection
     isAgent: true,
     content: settings.initial_message || '👋 Hi! How can I help you today?',
     timestamp: new Date().toISOString()
