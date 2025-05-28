@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { useInlineLeadForm } from "@/hooks/useInlineLeadForm";
+import LeadFormFields from "./lead-form/LeadFormFields";
 
 interface InlineLeadFormProps {
   agentId: string;
@@ -33,125 +32,20 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
   onSubmit,
   theme = 'light'
 }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: ''
+  const {
+    formData,
+    isSubmitting,
+    formKey,
+    handleInputChange,
+    handleSubmit
+  } = useInlineLeadForm({
+    agentId,
+    conversationId,
+    collectName,
+    collectEmail,
+    collectPhone,
+    onSubmit
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formKey, setFormKey] = useState(0); // Force re-render when settings change
-
-  // Enhanced reactivity to settings changes
-  useEffect(() => {
-    console.log('📋 Lead form settings changed (ENHANCED):', {
-      collectName,
-      collectEmail,
-      collectPhone,
-      title,
-      placeholders: {
-        name: namePlaceholder,
-        email: emailPlaceholder,
-        phone: phonePlaceholder
-      }
-    });
-    
-    // Clear form data when field visibility changes
-    setFormData(prev => ({
-      name: collectName ? prev.name : '',
-      email: collectEmail ? prev.email : '',
-      phone: collectPhone ? prev.phone : ''
-    }));
-    
-    // Force re-render to ensure UI updates immediately
-    setFormKey(prev => prev + 1);
-  }, [collectName, collectEmail, collectPhone, title, namePlaceholder, emailPlaceholder, phonePlaceholder]);
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const sendNotificationEmail = async (leadData: any) => {
-    try {
-      console.log('📧 Sending notification email for lead:', leadData);
-      // Call the edge function to send notification email
-      const { data, error } = await supabase.functions.invoke('send-lead-notification', {
-        body: { 
-          agentId,
-          leadData,
-          conversationId 
-        }
-      });
-
-      if (error) {
-        console.error('Error sending notification email:', error);
-      } else {
-        console.log('📧 Notification email sent successfully:', data);
-      }
-    } catch (error) {
-      console.error('Error calling notification function:', error);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Validate required fields
-    if (collectEmail && !formData.email) {
-      toast({
-        title: "Email required",
-        description: "Please enter your email address.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const leadData = {
-        agent_id: agentId,
-        conversation_id: conversationId,
-        name: collectName ? formData.name || null : null,
-        email: collectEmail ? formData.email || null : null,
-        phone: collectPhone ? formData.phone || null : null
-      };
-
-      console.log('📋 Submitting lead data:', leadData);
-
-      const { error } = await supabase
-        .from('leads')
-        .insert([leadData]);
-
-      if (error) {
-        console.error('Error submitting lead:', error);
-        toast({
-          title: "Submission failed",
-          description: "There was an error submitting your information. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Send notification email - this will now properly work
-      await sendNotificationEmail(leadData);
-
-      toast({
-        title: "Thank you!",
-        description: "Your information has been submitted successfully."
-      });
-
-      onSubmit();
-    } catch (error) {
-      console.error('Error submitting lead:', error);
-      toast({
-        title: "Submission failed",
-        description: "There was an error submitting your information. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const isDark = theme === 'dark';
 
@@ -183,42 +77,17 @@ const InlineLeadForm: React.FC<InlineLeadFormProps> = ({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-3">
-            {collectName && (
-              <div>
-                <Input
-                  type="text"
-                  placeholder={namePlaceholder}
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className={`text-sm ${isDark ? 'bg-gray-700 border-gray-600 text-white' : ''}`}
-                />
-              </div>
-            )}
-            
-            {collectEmail && (
-              <div>
-                <Input
-                  type="email"
-                  placeholder={emailPlaceholder}
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  required
-                  className={`text-sm ${isDark ? 'bg-gray-700 border-gray-600 text-white' : ''}`}
-                />
-              </div>
-            )}
-            
-            {collectPhone && (
-              <div>
-                <Input
-                  type="tel"
-                  placeholder={phonePlaceholder}
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className={`text-sm ${isDark ? 'bg-gray-700 border-gray-600 text-white' : ''}`}
-                />
-              </div>
-            )}
+            <LeadFormFields
+              formData={formData}
+              collectName={collectName}
+              collectEmail={collectEmail}
+              collectPhone={collectPhone}
+              namePlaceholder={namePlaceholder}
+              emailPlaceholder={emailPlaceholder}
+              phonePlaceholder={phonePlaceholder}
+              onInputChange={handleInputChange}
+              theme={theme}
+            />
             
             <div className="flex gap-2 pt-2">
               <Button

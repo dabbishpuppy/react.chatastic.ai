@@ -76,13 +76,6 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     await startNewConversation();
   };
 
-  // Create setUserHasMessaged function since it's needed by ChatSectionState
-  const setUserHasMessaged = (value: boolean) => {
-    // This function is needed for the interface but the actual userHasMessaged 
-    // state is managed internally by useMessageHandling
-    console.log('setUserHasMessaged called with:', value);
-  };
-
   return {
     agentId,
     displayMessages: chatHistory,
@@ -105,7 +98,6 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     rateLimitError,
     timeUntilReset,
     userHasMessaged,
-    setUserHasMessaged,
     inputRef,
     copyMessageToClipboard,
     handleFeedback,
