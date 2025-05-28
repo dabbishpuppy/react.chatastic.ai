@@ -55,16 +55,20 @@ export const useChatMessageHandlers = (
 
     setIsUpdatingFeedback(true);
     try {
+      console.log('🔥 Handling feedback:', { messageId, messageTimestamp, type, messageFeedback });
+      
+      // Determine new feedback value (toggle if same, set if different)
+      const newFeedback = messageFeedback === type ? null : type;
+      
       // Always try to save to database first if messageId exists
       if (messageId && messageId !== 'initial-message') {
-        console.log('💾 Saving feedback to database for message:', messageId);
-        
-        const newFeedback = messageFeedback === type ? null : type;
+        console.log('💾 Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
         
         const success = await analyticsService.updateMessageFeedback(messageId, newFeedback);
         
         if (success) {
           console.log('✅ Feedback saved to database successfully');
+          // Call the onFeedback callback to update local state
           onFeedback(messageTimestamp, type);
           toast({
             description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
