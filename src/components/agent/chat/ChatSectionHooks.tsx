@@ -14,7 +14,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   const { agentId: propAgentId, initialMessages, isEmbedded, conversationSource, leadSettings } = props;
   const agentId = propAgentId || routeAgentId;
 
-  const { settings, refreshSettings } = useChatSettings(agentId);
+  const { settings, refreshSettings } = useChatSettings(); // Remove agentId parameter
   
   // Use the leadSettings from props if provided, otherwise use the hook
   const leadSettingsHook = useLeadSettings(agentId || '');
