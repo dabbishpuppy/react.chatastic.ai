@@ -37,6 +37,16 @@ const SidebarActions: React.FC<SidebarActionsProps> = ({
     });
   };
 
+  // Provide default teams data since we don't have access to teams in this component
+  const defaultTeams = [
+    {
+      id: "default-team",
+      name: "Default Team",
+      isActive: true,
+      agents: []
+    }
+  ];
+
   return (
     <div className="space-y-2">
       <Button
@@ -60,6 +70,7 @@ const SidebarActions: React.FC<SidebarActionsProps> = ({
       <CreateAgentDialog
         open={showCreateAgent}
         onOpenChange={setShowCreateAgent}
+        teams={defaultTeams}
         onAgentCreated={handleAgentCreated}
       />
 

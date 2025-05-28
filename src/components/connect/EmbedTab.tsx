@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Copy, Check, Eye } from "lucide-react";
-import ChatBubbleTab from "./embed/ChatBubbleTab";
-import IframeTab from "./embed/IframeTab";
-import HelpSection from "./embed/HelpSection";
+import { ChatBubbleTab } from "./embed/ChatBubbleTab";
+import { IframeTab } from "./embed/IframeTab";
+import { HelpSection } from "./embed/HelpSection";
 import { useToast } from "@/hooks/use-toast";
 
 interface EmbedTabProps {
