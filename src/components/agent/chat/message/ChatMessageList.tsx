@@ -70,6 +70,9 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
           return null;
         }
         
+        // Detect if this is the initial message - use same logic as other components
+        const isInitialMessage = (index === 0 && msg.isAgent) || msg.id === 'initial-message';
+        
         // Render regular message
         return (
           <ChatMessageComponent
@@ -86,7 +89,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             agentBubbleClass={themeClasses.agentMessage}
             userBubbleClass={themeClasses.userMessage}
             userMessageStyle={userMessageStyle}
-            isInitialMessage={false}
+            isInitialMessage={isInitialMessage}
             isLastAgentMessage={index === chatHistory.length - 1}
           />
         );
