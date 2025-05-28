@@ -9,6 +9,112 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_sources: {
+        Row: {
+          agent_id: string
+          content: string | null
+          created_at: string
+          created_by: string | null
+          file_path: string | null
+          id: string
+          is_active: boolean
+          metadata: Json | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          title: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          agent_id: string
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_path?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          title: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          agent_id?: string
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_path?: string | null
+          id?: string
+          is_active?: boolean
+          metadata?: Json | null
+          source_type?: Database["public"]["Enums"]["source_type"]
+          title?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_sources_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_training_jobs: {
+        Row: {
+          agent_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          id: string
+          processed_chunks: number | null
+          processed_sources: number | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["training_status"]
+          total_chunks: number | null
+          total_sources: number | null
+        }
+        Insert: {
+          agent_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          processed_chunks?: number | null
+          processed_sources?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["training_status"]
+          total_chunks?: number | null
+          total_sources?: number | null
+        }
+        Update: {
+          agent_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          processed_chunks?: number | null
+          processed_sources?: number | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["training_status"]
+          total_chunks?: number | null
+          total_sources?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_training_jobs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           color: string
@@ -58,6 +164,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "agents_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_logs: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          agent_id: string | null
+          created_at: string
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          resource_id: string | null
+          resource_type: string
+          team_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          resource_id?: string | null
+          resource_type: string
+          team_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          agent_id?: string | null
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          resource_id?: string | null
+          resource_type?: string
+          team_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
@@ -185,6 +351,44 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_retention_policies: {
+        Row: {
+          auto_delete: boolean
+          created_at: string
+          id: string
+          resource_type: string
+          retention_days: number
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_delete?: boolean
+          created_at?: string
+          id?: string
+          resource_type: string
+          retention_days?: number
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_delete?: boolean
+          created_at?: string
+          id?: string
+          resource_type?: string
+          retention_days?: number
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_retention_policies_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -369,6 +573,76 @@ export type Database = {
           },
         ]
       }
+      source_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          source_id: string
+          token_count: number
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          source_id: string
+          token_count?: number
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          source_id?: string
+          token_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_chunks_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_embeddings: {
+        Row: {
+          chunk_id: string
+          created_at: string
+          embedding: string | null
+          id: string
+          model_name: string
+        }
+        Insert: {
+          chunk_id: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          model_name?: string
+        }
+        Update: {
+          chunk_id?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          model_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_embeddings_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "source_chunks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string | null
@@ -425,11 +699,73 @@ export type Database = {
         }
         Relationships: []
       }
+      user_consents: {
+        Row: {
+          consent_date: string | null
+          consent_type: string
+          consented: boolean
+          created_at: string
+          id: string
+          ip_address: unknown | null
+          team_id: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+          withdrawal_date: string | null
+        }
+        Insert: {
+          consent_date?: string | null
+          consent_type: string
+          consented?: boolean
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          team_id: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+          withdrawal_date?: string | null
+        }
+        Update: {
+          consent_date?: string | null
+          consent_type?: string
+          consented?: boolean
+          created_at?: string
+          id?: string
+          ip_address?: unknown | null
+          team_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+          withdrawal_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_consents_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      binary_quantize: {
+        Args: { "": string } | { "": unknown }
+        Returns: unknown
+      }
+      cleanup_expired_data: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      decrypt_sensitive_data: {
+        Args: { encrypted_data: string }
+        Returns: string
+      }
       delete_agent_and_related_data: {
         Args: { agent_id_param: string }
         Returns: Json
@@ -437,6 +773,18 @@ export type Database = {
       delete_conversation: {
         Args: { conversation_id: string }
         Returns: boolean
+      }
+      delete_user_data: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
+      encrypt_sensitive_data: {
+        Args: { data: string }
+        Returns: string
+      }
+      export_user_data: {
+        Args: { target_user_id: string }
+        Returns: Json
       }
       get_default_team_id: {
         Args: Record<PropertyKey, never>
@@ -446,6 +794,38 @@ export type Database = {
         Args: { team_id: string }
         Returns: Database["public"]["Enums"]["team_role"]
       }
+      halfvec_avg: {
+        Args: { "": number[] }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
+      hnsw_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       is_team_member: {
         Args: { team_id: string }
         Returns: boolean
@@ -454,9 +834,75 @@ export type Database = {
         Args: { team_id: string }
         Returns: boolean
       }
+      ivfflat_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      l2_norm: {
+        Args: { "": unknown } | { "": unknown }
+        Returns: number
+      }
+      l2_normalize: {
+        Args: { "": string } | { "": unknown } | { "": unknown }
+        Returns: string
+      }
+      sparsevec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
+      vector_avg: {
+        Args: { "": number[] }
+        Returns: string
+      }
+      vector_dims: {
+        Args: { "": string } | { "": unknown }
+        Returns: number
+      }
+      vector_norm: {
+        Args: { "": string }
+        Returns: number
+      }
+      vector_out: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: { "": string }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
     }
     Enums: {
+      audit_action:
+        | "create"
+        | "read"
+        | "update"
+        | "delete"
+        | "export"
+        | "train"
+        | "query"
+      source_type: "text" | "file" | "website" | "qa"
       team_role: "owner" | "admin" | "member"
+      training_status: "pending" | "in_progress" | "completed" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -572,7 +1018,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      audit_action: [
+        "create",
+        "read",
+        "update",
+        "delete",
+        "export",
+        "train",
+        "query",
+      ],
+      source_type: ["text", "file", "website", "qa"],
       team_role: ["owner", "admin", "member"],
+      training_status: ["pending", "in_progress", "completed", "failed"],
     },
   },
 } as const
