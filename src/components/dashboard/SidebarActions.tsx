@@ -2,7 +2,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { DollarSign, User, LogOut, Settings } from "lucide-react";
+import { Settings, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const SidebarActions = () => {
@@ -25,53 +25,58 @@ const SidebarActions = () => {
     // Add actual logout logic here when authentication is implemented
   };
 
-  // Mock credits data - replace with actual data when available
-  const totalCredits = 1250;
+  // Mock data - replace with actual data when available
+  const usageData = {
+    plan: "Free Plan",
+    creditsUsed: 0,
+    creditsTotal: 5,
+    creditsLeft: 5
+  };
 
   return (
     <div className="p-4 border-t border-gray-200 bg-white">
-      {/* Total Credits */}
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+      {/* Upgrade Button */}
+      <Button 
+        onClick={handleUpgrade}
+        className="w-full bg-black hover:bg-gray-800 text-white mb-4 flex items-center justify-center gap-2"
+        size="sm"
+      >
+        <span className="text-white">⭐</span>
+        Upgrade
+      </Button>
+
+      {/* Usage Credits Section */}
+      <div className="mb-4">
+        <div className="text-lg font-semibold text-gray-900 mb-1">Usage Credits</div>
+        <div className="text-sm text-gray-600 mb-2">{usageData.plan}</div>
+        <div className="text-sm text-gray-600 mb-1">Premium feature usage</div>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <DollarSign size={16} className="text-gray-600" />
-            <span className="text-sm font-medium text-gray-700">Total Credits</span>
-          </div>
-          <span className="text-sm font-semibold text-gray-900">{totalCredits.toLocaleString()}</span>
+          <span className="text-sm text-gray-700">{usageData.creditsUsed} of {usageData.creditsTotal} used</span>
+          <span className="text-sm font-medium text-purple-600">{usageData.creditsLeft} left</span>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="space-y-2">
-        <Button 
-          onClick={handleUpgrade}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+      <div className="flex gap-2">
+        <Button
+          onClick={handleSettings}
+          variant="outline"
           size="sm"
+          className="flex-1 flex items-center gap-2"
         >
-          Upgrade
+          <Settings size={16} />
+          Settings
         </Button>
         
-        <div className="flex gap-2">
-          <Button
-            onClick={handleSettings}
-            variant="outline"
-            size="sm"
-            className="flex-1 flex items-center gap-2"
-          >
-            <Settings size={16} />
-            Settings
-          </Button>
-          
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-            className="flex-1 flex items-center gap-2"
-          >
-            <LogOut size={16} />
-            Logout
-          </Button>
-        </div>
+        <Button
+          onClick={handleLogout}
+          variant="outline"
+          size="sm"
+          className="flex-1 flex items-center gap-2"
+        >
+          <LogOut size={16} />
+          Logout
+        </Button>
       </div>
     </div>
   );
