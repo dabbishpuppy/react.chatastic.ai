@@ -143,7 +143,7 @@ export const useChatSectionEffects = (
   useEffect(() => {
     if (initialMessages.length > 0 && !currentConversation) {
       setDisplayMessages(initialMessages);
-      setChatHistory(initialMessages);
+      setChatHistory(() => initialMessages);
     }
   }, [initialMessages, currentConversation, setChatHistory]);
 

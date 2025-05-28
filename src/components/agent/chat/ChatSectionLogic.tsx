@@ -69,6 +69,11 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
     handleRegenerateWithAgentId
   } = hooks;
 
+  // Wrap startNewConversation to match expected return type
+  const wrappedStartNewConversation = async () => {
+    await startNewConversation();
+  };
+
   const {
     handleSubmitWithConversation,
     handleStartNewChat,
@@ -83,7 +88,7 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
     isTyping,
     rateLimitError,
     isSubmitting,
-    startNewConversation,
+    wrappedStartNewConversation,
     handleSubmitWithAgentId,
     setChatHistory,
     setHasShownLeadForm,

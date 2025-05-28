@@ -48,7 +48,7 @@ export const useChatSectionHandlers = (
 
   const handleStartNewChat = async () => {
     await startNewConversation();
-    setChatHistory([{
+    setChatHistory(() => [{
       isAgent: true,
       content: initialMessages[0]?.content || "Hi! I'm Wonder AI. How can I help you today?",
       timestamp: new Date().toISOString()
@@ -64,7 +64,7 @@ export const useChatSectionHandlers = (
     await loadConversation(conversationId);
     const messages = await getConversationMessages(conversationId);
     if (messages.length > 0) {
-      setChatHistory(messages);
+      setChatHistory(() => messages);
       setDisplayMessages(messages);
     }
   };
