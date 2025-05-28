@@ -88,7 +88,6 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
       theme={resolvedTheme}
       onLeadFormSubmit={() => {
         console.log('📋 Lead form submitted from chat integration');
-        // Remove the lead form message from chat and add any new messages that were pending
         setMessage('');
       }}
 
@@ -100,7 +99,6 @@ const ChatSectionLogic: React.FC<ChatSectionProps> = (props) => {
       suggestedMessages={suggestedMessages}
       handleSuggestedMessageClick={handleSuggestedMessageClickWithAgentId}
       isInputDisabled={isInputDisabled}
-      theme={resolvedTheme}
       message={message}
       setMessage={setMessage}
       onSubmit={handleSubmitWithConversation}

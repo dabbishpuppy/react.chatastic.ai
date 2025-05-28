@@ -77,7 +77,7 @@ export const useMessageHandling = (
     conversationId,
     setRateLimitError,
     setTimeUntilReset,
-    rateLimitError // Add the missing property
+    rateLimitError
   });
 
   const {
