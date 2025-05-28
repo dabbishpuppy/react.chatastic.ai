@@ -1,5 +1,4 @@
 
-
 import * as pdfjsLib from 'pdfjs-dist';
 
 // Set up PDF.js worker
@@ -14,6 +13,7 @@ export interface FileProcessingResult {
     characterCount: number;
     fileType: string;
     processingMethod: string;
+    isHtml?: boolean;
   };
 }
 
@@ -103,28 +103,34 @@ export const processDocumentFile = async (file: File): Promise<FileProcessingRes
         const mammoth = mammothModule.default || mammothModule;
         console.log('🔧 Mammoth object:', mammoth);
         
-        if (!mammoth.extractRawText) {
-          throw new Error('mammoth.extractRawText is not available');
+        if (!mammoth.convertToHtml) {
+          throw new Error('mammoth.convertToHtml is not available');
         }
         
-        console.log('📖 Extracting text from DOCX...');
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        console.log('📝 Text extraction result:', result);
+        console.log('📖 Converting DOCX to HTML...');
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        console.log('📝 HTML conversion result:', result);
         
         const content = result.value;
-        console.log('✅ Successfully extracted content, length:', content.length);
+        console.log('✅ Successfully extracted HTML content, length:', content.length);
         
         if (!content || content.trim().length === 0) {
           throw new Error('Extracted content is empty');
         }
         
+        // Create a temporary div to get plain text for word count
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = content;
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        
         return {
           content,
           metadata: {
-            wordCount: content.split(/\s+/).filter(word => word.length > 0).length,
-            characterCount: content.length,
+            wordCount: plainText.split(/\s+/).filter(word => word.length > 0).length,
+            characterCount: plainText.length,
             fileType: file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            processingMethod: 'mammoth_docx_extraction'
+            processingMethod: 'mammoth_html_extraction',
+            isHtml: true
           }
         };
       } catch (mammothError) {

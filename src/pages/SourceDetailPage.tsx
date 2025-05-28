@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -223,6 +222,8 @@ const SourceDetailPage: React.FC = () => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
+  const isHtmlContent = source?.metadata?.isHtml === true;
+
   if (loading) {
     return (
       <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Source Details">
@@ -392,9 +393,20 @@ const SourceDetailPage: React.FC = () => {
                     </div>
                     
                     <div className="prose max-w-none">
-                      <pre className="whitespace-pre-wrap font-sans text-gray-700">
-                        {source.content || 'No content available'}
-                      </pre>
+                      {isHtmlContent ? (
+                        <div 
+                          className="whitespace-pre-wrap font-sans text-gray-700"
+                          style={{ fontSize: '0.875rem' }}
+                          dangerouslySetInnerHTML={{ __html: source.content || 'No content available' }}
+                        />
+                      ) : (
+                        <pre 
+                          className="whitespace-pre-wrap font-sans text-gray-700"
+                          style={{ fontSize: '0.875rem' }}
+                        >
+                          {source.content || 'No content available'}
+                        </pre>
+                      )}
                     </div>
                   </div>
                 )}
