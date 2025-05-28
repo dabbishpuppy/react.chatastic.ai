@@ -29,7 +29,8 @@ export const useOptimizedActivityData = () => {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [hasAnyConversations, setHasAnyConversations] = useState(true);
   
-  // Track if first conversation is being auto-loaded
+  // Track if conversations have been loaded to prevent infinite loops
+  const conversationsLoaded = useRef(false);
   const autoLoadingFirstConversation = useRef(false);
 
   // Default chat settings
@@ -91,7 +92,7 @@ export const useOptimizedActivityData = () => {
       chat_icon: dbSettings.chat_icon || undefined,
       footer: dbSettings.footer || undefined
     };
-  }, [defaultChatSettings]);
+  }, []);
 
   // Generate snippet from conversation without loading all messages
   const generateSnippet = useCallback((conversation: DBConversation): string => {
@@ -103,10 +104,14 @@ export const useOptimizedActivityData = () => {
 
   // Load conversations with instant display and background optimization
   const loadConversations = useCallback(async () => {
-    if (!agentId) return;
+    if (!agentId || conversationsLoaded.current) {
+      console.log('📋 Skipping conversation load - already loaded or no agentId');
+      return;
+    }
 
     console.log('🚀 Starting optimized conversation loading for agent:', agentId);
     setIsLoadingConversations(true);
+    conversationsLoaded.current = true;
     
     try {
       // Start both requests in parallel for maximum speed
@@ -172,8 +177,9 @@ export const useOptimizedActivityData = () => {
       setHasAnyConversations(false);
       setChatSettings(defaultChatSettings);
       setIsLoadingConversations(false);
+      conversationsLoaded.current = false; // Allow retry on error
     }
-  }, [agentId, generateSnippet, mapDatabaseSettings, defaultChatSettings]);
+  }, [agentId, generateSnippet, mapDatabaseSettings]);
 
   // Optimized message loading with caching
   const loadConversationMessages = useCallback(async (dbConversation: DBConversation) => {
@@ -296,6 +302,16 @@ export const useOptimizedActivityData = () => {
       });
     }
   }, [agentId, conversations, selectedConversationId, handleConversationClick]);
+
+  // Reset loaded state when agentId changes
+  useEffect(() => {
+    conversationsLoaded.current = false;
+    autoLoadingFirstConversation.current = false;
+    setConversations([]);
+    setSelectedConversationId(null);
+    setSelectedConversation(null);
+    setSelectedDBConversation(null);
+  }, [agentId]);
 
   return {
     agentId,

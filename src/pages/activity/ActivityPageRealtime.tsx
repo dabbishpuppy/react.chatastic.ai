@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Conversation as DBConversation, conversationService } from "@/services/conversationService";
 
@@ -14,9 +14,17 @@ export const useActivityRealtime = ({
   conversations,
   loadConversations
 }: UseActivityRealtimeProps) => {
-  // Real-time subscription for messages
+  const channelRef = useRef<any>(null);
+  const lastUpdateRef = useRef<number>(0);
+
+  // Real-time subscription for messages with debouncing
   useEffect(() => {
     if (!agentId) return;
+
+    // Clean up existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
 
     const channel = supabase
       .channel('messages-changes')
@@ -29,6 +37,14 @@ export const useActivityRealtime = ({
         },
         async (payload) => {
           console.log('Real-time message update:', payload);
+          
+          // Debounce updates to prevent infinite loops
+          const now = Date.now();
+          if (now - lastUpdateRef.current < 1000) {
+            console.log('Debouncing real-time update');
+            return;
+          }
+          lastUpdateRef.current = now;
           
           // Check if this message belongs to a conversation for our current agent
           if (payload.new && typeof payload.new === 'object' && 'conversation_id' in payload.new) {
@@ -55,17 +71,17 @@ export const useActivityRealtime = ({
             } catch (error) {
               console.warn('Could not verify conversation ownership for real-time message:', error);
             }
-          } else {
-            // For other changes, just refresh the conversations list
-            console.log('Non-message change detected, refreshing conversations');
-            await loadConversations();
           }
         }
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
     };
-  }, [agentId, conversations, loadConversations]);
+  }, [agentId]); // Only depend on agentId, not conversations or loadConversations to prevent loops
 };
