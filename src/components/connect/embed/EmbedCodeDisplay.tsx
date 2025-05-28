@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +9,7 @@ interface EmbedCodeDisplayProps {
 
 export const EmbedCodeDisplay: React.FC<EmbedCodeDisplayProps> = ({ getEmbedCode }) => {
   const [copyText, setCopyText] = useState("Copy");
+  const { toast } = useToast();
 
   const handleCopy = () => {
     const embedCode = getEmbedCode();
