@@ -19,7 +19,7 @@ export class SourceChunkService {
     if (error) throw new Error(`Failed to create chunks: ${error.message}`);
     return (createdChunks || []).map(chunk => ({
       ...chunk,
-      metadata: chunk.metadata as Record<string, any> || {}
+      metadata: (chunk.metadata as Record<string, any>) || {}
     }));
   }
 
@@ -34,7 +34,7 @@ export class SourceChunkService {
     if (error) throw new Error(`Failed to fetch chunks: ${error.message}`);
     return (chunks || []).map(chunk => ({
       ...chunk,
-      metadata: chunk.metadata as Record<string, any> || {}
+      metadata: (chunk.metadata as Record<string, any>) || {}
     }));
   }
 
@@ -52,7 +52,7 @@ export class SourceChunkService {
     if (error) throw new Error(`Failed to fetch agent chunks: ${error.message}`);
     return (chunks || []).map(chunk => ({
       ...chunk,
-      metadata: chunk.metadata as Record<string, any> || {}
+      metadata: (chunk.metadata as Record<string, any>) || {}
     }));
   }
 
@@ -80,10 +80,12 @@ export class SourceChunkService {
 
     if (error) throw new Error(`Failed to fetch chunk with embedding: ${error.message}`);
     
+    const embedding = data.source_embeddings?.[0]?.embedding;
+    
     return {
       ...data,
-      metadata: data.metadata as Record<string, any> || {},
-      embedding: data.source_embeddings?.[0]?.embedding as number[]
+      metadata: (data.metadata as Record<string, any>) || {},
+      embedding: embedding ? JSON.parse(embedding as unknown as string) as number[] : undefined
     };
   }
 }

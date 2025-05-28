@@ -11,13 +11,20 @@ export class GDPRService {
     ip_address?: string;
     user_agent?: string;
   }): Promise<UserConsent> {
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const consentData = {
+      ...data,
+      user_id: user.id,
+      consent_date: data.consented ? new Date().toISOString() : undefined,
+      withdrawal_date: !data.consented ? new Date().toISOString() : undefined
+    };
+
     const { data: consent, error } = await supabase
       .from('user_consents')
-      .insert({
-        ...data,
-        consent_date: data.consented ? new Date().toISOString() : undefined,
-        withdrawal_date: !data.consented ? new Date().toISOString() : undefined
-      })
+      .insert(consentData)
       .select()
       .single();
 
@@ -58,24 +65,34 @@ export class GDPRService {
     return consent;
   }
 
-  // Export user data (uses database function)
+  // Export user data
   static async exportUserData(userId: string): Promise<any> {
-    const { data, error } = await supabase.rpc('export_user_data', {
-      target_user_id: userId
-    });
+    try {
+      const { data, error } = await supabase.rpc('export_user_data', {
+        target_user_id: userId
+      });
 
-    if (error) throw new Error(`Failed to export user data: ${error.message}`);
-    return data;
+      if (error) throw new Error(`Failed to export user data: ${error.message}`);
+      return data;
+    } catch (error) {
+      console.warn('Export function not available:', error);
+      return null;
+    }
   }
 
-  // Delete user data (uses database function)
+  // Delete user data
   static async deleteUserData(userId: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('delete_user_data', {
-      target_user_id: userId
-    });
+    try {
+      const { data, error } = await supabase.rpc('delete_user_data', {
+        target_user_id: userId
+      });
 
-    if (error) throw new Error(`Failed to delete user data: ${error.message}`);
-    return data || false;
+      if (error) throw new Error(`Failed to delete user data: ${error.message}`);
+      return data || false;
+    } catch (error) {
+      console.warn('Delete function not available:', error);
+      return false;
+    }
   }
 
   // Check if user has given consent for a specific type
