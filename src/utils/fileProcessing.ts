@@ -95,11 +95,9 @@ export const processDocumentFile = async (file: File): Promise<FileProcessingRes
       
       try {
         console.log('📦 Attempting to import mammoth...');
-        // Try dynamic import with explicit error handling
         const mammothModule = await import('mammoth');
         console.log('✅ Successfully imported mammoth:', mammothModule);
         
-        // Access the default export or the extractRawText function
         const mammoth = mammothModule.default || mammothModule;
         console.log('🔧 Mammoth object:', mammoth);
         
@@ -107,16 +105,65 @@ export const processDocumentFile = async (file: File): Promise<FileProcessingRes
           throw new Error('mammoth.convertToHtml is not available');
         }
         
-        console.log('📖 Converting DOCX to HTML...');
-        const result = await mammoth.convertToHtml({ arrayBuffer });
+        console.log('📖 Converting DOCX to HTML with enhanced options...');
+        
+        // Enhanced conversion options to preserve more formatting
+        const result = await mammoth.convertToHtml({ 
+          arrayBuffer,
+          options: {
+            // Preserve heading styles
+            styleMap: [
+              "p[style-name='Heading 1'] => h1:fresh",
+              "p[style-name='Heading 2'] => h2:fresh", 
+              "p[style-name='Heading 3'] => h3:fresh",
+              "p[style-name='Heading 4'] => h4:fresh",
+              "p[style-name='Heading 5'] => h5:fresh",
+              "p[style-name='Heading 6'] => h6:fresh",
+              "p[style-name='Title'] => h1.title:fresh",
+              "p[style-name='Subtitle'] => h2.subtitle:fresh"
+            ],
+            // Include default styles for formatting
+            includeDefaultStyleMap: true,
+            // Convert embedded styles
+            convertImage: mammoth.images.imgElement(function(image: any) {
+              return image.read("base64").then(function(imageBuffer: any) {
+                return {
+                  src: "data:" + image.contentType + ";base64," + imageBuffer
+                };
+              });
+            })
+          }
+        });
+        
         console.log('📝 HTML conversion result:', result);
         
-        const content = result.value;
+        let content = result.value;
         console.log('✅ Successfully extracted HTML content, length:', content.length);
         
         if (!content || content.trim().length === 0) {
           throw new Error('Extracted content is empty');
         }
+        
+        // Clean up and enhance the HTML for better display
+        content = content
+          // Ensure proper paragraph spacing
+          .replace(/<p><\/p>/g, '<br>')
+          // Add proper styling classes for headings
+          .replace(/<h1>/g, '<h1 style="font-size: 1.5rem; font-weight: bold; margin: 1rem 0 0.5rem 0;">')
+          .replace(/<h2>/g, '<h2 style="font-size: 1.25rem; font-weight: bold; margin: 1rem 0 0.5rem 0;">')
+          .replace(/<h3>/g, '<h3 style="font-size: 1.125rem; font-weight: bold; margin: 0.75rem 0 0.375rem 0;">')
+          .replace(/<h4>/g, '<h4 style="font-size: 1rem; font-weight: bold; margin: 0.75rem 0 0.375rem 0;">')
+          .replace(/<h5>/g, '<h5 style="font-size: 0.875rem; font-weight: bold; margin: 0.5rem 0 0.25rem 0;">')
+          .replace(/<h6>/g, '<h6 style="font-size: 0.875rem; font-weight: bold; margin: 0.5rem 0 0.25rem 0;">')
+          // Add proper paragraph styling
+          .replace(/<p>/g, '<p style="margin: 0.5rem 0; line-height: 1.5;">')
+          // Enhance list styling
+          .replace(/<ul>/g, '<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">')
+          .replace(/<ol>/g, '<ol style="margin: 0.5rem 0; padding-left: 1.5rem;">')
+          .replace(/<li>/g, '<li style="margin: 0.25rem 0;">')
+          // Ensure strong and em tags are properly styled
+          .replace(/<strong>/g, '<strong style="font-weight: bold;">')
+          .replace(/<em>/g, '<em style="font-style: italic;">');
         
         // Create a temporary div to get plain text for word count
         const tempDiv = document.createElement('div');
@@ -129,7 +176,7 @@ export const processDocumentFile = async (file: File): Promise<FileProcessingRes
             wordCount: plainText.split(/\s+/).filter(word => word.length > 0).length,
             characterCount: plainText.length,
             fileType: file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            processingMethod: 'mammoth_html_extraction',
+            processingMethod: 'mammoth_enhanced_html_extraction',
             isHtml: true
           }
         };

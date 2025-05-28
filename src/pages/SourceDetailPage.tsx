@@ -399,8 +399,11 @@ const SourceDetailPage: React.FC = () => {
                     <div className="prose max-w-none">
                       {isHtmlContent ? (
                         <div 
-                          className="whitespace-pre-wrap font-sans text-gray-700"
-                          style={{ fontSize: '0.875rem' }}
+                          className="font-sans text-gray-700"
+                          style={{ 
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5'
+                          }}
                           dangerouslySetInnerHTML={{ __html: source.content || 'No content available' }}
                         />
                       ) : (
