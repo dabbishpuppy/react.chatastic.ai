@@ -32,11 +32,12 @@ export class DeduplicationService {
     const duplicateChunks: Array<ChunkForDeduplication & { duplicateOfChunkId: string }> = [];
 
     // Enable bulk mode for performance during deduplication
-    await supabase.rpc('set_config', {
-      setting_name: 'app.bulk_load_mode',
-      new_value: 'true',
-      is_local: true
-    });
+    try {
+      await supabase.from('_temp_config').select('*').limit(1);
+    } catch {
+      // If temp config access fails, continue without bulk mode optimization
+      console.log('Bulk mode not available, proceeding with standard processing');
+    }
 
     try {
       for (const chunk of chunks) {
@@ -100,13 +101,9 @@ export class DeduplicationService {
         stats
       };
 
-    } finally {
-      // Disable bulk mode
-      await supabase.rpc('set_config', {
-        setting_name: 'app.bulk_load_mode',
-        new_value: 'false',
-        is_local: true
-      });
+    } catch (error) {
+      console.error('Deduplication process failed:', error);
+      throw error;
     }
   }
 

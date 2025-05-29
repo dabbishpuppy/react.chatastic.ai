@@ -15,13 +15,15 @@ interface CompressionStats {
   space_saved_percentage: number;
 }
 
+interface MigrationResult {
+  processed_sources: number;
+  processed_chunks: number;
+  timestamp: string;
+}
+
 export class MigrationService {
   // Run safe migration backfill for existing data
-  static async runSafeMigrationBackfill(batchSize: number = 500): Promise<{
-    processed_sources: number;
-    processed_chunks: number;
-    timestamp: string;
-  }> {
+  static async runSafeMigrationBackfill(batchSize: number = 500): Promise<MigrationResult> {
     console.log(`🔄 Starting safe migration backfill (batch size: ${batchSize})...`);
     
     const { data: result, error } = await supabase
@@ -32,8 +34,11 @@ export class MigrationService {
       throw new Error(`Migration failed: ${error.message}`);
     }
 
-    console.log(`✅ Migration backfill completed:`, result);
-    return result;
+    // Type-safe casting from Json to our expected interface
+    const migrationResult = result as unknown as MigrationResult;
+    
+    console.log(`✅ Migration backfill completed:`, migrationResult);
+    return migrationResult;
   }
 
   // Get migration progress for monitoring
@@ -107,7 +112,7 @@ export class MigrationService {
 
   // Run full system optimization
   static async runSystemOptimization(): Promise<{
-    migrationResult: any;
+    migrationResult: MigrationResult;
     hashesProcessed: number;
     orphanedCleaned: number;
     compressionStats: CompressionStats | null;
