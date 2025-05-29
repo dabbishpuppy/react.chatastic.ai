@@ -10,7 +10,8 @@ import {
   RefreshCw,
   Edit,
   EyeOff,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,6 +40,10 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   onRecrawl
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const isParentSource = !source.parent_source_id;
+  const showToggle = isParentSource; // Always show toggle for parent sources
+  const hasChildSources = childSources.length > 0;
+  const isCrawling = source.crawl_status === 'in_progress' || source.crawl_status === 'pending';
 
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -60,8 +65,6 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     }
   };
 
-  const hasChildSources = childSources.length > 0;
-
   return (
     <div className="border border-gray-200 rounded-lg">
       {/* Main source item */}
@@ -72,12 +75,13 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             className="rounded border-gray-300 text-black focus:ring-black mr-4" 
           />
           
-          {hasChildSources && (
+          {showToggle && (
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6 mr-2"
               onClick={() => setIsExpanded(!isExpanded)}
+              disabled={!hasChildSources && !isCrawling}
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </Button>
@@ -88,7 +92,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           </div>
           
           <div className="flex-1">
-            <div className="font-medium">{source.url}</div>
+            <div className="font-medium">{source.title || source.url}</div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>Added {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}</span>
               {source.links_count && source.links_count > 0 && (
@@ -102,6 +106,9 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           
           <div className="flex items-center gap-2">
             <Badge className={getStatusColor(source.crawl_status)}>
+              {isCrawling && (
+                <Loader2 size={14} className="mr-1 animate-spin" />
+              )}
               {getStatusText(source.crawl_status)}
             </Badge>
             
@@ -121,9 +128,13 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             variant="outline"
             size="sm"
             onClick={() => onRecrawl(source)}
-            disabled={source.crawl_status === 'in_progress'}
+            disabled={source.crawl_status === 'in_progress' || source.crawl_status === 'pending'}
           >
-            <RefreshCw size={16} className="mr-1" />
+            {(source.crawl_status === 'in_progress' || source.crawl_status === 'pending') ? (
+              <Loader2 size={16} className="mr-1 animate-spin" />
+            ) : (
+              <RefreshCw size={16} className="mr-1" />
+            )}
             Recrawl
           </Button>
           
@@ -154,9 +165,18 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
       </div>
       
-      {/* Child sources (crawled links) */}
-      {isExpanded && hasChildSources && (
+      {/* Child sources (crawled links) or loading state */}
+      {isExpanded && (
         <div className="border-t border-gray-200 bg-gray-50">
+          {/* Show loading state if crawling in progress but no child sources yet */}
+          {isCrawling && childSources.length === 0 && (
+            <div className="flex items-center justify-center py-6 text-gray-500">
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              <span>Crawling in progress...</span>
+            </div>
+          )}
+          
+          {/* Show child sources when available */}
           {childSources.map((childSource) => (
             <div key={childSource.id} className="flex items-center justify-between p-3 pl-16 border-b border-gray-100 last:border-b-0">
               <div className="flex items-center flex-1">
@@ -168,7 +188,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   <Link className="h-4 w-4 text-gray-600" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-medium">{childSource.url}</div>
+                  <div className="text-sm font-medium">{childSource.title || childSource.url}</div>
                   <div className="text-xs text-gray-500">
                     {formatDistanceToNow(new Date(childSource.created_at), { addSuffix: true })}
                   </div>
@@ -204,6 +224,13 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               </DropdownMenu>
             </div>
           ))}
+          
+          {/* Show message if no child sources and not loading */}
+          {!isCrawling && childSources.length === 0 && (
+            <div className="flex items-center justify-center py-6 text-gray-500">
+              <span>No links discovered</span>
+            </div>
+          )}
         </div>
       )}
     </div>

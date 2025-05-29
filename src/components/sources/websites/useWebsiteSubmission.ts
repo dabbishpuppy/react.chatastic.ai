@@ -38,6 +38,12 @@ export const useWebsiteSubmission = (refetch: () => void) => {
     try {
       setIsSubmitting(true);
 
+      // Ensure URL starts with http:// or https://
+      let url = formData.url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+      }
+
       // Prepare metadata based on crawl type
       const metadata = {
         crawlType: formData.crawlType,
@@ -47,21 +53,22 @@ export const useWebsiteSubmission = (refetch: () => void) => {
       };
 
       // Determine title based on crawl type
-      let title = formData.url;
+      let title = url;
       if (formData.crawlType === 'crawl-links') {
-        title = `Crawl: ${formData.url}`;
+        title = `Crawl: ${url}`;
       } else if (formData.crawlType === 'sitemap') {
-        title = `Sitemap: ${formData.url}`;
+        title = `Sitemap: ${url}`;
       }
 
       const newSource = await sources.createSource({
         agent_id: agentId,
         source_type: 'website',
         title,
-        url: formData.url,
+        url,
         metadata,
         crawl_status: 'pending',
-        progress: 0
+        progress: 0,
+        links_count: 0
       });
 
       console.log('✅ New website source created:', newSource);

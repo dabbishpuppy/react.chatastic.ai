@@ -1,11 +1,11 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Info } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { useAgentSources } from "@/hooks/useAgentSources";
 import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import WebsiteSourceItem from "./websites/WebsiteSourceItem";
@@ -21,11 +21,27 @@ const WebsiteTab: React.FC = () => {
   const [url, setUrl] = useState("");
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
 
   // Group sources by parent-child relationships
   const parentSources = websiteSources.filter(source => !source.parent_source_id);
   const getChildSources = (parentId: string) => 
     websiteSources.filter(source => source.parent_source_id === parentId);
+
+  // Auto-expand sources that are currently crawling
+  useEffect(() => {
+    const crawlingSources = parentSources.filter(
+      source => source.crawl_status === 'in_progress' || source.crawl_status === 'pending'
+    );
+    
+    if (crawlingSources.length > 0) {
+      const newExpandedSources = new Set(expandedSources);
+      crawlingSources.forEach(source => {
+        newExpandedSources.add(source.id);
+      });
+      setExpandedSources(newExpandedSources);
+    }
+  }, [parentSources]);
 
   const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link') => {
     if (!url) {
@@ -107,6 +123,9 @@ const WebsiteTab: React.FC = () => {
         last_crawled_at: new Date().toISOString()
       });
       
+      // Auto-expand the source that is being recrawled
+      setExpandedSources(prev => new Set([...prev, source.id]));
+      
       toast({
         title: "Recrawl initiated",
         description: "The website will be recrawled shortly"
@@ -122,6 +141,17 @@ const WebsiteTab: React.FC = () => {
     }
   };
 
+  // Handle source expansion toggle
+  const handleSourceExpansion = (sourceId: string, expanded: boolean) => {
+    const newExpandedSources = new Set(expandedSources);
+    if (expanded) {
+      newExpandedSources.add(sourceId);
+    } else {
+      newExpandedSources.delete(sourceId);
+    }
+    setExpandedSources(newExpandedSources);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 mt-4">
@@ -129,6 +159,7 @@ const WebsiteTab: React.FC = () => {
           <h2 className="text-2xl font-semibold">Website Training</h2>
         </div>
         <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-8 w-8 mr-2 animate-spin text-gray-500" />
           <div className="text-gray-500">Loading website sources...</div>
         </div>
       </div>
@@ -224,7 +255,12 @@ const WebsiteTab: React.FC = () => {
                       className="bg-gray-800 hover:bg-gray-700"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Processing...' : 'Fetch links'}
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : 'Fetch links'}
                     </Button>
                   </div>
                 </div>
@@ -247,7 +283,12 @@ const WebsiteTab: React.FC = () => {
                       onClick={() => handleSubmit('sitemap')}
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Processing...' : 'Upload sitemap'}
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : 'Upload sitemap'}
                     </Button>
                   </div>
                 </div>
@@ -270,7 +311,12 @@ const WebsiteTab: React.FC = () => {
                       onClick={() => handleSubmit('individual-link')}
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Processing...' : 'Add link'}
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : 'Add link'}
                     </Button>
                   </div>
                 </div>
