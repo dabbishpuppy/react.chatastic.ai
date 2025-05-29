@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
@@ -20,54 +19,20 @@ const WebsiteTab: React.FC = () => {
   const [protocol, setProtocol] = useState("https://");
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
-  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
-  const [stalledSources, setStalledSources] = useState<Set<string>>(new Set());
   
   // Add ref to track ongoing recrawl operations
   const recrawlInProgressRef = useRef<Set<string>>(new Set());
 
-  // Group sources by parent-child relationships
-  const parentSources = websiteSources.filter(source => !source.parent_source_id);
-  const getChildSources = (parentId: string) => 
-    websiteSources.filter(source => source.parent_source_id === parentId);
-
-  // Auto-expand sources that are currently crawling
-  useEffect(() => {
-    const crawlingSources = parentSources.filter(
-      source => source.crawl_status === 'in_progress' || source.crawl_status === 'pending'
-    );
-    
-    if (crawlingSources.length > 0) {
-      const newExpandedSources = new Set(expandedSources);
-      crawlingSources.forEach(source => {
-        newExpandedSources.add(source.id);
-      });
-      setExpandedSources(newExpandedSources);
-    }
-  }, [parentSources]);
-
-  // Monitor for stalled crawling processes
-  useEffect(() => {
-    const crawlingSources = parentSources.filter(
-      source => source.crawl_status === 'in_progress'
-    );
-
-    crawlingSources.forEach(source => {
-      const lastUpdate = source.metadata?.last_progress_update;
-      if (lastUpdate) {
-        const timeSinceUpdate = Date.now() - new Date(lastUpdate).getTime();
-        if (timeSinceUpdate > 45000) { // 45 seconds threshold
-          setStalledSources(prev => new Set([...prev, source.id]));
-          
-          // Auto-restart stalled crawls
-          if (timeSinceUpdate > 60000) { // 1 minute
-            console.log(`Auto-restarting stalled crawl for source ${source.id}`);
-            handleRecrawl(source);
-          }
-        }
-      }
-    });
-  }, [parentSources]);
+  // Memoized source grouping to prevent unnecessary recalculations
+  const parentSources = React.useMemo(() => 
+    websiteSources.filter(source => !source.parent_source_id), 
+    [websiteSources]
+  );
+  
+  const getChildSources = useCallback((parentId: string) => 
+    websiteSources.filter(source => source.parent_source_id === parentId),
+    [websiteSources]
+  );
 
   const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link', options?: { maxPages?: number; maxDepth?: number; concurrency?: number }) => {
     if (!url) {
@@ -99,15 +64,15 @@ const WebsiteTab: React.FC = () => {
     }
   };
 
-  const handleEdit = (source: AgentSource) => {
+  const handleEdit = useCallback((source: AgentSource) => {
     // TODO: Implement edit functionality
     toast({
       title: "Edit functionality",
       description: "Edit functionality will be implemented soon"
     });
-  };
+  }, []);
 
-  const handleExclude = async (source: AgentSource) => {
+  const handleExclude = useCallback(async (source: AgentSource) => {
     try {
       await sourceService.updateSource(source.id, {
         is_excluded: !source.is_excluded
@@ -126,9 +91,9 @@ const WebsiteTab: React.FC = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [sourceService, refetch]);
 
-  const handleDelete = async (source: AgentSource) => {
+  const handleDelete = useCallback(async (source: AgentSource) => {
     try {
       await sourceService.deleteSource(source.id);
       removeSourceFromState(source.id);
@@ -157,7 +122,7 @@ const WebsiteTab: React.FC = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [sourceService, removeSourceFromState, parentSources, getChildSources, refetch]);
 
   const handleRecrawl = useCallback(async (source: AgentSource) => {
     // Prevent multiple recrawl operations on the same source
@@ -170,13 +135,6 @@ const WebsiteTab: React.FC = () => {
       // Mark recrawl as in progress
       recrawlInProgressRef.current.add(source.id);
 
-      // Clear stalled status
-      setStalledSources(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(source.id);
-        return newSet;
-      });
-
       await sourceService.updateSource(source.id, {
         crawl_status: 'pending',
         progress: 0,
@@ -188,9 +146,6 @@ const WebsiteTab: React.FC = () => {
           restart_count: (source.metadata?.restart_count || 0) + 1
         }
       });
-      
-      // Auto-expand the source that is being recrawled
-      setExpandedSources(prev => new Set([...prev, source.id]));
       
       toast({
         title: "Recrawl initiated",

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceItem from '../WebsiteSourceItem';
@@ -25,8 +25,8 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   loading,
   error
 }) => {
-  // Calculate total content size safely
-  const calculateTotalSize = () => {
+  // Memoize total size calculation to prevent recalculation on every render
+  const { totalSize, sizeText } = useMemo(() => {
     try {
       let totalBytes = 0;
       
@@ -51,19 +51,25 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         });
       });
       
-      return totalBytes;
+      const formatSize = (bytes: number) => {
+        if (bytes === 0) return '';
+        if (bytes < 1024) return ` • ${bytes}B`;
+        if (bytes < 1024 * 1024) return ` • ${Math.round(bytes / 1024)}KB`;
+        return ` • ${Math.round(bytes / (1024 * 1024))}MB`;
+      };
+
+      return {
+        totalSize: totalBytes,
+        sizeText: formatSize(totalBytes)
+      };
     } catch (error) {
       console.error('Error calculating total size:', error);
-      return 0;
+      return {
+        totalSize: 0,
+        sizeText: ''
+      };
     }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '';
-    if (bytes < 1024) return ` • ${bytes}B`;
-    if (bytes < 1024 * 1024) return ` • ${Math.round(bytes / 1024)}KB`;
-    return ` • ${Math.round(bytes / (1024 * 1024))}MB`;
-  };
+  }, [parentSources, getChildSources]);
 
   if (loading) {
     return (
@@ -90,9 +96,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       </div>
     );
   }
-
-  const totalSize = calculateTotalSize();
-  const sizeText = formatSize(totalSize);
 
   return (
     <div className="space-y-4">
