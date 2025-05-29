@@ -65,6 +65,18 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
+  const getDisplayTitle = (source: AgentSource) => {
+    // For website sources, show only the domain
+    if (source.source_type === 'website' && source.url) {
+      try {
+        return new URL(source.url).hostname;
+      } catch {
+        return source.title;
+      }
+    }
+    return source.title;
+  };
+
   return (
     <div className="space-y-3">
       {sourcesByType.map(({ type, sources }) => {
@@ -86,7 +98,7 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
               {sources.slice(0, 3).map((source) => (
                 <div key={source.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2 flex-1 min-w-0">
-                    <span className="truncate">{source.title}</span>
+                    <span className="truncate">{getDisplayTitle(source)}</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-5 w-5 p-0">

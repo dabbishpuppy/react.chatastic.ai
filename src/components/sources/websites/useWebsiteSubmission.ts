@@ -23,11 +23,11 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
     setIsSubmitting(true);
     
     try {
-      // Create the parent source
+      // Create the parent source without "Crawl:" prefix
       const source = await sourceService.createSource({
         agent_id: agentId,
         source_type: 'website',
-        title: data.url,
+        title: data.url, // Just use the URL without "Crawl:" prefix
         url: data.url,
         crawl_status: 'pending',
         progress: 0,
@@ -42,14 +42,14 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
 
       // Start enhanced crawling based on type
       if (data.crawlType === 'crawl-links') {
-        // Start background crawling with enhanced service
+        // Start background crawling with infinite capability
         WebsiteCrawlService.startEnhancedCrawl(
           agentId,
           source.id,
           data.url,
           {
             maxDepth: 3,
-            maxPages: 1000, // Remove the 50-link limit
+            maxPages: Infinity, // Infinite crawling
             includePaths: data.includePaths,
             excludePaths: data.excludePaths,
             respectRobots: true

@@ -23,7 +23,7 @@ export class WebsiteCrawlService {
   private static crawlQueue: { url: string; depth: number; parentId: string }[] = [];
   private static isCrawling = false;
 
-  // Enhanced crawling function that removes limits and implements continuous crawling
+  // Enhanced crawling function that implements infinite crawling
   static async startEnhancedCrawl(
     agentId: string,
     sourceId: string,
@@ -32,7 +32,7 @@ export class WebsiteCrawlService {
   ): Promise<void> {
     const {
       maxDepth = 5, // Increased depth for more comprehensive crawling
-      maxPages = 10000, // Much higher limit for extensive crawling
+      maxPages = Infinity, // Infinite crawling capability
       includePaths = '',
       excludePaths = '',
       respectRobots = true
@@ -50,7 +50,7 @@ export class WebsiteCrawlService {
       let processedCount = 0;
       let discoveredLinksCount = 0;
 
-      // Continuous crawling loop
+      // Infinite crawling loop
       while (this.crawlQueue.length > 0 && processedCount < maxPages && this.isCrawling) {
         const currentItem = this.crawlQueue.shift()!;
         const { url, depth, parentId } = currentItem;
@@ -177,7 +177,7 @@ export class WebsiteCrawlService {
   ): string[] {
     const baseDomain = new URL(baseUrl).hostname;
     
-    return links.filter(link => {
+    let filteredLinks = links.filter(link => {
       try {
         const linkUrl = new URL(link);
         
@@ -210,6 +210,9 @@ export class WebsiteCrawlService {
         return false;
       }
     });
+
+    // Remove any artificial limits - allow infinite crawling
+    return filteredLinks;
   }
 
   // Create child source for crawled page with proper type handling

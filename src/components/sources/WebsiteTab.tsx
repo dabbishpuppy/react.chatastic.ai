@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -125,10 +126,23 @@ const WebsiteTab: React.FC = () => {
       await sourceService.deleteSource(source.id);
       removeSourceFromState(source.id);
       
+      // If deleting a child source, update parent's links_count
+      if (source.parent_source_id) {
+        const parentSource = parentSources.find(p => p.id === source.parent_source_id);
+        if (parentSource) {
+          const remainingChildSources = getChildSources(source.parent_source_id).filter(c => c.id !== source.id);
+          await sourceService.updateSource(source.parent_source_id, {
+            links_count: remainingChildSources.length
+          });
+        }
+      }
+      
       toast({
         title: "Success",
         description: "Source deleted successfully"
       });
+      
+      refetch();
     } catch (error) {
       toast({
         title: "Error",

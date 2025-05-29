@@ -39,6 +39,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   const isCrawling = source.crawl_status === 'in_progress' || source.crawl_status === 'pending';
   const buttonSize = isChild ? 'h-6 w-6' : 'h-8 w-8';
   const iconSize = isChild ? 14 : 18;
+  const isParentSource = !source.parent_source_id;
 
   return (
     <div className="flex items-center ml-4">
@@ -50,7 +51,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {showRecrawl && (
-            <DropdownMenuItem onClick={() => onRecrawl(source)} disabled={isCrawling}>
+            <DropdownMenuItem onClick={() => onRecrawl(source)} disabled={isCrawling} className="text-sm">
               {isCrawling ? (
                 <Loader2 size={isChild ? 14 : 16} className="mr-2 animate-spin" />
               ) : (
@@ -59,17 +60,20 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               Recrawl
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => onEdit(source)}>
+          <DropdownMenuItem onClick={() => onEdit(source)} className="text-sm">
             <Edit size={isChild ? 14 : 16} className="mr-2" />
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onExclude(source)}>
-            <EyeOff size={isChild ? 14 : 16} className="mr-2" />
-            {source.is_excluded ? 'Include' : 'Exclude'} link
-          </DropdownMenuItem>
+          {/* Only show exclude option for child sources */}
+          {!isParentSource && (
+            <DropdownMenuItem onClick={() => onExclude(source)} className="text-sm">
+              <EyeOff size={isChild ? 14 : 16} className="mr-2" />
+              {source.is_excluded ? 'Include' : 'Exclude'} link
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem 
             onClick={() => onDelete(source)}
-            className="text-red-600"
+            className="text-red-600 text-sm"
           >
             <Trash2 size={isChild ? 14 : 16} className="mr-2" />
             Delete

@@ -279,12 +279,11 @@ async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promis
       .map(match => match.replace(/<\/?loc>/g, ''))
       .filter(url => url.startsWith('http'));
     
-    // Filter and normalize links
+    // Filter and normalize links - Remove artificial limits
     const validLinks = rawLinks
       .filter(link => isValidFrontendUrl(link, baseDomain))
       .map(link => normalizeUrl(link))
-      .filter((link, index, array) => array.indexOf(link) === index) // Remove duplicates
-      .slice(0, 100); // Limit to 100 URLs for performance
+      .filter((link, index, array) => array.indexOf(link) === index); // Remove duplicates
     
     console.log(`📊 Filtered ${rawLinks.length} raw URLs to ${validLinks.length} valid frontend URLs from sitemap`);
     return validLinks;
@@ -351,10 +350,9 @@ async function discoverLinksFromPage(url: string, metadata: any, baseDomain: str
       console.log(`🚫 Applied exclude filters, ${validLinks.length} links remaining`);
     }
 
-    // Final limit for performance
-    const finalLinks = validLinks.slice(0, 50);
-    console.log(`📊 Final result: ${finalLinks.length} quality frontend links`);
-    return finalLinks;
+    // Remove artificial limits for infinite crawling
+    console.log(`📊 Final result: ${validLinks.length} quality frontend links (no limits applied)`);
+    return validLinks;
     
   } catch (error) {
     console.error('❌ Error discovering links:', error);
