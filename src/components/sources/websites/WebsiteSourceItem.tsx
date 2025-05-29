@@ -38,10 +38,10 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     <div className="border border-gray-200 rounded-lg">
       {/* Main source item */}
       <div className="flex items-center justify-between p-4">
-        <div className="flex items-center flex-1">
+        <div className="flex items-center flex-1 min-w-0">
           <input 
             type="checkbox" 
-            className="rounded border-gray-300 text-black focus:ring-black mr-4" 
+            className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0" 
           />
           
           <WebsiteSourceInfo
@@ -53,14 +53,19 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             crawlStatus={source.crawl_status}
           />
           
-          <WebsiteSourceStatus
-            status={source.crawl_status}
-            progress={source.progress}
-            showProgressBar={true}
-          />
+          {/* Show status and progress for completed sources */}
+          {source.crawl_status === 'completed' && (
+            <div className="ml-4 flex-shrink-0">
+              <WebsiteSourceStatus
+                status={source.crawl_status}
+                progress={source.progress}
+                showProgressBar={true}
+              />
+            </div>
+          )}
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <WebsiteSourceActions
             source={source}
             onEdit={onEdit}

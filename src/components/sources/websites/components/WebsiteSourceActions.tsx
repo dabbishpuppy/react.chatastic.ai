@@ -41,23 +41,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   const iconSize = isChild ? 14 : 18;
 
   return (
-    <div className="flex items-center space-x-1 ml-4">
-      {showRecrawl && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onRecrawl(source)}
-          disabled={isCrawling}
-        >
-          {isCrawling ? (
-            <Loader2 size={16} className="mr-1 animate-spin" />
-          ) : (
-            <RefreshCw size={16} className="mr-1" />
-          )}
-          Recrawl
-        </Button>
-      )}
-      
+    <div className="flex items-center ml-4">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className={buttonSize}>
@@ -65,6 +49,16 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
+          {showRecrawl && (
+            <DropdownMenuItem onClick={() => onRecrawl(source)} disabled={isCrawling}>
+              {isCrawling ? (
+                <Loader2 size={isChild ? 14 : 16} className="mr-2 animate-spin" />
+              ) : (
+                <RefreshCw size={isChild ? 14 : 16} className="mr-2" />
+              )}
+              Recrawl
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => onEdit(source)}>
             <Edit size={isChild ? 14 : 16} className="mr-2" />
             Edit

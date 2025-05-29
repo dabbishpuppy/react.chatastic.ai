@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import WebsiteSourceStatus from './WebsiteSourceStatus';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -30,16 +31,30 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const isCrawling = crawlStatus === 'in_progress' || crawlStatus === 'pending';
   const showMetadata = !isCrawling && crawlStatus === 'completed';
 
+  // Truncate URL for child sources to prevent width changes
+  const displayUrl = isChild && url.length > 50 ? `${url.substring(0, 50)}...` : url;
+
   return (
-    <div className="flex items-center flex-1">
-      <div className={`bg-gray-100 rounded-full ${iconPadding} mr-3`}>
+    <div className="flex items-center flex-1 min-w-0">
+      <div className={`bg-gray-100 rounded-full ${iconPadding} mr-3 flex-shrink-0`}>
         <Link className={`${iconSize} text-gray-600`} />
       </div>
       
-      <div className="flex-1">
-        <div className={`font-medium ${titleSize}`}>{title || url}</div>
+      <div className="flex-1 min-w-0">
+        <div className={`font-medium ${titleSize} truncate`} title={title || url}>
+          {title || (isChild ? displayUrl : url)}
+        </div>
+        
+        {/* Show status for parent sources when crawling */}
+        {!isChild && isCrawling && (
+          <div className="mt-1">
+            <WebsiteSourceStatus status={crawlStatus} />
+          </div>
+        )}
+        
+        {/* Show metadata when crawling is completed */}
         {showMetadata && (
-          <div className={`flex items-center gap-2 ${metaSize} text-gray-500`}>
+          <div className={`flex items-center gap-2 ${metaSize} text-gray-500 mt-1`}>
             {linksCount && linksCount > 0 && (
               <span>{linksCount} links</span>
             )}
