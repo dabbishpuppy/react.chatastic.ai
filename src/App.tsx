@@ -22,6 +22,14 @@ import ActionsPage from "./pages/ActionsPage";
 import IntegrationsPage from "./pages/IntegrationsPage";
 import AgentSettingsPage from "./pages/AgentSettingsPage";
 
+// Import settings components
+import GeneralSettings from "./pages/settings/General";
+import MembersSettings from "./pages/settings/Members";
+import PlansSettings from "./pages/settings/Plans";
+import BillingSettings from "./pages/settings/Billing";
+import ApiKeysSettings from "./pages/settings/ApiKeys";
+import UsageSettings from "./pages/settings/Usage";
+
 // Import components
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -40,7 +48,17 @@ function App() {
               <Route path="/signin" element={<SignIn />} />
               <Route path="/embed/:agentId" element={<EmbeddedChat />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/settings/*" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              
+              {/* Settings Routes with nested structure */}
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>}>
+                <Route path="general" element={<GeneralSettings />} />
+                <Route path="members" element={<MembersSettings />} />
+                <Route path="plans" element={<PlansSettings />} />
+                <Route path="billing" element={<BillingSettings />} />
+                <Route path="api-keys" element={<ApiKeysSettings />} />
+                <Route path="usage" element={<UsageSettings />} />
+              </Route>
+              
               <Route path="/usage" element={<ProtectedRoute><Usage /></ProtectedRoute>} />
               
               {/* Agent Routes */}

@@ -1,11 +1,19 @@
 
-import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard } from "lucide-react";
+import React, { useEffect } from "react";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard, BarChart3 } from "lucide-react";
 import Logo from "@/components/layout/Logo";
 
 const Settings = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Redirect to general settings if on root settings path
+  useEffect(() => {
+    if (location.pathname === '/settings' || location.pathname === '/settings/') {
+      navigate('/settings/general', { replace: true });
+    }
+  }, [location.pathname, navigate]);
   
   const menuItems = [
     { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
@@ -14,12 +22,11 @@ const Settings = () => {
     { to: "/settings/plans", label: "Plans", icon: <Package size={18} /> },
     { to: "/settings/billing", label: "Billing", icon: <CreditCard size={18} /> },
     { to: "/settings/api-keys", label: "API Keys", icon: <Key size={18} /> },
+    { to: "/settings/usage", label: "Usage", icon: <BarChart3 size={18} /> },
   ];
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Removed the TopNavBar */}
-      
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <div className="w-64 border-r border-gray-200 bg-white">
