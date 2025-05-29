@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SourceType } from "@/types/rag";
@@ -33,8 +32,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
           table: 'agent_sources',
           filter: `agent_id=eq.${agentId}`
         },
-        () => {
-          console.log('📡 Sources size update triggered');
+        (payload) => {
+          console.log('📡 Sources size update triggered', payload);
           setRealtimeSize(Date.now()); // Force recalculation
         }
       )
@@ -45,13 +44,62 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [agentId]);
 
+  // Enhanced size calculation that properly handles website parent-child relationships
+  const calculateSourceSize = (source: any, allSources: any[]) => {
+    let sourceSize = 0;
+    
+    // If this is a website parent source, calculate total from all its children
+    if (source.source_type === 'website' && !source.parent_source_id) {
+      const childSources = allSources.filter(s => 
+        s.source_type === 'website' && s.parent_source_id === source.id
+      );
+      
+      if (childSources.length > 0) {
+        sourceSize = childSources.reduce((total, child) => {
+          let childSize = 0;
+          
+          if (child.content) {
+            childSize += new Blob([child.content]).size;
+          }
+          
+          if (child.metadata?.content_size) {
+            childSize += child.metadata.content_size;
+          }
+          
+          return total + childSize;
+        }, 0);
+      } else {
+        // Fallback to parent's own metadata if no children found
+        if (source.metadata?.total_content_size) {
+          sourceSize += source.metadata.total_content_size;
+        } else if (source.content) {
+          sourceSize += new Blob([source.content]).size;
+        }
+      }
+    } else if (source.source_type !== 'website' || source.parent_source_id) {
+      // For non-website sources or website child sources, use individual size
+      if (source.content) {
+        sourceSize += new Blob([source.content]).size;
+      }
+      
+      if (source.metadata?.content_size) {
+        sourceSize += source.metadata.content_size;
+      }
+      
+      if (source.metadata?.total_content_size) {
+        sourceSize += source.metadata.total_content_size;
+      }
+    }
+    
+    return sourceSize;
+  };
+
   // Calculate total stats and filter sources for display
   const { totalSources, totalSize, sourcesByType } = useMemo(() => {
     console.log(`🧮 Calculating stats for ${sourcesData.length} sources`);
     
-    // For total stats calculation, include all sources
+    // For total stats calculation, include all sources for counting
     let sourcesToCount = sourcesData;
-    let sourcesToSize = sourcesData;
     
     // For website tab in crawl-links mode, count only parent sources but size includes all
     if (currentTab === 'website') {
@@ -64,31 +112,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       const nonWebsiteSources = sourcesData.filter(source => source.source_type !== 'website');
       
       sourcesToCount = [...websiteParents, ...nonWebsiteSources];
-      sourcesToSize = sourcesData; // Include all for size calculation
       
       console.log(`🌐 Website tab stats: ${websiteParents.length} parents, ${websiteChildren.length} children, ${nonWebsiteSources.length} non-website`);
     }
     
-    // Calculate total size including content from database and metadata
-    const totalBytes = sourcesToSize.reduce((total, source) => {
-      let sourceSize = 0;
-      
-      // Check for content in the source
-      if (source.content) {
-        sourceSize += new Blob([source.content]).size;
-      }
-      
-      // Check for content size in metadata (for crawled sources)
-      if (source.metadata?.content_size) {
-        sourceSize += source.metadata.content_size;
-      }
-      
-      // Check for total content size in metadata (for parent sources)
-      if (source.metadata?.total_content_size) {
-        sourceSize += source.metadata.total_content_size;
-      }
-      
-      return total + sourceSize;
+    // Calculate total size using enhanced calculation
+    const totalBytes = sourcesToCount.reduce((total, source) => {
+      return total + calculateSourceSize(source, sourcesData);
     }, 0);
     
     let formattedTotalSize;

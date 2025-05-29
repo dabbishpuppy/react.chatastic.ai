@@ -54,6 +54,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               crawlStatus={source.crawl_status}
               metadata={source.metadata}
               content={source.content}
+              childSources={childSources}
             />
           </div>
           

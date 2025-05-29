@@ -198,6 +198,39 @@ export class AgentSourceService {
     last_crawled_at?: string;
   }>): Promise<AgentSource> {
     try {
+      // If this is a completion update for a parent source, calculate total content size
+      if (updates.crawl_status === 'completed' && updates.links_count !== undefined) {
+        // Get all child sources to calculate total size
+        const { data: childSources, error: childError } = await supabase
+          .from('agent_sources')
+          .select('content, metadata')
+          .eq('parent_source_id', id)
+          .eq('is_active', true);
+
+        if (!childError && childSources && childSources.length > 0) {
+          const totalContentSize = childSources.reduce((total, child) => {
+            let childSize = 0;
+            
+            if (child.content) {
+              childSize += new Blob([child.content]).size;
+            }
+            
+            if (child.metadata?.content_size) {
+              childSize += child.metadata.content_size;
+            }
+            
+            return total + childSize;
+          }, 0);
+
+          // Update metadata with total content size
+          updates.metadata = {
+            ...(updates.metadata || {}),
+            total_content_size: totalContentSize,
+            last_size_update: new Date().toISOString()
+          };
+        }
+      }
+
       const { data: source, error } = await supabase
         .from('agent_sources')
         .update(updates)

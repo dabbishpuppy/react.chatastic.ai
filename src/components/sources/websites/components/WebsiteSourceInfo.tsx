@@ -2,6 +2,7 @@
 import React from 'react';
 import { Link } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { AgentSource } from '@/types/rag';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -13,6 +14,7 @@ interface WebsiteSourceInfoProps {
   crawlStatus?: string;
   metadata?: any;
   content?: string;
+  childSources?: AgentSource[];
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -23,7 +25,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   isChild = false,
   crawlStatus,
   metadata,
-  content
+  content,
+  childSources = []
 }) => {
   const iconSize = isChild ? 'h-3 w-3' : 'h-4 w-4';
   const titleSize = isChild ? 'text-sm' : '';
@@ -51,19 +54,39 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const getContentSize = () => {
     let size = 0;
     
-    // Check for content in the source
-    if (content) {
-      size += new Blob([content]).size;
-    }
-    
-    // Check for content size in metadata (for crawled sources)
-    if (metadata?.content_size) {
-      size += metadata.content_size;
-    }
-    
-    // Check for total content size in metadata (for parent sources)
-    if (metadata?.total_content_size) {
-      size += metadata.total_content_size;
+    if (isChild) {
+      // For child sources, calculate individual size
+      if (content) {
+        size += new Blob([content]).size;
+      }
+      
+      if (metadata?.content_size) {
+        size += metadata.content_size;
+      }
+    } else {
+      // For parent sources, calculate total size from all child sources
+      if (childSources && childSources.length > 0) {
+        size = childSources.reduce((total, child) => {
+          let childSize = 0;
+          
+          if (child.content) {
+            childSize += new Blob([child.content]).size;
+          }
+          
+          if (child.metadata?.content_size) {
+            childSize += child.metadata.content_size;
+          }
+          
+          return total + childSize;
+        }, 0);
+      } else {
+        // Fallback to metadata if no child sources available
+        if (metadata?.total_content_size) {
+          size += metadata.total_content_size;
+        } else if (content) {
+          size += new Blob([content]).size;
+        }
+      }
     }
     
     return size;
