@@ -94,6 +94,22 @@ export function matchesDefaultExcludes(url) {
 }
 
 /**
+ * Check if URL uses a valid HTTP/HTTPS protocol
+ * @param {string} url - URL to check
+ * @returns {boolean} True if URL uses HTTP or HTTPS protocol
+ */
+function isHttpProtocol(url) {
+  const nonHttpProtocols = [
+    'mailto:', 'tel:', 'callto:', 'sms:', 'ftp:', 'file:', 
+    'javascript:', 'data:', 'blob:', 'about:', 'chrome:', 
+    'moz-extension:', 'chrome-extension:', 'safari-extension:'
+  ];
+  
+  const lowerUrl = url.toLowerCase();
+  return !nonHttpProtocols.some(protocol => lowerUrl.startsWith(protocol));
+}
+
+/**
  * Validate if URL is a customer-facing page
  * @param {string} url - URL to validate
  * @param {string} baseDomain - Base domain to check against
@@ -142,10 +158,16 @@ export function isCustomerFacingUrl(url, baseDomain) {
 /**
  * Normalize URL for consistent comparison
  * @param {string} url - URL to normalize
- * @returns {string} Normalized URL
+ * @returns {string|null} Normalized URL or null if invalid/non-HTTP protocol
  */
 export function normalizeUrl(url) {
   try {
+    // Check for non-HTTP protocols first
+    if (!isHttpProtocol(url)) {
+      console.log(`Skipping non-HTTP protocol URL: ${url}`);
+      return null;
+    }
+    
     // Add protocol if missing
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
@@ -175,7 +197,7 @@ export function normalizeUrl(url) {
     return urlObj.toString();
   } catch (error) {
     console.warn(`Failed to normalize URL: ${url}`, error);
-    return url;
+    return null;
   }
 }
 
@@ -187,6 +209,8 @@ export function normalizeUrl(url) {
 export function extractDomain(url) {
   try {
     const normalizedUrl = normalizeUrl(url);
+    if (!normalizedUrl) return '';
+    
     const urlObj = new URL(normalizedUrl);
     return urlObj.hostname.toLowerCase().replace(/^www\./, '');
   } catch (error) {
@@ -214,7 +238,8 @@ export function filterUrls(urls, baseDomain, includePatterns = [], excludePatter
       filteredByDefault: 0,
       filteredByInclude: 0,
       filteredByExclude: 0,
-      filteredByStructure: 0
+      filteredByStructure: 0,
+      filteredByProtocol: 0
     }
   };
   
@@ -222,6 +247,13 @@ export function filterUrls(urls, baseDomain, includePatterns = [], excludePatter
   
   for (const url of urls) {
     const normalized = normalizeUrl(url);
+    
+    // Skip URLs with invalid or non-HTTP protocols
+    if (!normalized) {
+      results.filtered.push({ url, reason: 'Invalid or non-HTTP protocol' });
+      results.stats.filteredByProtocol++;
+      continue;
+    }
     
     // Skip duplicates
     if (seenUrls.has(normalized)) continue;
