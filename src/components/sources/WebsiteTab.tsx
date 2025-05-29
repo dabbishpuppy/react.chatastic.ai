@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +17,7 @@ const WebsiteTab: React.FC = () => {
   
   const [activeSubTab, setActiveSubTab] = useState("crawl-links");
   const [url, setUrl] = useState("");
+  const [protocol, setProtocol] = useState("https://");
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
@@ -77,8 +77,11 @@ const WebsiteTab: React.FC = () => {
       return;
     }
 
+    // Combine protocol with domain
+    const fullUrl = protocol + url.replace(/^https?:\/\//, '');
+
     const result = await submitWebsiteSource({
-      url,
+      url: fullUrl,
       includePaths,
       excludePaths,
       crawlType
@@ -89,6 +92,7 @@ const WebsiteTab: React.FC = () => {
       setUrl("");
       setIncludePaths("");
       setExcludePaths("");
+      setProtocol("https://");
     }
   };
 
@@ -206,6 +210,8 @@ const WebsiteTab: React.FC = () => {
                 <WebsiteCrawlForm
                   url={url}
                   setUrl={setUrl}
+                  protocol={protocol}
+                  setProtocol={setProtocol}
                   includePaths={includePaths}
                   setIncludePaths={setIncludePaths}
                   excludePaths={excludePaths}
@@ -225,6 +231,8 @@ const WebsiteTab: React.FC = () => {
                   <WebsiteCrawlForm
                     url={url}
                     setUrl={setUrl}
+                    protocol={protocol}
+                    setProtocol={setProtocol}
                     includePaths={includePaths}
                     setIncludePaths={setIncludePaths}
                     excludePaths={excludePaths}
@@ -245,6 +253,8 @@ const WebsiteTab: React.FC = () => {
                   <WebsiteCrawlForm
                     url={url}
                     setUrl={setUrl}
+                    protocol={protocol}
+                    setProtocol={setProtocol}
                     includePaths={includePaths}
                     setIncludePaths={setIncludePaths}
                     excludePaths={excludePaths}

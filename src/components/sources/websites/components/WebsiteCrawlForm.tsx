@@ -2,11 +2,14 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Info, Loader2 } from 'lucide-react';
 
 interface WebsiteCrawlFormProps {
   url: string;
   setUrl: (url: string) => void;
+  protocol: string;
+  setProtocol: (protocol: string) => void;
   includePaths: string;
   setIncludePaths: (paths: string) => void;
   excludePaths: string;
@@ -20,6 +23,8 @@ interface WebsiteCrawlFormProps {
 const WebsiteCrawlForm: React.FC<WebsiteCrawlFormProps> = ({
   url,
   setUrl,
+  protocol,
+  setProtocol,
   includePaths,
   setIncludePaths,
   excludePaths,
@@ -36,16 +41,15 @@ const WebsiteCrawlForm: React.FC<WebsiteCrawlFormProps> = ({
           URL
         </label>
         <div className="flex">
-          <div className="relative flex items-center min-w-[120px]">
-            <select className="h-full rounded-l-md border border-r-0 border-gray-300 bg-white pl-3 pr-8 py-0 text-sm">
-              <option>https://</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
-              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 20 20">
-                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M6 8l4 4 4-4" />
-              </svg>
-            </div>
-          </div>
+          <Select value={protocol} onValueChange={setProtocol}>
+            <SelectTrigger className="w-32 rounded-r-none border-r-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="https://">https://</SelectItem>
+              <SelectItem value="http://">http://</SelectItem>
+            </SelectContent>
+          </Select>
           <Input 
             id="url" 
             value={url} 

@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,13 +65,9 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
   };
 
   const getDisplayTitle = (source: AgentSource) => {
-    // For website sources, show only the domain
+    // For website sources, show the full URL with protocol
     if (source.source_type === 'website' && source.url) {
-      try {
-        return new URL(source.url).hostname;
-      } catch {
-        return source.title;
-      }
+      return source.url;
     }
     return source.title;
   };
