@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,7 +7,6 @@ import { useAgentSources } from "@/hooks/useAgentSources";
 import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import { useRAGServices } from "@/hooks/useRAGServices";
 import { AgentSource } from "@/types/rag";
-import { supabase } from "@/integrations/supabase/client";
 import WebsiteCrawlForm from "./websites/components/WebsiteCrawlForm";
 import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
 
@@ -21,7 +21,6 @@ const WebsiteTab: React.FC = () => {
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
-  const [lastRefetchTime, setLastRefetchTime] = useState(Date.now());
 
   // Group sources by parent-child relationships
   const parentSources = websiteSources.filter(source => !source.parent_source_id);
@@ -42,57 +41,6 @@ const WebsiteTab: React.FC = () => {
       setExpandedSources(newExpandedSources);
     }
   }, [parentSources]);
-
-  // Debounced refetch function to prevent excessive updates
-  const debouncedRefetch = useCallback(() => {
-    const now = Date.now();
-    if (now - lastRefetchTime > 1000) { // Only refetch if more than 1 second has passed
-      setLastRefetchTime(now);
-      refetch();
-    }
-  }, [refetch, lastRefetchTime]);
-
-  // Real-time updates for crawling progress - optimized to reduce flashing
-  useEffect(() => {
-    const channel = supabase
-      .channel('website-crawl-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sources',
-          filter: `source_type=eq.website`
-        },
-        (payload) => {
-          console.log('Real-time crawl update:', payload);
-          
-          // Only refetch for significant status changes, not for every child source creation
-          if (payload.eventType === 'UPDATE' && payload.new && payload.old) {
-            const statusChanged = payload.new.crawl_status !== payload.old.crawl_status;
-            const progressChanged = Math.abs((payload.new.progress || 0) - (payload.old.progress || 0)) >= 10;
-            
-            if (statusChanged || progressChanged) {
-              debouncedRefetch();
-            }
-          } else if (payload.eventType === 'INSERT' && payload.new?.parent_source_id) {
-            // For child sources, only update the parent's links count without full refetch
-            const parentId = payload.new.parent_source_id;
-            const currentChildCount = getChildSources(parentId).length + 1;
-            
-            // Update parent's links_count in the background
-            sourceService.updateSource(parentId, {
-              links_count: currentChildCount
-            }).catch(console.error);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [debouncedRefetch, getChildSources, sourceService]);
 
   const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link') => {
     if (!url) {

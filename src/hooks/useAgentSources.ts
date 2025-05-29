@@ -46,7 +46,7 @@ export const useAgentSources = (sourceType?: SourceType) => {
     fetchSources();
   }, [fetchSources]);
 
-  // Set up real-time subscription for sources with optimized updates
+  // Set up real-time subscription for sources with improved handling
   useEffect(() => {
     if (!agentId) return;
 
@@ -88,19 +88,26 @@ export const useAgentSources = (sourceType?: SourceType) => {
               metadata: payload.new.metadata as Record<string, any> || {}
             } as AgentSource;
             
+            // For crawling status changes, update immediately without debounce
+            const isStatusChange = payload.old && 
+              payload.new.crawl_status !== payload.old.crawl_status;
+            
             setSources(prevSources => 
               prevSources.map(source => 
                 source.id === updatedSource.id ? updatedSource : source
               )
             );
+            
+            // For major status changes (completed, failed), trigger a refetch to ensure data consistency
+            if (isStatusChange && (updatedSource.crawl_status === 'completed' || updatedSource.crawl_status === 'failed')) {
+              console.log('Major status change detected, triggering refetch');
+              setTimeout(() => fetchSources(), 1000); // Small delay to ensure database is fully updated
+            }
           } else if (payload.eventType === 'DELETE' && payload.old) {
             // Remove the deleted source from state
             setSources(prevSources => 
               prevSources.filter(source => source.id !== payload.old.id)
             );
-          } else {
-            // Fallback to full refetch for other cases
-            fetchSources();
           }
         }
       )

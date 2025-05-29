@@ -6,12 +6,44 @@ import { useAgentSources } from "@/hooks/useAgentSources";
 import TotalStatsSection from "./TotalStatsSection";
 import SourceSectionsDisplay from "./SourceSectionsDisplay";
 
-const SourcesWidget: React.FC = () => {
+interface SourcesWidgetProps {
+  currentTab?: string;
+}
+
+const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { sources: sourcesData, loading } = useAgentSources();
 
-  // Memoize total stats separately - these will update when sources change
+  // Filter sources based on current tab context
+  const filteredSources = useMemo(() => {
+    if (currentTab === 'website') {
+      // For website tab, only show parent sources (no parent_source_id)
+      return sourcesData.filter(source => 
+        source.source_type === 'website' && !source.parent_source_id
+      );
+    }
+    return sourcesData;
+  }, [sourcesData, currentTab]);
+
+  // Calculate total stats - include all sources for size calculation but filtered for count
   const { totalSources, totalSize } = useMemo(() => {
-    const totalBytes = sourcesData.reduce((total, source) => {
+    let sourcesToCount = filteredSources;
+    let sourcesToSize = sourcesData;
+    
+    // For website tab in crawl-links mode, count only parent sources but size includes all
+    if (currentTab === 'website') {
+      const websiteParents = sourcesData.filter(source => 
+        source.source_type === 'website' && !source.parent_source_id
+      );
+      const websiteChildren = sourcesData.filter(source => 
+        source.source_type === 'website' && source.parent_source_id
+      );
+      const nonWebsiteSources = sourcesData.filter(source => source.source_type !== 'website');
+      
+      sourcesToCount = [...websiteParents, ...nonWebsiteSources];
+      sourcesToSize = sourcesData; // Include all for size calculation
+    }
+    
+    const totalBytes = sourcesToSize.reduce((total, source) => {
       if (!source.content) return total;
       return total + new Blob([source.content]).size;
     }, 0);
@@ -22,19 +54,19 @@ const SourcesWidget: React.FC = () => {
     else formattedTotalSize = `${Math.round(totalBytes / (1024 * 1024))} MB`;
 
     return {
-      totalSources: sourcesData.length,
+      totalSources: sourcesToCount.length,
       totalSize: formattedTotalSize
     };
-  }, [sourcesData]);
+  }, [filteredSources, sourcesData, currentTab]);
 
-  // Memoize source sections - these will only update when the actual source structure changes
+  // Create source sections based on filtered sources
   const sourcesByType = useMemo(() => {
     const sourceTypes: SourceType[] = ['text', 'file', 'website', 'qa'];
     return sourceTypes.map(type => ({
       type,
-      sources: sourcesData.filter(source => source.source_type === type)
+      sources: filteredSources.filter(source => source.source_type === type)
     }));
-  }, [sourcesData]);
+  }, [filteredSources]);
 
   if (loading) {
     return (
@@ -62,9 +94,10 @@ const SourcesWidget: React.FC = () => {
 
         <SourceSectionsDisplay 
           sourcesByType={sourcesByType}
+          displayMode={currentTab === 'website' ? 'crawl-links' : 'default'}
         />
 
-        {sourcesData.length === 0 && (
+        {filteredSources.length === 0 && (
           <div className="text-center text-gray-500 text-sm py-4">
             No sources added yet
           </div>

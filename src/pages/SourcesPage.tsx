@@ -63,7 +63,7 @@ const SourcesPage: React.FC = () => {
             {renderTabContent()}
           </div>
           <div className="w-80 flex-shrink-0">
-            <SourcesWidget />
+            <SourcesWidget currentTab={tab} />
           </div>
         </div>
       </div>

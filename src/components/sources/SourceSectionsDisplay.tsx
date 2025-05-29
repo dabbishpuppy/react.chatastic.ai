@@ -21,10 +21,12 @@ interface SourceSectionsDisplayProps {
     type: SourceType;
     sources: AgentSource[];
   }>;
+  displayMode?: 'crawl-links' | 'default';
 }
 
 const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo(({ 
-  sourcesByType 
+  sourcesByType,
+  displayMode = 'default'
 }) => {
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
@@ -65,7 +67,23 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
   };
 
   const getDisplayTitle = (source: AgentSource) => {
-    // For website sources, show the full URL with protocol
+    // For website sources in crawl-links mode, show the domain without protocol for cleaner display
+    if (source.source_type === 'website' && source.url) {
+      if (displayMode === 'crawl-links') {
+        // Extract domain from URL for display, but keep full URL for tooltip
+        try {
+          const urlObj = new URL(source.url);
+          return urlObj.hostname.replace(/^www\./, '');
+        } catch {
+          return source.url;
+        }
+      }
+      return source.url;
+    }
+    return source.title;
+  };
+
+  const getFullUrl = (source: AgentSource) => {
     if (source.source_type === 'website' && source.url) {
       return source.url;
     }
@@ -93,7 +111,9 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
               {sources.slice(0, 3).map((source) => (
                 <div key={source.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center space-x-2 flex-1 min-w-0">
-                    <span className="truncate">{getDisplayTitle(source)}</span>
+                    <span className="truncate" title={getFullUrl(source)}>
+                      {getDisplayTitle(source)}
+                    </span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
@@ -102,6 +122,12 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
                       </PopoverTrigger>
                       <PopoverContent className="w-64" align="end">
                         <div className="space-y-2 text-xs">
+                          <div>
+                            <span className="font-medium">URL:</span>
+                            <div className="text-gray-600 break-all">
+                              {getFullUrl(source)}
+                            </div>
+                          </div>
                           <div>
                             <span className="font-medium">Created:</span>
                             <div className="text-gray-600">
