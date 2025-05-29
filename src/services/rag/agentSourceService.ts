@@ -57,7 +57,7 @@ export class AgentSourceService {
     try {
       console.log(`Fetching sources for agent: ${agentId}`);
       
-      // Use very small limit and specific columns to prevent timeout
+      // Use very small limit and select all columns to prevent timeout and type errors
       const { data: sources, error } = await supabase
         .from('agent_sources')
         .select(`
@@ -78,7 +78,15 @@ export class AgentSourceService {
           links_count,
           parent_source_id,
           is_excluded,
-          last_crawled_at
+          last_crawled_at,
+          compressed_size,
+          original_size,
+          compression_ratio,
+          extraction_method,
+          keywords,
+          content_summary,
+          raw_text,
+          created_by
         `)
         .eq('agent_id', agentId)
         .eq('is_active', true)
@@ -127,7 +135,15 @@ export class AgentSourceService {
           links_count,
           parent_source_id,
           is_excluded,
-          last_crawled_at
+          last_crawled_at,
+          compressed_size,
+          original_size,
+          compression_ratio,
+          extraction_method,
+          keywords,
+          content_summary,
+          raw_text,
+          created_by
         `)
         .eq('agent_id', agentId)
         .eq('source_type', sourceType)
@@ -231,7 +247,7 @@ export class AgentSourceService {
 
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
     try {
-      // Get source with minimal data first
+      // Get source with all required columns
       const { data: source, error } = await supabase
         .from('agent_sources')
         .select(`
@@ -252,7 +268,15 @@ export class AgentSourceService {
           links_count,
           parent_source_id,
           is_excluded,
-          last_crawled_at
+          last_crawled_at,
+          compressed_size,
+          original_size,
+          compression_ratio,
+          extraction_method,
+          keywords,
+          content_summary,
+          raw_text,
+          created_by
         `)
         .eq('id', id)
         .single();
