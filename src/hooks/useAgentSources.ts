@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRAGServices } from './useRAGServices';
 import { AgentSource } from '@/types/rag';
@@ -11,6 +11,7 @@ export const useAgentSources = (sourceType?: string) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { sources: sourceService } = useRAGServices();
+  const channelRef = useRef<any>(null);
 
   const fetchSources = async () => {
     if (!agentId) return;
@@ -38,8 +39,13 @@ export const useAgentSources = (sourceType?: string) => {
   useEffect(() => {
     if (!agentId) return;
 
+    // Clean up existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     const channel = supabase
-      .channel(`agent-sources-${agentId}`)
+      .channel(`agent-sources-${agentId}-${sourceType || 'all'}`)
       .on(
         'postgres_changes',
         {
@@ -54,7 +60,13 @@ export const useAgentSources = (sourceType?: string) => {
           if (payload.eventType === 'INSERT') {
             const newSource = payload.new as AgentSource;
             if (!sourceType || newSource.source_type === sourceType) {
-              setSources(prev => [...prev, newSource]);
+              setSources(prev => {
+                // Check if source already exists to avoid duplicates
+                if (prev.some(source => source.id === newSource.id)) {
+                  return prev;
+                }
+                return [...prev, newSource];
+              });
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedSource = payload.new as AgentSource;
@@ -71,8 +83,13 @@ export const useAgentSources = (sourceType?: string) => {
       )
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [agentId, sourceType]);
 
