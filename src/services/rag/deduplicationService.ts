@@ -1,251 +1,176 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { SourceChunk } from "@/types/rag";
 
-interface DeduplicationResult {
-  isDuplicate: boolean;
-  duplicateOfChunkId?: string;
-  similarity?: number;
+interface ChunkForDeduplication {
+  source_id: string;
+  chunk_index: number;
+  content: string;
+  token_count: number;
+  metadata?: Record<string, any>;
 }
 
-interface DeduplicationStats {
-  totalChunks: number;
-  duplicatesFound: number;
-  uniqueChunks: number;
-  deduplicationRate: number;
+interface DeduplicationResult {
+  uniqueChunks: ChunkForDeduplication[];
+  duplicateChunks: Array<ChunkForDeduplication & { duplicateOfChunkId: string }>;
+  stats: {
+    totalProcessed: number;
+    uniqueCount: number;
+    duplicateCount: number;
+    deduplicationRate: number;
+  };
 }
 
 export class DeduplicationService {
-  // Check if a chunk is a duplicate based on content hash
-  static async checkChunkDuplicate(
-    content: string,
-    agentId: string,
-    excludeSourceId?: string
-  ): Promise<DeduplicationResult> {
-    try {
-      // Calculate content hash
-      const contentHash = await this.calculateContentHash(content);
-
-      // Query for existing chunks with the same hash
-      let query = supabase
-        .from('source_chunks')
-        .select(`
-          id,
-          source_id,
-          agent_sources!inner(agent_id)
-        `)
-        .eq('content_hash', contentHash)
-        .eq('agent_sources.agent_id', agentId)
-        .eq('is_duplicate', false);
-
-      if (excludeSourceId) {
-        query = query.neq('source_id', excludeSourceId);
-      }
-
-      const { data: existingChunks, error } = await query;
-
-      if (error) {
-        console.error('Error checking for duplicates:', error);
-        return { isDuplicate: false };
-      }
-
-      if (existingChunks && existingChunks.length > 0) {
-        return {
-          isDuplicate: true,
-          duplicateOfChunkId: existingChunks[0].id,
-          similarity: 1.0 // Exact match based on hash
-        };
-      }
-
-      return { isDuplicate: false };
-    } catch (error) {
-      console.error('Error in duplicate check:', error);
-      return { isDuplicate: false };
-    }
-  }
-
-  // Process chunks for deduplication during bulk insert
+  // Process chunks for deduplication using the new optimized content_hash system
   static async processChunksForDeduplication(
-    chunks: Array<{
-      source_id: string;
-      chunk_index: number;
-      content: string;
-      token_count: number;
-      metadata?: Record<string, any>;
-    }>,
+    chunks: ChunkForDeduplication[],
     agentId: string
-  ): Promise<{
-    uniqueChunks: typeof chunks;
-    duplicateChunks: typeof chunks;
-    stats: DeduplicationStats;
-  }> {
-    const uniqueChunks: typeof chunks = [];
-    const duplicateChunks: typeof chunks = [];
-    const processedHashes = new Set<string>();
-
-    for (const chunk of chunks) {
-      const contentHash = await this.calculateContentHash(chunk.content);
-
-      // Check if we've already processed this hash in this batch
-      if (processedHashes.has(contentHash)) {
-        duplicateChunks.push(chunk);
-        continue;
-      }
-
-      // Check against existing chunks in database
-      const duplicateResult = await this.checkChunkDuplicate(
-        chunk.content,
-        agentId,
-        chunk.source_id
-      );
-
-      if (duplicateResult.isDuplicate) {
-        duplicateChunks.push(chunk);
-      } else {
-        uniqueChunks.push(chunk);
-        processedHashes.add(contentHash);
-      }
-    }
-
-    const stats: DeduplicationStats = {
-      totalChunks: chunks.length,
-      duplicatesFound: duplicateChunks.length,
-      uniqueChunks: uniqueChunks.length,
-      deduplicationRate: duplicateChunks.length / chunks.length
-    };
-
-    return { uniqueChunks, duplicateChunks, stats };
-  }
-
-  // Calculate SHA-256 hash of content
-  private static async calculateContentHash(content: string): Promise<string> {
-    // Normalize content for consistent hashing
-    const normalizedContent = content
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, ' ');
-
-    // Use SubtleCrypto for hash calculation
-    const encoder = new TextEncoder();
-    const data = encoder.encode(normalizedContent);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  ): Promise<DeduplicationResult> {
+    console.log(`🔍 Processing ${chunks.length} chunks for deduplication...`);
     
-    return hashHex;
-  }
+    const uniqueChunks: ChunkForDeduplication[] = [];
+    const duplicateChunks: Array<ChunkForDeduplication & { duplicateOfChunkId: string }> = [];
 
-  // Mark chunks as duplicates in the database
-  static async markChunksAsDuplicates(
-    chunkIds: string[],
-    duplicateOfChunkId: string
-  ): Promise<boolean> {
+    // Enable bulk mode for performance during deduplication
+    await supabase.rpc('set_config', {
+      setting_name: 'app.bulk_load_mode',
+      new_value: 'true',
+      is_local: true
+    });
+
     try {
-      const { error } = await supabase
-        .from('source_chunks')
-        .update({
-          is_duplicate: true,
-          duplicate_of_chunk_id: duplicateOfChunkId
-        })
-        .in('id', chunkIds);
+      for (const chunk of chunks) {
+        // Calculate content hash using the database function
+        const { data: contentHash, error: hashError } = await supabase
+          .rpc('calculate_content_hash', { content: chunk.content });
 
-      if (error) {
-        console.error('Error marking chunks as duplicates:', error);
-        return false;
+        if (hashError) {
+          console.error('Error calculating hash:', hashError);
+          // Treat as unique if hash calculation fails
+          uniqueChunks.push(chunk);
+          continue;
+        }
+
+        // Check for existing chunks with the same hash across the agent's sources
+        const { data: existingChunks, error: searchError } = await supabase
+          .from('source_chunks')
+          .select(`
+            id,
+            source_id,
+            agent_sources!inner(agent_id)
+          `)
+          .eq('content_hash', contentHash)
+          .eq('agent_sources.agent_id', agentId)
+          .eq('is_duplicate', false) // Only check against non-duplicate chunks
+          .limit(1);
+
+        if (searchError) {
+          console.error('Error searching for duplicates:', searchError);
+          uniqueChunks.push(chunk);
+          continue;
+        }
+
+        if (existingChunks && existingChunks.length > 0) {
+          // Found duplicate
+          const originalChunk = existingChunks[0];
+          duplicateChunks.push({
+            ...chunk,
+            duplicateOfChunkId: originalChunk.id
+          });
+          
+          console.log(`🔄 Duplicate found: chunk from ${chunk.source_id} matches ${originalChunk.id}`);
+        } else {
+          // Unique chunk
+          uniqueChunks.push(chunk);
+        }
       }
 
-      return true;
-    } catch (error) {
-      console.error('Error in markChunksAsDuplicates:', error);
-      return false;
+      const stats = {
+        totalProcessed: chunks.length,
+        uniqueCount: uniqueChunks.length,
+        duplicateCount: duplicateChunks.length,
+        deduplicationRate: duplicateChunks.length / chunks.length
+      };
+
+      console.log(`✅ Deduplication complete: ${stats.uniqueCount} unique, ${stats.duplicateCount} duplicates (${(stats.deduplicationRate * 100).toFixed(1)}% dedup rate)`);
+
+      return {
+        uniqueChunks,
+        duplicateChunks,
+        stats
+      };
+
+    } finally {
+      // Disable bulk mode
+      await supabase.rpc('set_config', {
+        setting_name: 'app.bulk_load_mode',
+        new_value: 'false',
+        is_local: true
+      });
     }
   }
 
   // Get deduplication statistics for an agent
-  static async getDeduplicationStats(agentId: string): Promise<DeduplicationStats> {
-    try {
-      const { data: totalChunks, error: totalError } = await supabase
-        .from('source_chunks')
-        .select('count', { count: 'exact' })
-        .eq('agent_sources.agent_id', agentId);
+  static async getDeduplicationStats(agentId: string): Promise<{
+    totalChunks: number;
+    uniqueChunks: number;
+    duplicateChunks: number;
+    deduplicationRate: number;
+    spaceSaved: number;
+  }> {
+    const { data: stats, error } = await supabase
+      .from('source_chunks')
+      .select(`
+        id,
+        is_duplicate,
+        content,
+        agent_sources!inner(agent_id)
+      `)
+      .eq('agent_sources.agent_id', agentId);
 
-      const { data: duplicateChunks, error: duplicateError } = await supabase
-        .from('source_chunks')
-        .select('count', { count: 'exact' })
-        .eq('agent_sources.agent_id', agentId)
-        .eq('is_duplicate', true);
-
-      if (totalError || duplicateError) {
-        console.error('Error getting deduplication stats:', totalError || duplicateError);
-        return {
-          totalChunks: 0,
-          duplicatesFound: 0,
-          uniqueChunks: 0,
-          deduplicationRate: 0
-        };
-      }
-
-      const total = (totalChunks as any)?.[0]?.count || 0;
-      const duplicates = (duplicateChunks as any)?.[0]?.count || 0;
-      const unique = total - duplicates;
-
-      return {
-        totalChunks: total,
-        duplicatesFound: duplicates,
-        uniqueChunks: unique,
-        deduplicationRate: total > 0 ? duplicates / total : 0
-      };
-    } catch (error) {
-      console.error('Error in getDeduplicationStats:', error);
+    if (error || !stats) {
+      console.error('Error fetching deduplication stats:', error);
       return {
         totalChunks: 0,
-        duplicatesFound: 0,
         uniqueChunks: 0,
-        deduplicationRate: 0
+        duplicateChunks: 0,
+        deduplicationRate: 0,
+        spaceSaved: 0
       };
     }
+
+    const totalChunks = stats.length;
+    const duplicateChunks = stats.filter(chunk => chunk.is_duplicate).length;
+    const uniqueChunks = totalChunks - duplicateChunks;
+    const deduplicationRate = totalChunks > 0 ? duplicateChunks / totalChunks : 0;
+    
+    // Calculate approximate space saved (content length of duplicates)
+    const spaceSaved = stats
+      .filter(chunk => chunk.is_duplicate)
+      .reduce((sum, chunk) => sum + (chunk.content?.length || 0), 0);
+
+    return {
+      totalChunks,
+      uniqueChunks,
+      duplicateChunks,
+      deduplicationRate,
+      spaceSaved
+    };
   }
 
-  // Clean up orphaned duplicate references
-  static async cleanupOrphanedDuplicates(): Promise<number> {
-    try {
-      // Find chunks marked as duplicates but their reference doesn't exist
-      const { data: orphanedChunks, error: findError } = await supabase
-        .from('source_chunks')
-        .select('id')
-        .eq('is_duplicate', true)
-        .not('duplicate_of_chunk_id', 'is', null)
-        .not('duplicate_of_chunk_id', 'in', 
-          `(SELECT id FROM source_chunks WHERE is_duplicate = false)`
-        );
+  // Cleanup orphaned chunks using the new maintenance function
+  static async cleanupOrphanedChunks(): Promise<number> {
+    console.log('🧹 Cleaning up orphaned chunks...');
+    
+    const { data: deletedCount, error } = await supabase
+      .rpc('cleanup_orphaned_chunks');
 
-      if (findError) {
-        console.error('Error finding orphaned duplicates:', findError);
-        return 0;
-      }
-
-      if (!orphanedChunks || orphanedChunks.length === 0) {
-        return 0;
-      }
-
-      // Reset orphaned chunks to non-duplicate status
-      const { error: updateError } = await supabase
-        .from('source_chunks')
-        .update({
-          is_duplicate: false,
-          duplicate_of_chunk_id: null
-        })
-        .in('id', orphanedChunks.map(chunk => chunk.id));
-
-      if (updateError) {
-        console.error('Error cleaning up orphaned duplicates:', updateError);
-        return 0;
-      }
-
-      return orphanedChunks.length;
-    } catch (error) {
-      console.error('Error in cleanupOrphanedDuplicates:', error);
+    if (error) {
+      console.error('Error cleaning up orphaned chunks:', error);
       return 0;
     }
+
+    console.log(`✅ Cleaned up ${deletedCount} orphaned chunks`);
+    return deletedCount;
   }
 }

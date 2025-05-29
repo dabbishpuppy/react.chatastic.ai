@@ -9,12 +9,13 @@ export { GDPRService } from './gdprService';
 export { EncryptionService } from './encryptionService';
 export { DataRetentionService } from './dataRetentionService';
 
-// Export new content pipeline services
+// Export enhanced content pipeline services
 export { ContentExtractionService } from './contentExtractionService';
 export { SemanticChunkingService } from './semanticChunkingService';
 export { DeduplicationService } from './deduplicationService';
 export { PerformanceMetricsService } from './performanceMetricsService';
 export { WebsiteCrawlService } from './websiteCrawlService';
+export { MigrationService } from './migrationService';
 
 // Export types
 export * from '@/types/rag';

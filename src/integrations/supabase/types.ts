@@ -885,12 +885,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      migration_progress: {
+        Row: {
+          completion_percentage: number | null
+          migrated_rows: number | null
+          table_name: string | null
+          total_rows: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      bulk_populate_content_hashes: {
+        Args: { batch_size?: number }
+        Returns: number
       }
       calculate_content_hash: {
         Args: { content: string }
@@ -900,16 +912,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      compress_text: {
-        Args: { input_text: string }
-        Returns: string
-      }
-      decompress_text: {
-        Args: { compressed_data: string }
-        Returns: string
+      cleanup_orphaned_chunks: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       decrypt_sensitive_data: {
-        Args: { encrypted_data: string }
+        Args:
+          | { encrypted_data: string }
+          | { encrypted_data: string; key_id?: string }
         Returns: string
       }
       delete_agent_and_related_data: {
@@ -925,12 +935,21 @@ export type Database = {
         Returns: boolean
       }
       encrypt_sensitive_data: {
-        Args: { data: string }
+        Args: { data: string } | { data: string; key_id?: string }
         Returns: string
       }
       export_user_data: {
         Args: { target_user_id: string }
         Returns: Json
+      }
+      get_compression_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avg_compression_ratio: number
+          total_original_size: number
+          total_compressed_size: number
+          space_saved_percentage: number
+        }[]
       }
       get_default_team_id: {
         Args: Record<PropertyKey, never>
@@ -999,6 +1018,10 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
+      }
+      safe_migration_backfill: {
+        Args: { batch_size?: number }
+        Returns: Json
       }
       sparsevec_out: {
         Args: { "": unknown }
