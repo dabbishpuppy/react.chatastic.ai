@@ -1,13 +1,14 @@
-
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Settings, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SidebarActions = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signOut } = useAuth();
 
   const handleUpgrade = () => {
     navigate("/settings/plans");
@@ -17,12 +18,21 @@ const SidebarActions = () => {
     navigate("/settings/general");
   };
 
-  const handleLogout = () => {
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out."
-    });
-    // Add actual logout logic here when authentication is implemented
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been successfully signed out."
+      });
+      navigate("/signin");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Mock data - replace with actual data when available
