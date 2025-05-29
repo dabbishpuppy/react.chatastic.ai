@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,9 @@ import {
   File, 
   Link, 
   MessageCircleQuestion,
-  Info
+  Info,
+  Filter,
+  CheckCircle2
 } from "lucide-react";
 import {
   Popover,
@@ -67,10 +70,8 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
   };
 
   const getDisplayTitle = (source: AgentSource) => {
-    // For website sources in crawl-links mode, show the domain without protocol for cleaner display
     if (source.source_type === 'website' && source.url) {
       if (displayMode === 'crawl-links') {
-        // Extract domain from URL for display, but keep full URL for tooltip
         try {
           const urlObj = new URL(source.url);
           return urlObj.hostname.replace(/^www\./, '');
@@ -90,6 +91,47 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
     return source.title;
   };
 
+  const getCrawlStats = (source: AgentSource) => {
+    return source.metadata?.crawl_stats || source.metadata?.last_crawl_summary;
+  };
+
+  const renderCrawlStats = (source: AgentSource) => {
+    const stats = getCrawlStats(source);
+    if (!stats) return null;
+
+    return (
+      <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+        <div className="flex items-center space-x-1 mb-1">
+          <Filter size={12} className="text-blue-500" />
+          <span className="font-medium text-gray-700">Crawl Results</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-gray-600">
+          <div>URLs Found: <span className="font-medium">{stats.urls_discovered || stats.total_urls || 0}</span></div>
+          <div>Pages Visited: <span className="font-medium">{stats.pages_visited || 0}</span></div>
+          {stats.links_filtered > 0 && (
+            <div className="col-span-2">
+              Filtered: <span className="font-medium text-orange-600">{stats.links_filtered}</span>
+              <span className="text-gray-500 ml-1">(non-customer pages)</span>
+            </div>
+          )}
+        </div>
+        {stats.filter_reasons && Object.keys(stats.filter_reasons).length > 0 && (
+          <div className="mt-1 pt-1 border-t border-gray-200">
+            <div className="text-gray-500">Top filter reasons:</div>
+            {Object.entries(stats.filter_reasons)
+              .sort(([,a], [,b]) => (b as number) - (a as number))
+              .slice(0, 2)
+              .map(([reason, count]) => (
+                <div key={reason} className="text-gray-600">
+                  • {reason}: {count as number}
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-3">
       {sourcesByType.map(({ type, sources }) => {
@@ -104,59 +146,79 @@ const SourceSectionsDisplay: React.FC<SourceSectionsDisplayProps> = React.memo((
                 <Badge variant="secondary" className="text-xs">
                   {sources.length}
                 </Badge>
+                {type === 'website' && displayMode === 'crawl-links' && (
+                  <Badge variant="outline" className="text-xs flex items-center space-x-1">
+                    <CheckCircle2 size={10} className="text-green-500" />
+                    <span>Filtered</span>
+                  </Badge>
+                )}
               </div>
             </div>
             
             <div className="space-y-2">
               {sources.slice(0, 3).map((source) => (
-                <div key={source.id} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2 flex-1 min-w-0">
-                    <span className="truncate" title={getFullUrl(source)}>
-                      {getDisplayTitle(source)}
+                <div key={source.id} className="border-l-2 border-gray-200 pl-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
+                      <span className="truncate" title={getFullUrl(source)}>
+                        {getDisplayTitle(source)}
+                      </span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                            <Info size={12} className="text-gray-400" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="end">
+                          <div className="space-y-2 text-xs">
+                            <div>
+                              <span className="font-medium">URL:</span>
+                              <div className="text-gray-600 break-all">
+                                {getFullUrl(source)}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Created:</span>
+                              <div className="text-gray-600">
+                                {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Last updated:</span>
+                              <div className="text-gray-600">
+                                {formatDistanceToNow(new Date(source.updated_at), { addSuffix: true })}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Size:</span>
+                              <div className="text-gray-600">{formatFileSize(source.content)}</div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Status:</span>
+                              <div className="text-gray-600">
+                                {source.is_active ? 'Active' : 'Inactive'}
+                              </div>
+                            </div>
+                            {source.source_type === 'website' && source.metadata?.validation_passed && (
+                              <div>
+                                <span className="font-medium">Validation:</span>
+                                <div className="text-green-600 flex items-center space-x-1">
+                                  <CheckCircle2 size={12} />
+                                  <span>Customer-facing page</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <span className="text-gray-500 text-xs">
+                      {formatFileSize(source.content)}
                     </span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
-                          <Info size={12} className="text-gray-400" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-64" align="end">
-                        <div className="space-y-2 text-xs">
-                          <div>
-                            <span className="font-medium">URL:</span>
-                            <div className="text-gray-600 break-all">
-                              {getFullUrl(source)}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Created:</span>
-                            <div className="text-gray-600">
-                              {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Last updated:</span>
-                            <div className="text-gray-600">
-                              {formatDistanceToNow(new Date(source.updated_at), { addSuffix: true })}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Size:</span>
-                            <div className="text-gray-600">{formatFileSize(source.content)}</div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Status:</span>
-                            <div className="text-gray-600">
-                              {source.is_active ? 'Active' : 'Inactive'}
-                            </div>
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
                   </div>
-                  <span className="text-gray-500 text-xs">
-                    {formatFileSize(source.content)}
-                  </span>
+                  
+                  {/* Show crawl statistics for parent website sources */}
+                  {source.source_type === 'website' && !source.parent_source_id && renderCrawlStats(source)}
                 </div>
               ))}
               
