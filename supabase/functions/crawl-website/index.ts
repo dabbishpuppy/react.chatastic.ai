@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -33,7 +32,7 @@ const EXCLUDED_EXTENSIONS = [
   'xml', 'json', 'csv', 'rss', 'atom'
 ];
 
-// Path patterns to exclude
+// Path patterns to exclude (reduced restrictions)
 const EXCLUDED_PATH_PATTERNS = [
   // API endpoints
   '/api/', '/rest/', '/graphql/', '/wp-json/',
@@ -41,16 +40,10 @@ const EXCLUDED_PATH_PATTERNS = [
   '/admin/', '/dashboard/', '/backend/', '/control-panel/',
   // WordPress specific
   '/wp-content/', '/wp-admin/', '/wp-includes/',
-  // Drupal specific
-  '/sites/default/files/', '/node/', '/user/',
-  // Asset directories
-  '/assets/', '/static/', '/public/', '/dist/', '/build/', '/uploads/',
   // System files
   '/robots.txt', '/sitemap.xml', '/favicon.ico', '/.well-known/',
-  // Feeds
-  '/feed/', '/rss/', '/feeds/',
   // Common utility paths
-  '/search/', '/login/', '/register/', '/checkout/', '/cart/'
+  '/login/', '/register/', '/checkout/', '/cart/'
 ];
 
 // Tracking parameters to remove
@@ -121,21 +114,21 @@ function isValidFrontendUrl(url: string, baseDomain: string): boolean {
       return false;
     }
     
-    // Check for excluded path patterns
+    // Check for excluded path patterns (reduced restrictions)
     for (const pattern of EXCLUDED_PATH_PATTERNS) {
       if (pathname.includes(pattern.toLowerCase())) {
         return false;
       }
     }
     
-    // Exclude very long URLs (likely not content pages)
-    if (url.length > 200) {
+    // Exclude very long URLs (increased limit)
+    if (url.length > 300) {
       return false;
     }
     
-    // Exclude URLs with too many path segments (likely not main content)
+    // Exclude URLs with too many path segments (increased limit)
     const pathSegments = pathname.split('/').filter(Boolean);
-    if (pathSegments.length > 5) {
+    if (pathSegments.length > 8) {
       return false;
     }
     
@@ -145,7 +138,7 @@ function isValidFrontendUrl(url: string, baseDomain: string): boolean {
   }
 }
 
-// Enhanced recursive crawling function
+// Enhanced recursive crawling function with no depth limits
 async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
   console.log(`🕷️ Starting recursive crawl for ${url} with type ${crawlType}`);
   
@@ -202,9 +195,9 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       const sitemapLinks = await fetchSitemapLinks(normalizedUrl, baseDomain);
       sitemapLinks.forEach(link => discoveredLinks.add(link));
     } else {
-      // For crawl-links, start recursive discovery
-      console.log(`🔍 Starting recursive link discovery from: ${normalizedUrl}`);
-      await discoverLinksRecursively(normalizedUrl, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, 3);
+      // For crawl-links, start recursive discovery with no depth limit
+      console.log(`🔍 Starting unlimited recursive link discovery from: ${normalizedUrl}`);
+      await discoverLinksRecursively(normalizedUrl, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, Infinity);
     }
 
     console.log(`✅ Discovered ${discoveredLinks.size} unique links total`);
@@ -218,13 +211,13 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       })
       .eq('id', sourceId);
 
-    // Create child sources for all discovered links
+    // Create child sources for all discovered links in larger batches
     if (discoveredLinks.size > 0) {
       console.log(`📝 Creating ${discoveredLinks.size} child sources`);
       const linksArray = Array.from(discoveredLinks);
       
-      // Process in batches to avoid overwhelming the database
-      const batchSize = 50;
+      // Process in larger batches to improve performance
+      const batchSize = 100;
       for (let i = 0; i < linksArray.length; i += batchSize) {
         const batch = linksArray.slice(i, i + batchSize);
         const childSources = batch.map(link => ({
@@ -292,7 +285,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   }
 }
 
-// Recursive link discovery function
+// Recursive link discovery function with no depth limits and more aggressive crawling
 async function discoverLinksRecursively(
   url: string, 
   baseDomain: string, 
@@ -302,8 +295,8 @@ async function discoverLinksRecursively(
   currentDepth: number,
   maxDepth: number
 ): Promise<void> {
-  // Stop if we've reached max depth or already crawled this URL
-  if (currentDepth > maxDepth || crawledUrls.has(url)) {
+  // Stop if we've already crawled this URL
+  if (crawledUrls.has(url)) {
     return;
   }
 
@@ -317,15 +310,15 @@ async function discoverLinksRecursively(
     pageLinks.forEach(link => discoveredLinks.add(link));
     console.log(`📊 Found ${pageLinks.length} new links on ${url}`);
 
-    // If we haven't reached max depth, recursively crawl some of the discovered links
+    // If we haven't reached max depth, recursively crawl more links
     if (currentDepth < maxDepth) {
-      // Limit the number of links we recursively crawl from each page to prevent explosion
-      const linksToRecurse = pageLinks.slice(0, 5);
+      // Crawl more links from each page (increased from 5 to 20)
+      const linksToRecurse = pageLinks.slice(0, 20);
       
       for (const link of linksToRecurse) {
         if (!crawledUrls.has(link)) {
-          // Add small delay between requests
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Reduced delay between requests for faster crawling
+          await new Promise(resolve => setTimeout(resolve, 50));
           await discoverLinksRecursively(link, baseDomain, crawledUrls, discoveredLinks, metadata, currentDepth + 1, maxDepth);
         }
       }

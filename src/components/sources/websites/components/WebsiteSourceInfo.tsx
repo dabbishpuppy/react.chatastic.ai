@@ -33,8 +33,10 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // Fixed width containers to prevent layout shifts
   const containerWidth = isChild ? 'w-full max-w-md' : 'flex-1';
   
-  // Truncate URL for child sources with ellipsis
-  const displayUrl = isChild && url.length > 45 ? `${url.substring(0, 45)}...` : url;
+  // For child sources, show the full URL with protocol
+  // For parent sources, show the title (domain) but ensure URL is complete
+  const displayText = isChild ? url : (title || url);
+  const displayUrl = isChild && url.length > 45 ? `${url.substring(0, 45)}...` : displayText;
 
   return (
     <div className="flex items-center flex-1 min-w-0">
@@ -43,8 +45,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
       </div>
       
       <div className={`${containerWidth} min-w-0`}>
-        <div className={`font-medium ${titleSize} truncate`} title={title || url}>
-          {title || (isChild ? displayUrl : url)}
+        <div className={`font-medium ${titleSize} truncate`} title={displayText}>
+          {displayUrl}
         </div>
         
         {/* Show status for parent sources when crawling */}
