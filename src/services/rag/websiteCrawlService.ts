@@ -23,7 +23,7 @@ export class WebsiteCrawlService {
   private static crawlQueue: { url: string; depth: number; parentId: string }[] = [];
   private static isCrawling = false;
 
-  // Enhanced crawling function that removes the 50-link limit
+  // Enhanced crawling function that removes limits and implements continuous crawling
   static async startEnhancedCrawl(
     agentId: string,
     sourceId: string,
@@ -31,8 +31,8 @@ export class WebsiteCrawlService {
     options: CrawlOptions = {}
   ): Promise<void> {
     const {
-      maxDepth = 3,
-      maxPages = 1000, // Much higher limit, configurable
+      maxDepth = 5, // Increased depth for more comprehensive crawling
+      maxPages = 10000, // Much higher limit for extensive crawling
       includePaths = '',
       excludePaths = '',
       respectRobots = true
@@ -48,8 +48,9 @@ export class WebsiteCrawlService {
       await this.updateSourceStatus(sourceId, 'in_progress', 0);
 
       let processedCount = 0;
-      const totalEstimate = Math.min(maxPages, 100); // Initial estimate
+      let discoveredLinksCount = 0;
 
+      // Continuous crawling loop
       while (this.crawlQueue.length > 0 && processedCount < maxPages && this.isCrawling) {
         const currentItem = this.crawlQueue.shift()!;
         const { url, depth, parentId } = currentItem;
@@ -64,11 +65,12 @@ export class WebsiteCrawlService {
           this.crawledUrls.add(url);
           processedCount++;
 
-          // Update progress
-          const progress = Math.min((processedCount / totalEstimate) * 100, 95);
+          // Update progress dynamically based on discovered links
+          const totalEstimate = Math.max(discoveredLinksCount, processedCount + this.crawlQueue.length);
+          const progress = Math.min((processedCount / Math.max(totalEstimate, 10)) * 90, 90);
           await this.updateSourceStatus(sourceId, 'in_progress', progress);
 
-          // Crawl the page
+          // Crawl the page and discover new links
           const result = await this.crawlSinglePage(url);
           
           if (result) {
@@ -81,7 +83,7 @@ export class WebsiteCrawlService {
               result.content
             );
 
-            // Process discovered links
+            // Process and filter discovered links
             const filteredLinks = this.filterLinks(
               result.links,
               initialUrl,
@@ -89,23 +91,31 @@ export class WebsiteCrawlService {
               excludePaths
             );
 
-            // Add new links to queue for next depth level
+            // Add new unique links to queue for next depth level
             for (const link of filteredLinks) {
               if (!this.crawledUrls.has(link) && depth + 1 <= maxDepth) {
-                this.crawlQueue.push({
-                  url: link,
-                  depth: depth + 1,
-                  parentId: sourceId
-                });
+                // Check if link is already in queue to avoid duplicates
+                const isInQueue = this.crawlQueue.some(item => item.url === link);
+                if (!isInQueue) {
+                  this.crawlQueue.push({
+                    url: link,
+                    depth: depth + 1,
+                    parentId: sourceId
+                  });
+                  discoveredLinksCount++;
+                }
               }
             }
 
             // Update parent source with current stats
             await this.updateParentSourceStats(sourceId, processedCount);
+
+            // Log progress
+            console.log(`Crawled ${processedCount} pages, ${this.crawlQueue.length} in queue, discovered ${discoveredLinksCount} total links`);
           }
 
-          // Add delay to be respectful
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Respectful delay between requests
+          await new Promise(resolve => setTimeout(resolve, 500));
 
         } catch (error) {
           console.error(`Error crawling ${url}:`, error);
@@ -116,6 +126,8 @@ export class WebsiteCrawlService {
       // Mark crawl as completed
       await this.updateSourceStatus(sourceId, 'completed', 100);
       await this.updateParentSourceStats(sourceId, processedCount, new Date().toISOString());
+
+      console.log(`Crawl completed: ${processedCount} pages processed, ${discoveredLinksCount} links discovered`);
 
     } catch (error) {
       console.error('Crawl failed:', error);
@@ -137,7 +149,7 @@ export class WebsiteCrawlService {
       const { data, error } = await supabase.functions.invoke('crawl-website', {
         body: { 
           url,
-          single_page: true // Flag for single page crawling
+          single_page: true
         }
       });
 
@@ -156,7 +168,7 @@ export class WebsiteCrawlService {
     }
   }
 
-  // Filter links based on include/exclude patterns
+  // Enhanced link filtering with better domain and pattern matching
   private static filterLinks(
     links: string[],
     baseUrl: string,
@@ -171,6 +183,11 @@ export class WebsiteCrawlService {
         
         // Only crawl same domain
         if (linkUrl.hostname !== baseDomain) return false;
+        
+        // Skip common non-content file types
+        const pathname = linkUrl.pathname.toLowerCase();
+        const excludedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.css', '.js', '.json', '.xml'];
+        if (excludedExtensions.some(ext => pathname.endsWith(ext))) return false;
         
         // Apply include patterns
         if (includePaths) {
@@ -195,7 +212,7 @@ export class WebsiteCrawlService {
     });
   }
 
-  // Create child source for crawled page
+  // Create child source for crawled page with proper type handling
   private static async createChildSource(
     agentId: string,
     parentSourceId: string,
@@ -223,13 +240,21 @@ export class WebsiteCrawlService {
         url,
         content,
         crawl_status: 'completed',
-        metadata: { crawled_at: new Date().toISOString() }
+        metadata: { 
+          crawled_at: new Date().toISOString(),
+          parent_url: url
+        }
       })
       .select()
       .single();
 
     if (error) throw error;
-    return source;
+    
+    // Properly handle the metadata type conversion
+    return {
+      ...source,
+      metadata: source.metadata as Record<string, any> || {}
+    } as AgentSource;
   }
 
   // Update source crawl status and progress
