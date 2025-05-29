@@ -1,8 +1,10 @@
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SourceType } from "@/types/rag";
 import { useAgentSources } from "@/hooks/useAgentSources";
+import { supabase } from "@/integrations/supabase/client";
+import { useParams } from "react-router-dom";
 import TotalStatsSection from "./TotalStatsSection";
 import SourceSectionsDisplay from "./SourceSectionsDisplay";
 
@@ -11,7 +13,35 @@ interface SourcesWidgetProps {
 }
 
 const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
+  const { agentId } = useParams();
   const { sources: sourcesData, loading } = useAgentSources();
+  const [realtimeSize, setRealtimeSize] = useState(0);
+
+  // Set up real-time subscription for content size updates
+  useEffect(() => {
+    if (!agentId) return;
+
+    const channel = supabase
+      .channel(`sources-size-${agentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `agent_id=eq.${agentId}`
+        },
+        () => {
+          // Recalculate size when any source changes
+          setRealtimeSize(Date.now()); // Force recalculation
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [agentId]);
 
   // Calculate total stats and filter sources for display
   const { totalSources, totalSize, sourcesByType } = useMemo(() => {
@@ -82,7 +112,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       totalSize: formattedTotalSize,
       sourcesByType
     };
-  }, [sourcesData, currentTab]);
+  }, [sourcesData, currentTab, realtimeSize]);
 
   if (loading) {
     return (

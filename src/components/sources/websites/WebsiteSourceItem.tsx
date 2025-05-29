@@ -52,6 +52,8 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               linksCount={source.links_count}
               lastCrawledAt={source.last_crawled_at}
               crawlStatus={source.crawl_status}
+              metadata={source.metadata}
+              content={source.content}
             />
           </div>
           
@@ -96,6 +98,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
       {isExpanded && (
         <WebsiteChildSources
           childSources={childSources}
+          parentSourceId={source.id}
           isCrawling={isCrawling}
           onEdit={onEdit}
           onExclude={onExclude}

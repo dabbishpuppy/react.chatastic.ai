@@ -11,7 +11,7 @@ interface WebsiteSourceStatusProps {
   linksCount?: number;
   metadata?: any;
   showProgressBar?: boolean;
-  isChild?: boolean; // Add this prop to detect child sources
+  isChild?: boolean;
 }
 
 const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
@@ -90,34 +90,22 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
   const getStatusText = (status?: string) => {
     const maxPages = realtimeData.metadata?.max_pages || 1000;
     const currentCount = realtimeData.linksCount || 0;
-    const contentSize = realtimeData.metadata?.content_size || realtimeData.metadata?.total_content_size || 0;
-
-    // Format content size for display
-    const formatSize = (bytes: number) => {
-      if (bytes === 0) return '';
-      if (bytes < 1024) return ` • ${bytes}B`;
-      if (bytes < 1024 * 1024) return ` • ${Math.round(bytes / 1024)}KB`;
-      return ` • ${Math.round(bytes / (1024 * 1024))}MB`;
-    };
-
-    const sizeText = formatSize(contentSize);
 
     switch (status) {
       case 'completed':
         if (isChild) {
-          // For child sources, just show "Completed" with size
-          return `Completed${sizeText}`;
+          return 'Completed';
         }
-        return `Completed (${currentCount} pages)${sizeText}`;
+        return `Completed (${currentCount} pages)`;
       case 'in_progress': 
         if (isStalled) {
-          return `Crawling stalled ${currentCount}/${maxPages}${sizeText}`;
+          return `Crawling stalled ${currentCount}/${maxPages}`;
         }
-        return `Crawling ${currentCount}/${maxPages}${sizeText}`;
+        return `Crawling ${currentCount}/${maxPages}`;
       case 'failed': 
         return 'Failed';
       case 'pending': 
-        return `Pending (${currentCount} found)${sizeText}`;
+        return `Pending (${currentCount} found)`;
       default: 
         return 'Unknown';
     }
