@@ -15,7 +15,6 @@ interface WebsiteSourceInfoProps {
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   title,
   url,
-  createdAt,
   linksCount,
   lastCrawledAt,
   isChild = false
@@ -34,12 +33,14 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
       <div className="flex-1">
         <div className={`font-medium ${titleSize}`}>{title || url}</div>
         <div className={`flex items-center gap-2 ${metaSize} text-gray-500`}>
-          <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
           {linksCount && linksCount > 0 && (
-            <span>• {linksCount} links</span>
+            <span>{linksCount} links</span>
           )}
           {lastCrawledAt && (
-            <span>• Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
+            <>
+              {linksCount && linksCount > 0 && <span>•</span>}
+              <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
+            </>
           )}
         </div>
       </div>
