@@ -18,7 +18,9 @@ export const useAgentSources = (sourceType?: string) => {
     try {
       setLoading(true);
       setError(null);
-      const fetchedSources = await sourceService.getAgentSources(agentId, sourceType);
+      const fetchedSources = sourceType 
+        ? await sourceService.getSourcesByType(agentId, sourceType as any)
+        : await sourceService.getSourcesByAgent(agentId);
       setSources(fetchedSources);
     } catch (err: any) {
       console.error('Error fetching sources:', err);
