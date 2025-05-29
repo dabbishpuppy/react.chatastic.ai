@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
-// Import our new modules
+// Import our modules
 import { extractFrontEndLinks, extractNavigationLinks } from './modules/linkExtractor.js';
 import { matchesIncludePatterns, matchesExcludePatterns, parsePatterns } from './modules/patternMatcher.js';
 import { isCustomerFacingUrl, filterUrls, normalizeUrl, extractDomain } from './modules/urlValidator.js';
@@ -18,7 +18,12 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Enhanced recursive crawling function with improved filtering
+// Configurable crawl limits
+const DEFAULT_MAX_PAGES = parseInt(Deno.env.get('MAX_CRAWL_PAGES') || '1000');
+const DEFAULT_MAX_DEPTH = parseInt(Deno.env.get('MAX_CRAWL_DEPTH') || '10');
+const DEFAULT_CONCURRENCY = parseInt(Deno.env.get('CRAWL_CONCURRENCY') || '5');
+
+// Enhanced recursive crawling function with configurable limits and concurrency
 async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
   console.log(`🕷️ Starting enhanced crawl for ${url} with type ${crawlType}`);
   
@@ -55,10 +60,14 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       throw new Error(`Invalid domain extracted from URL: ${normalizedUrl}`);
     }
 
-    // Parse include/exclude patterns from metadata
+    // Parse include/exclude patterns and crawl settings from metadata
     const includePatterns = parsePatterns(source.metadata?.include_paths || '');
     const excludePatterns = parsePatterns(source.metadata?.exclude_paths || '');
+    const maxPages = source.metadata?.max_pages || DEFAULT_MAX_PAGES;
+    const maxDepth = source.metadata?.max_depth || DEFAULT_MAX_DEPTH;
+    const concurrency = source.metadata?.concurrency || DEFAULT_CONCURRENCY;
     
+    console.log(`📋 Settings: maxPages=${maxPages}, maxDepth=${maxDepth}, concurrency=${concurrency}`);
     console.log(`📋 Include patterns: ${includePatterns.length}, Exclude patterns: ${excludePatterns.length}`);
 
     const discoveredUrls = new Set<string>();
@@ -66,7 +75,10 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       pagesVisited: 0,
       linksFound: 0,
       linksFiltered: 0,
-      filterReasons: {}
+      filterReasons: {},
+      maxPagesReached: false,
+      maxDepthReached: false,
+      completionReason: 'completed'
     };
 
     if (crawlType === 'individual-link') {
@@ -83,13 +95,21 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       
       // Apply filtering to sitemap URLs
       const filterResults = filterUrls(sitemapUrls, baseDomain, includePatterns, excludePatterns);
-      filterResults.valid.forEach(url => discoveredUrls.add(url));
       
-      console.log(`✅ Sitemap: ${filterResults.stats.validCount} valid, ${filterResults.stats.total - filterResults.stats.validCount} filtered`);
+      // Apply page limit to sitemap results
+      const limitedUrls = filterResults.valid.slice(0, maxPages);
+      limitedUrls.forEach(url => discoveredUrls.add(url));
+      
+      if (filterResults.valid.length > maxPages) {
+        crawlStats.maxPagesReached = true;
+        crawlStats.completionReason = 'max_pages_reached';
+      }
+      
+      console.log(`✅ Sitemap: ${limitedUrls.length} valid (limited from ${filterResults.valid.length}), ${filterResults.stats.total - filterResults.stats.validCount} filtered`);
       Object.assign(crawlStats, filterResults.stats);
     } else {
       console.log(`🔍 Starting enhanced recursive crawl from: ${normalizedUrl}`);
-      await enhancedRecursiveCrawl(
+      await enhancedRecursiveCrawlWithConcurrency(
         normalizedUrl, 
         baseDomain, 
         includePatterns, 
@@ -97,7 +117,9 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
         discoveredUrls, 
         crawlStats,
         0, 
-        3 // Reduced max depth for better quality
+        maxDepth,
+        maxPages,
+        concurrency
       );
     }
 
@@ -115,7 +137,10 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
           last_crawl_summary: {
             urls_discovered: discoveredUrls.size,
             pages_visited: crawlStats.pagesVisited,
-            links_filtered: crawlStats.linksFiltered
+            links_filtered: crawlStats.linksFiltered,
+            completion_reason: crawlStats.completionReason,
+            max_pages_reached: crawlStats.maxPagesReached,
+            max_depth_reached: crawlStats.maxDepthReached
           }
         }
       })
@@ -176,7 +201,8 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
           crawl_stats: crawlStats,
           completion_summary: {
             total_urls: discoveredUrls.size,
-            completion_time: new Date().toISOString()
+            completion_time: new Date().toISOString(),
+            completion_reason: crawlStats.completionReason
           }
         }
       })
@@ -200,27 +226,101 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   }
 }
 
-// Enhanced recursive crawl with improved link discovery and filtering
-async function enhancedRecursiveCrawl(
-  url: string,
+// Enhanced recursive crawl with concurrency control and configurable limits
+async function enhancedRecursiveCrawlWithConcurrency(
+  startUrl: string,
   baseDomain: string,
   includePatterns: string[],
   excludePatterns: string[],
   discoveredUrls: Set<string>,
   crawlStats: any,
   currentDepth: number,
-  maxDepth: number
+  maxDepth: number,
+  maxPages: number,
+  concurrency: number
 ): Promise<void> {
-  if (currentDepth > maxDepth) {
-    console.log(`🛑 Max depth ${maxDepth} reached at ${url}`);
-    return;
-  }
+  const urlQueue: Array<{url: string, depth: number}> = [{url: startUrl, depth: 0}];
+  const processingUrls = new Set<string>();
+  const processedUrls = new Set<string>();
+  
+  console.log(`🚀 Starting concurrent crawl: maxDepth=${maxDepth}, maxPages=${maxPages}, concurrency=${concurrency}`);
 
-  console.log(`🔍 Enhanced crawling depth ${currentDepth}: ${url}`);
+  while (urlQueue.length > 0 && discoveredUrls.size < maxPages) {
+    // Take up to 'concurrency' URLs from the queue
+    const currentBatch = urlQueue.splice(0, concurrency);
+    
+    // Process batch concurrently
+    const batchPromises = currentBatch.map(async ({url, depth}) => {
+      if (processingUrls.has(url) || processedUrls.has(url) || depth > maxDepth) {
+        if (depth > maxDepth) {
+          crawlStats.maxDepthReached = true;
+        }
+        return [];
+      }
+      
+      processingUrls.add(url);
+      
+      try {
+        const newUrls = await crawlSinglePage(url, baseDomain, includePatterns, excludePatterns, crawlStats);
+        processedUrls.add(url);
+        processingUrls.delete(url);
+        
+        // Add new URLs to discovered set and queue for next depth
+        const validNewUrls: Array<{url: string, depth: number}> = [];
+        for (const newUrl of newUrls) {
+          if (!discoveredUrls.has(newUrl) && !processedUrls.has(newUrl) && !processingUrls.has(newUrl)) {
+            discoveredUrls.add(newUrl);
+            if (depth + 1 <= maxDepth && discoveredUrls.size < maxPages) {
+              validNewUrls.push({url: newUrl, depth: depth + 1});
+            }
+          }
+        }
+        
+        return validNewUrls;
+      } catch (error) {
+        console.error(`❌ Error crawling ${url}:`, error);
+        processedUrls.add(url);
+        processingUrls.delete(url);
+        return [];
+      }
+    });
+    
+    // Wait for batch to complete and add new URLs to queue
+    const batchResults = await Promise.all(batchPromises);
+    for (const newUrls of batchResults) {
+      urlQueue.push(...newUrls);
+    }
+    
+    // Check if we've hit our limits
+    if (discoveredUrls.size >= maxPages) {
+      crawlStats.maxPagesReached = true;
+      crawlStats.completionReason = 'max_pages_reached';
+      break;
+    }
+    
+    // Rate limiting between batches
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  if (urlQueue.length === 0) {
+    crawlStats.completionReason = 'all_pages_crawled';
+  }
+  
+  console.log(`🏁 Crawl finished: ${discoveredUrls.size} URLs, reason: ${crawlStats.completionReason}`);
+}
+
+// Single page crawling function
+async function crawlSinglePage(
+  url: string,
+  baseDomain: string,
+  includePatterns: string[],
+  excludePatterns: string[],
+  crawlStats: any
+): Promise<string[]> {
+  console.log(`🔍 Crawling: ${url}`);
   crawlStats.pagesVisited++;
 
   try {
-    // Fetch page content with enhanced headers
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; CustomerPageCrawler/1.0)',
@@ -246,13 +346,10 @@ async function enhancedRecursiveCrawl(
     const allLinks = [...new Set([...extractedLinks, ...navLinks])];
     crawlStats.linksFound += allLinks.length;
     
-    console.log(`🔗 Found ${allLinks.length} potential links (${extractedLinks.length} content + ${navLinks.length} navigation)`);
+    console.log(`🔗 Found ${allLinks.length} potential links`);
     
     // Apply comprehensive filtering
     const filterResults = filterUrls(allLinks, baseDomain, includePatterns, excludePatterns);
-    
-    // Add valid URLs to discovered set
-    filterResults.valid.forEach(link => discoveredUrls.add(link));
     
     // Track filtering statistics
     crawlStats.linksFiltered += filterResults.filtered.length;
@@ -261,31 +358,13 @@ async function enhancedRecursiveCrawl(
       crawlStats.filterReasons[reason] = (crawlStats.filterReasons[reason] || 0) + 1;
     });
     
-    console.log(`✅ Added ${filterResults.valid.length} valid URLs, filtered ${filterResults.filtered.length}`);
+    console.log(`✅ Found ${filterResults.valid.length} valid URLs, filtered ${filterResults.filtered.length}`);
     
-    // Recursively crawl a subset of valid URLs for deeper discovery
-    if (currentDepth < maxDepth) {
-      const urlsToRecurse = filterResults.valid
-        .filter(link => !discoveredUrls.has(link)) // Only crawl new URLs
-        .slice(0, 10); // Limit to prevent explosion
-      
-      for (const link of urlsToRecurse) {
-        await new Promise(resolve => setTimeout(resolve, 200)); // Rate limiting
-        await enhancedRecursiveCrawl(
-          link, 
-          baseDomain, 
-          includePatterns, 
-          excludePatterns, 
-          discoveredUrls, 
-          crawlStats, 
-          currentDepth + 1, 
-          maxDepth
-        );
-      }
-    }
+    return filterResults.valid;
     
   } catch (error) {
     console.error(`❌ Error crawling ${url}:`, error);
+    return [];
   }
 }
 
@@ -328,9 +407,16 @@ serve(async (req) => {
   }
 
   try {
-    const { source_id, url, crawl_type } = await req.json();
+    const { source_id, url, crawl_type, max_pages, max_depth, concurrency } = await req.json();
     
-    console.log('📝 Received enhanced crawl request:', { source_id, url, crawl_type });
+    console.log('📝 Received enhanced crawl request:', { 
+      source_id, 
+      url, 
+      crawl_type, 
+      max_pages: max_pages || DEFAULT_MAX_PAGES,
+      max_depth: max_depth || DEFAULT_MAX_DEPTH,
+      concurrency: concurrency || DEFAULT_CONCURRENCY
+    });
 
     if (!source_id || !url || !crawl_type) {
       return new Response(
@@ -340,6 +426,29 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       );
+    }
+
+    // Update source metadata with crawl settings if provided
+    if (max_pages || max_depth || concurrency) {
+      const { data: source } = await supabase
+        .from('agent_sources')
+        .select('metadata')
+        .eq('id', source_id)
+        .single();
+
+      if (source) {
+        const updatedMetadata = {
+          ...source.metadata,
+          max_pages: max_pages || DEFAULT_MAX_PAGES,
+          max_depth: max_depth || DEFAULT_MAX_DEPTH,
+          concurrency: concurrency || DEFAULT_CONCURRENCY
+        };
+
+        await supabase
+          .from('agent_sources')
+          .update({ metadata: updatedMetadata })
+          .eq('id', source_id);
+      }
     }
 
     // Start enhanced crawling process
@@ -353,9 +462,15 @@ serve(async (req) => {
         source_id,
         url: normalizeUrl(url),
         crawl_type,
+        settings: {
+          max_pages: max_pages || DEFAULT_MAX_PAGES,
+          max_depth: max_depth || DEFAULT_MAX_DEPTH,
+          concurrency: concurrency || DEFAULT_CONCURRENCY
+        },
         features: [
           'Customer-facing link extraction',
           'Semantic HTML parsing',
+          'Configurable limits and concurrency',
           'Advanced filtering',
           'Include/exclude pattern support'
         ]

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -42,7 +41,7 @@ const WebsiteTab: React.FC = () => {
     }
   }, [parentSources]);
 
-  const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link') => {
+  const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link', options?: { maxPages?: number; maxDepth?: number; concurrency?: number }) => {
     if (!url) {
       toast({
         title: "URL required",
@@ -59,7 +58,8 @@ const WebsiteTab: React.FC = () => {
       url: fullUrl,
       includePaths,
       excludePaths,
-      crawlType
+      crawlType,
+      ...options
     });
 
     if (result) {
@@ -191,7 +191,7 @@ const WebsiteTab: React.FC = () => {
                   setIncludePaths={setIncludePaths}
                   excludePaths={excludePaths}
                   setExcludePaths={setExcludePaths}
-                  onSubmit={() => handleSubmit('crawl-links')}
+                  onSubmit={(options) => handleSubmit('crawl-links', options)}
                   isSubmitting={isSubmitting}
                   buttonText="Fetch links"
                   showFilters={true}
@@ -212,7 +212,7 @@ const WebsiteTab: React.FC = () => {
                     setIncludePaths={setIncludePaths}
                     excludePaths={excludePaths}
                     setExcludePaths={setExcludePaths}
-                    onSubmit={() => handleSubmit('sitemap')}
+                    onSubmit={(options) => handleSubmit('sitemap', options)}
                     isSubmitting={isSubmitting}
                     buttonText="Upload sitemap"
                     showFilters={false}
@@ -234,7 +234,7 @@ const WebsiteTab: React.FC = () => {
                     setIncludePaths={setIncludePaths}
                     excludePaths={excludePaths}
                     setExcludePaths={setExcludePaths}
-                    onSubmit={() => handleSubmit('individual-link')}
+                    onSubmit={(options) => handleSubmit('individual-link', options)}
                     isSubmitting={isSubmitting}
                     buttonText="Add link"
                     showFilters={false}

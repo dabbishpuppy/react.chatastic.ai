@@ -4,13 +4,19 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Info, Loader2, HelpCircle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Info, Loader2, HelpCircle, CheckCircle2, AlertCircle, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
 
 interface WebsiteCrawlFormProps {
   url: string;
@@ -21,7 +27,7 @@ interface WebsiteCrawlFormProps {
   setIncludePaths: (paths: string) => void;
   excludePaths: string;
   setExcludePaths: (paths: string) => void;
-  onSubmit: () => void;
+  onSubmit: (options?: { maxPages?: number; maxDepth?: number; concurrency?: number }) => void;
   isSubmitting: boolean;
   buttonText: string;
   showFilters?: boolean;
@@ -42,6 +48,10 @@ const WebsiteCrawlForm: React.FC<WebsiteCrawlFormProps> = ({
   showFilters = false
 }) => {
   const [showPatternHelp, setShowPatternHelp] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [maxPages, setMaxPages] = useState(1000);
+  const [maxDepth, setMaxDepth] = useState(10);
+  const [concurrency, setConcurrency] = useState(5);
 
   const patternExamples = {
     include: [
@@ -72,6 +82,16 @@ const WebsiteCrawlForm: React.FC<WebsiteCrawlFormProps> = ({
   const includeValidation = validatePatterns(includePaths);
   const excludeValidation = validatePatterns(excludePaths);
 
+  const handleSubmit = () => {
+    const options = showAdvanced ? {
+      maxPages,
+      maxDepth,
+      concurrency
+    } : undefined;
+    
+    onSubmit(options);
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -97,6 +117,126 @@ const WebsiteCrawlForm: React.FC<WebsiteCrawlFormProps> = ({
           />
         </div>
       </div>
+
+      {/* Advanced Settings */}
+      <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <div className="flex items-center">
+              <Settings size={16} className="mr-2" />
+              Advanced Crawl Settings
+            </div>
+            {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 mt-4">
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+            <div className="flex items-start">
+              <Info size={18} className="text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">Crawl Limits Configuration</p>
+                <p>Adjust these settings to control the scope and speed of your website crawl. Higher values will crawl more pages but take longer.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="max-pages" className="text-sm font-medium">
+                Max Pages
+              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Input
+                        id="max-pages"
+                        type="number"
+                        value={maxPages}
+                        onChange={e => setMaxPages(parseInt(e.target.value) || 1000)}
+                        min="1"
+                        max="10000"
+                        className="mt-1"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Maximum number of pages to crawl (1-10,000)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <p className="text-xs text-gray-500 mt-1">Default: 1,000</p>
+            </div>
+
+            <div>
+              <Label htmlFor="max-depth" className="text-sm font-medium">
+                Max Depth
+              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Input
+                        id="max-depth"
+                        type="number"
+                        value={maxDepth}
+                        onChange={e => setMaxDepth(parseInt(e.target.value) || 10)}
+                        min="1"
+                        max="20"
+                        className="mt-1"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>How many clicks away from start URL to crawl (1-20)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <p className="text-xs text-gray-500 mt-1">Default: 10</p>
+            </div>
+
+            <div>
+              <Label htmlFor="concurrency" className="text-sm font-medium">
+                Concurrency
+              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Input
+                        id="concurrency"
+                        type="number"
+                        value={concurrency}
+                        onChange={e => setConcurrency(parseInt(e.target.value) || 5)}
+                        min="1"
+                        max="20"
+                        className="mt-1"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Number of pages to crawl simultaneously (1-20)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <p className="text-xs text-gray-500 mt-1">Default: 5</p>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md">
+            <div className="flex items-start">
+              <AlertCircle size={16} className="text-amber-500 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="text-sm text-amber-800">
+                <p className="font-medium">Performance Note:</p>
+                <p className="mt-1">
+                  Higher concurrency crawls faster but uses more resources. 
+                  Very high page limits may take significant time to complete.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {showFilters && (
         <>
@@ -244,7 +384,7 @@ const WebsiteCrawlForm: React.FC<WebsiteCrawlFormProps> = ({
 
       <div className="text-right">
         <Button 
-          onClick={onSubmit} 
+          onClick={handleSubmit} 
           className="bg-gray-800 hover:bg-gray-700"
           disabled={isSubmitting}
         >

@@ -10,6 +10,9 @@ interface WebsiteSubmissionData {
   includePaths?: string;
   excludePaths?: string;
   crawlType: 'crawl-links' | 'sitemap' | 'individual-link';
+  maxPages?: number;
+  maxDepth?: number;
+  concurrency?: number;
 }
 
 // Helper function to normalize URL
@@ -66,7 +69,10 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
         originalUrl: data.url,
         normalizedUrl,
         domain,
-        crawlType: data.crawlType
+        crawlType: data.crawlType,
+        maxPages: data.maxPages,
+        maxDepth: data.maxDepth,
+        concurrency: data.concurrency
       });
 
       // Create the parent source with the domain as title and normalized URL
@@ -82,23 +88,27 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
           crawl_type: data.crawlType,
           include_paths: data.includePaths,
           exclude_paths: data.excludePaths,
+          max_pages: data.maxPages,
+          max_depth: data.maxDepth,
+          concurrency: data.concurrency,
           created_at: new Date().toISOString()
         }
       });
 
       // Start enhanced crawling based on type
       if (data.crawlType === 'crawl-links') {
-        // Start background crawling with recursive capability
+        // Start background crawling with configurable settings
         WebsiteCrawlService.startEnhancedCrawl(
           agentId,
           source.id,
           normalizedUrl,
           {
-            maxDepth: 3,
-            maxPages: Infinity, // Infinite crawling
+            maxDepth: data.maxDepth || 10,
+            maxPages: data.maxPages || 1000,
             includePaths: data.includePaths,
             excludePaths: data.excludePaths,
-            respectRobots: true
+            respectRobots: true,
+            concurrency: data.concurrency || 5
           }
         ).catch(error => {
           console.error('Background crawl failed:', error);
@@ -111,7 +121,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
 
         toast({
           title: "Crawling started",
-          description: "Website crawling has started and will continue in the background",
+          description: `Website crawling started with max ${data.maxPages || 1000} pages and depth ${data.maxDepth || 10}`,
         });
       } else if (data.crawlType === 'individual-link') {
         // For individual links, just crawl the single page
@@ -139,7 +149,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
           normalizedUrl,
           {
             maxDepth: 0,
-            maxPages: Infinity
+            maxPages: data.maxPages || 1000
           }
         ).catch(error => {
           console.error('Sitemap crawl failed:', error);
@@ -147,7 +157,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
 
         toast({
           title: "Sitemap crawling started",
-          description: "Sitemap is being processed in the background",
+          description: `Sitemap processing started with max ${data.maxPages || 1000} pages`,
         });
       }
 

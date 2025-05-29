@@ -8,6 +8,7 @@ interface CrawlOptions {
   includePaths?: string;
   excludePaths?: string;
   respectRobots?: boolean;
+  concurrency?: number;
 }
 
 export class WebsiteCrawlService {
@@ -26,7 +27,10 @@ export class WebsiteCrawlService {
         body: { 
           source_id: sourceId,
           url: initialUrl,
-          crawl_type: options.maxDepth === 0 ? 'individual-link' : 'crawl-links'
+          crawl_type: options.maxDepth === 0 ? 'individual-link' : 'crawl-links',
+          max_pages: options.maxPages,
+          max_depth: options.maxDepth,
+          concurrency: options.concurrency
         }
       });
 
