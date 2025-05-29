@@ -2,6 +2,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import WebsiteSourceInfo from './WebsiteSourceInfo';
 import WebsiteSourceStatus from './WebsiteSourceStatus';
 import WebsiteSourceActions from './WebsiteSourceActions';
@@ -33,34 +34,40 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         </div>
       )}
       
-      {/* Show child sources when available */}
-      {childSources.map((childSource) => (
-        <div key={childSource.id} className="flex items-center justify-between p-3 pl-16 border-b border-gray-100 last:border-b-0">
-          <div className="flex items-center flex-1">
-            <input 
-              type="checkbox" 
-              className="rounded border-gray-300 text-black focus:ring-black mr-4" 
-            />
-            <WebsiteSourceInfo
-              title={childSource.title}
-              url={childSource.url}
-              createdAt={childSource.created_at}
-              isChild={true}
-            />
-            <WebsiteSourceStatus status={childSource.crawl_status} />
+      {/* Show child sources when available with scrollbar */}
+      {childSources.length > 0 && (
+        <ScrollArea className="max-h-80">
+          <div className="divide-y divide-gray-100">
+            {childSources.map((childSource) => (
+              <div key={childSource.id} className="flex items-center justify-between p-3 pl-16 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center flex-1">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-black focus:ring-black mr-4" 
+                  />
+                  <WebsiteSourceInfo
+                    title={childSource.title}
+                    url={childSource.url}
+                    createdAt={childSource.created_at}
+                    isChild={true}
+                  />
+                  <WebsiteSourceStatus status={childSource.crawl_status} />
+                </div>
+                
+                <WebsiteSourceActions
+                  source={childSource}
+                  onEdit={onEdit}
+                  onExclude={onExclude}
+                  onDelete={onDelete}
+                  onRecrawl={onRecrawl}
+                  showRecrawl={false}
+                  isChild={true}
+                />
+              </div>
+            ))}
           </div>
-          
-          <WebsiteSourceActions
-            source={childSource}
-            onEdit={onEdit}
-            onExclude={onExclude}
-            onDelete={onDelete}
-            onRecrawl={onRecrawl}
-            showRecrawl={false}
-            isChild={true}
-          />
-        </div>
-      ))}
+        </ScrollArea>
+      )}
       
       {/* Show message if no child sources and not loading */}
       {!isCrawling && childSources.length === 0 && (
