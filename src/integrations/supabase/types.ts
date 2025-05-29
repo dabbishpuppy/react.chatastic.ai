@@ -12,19 +12,26 @@ export type Database = {
       agent_sources: {
         Row: {
           agent_id: string
+          compressed_size: number | null
+          compression_ratio: number | null
           content: string | null
+          content_summary: string | null
           crawl_status: string | null
           created_at: string
           created_by: string | null
+          extraction_method: string | null
           file_path: string | null
           id: string
           is_active: boolean
           is_excluded: boolean | null
+          keywords: string[] | null
           last_crawled_at: string | null
           links_count: number | null
           metadata: Json | null
+          original_size: number | null
           parent_source_id: string | null
           progress: number | null
+          raw_text: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
           title: string
@@ -33,19 +40,26 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          compressed_size?: number | null
+          compression_ratio?: number | null
           content?: string | null
+          content_summary?: string | null
           crawl_status?: string | null
           created_at?: string
           created_by?: string | null
+          extraction_method?: string | null
           file_path?: string | null
           id?: string
           is_active?: boolean
           is_excluded?: boolean | null
+          keywords?: string[] | null
           last_crawled_at?: string | null
           links_count?: number | null
           metadata?: Json | null
+          original_size?: number | null
           parent_source_id?: string | null
           progress?: number | null
+          raw_text?: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
           title: string
@@ -54,19 +68,26 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          compressed_size?: number | null
+          compression_ratio?: number | null
           content?: string | null
+          content_summary?: string | null
           crawl_status?: string | null
           created_at?: string
           created_by?: string | null
+          extraction_method?: string | null
           file_path?: string | null
           id?: string
           is_active?: boolean
           is_excluded?: boolean | null
+          keywords?: string[] | null
           last_crawled_at?: string | null
           links_count?: number | null
           metadata?: Json | null
+          original_size?: number | null
           parent_source_id?: string | null
           progress?: number | null
+          raw_text?: string | null
           source_type?: Database["public"]["Enums"]["source_type"]
           team_id?: string
           title?: string
@@ -390,6 +411,68 @@ export type Database = {
           },
         ]
       }
+      crawl_performance_metrics: {
+        Row: {
+          agent_id: string
+          created_at: string
+          duration_ms: number | null
+          end_time: string | null
+          error_message: string | null
+          id: string
+          input_size: number | null
+          items_processed: number | null
+          metadata: Json | null
+          output_size: number | null
+          phase: string
+          source_id: string | null
+          start_time: string
+          success_rate: number | null
+          team_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          duration_ms?: number | null
+          end_time?: string | null
+          error_message?: string | null
+          id?: string
+          input_size?: number | null
+          items_processed?: number | null
+          metadata?: Json | null
+          output_size?: number | null
+          phase: string
+          source_id?: string | null
+          start_time: string
+          success_rate?: number | null
+          team_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          end_time?: string | null
+          error_message?: string | null
+          id?: string
+          input_size?: number | null
+          items_processed?: number | null
+          metadata?: Json | null
+          output_size?: number | null
+          phase?: string
+          source_id?: string | null
+          start_time?: string
+          success_rate?: number | null
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crawl_performance_metrics_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       data_retention_policies: {
         Row: {
           auto_delete: boolean
@@ -612,8 +695,11 @@ export type Database = {
         Row: {
           chunk_index: number
           content: string
+          content_hash: string | null
           created_at: string
+          duplicate_of_chunk_id: string | null
           id: string
+          is_duplicate: boolean | null
           metadata: Json | null
           source_id: string
           token_count: number
@@ -621,8 +707,11 @@ export type Database = {
         Insert: {
           chunk_index: number
           content: string
+          content_hash?: string | null
           created_at?: string
+          duplicate_of_chunk_id?: string | null
           id?: string
+          is_duplicate?: boolean | null
           metadata?: Json | null
           source_id: string
           token_count?: number
@@ -630,13 +719,23 @@ export type Database = {
         Update: {
           chunk_index?: number
           content?: string
+          content_hash?: string | null
           created_at?: string
+          duplicate_of_chunk_id?: string | null
           id?: string
+          is_duplicate?: boolean | null
           metadata?: Json | null
           source_id?: string
           token_count?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "source_chunks_duplicate_of_chunk_id_fkey"
+            columns: ["duplicate_of_chunk_id"]
+            isOneToOne: false
+            referencedRelation: "source_chunks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "source_chunks_source_id_fkey"
             columns: ["source_id"]
@@ -793,9 +892,21 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      calculate_content_hash: {
+        Args: { content: string }
+        Returns: string
+      }
       cleanup_expired_data: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      compress_text: {
+        Args: { input_text: string }
+        Returns: string
+      }
+      decompress_text: {
+        Args: { compressed_data: string }
+        Returns: string
       }
       decrypt_sensitive_data: {
         Args: { encrypted_data: string }

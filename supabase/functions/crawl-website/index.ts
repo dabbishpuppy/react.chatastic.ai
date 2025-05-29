@@ -1,614 +1,538 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
-// Import our modules
-import { extractFrontEndLinks, extractNavigationLinks } from './modules/linkExtractor.js';
-import { matchesIncludePatterns, matchesExcludePatterns, parsePatterns } from './modules/patternMatcher.js';
-import { isCustomerFacingUrl, filterUrls, normalizeUrl, extractDomain } from './modules/urlValidator.js';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// Reduced limits to prevent CPU timeouts
-const DEFAULT_MAX_PAGES = parseInt(Deno.env.get('MAX_CRAWL_PAGES') || '100');
-const DEFAULT_MAX_DEPTH = parseInt(Deno.env.get('MAX_CRAWL_DEPTH') || '3');
-const DEFAULT_CONCURRENCY = parseInt(Deno.env.get('CRAWL_CONCURRENCY') || '2');
-
-// Track shutdown state and CPU usage
-let isShuttingDown = false;
-let processedCount = 0;
-const startTime = Date.now();
-
-// Handle graceful shutdown
-addEventListener('beforeunload', (ev) => {
-  console.log('Function shutdown due to:', ev.detail?.reason);
-  isShuttingDown = true;
-});
-
-// CPU timeout prevention
-function shouldStopForCPU(): boolean {
-  const runTime = Date.now() - startTime;
-  const avgTimePerPage = runTime / Math.max(processedCount, 1);
-  const estimatedTimeRemaining = avgTimePerPage * 10; // For next 10 pages
-  
-  // Stop if we've been running for 140 seconds or if we estimate we'll timeout
-  if (runTime > 140000 || runTime + estimatedTimeRemaining > 160000) {
-    console.log(`🛑 Stopping to prevent CPU timeout. Runtime: ${runTime}ms, Processed: ${processedCount}`);
-    return true;
-  }
-  return false;
+interface CrawlRequest {
+  source_id: string;
+  url: string;
+  crawl_type: 'crawl-links' | 'sitemap' | 'individual-link';
+  max_pages?: number;
+  max_depth?: number;
+  concurrency?: number;
+  enable_content_pipeline?: boolean;
 }
 
-// Enhanced recursive crawling function with immediate status updates and content size tracking
-async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
-  console.log(`🕷️ Starting enhanced crawl for ${url} with type ${crawlType}`);
-  
-  try {
-    const normalizedUrl = normalizeUrl(url);
-    console.log(`🔧 Normalized URL: ${normalizedUrl}`);
-    
-    // IMMEDIATELY update status to in_progress
-    await updateSourceProgress(sourceId, 'in_progress', 5, 0, 0, 0);
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
+serve(async (req) => {
+  try {
+    const { source_id, url, crawl_type, max_pages = 100, max_depth = 3, concurrency = 2, enable_content_pipeline = false }: CrawlRequest = await req.json();
+    
+    console.log(`Starting crawl for source ${source_id}, URL: ${url}, type: ${crawl_type}`);
+
+    // Get source info and agent details
     const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
-      .select('agent_id, team_id, metadata')
-      .eq('id', sourceId)
+      .select(`
+        *,
+        agents!inner(id, team_id)
+      `)
+      .eq('id', source_id)
       .single();
 
     if (sourceError || !source) {
       throw new Error(`Source not found: ${sourceError?.message}`);
     }
 
-    console.log(`📊 Source found: agent_id=${source.agent_id}, team_id=${source.team_id}`);
+    const agentId = source.agents.id;
+    const teamId = source.agents.team_id;
 
-    const baseDomain = extractDomain(normalizedUrl);
-    console.log(`🌐 Base domain: ${baseDomain}`);
+    // Update source status to in_progress
+    await supabase
+      .from('agent_sources')
+      .update({
+        crawl_status: 'in_progress',
+        progress: 0,
+        last_crawled_at: new Date().toISOString()
+      })
+      .eq('id', source_id);
 
-    if (!baseDomain) {
-      throw new Error(`Invalid domain extracted from URL: ${normalizedUrl}`);
-    }
-
-    // Parse include/exclude patterns and crawl settings from metadata
-    const includePatterns = parsePatterns(source.metadata?.include_paths || '');
-    const excludePatterns = parsePatterns(source.metadata?.exclude_paths || '');
-    const maxPages = Math.min(source.metadata?.max_pages || DEFAULT_MAX_PAGES, DEFAULT_MAX_PAGES);
-    const maxDepth = Math.min(source.metadata?.max_depth || DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH);
-    const concurrency = Math.min(source.metadata?.concurrency || DEFAULT_CONCURRENCY, DEFAULT_CONCURRENCY);
-    
-    console.log(`📋 Settings: maxPages=${maxPages}, maxDepth=${maxDepth}, concurrency=${concurrency}`);
-    console.log(`📋 Include patterns: ${includePatterns.length}, Exclude patterns: ${excludePatterns.length}`);
-
-    const discoveredUrls = new Set<string>();
-    const crawlStats = {
-      pagesVisited: 0,
-      linksFound: 0,
-      linksFiltered: 0,
-      filterReasons: {},
-      maxPagesReached: false,
-      maxDepthReached: false,
-      completionReason: 'completed',
-      totalSize: 0
-    };
-
-    // Update status again to confirm we're starting
-    await updateSourceProgress(sourceId, 'in_progress', 10, 0, maxPages, 0);
-
-    if (crawlType === 'individual-link') {
-      console.log(`📄 Processing individual link: ${normalizedUrl}`);
-      const validation = isCustomerFacingUrl(normalizedUrl, baseDomain);
-      if (validation.valid) {
-        // Fetch content for size calculation
-        const content = await fetchPageContent(normalizedUrl);
-        const contentSize = content ? new Blob([content]).size : 0;
-        
-        discoveredUrls.add(normalizedUrl);
-        crawlStats.totalSize = contentSize;
-        await updateSourceProgress(sourceId, 'in_progress', 50, 1, maxPages, contentSize);
-        
-        // Create child source with content
-        await createChildSource(source, normalizedUrl, normalizedUrl, sourceId, content);
-      } else {
-        console.log(`❌ Individual link failed validation: ${validation.reason}`);
-      }
-    } else if (crawlType === 'sitemap') {
-      console.log(`🗺️ Fetching sitemap from: ${normalizedUrl}`);
-      await updateSourceProgress(sourceId, 'in_progress', 20, 0, maxPages, 0);
-      
-      const sitemapUrls = await fetchSitemapLinks(normalizedUrl);
-      
-      // Apply filtering to sitemap URLs
-      const filterResults = filterUrls(sitemapUrls, baseDomain, includePatterns, excludePatterns);
-      
-      // Apply page limit to sitemap results
-      const limitedUrls = filterResults.valid.slice(0, maxPages);
-      
-      // Process sitemap URLs in smaller batches
-      let totalSize = 0;
-      for (let i = 0; i < limitedUrls.length && !isShuttingDown && !shouldStopForCPU(); i += 5) {
-        const batch = limitedUrls.slice(i, i + 5);
-        
-        for (const url of batch) {
-          if (isShuttingDown || shouldStopForCPU()) break;
-          
-          const content = await fetchPageContent(url);
-          const contentSize = content ? new Blob([content]).size : 0;
-          totalSize += contentSize;
-          
-          discoveredUrls.add(url);
-          await createChildSource(source, url, normalizedUrl, sourceId, content);
-          
-          const progress = Math.min(20 + (i / limitedUrls.length) * 60, 80);
-          await updateSourceProgress(sourceId, 'in_progress', Math.round(progress), discoveredUrls.size, maxPages, totalSize);
-        }
-      }
-      
-      crawlStats.totalSize = totalSize;
-      
-      if (filterResults.valid.length > maxPages) {
-        crawlStats.maxPagesReached = true;
-        crawlStats.completionReason = 'max_pages_reached';
-      }
-      
-      console.log(`✅ Sitemap: ${discoveredUrls.size} processed, total size: ${totalSize} bytes`);
-      Object.assign(crawlStats, filterResults.stats);
-      
+    if (crawl_type === 'individual-link') {
+      // Process single page with enhanced pipeline
+      await processSinglePage(source_id, agentId, teamId, url, enable_content_pipeline);
     } else {
-      console.log(`🔍 Starting enhanced recursive crawl from: ${normalizedUrl}`);
-      await enhancedRecursiveCrawlWithConcurrency(
-        sourceId,
-        normalizedUrl, 
-        baseDomain, 
-        includePatterns, 
-        excludePatterns,
-        discoveredUrls, 
-        crawlStats,
-        0, 
-        maxDepth,
-        maxPages,
+      // Process multiple pages with enhanced pipeline
+      await processMultiplePages(source_id, agentId, teamId, url, {
+        maxPages: max_pages,
+        maxDepth: max_depth,
         concurrency,
-        source
-      );
-    }
-
-    if (isShuttingDown || shouldStopForCPU()) {
-      console.log('⚠️ Function stopping early, saving progress...');
-      await updateSourceProgress(sourceId, 'pending', 50, discoveredUrls.size, maxPages, crawlStats.totalSize);
-      return;
-    }
-
-    console.log(`✅ Discovery complete: ${discoveredUrls.size} valid URLs found, total size: ${crawlStats.totalSize} bytes`);
-    console.log(`📊 Crawl stats:`, crawlStats);
-
-    const finalStatus = isShuttingDown || shouldStopForCPU() ? 'pending' : 'completed';
-    const finalProgress = isShuttingDown || shouldStopForCPU() ? 50 : 100;
-    
-    await supabase
-      .from('agent_sources')
-      .update({ 
-        crawl_status: finalStatus,
-        progress: finalProgress,
-        links_count: discoveredUrls.size,
-        last_crawled_at: new Date().toISOString(),
-        metadata: {
-          ...source.metadata,
-          crawl_stats: crawlStats,
-          total_content_size: crawlStats.totalSize,
-          completion_summary: {
-            total_urls: discoveredUrls.size,
-            completion_time: new Date().toISOString(),
-            completion_reason: isShuttingDown || shouldStopForCPU() ? 'function_resource_limit' : crawlStats.completionReason,
-            max_pages: maxPages,
-            pages_crawled: discoveredUrls.size,
-            total_size: crawlStats.totalSize
-          }
-        }
-      })
-      .eq('id', sourceId);
-
-    const statusMessage = finalStatus === 'pending' ? 
-      `⚠️ Crawl paused due to resource limits for ${normalizedUrl} - found ${discoveredUrls.size} URLs (${(crawlStats.totalSize / 1024).toFixed(1)}KB)` :
-      `✅ Enhanced crawl completed for ${normalizedUrl} - found ${discoveredUrls.size} customer-facing URLs (${(crawlStats.totalSize / 1024).toFixed(1)}KB)`;
-    
-    console.log(statusMessage);
-    
-  } catch (error) {
-    console.error(`❌ Crawl failed for ${url}:`, error);
-    
-    await supabase
-      .from('agent_sources')
-      .update({ 
-        crawl_status: 'failed',
-        metadata: {
-          error: error.message,
-          failed_at: new Date().toISOString()
-        }
-      })
-      .eq('id', sourceId);
-  }
-}
-
-// Helper function to fetch page content
-async function fetchPageContent(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CustomerPageCrawler/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      redirect: 'follow'
-    });
-    
-    if (!response.ok) {
-      console.log(`Failed to fetch ${url}: ${response.status}`);
-      return null;
-    }
-    
-    return await response.text();
-  } catch (error) {
-    console.error(`Error fetching ${url}:`, error);
-    return null;
-  }
-}
-
-// Helper function to create child source with content
-async function createChildSource(source: any, url: string, parentUrl: string, parentSourceId: string, content: string | null): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('agent_sources')
-      .insert({
-        agent_id: source.agent_id,
-        team_id: source.team_id,
-        source_type: 'website',
-        title: url,
-        url: url,
-        content: content,
-        parent_source_id: parentSourceId,
-        crawl_status: 'completed',
-        metadata: {
-          crawl_type: 'individual-link',
-          parent_url: parentUrl,
-          discovered_at: new Date().toISOString(),
-          validation_passed: true,
-          content_size: content ? new Blob([content]).size : 0
-        },
-        created_by: null
-      });
-
-    if (error) {
-      console.error(`❌ Error creating child source for ${url}:`, error);
-    }
-  } catch (error) {
-    console.error(`❌ Error creating child source for ${url}:`, error);
-  }
-}
-
-// Helper function to update source progress with content size
-async function updateSourceProgress(sourceId: string, status: string, progress: number, currentCount: number, maxPages: number, totalSize: number): Promise<void> {
-  const { error } = await supabase
-    .from('agent_sources')
-    .update({
-      crawl_status: status,
-      progress,
-      links_count: currentCount,
-      metadata: {
-        current_crawled: currentCount,
-        max_pages: maxPages,
-        total_content_size: totalSize,
-        last_progress_update: new Date().toISOString()
-      }
-    })
-    .eq('id', sourceId);
-
-  if (error) {
-    console.error('Error updating progress:', error);
-  } else {
-    console.log(`📊 Progress update: ${status} ${progress}% (${currentCount}/${maxPages}) - ${(totalSize / 1024).toFixed(1)}KB`);
-  }
-}
-
-// Enhanced recursive crawl with CPU timeout protection
-async function enhancedRecursiveCrawlWithConcurrency(
-  sourceId: string,
-  startUrl: string,
-  baseDomain: string,
-  includePatterns: string[],
-  excludePatterns: string[],
-  discoveredUrls: Set<string>,
-  crawlStats: any,
-  currentDepth: number,
-  maxDepth: number,
-  maxPages: number,
-  concurrency: number,
-  source: any
-): Promise<void> {
-  const urlQueue: Array<{url: string, depth: number}> = [{url: startUrl, depth: 0}];
-  const processingUrls = new Set<string>();
-  const processedUrls = new Set<string>();
-  
-  console.log(`🚀 Starting concurrent crawl: maxDepth=${maxDepth}, maxPages=${maxPages}, concurrency=${concurrency}`);
-
-  while (urlQueue.length > 0 && discoveredUrls.size < maxPages && !isShuttingDown && !shouldStopForCPU()) {
-    // Take up to 'concurrency' URLs from the queue (reduced from original)
-    const currentBatch = urlQueue.splice(0, Math.min(concurrency, 2));
-    
-    // Process batch concurrently
-    const batchPromises = currentBatch.map(async ({url, depth}) => {
-      if (processingUrls.has(url) || processedUrls.has(url) || depth > maxDepth || isShuttingDown || shouldStopForCPU()) {
-        if (depth > maxDepth) {
-          crawlStats.maxDepthReached = true;
-        }
-        return [];
-      }
-      
-      processingUrls.add(url);
-      processedCount++;
-      
-      try {
-        const newUrls = await crawlSinglePage(url, baseDomain, includePatterns, excludePatterns, crawlStats, source, sourceId);
-        processedUrls.add(url);
-        processingUrls.delete(url);
-        
-        // Add new URLs to discovered set and queue for next depth
-        const validNewUrls: Array<{url: string, depth: number}> = [];
-        for (const newUrl of newUrls) {
-          if (!discoveredUrls.has(newUrl) && !processedUrls.has(newUrl) && !processingUrls.has(newUrl)) {
-            discoveredUrls.add(newUrl);
-            if (depth + 1 <= maxDepth && discoveredUrls.size < maxPages) {
-              validNewUrls.push({url: newUrl, depth: depth + 1});
-            }
-          }
-        }
-        
-        // Update progress more frequently (every page)
-        const progressPercent = Math.min(10 + (discoveredUrls.size / maxPages) * 60, 70);
-        await updateSourceProgress(sourceId, 'in_progress', Math.round(progressPercent), discoveredUrls.size, maxPages, crawlStats.totalSize);
-        
-        return validNewUrls;
-      } catch (error) {
-        console.error(`❌ Error crawling ${url}:`, error);
-        processedUrls.add(url);
-        processingUrls.delete(url);
-        return [];
-      }
-    });
-    
-    // Wait for batch to complete and add new URLs to queue
-    const batchResults = await Promise.all(batchPromises);
-    for (const newUrls of batchResults) {
-      urlQueue.push(...newUrls);
-    }
-    
-    // Check if we've hit our limits
-    if (discoveredUrls.size >= maxPages) {
-      crawlStats.maxPagesReached = true;
-      crawlStats.completionReason = 'max_pages_reached';
-      break;
-    }
-    
-    // Longer rate limiting between batches to prevent CPU overload
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  
-  if (isShuttingDown || shouldStopForCPU()) {
-    crawlStats.completionReason = 'function_resource_limit';
-  } else if (urlQueue.length === 0) {
-    crawlStats.completionReason = 'all_pages_crawled';
-  }
-  
-  console.log(`🏁 Crawl finished: ${discoveredUrls.size} URLs, reason: ${crawlStats.completionReason}, total size: ${(crawlStats.totalSize / 1024).toFixed(1)}KB`);
-}
-
-// Single page crawling function with content storage
-async function crawlSinglePage(
-  url: string,
-  baseDomain: string,
-  includePatterns: string[],
-  excludePatterns: string[],
-  crawlStats: any,
-  source: any,
-  parentSourceId: string
-): Promise<string[]> {
-  console.log(`🔍 Crawling: ${url}`);
-  crawlStats.pagesVisited++;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CustomerPageCrawler/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Cache-Control': 'no-cache'
-      },
-      redirect: 'follow'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const html = await response.text();
-    const contentSize = new Blob([html]).size;
-    crawlStats.totalSize = (crawlStats.totalSize || 0) + contentSize;
-    
-    console.log(`📄 Fetched ${html.length} characters (${(contentSize / 1024).toFixed(1)}KB) from ${url}`);
-    
-    // Create child source with content
-    await createChildSource(source, url, url, parentSourceId, html);
-    
-    // Extract customer-facing links using enhanced extraction
-    const extractedLinks = extractFrontEndLinks(html, url);
-    const navLinks = extractNavigationLinks(html, url);
-    
-    // Combine and deduplicate links
-    const allLinks = [...new Set([...extractedLinks, ...navLinks])];
-    crawlStats.linksFound += allLinks.length;
-    
-    console.log(`🔗 Found ${allLinks.length} potential links`);
-    
-    // Apply comprehensive filtering
-    const filterResults = filterUrls(allLinks, baseDomain, includePatterns, excludePatterns);
-    
-    // Track filtering statistics
-    crawlStats.linksFiltered += filterResults.filtered.length;
-    filterResults.filtered.forEach(filtered => {
-      const reason = filtered.reason;
-      crawlStats.filterReasons[reason] = (crawlStats.filterReasons[reason] || 0) + 1;
-    });
-    
-    console.log(`✅ Found ${filterResults.valid.length} valid URLs, filtered ${filterResults.filtered.length}`);
-    
-    return filterResults.valid;
-    
-  } catch (error) {
-    console.error(`❌ Error crawling ${url}:`, error);
-    return [];
-  }
-}
-
-// Enhanced sitemap processing
-async function fetchSitemapLinks(sitemapUrl: string): Promise<string[]> {
-  try {
-    console.log(`🌐 Fetching sitemap from: ${sitemapUrl}`);
-    const response = await fetch(sitemapUrl);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    
-    const sitemapContent = await response.text();
-    
-    // Extract URLs from sitemap XML
-    const urlMatches = sitemapContent.match(/<loc>(.*?)<\/loc>/g);
-    if (!urlMatches) {
-      console.log('📄 No URLs found in sitemap');
-      return [];
-    }
-    
-    const urls = urlMatches
-      .map(match => match.replace(/<\/?loc>/g, ''))
-      .filter(url => url.startsWith('http'));
-    
-    console.log(`📊 Extracted ${urls.length} URLs from sitemap`);
-    return urls;
-  } catch (error) {
-    console.error('❌ Error fetching sitemap:', error);
-    return [];
-  }
-}
-
-serve(async (req) => {
-  console.log(`📥 ${req.method} request received`);
-  
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const { source_id, url, crawl_type, max_pages, max_depth, concurrency } = await req.json();
-    
-    console.log('📝 Received enhanced crawl request:', { 
-      source_id, 
-      url, 
-      crawl_type, 
-      max_pages: Math.min(max_pages || DEFAULT_MAX_PAGES, DEFAULT_MAX_PAGES),
-      max_depth: Math.min(max_depth || DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH),
-      concurrency: Math.min(concurrency || DEFAULT_CONCURRENCY, DEFAULT_CONCURRENCY)
-    });
-
-    if (!source_id || !url || !crawl_type) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters: source_id, url, crawl_type' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    // Update source metadata with reduced crawl settings if provided
-    const finalMaxPages = Math.min(max_pages || DEFAULT_MAX_PAGES, DEFAULT_MAX_PAGES);
-    const finalMaxDepth = Math.min(max_depth || DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH);
-    const finalConcurrency = Math.min(concurrency || DEFAULT_CONCURRENCY, DEFAULT_CONCURRENCY);
-
-    if (max_pages || max_depth || concurrency) {
-      const { data: source } = await supabase
-        .from('agent_sources')
-        .select('metadata')
-        .eq('id', source_id)
-        .single();
-
-      if (source) {
-        const updatedMetadata = {
-          ...source.metadata,
-          max_pages: finalMaxPages,
-          max_depth: finalMaxDepth,
-          concurrency: finalConcurrency
-        };
-
-        await supabase
-          .from('agent_sources')
-          .update({ metadata: updatedMetadata })
-          .eq('id', source_id);
-      }
-    }
-
-    // Use EdgeRuntime.waitUntil to prevent premature shutdown
-    const crawlPromise = recursiveCrawlWebsite(source_id, url, crawl_type);
-    
-    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-      EdgeRuntime.waitUntil(crawlPromise);
-    } else {
-      // Fallback for environments without EdgeRuntime
-      crawlPromise.catch(error => {
-        console.error('🔥 Uncaught enhanced crawl error:', error);
+        enableContentPipeline: enable_content_pipeline
       });
     }
 
     return new Response(
       JSON.stringify({ 
-        message: 'Enhanced crawling started successfully',
-        source_id,
-        url: normalizeUrl(url),
-        crawl_type,
-        settings: {
-          max_pages: finalMaxPages,
-          max_depth: finalMaxDepth,
-          concurrency: finalConcurrency
-        },
-        features: [
-          'CPU timeout prevention',
-          'Content size tracking',
-          'Immediate status updates',
-          'Customer-facing link extraction',
-          'Frequent progress tracking',
-          'Graceful shutdown handling',
-          'Optimized batch processing'
-        ]
-      }), 
+        success: true, 
+        message: `Crawl completed for ${url}`,
+        contentPipelineEnabled: enable_content_pipeline
+      }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         status: 200 
       }
     );
 
   } catch (error) {
-    console.error('❌ Error in enhanced crawl-website function:', error);
+    console.error('Crawl error:', error);
+    
     return new Response(
-      JSON.stringify({ error: error.message }), 
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
+      }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { "Content-Type": "application/json" },
+        status: 500 
       }
     );
   }
 });
+
+async function processSinglePage(
+  sourceId: string, 
+  agentId: string, 
+  teamId: string, 
+  url: string, 
+  enableContentPipeline: boolean
+) {
+  try {
+    console.log(`Processing single page: ${url}`);
+    
+    // Fetch the page content
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; WonderwaveBot/1.0)',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+    }
+
+    const htmlContent = await response.text();
+
+    if (enableContentPipeline) {
+      // Use the new enhanced content processing pipeline
+      await processWithContentPipeline(sourceId, agentId, teamId, url, htmlContent);
+    } else {
+      // Fallback to basic content storage
+      await processBasicContent(sourceId, url, htmlContent);
+    }
+
+    // Update source status to completed
+    await supabase
+      .from('agent_sources')
+      .update({
+        crawl_status: 'completed',
+        progress: 100,
+        links_count: 1
+      })
+      .eq('id', sourceId);
+
+  } catch (error) {
+    console.error(`Error processing single page ${url}:`, error);
+    
+    await supabase
+      .from('agent_sources')
+      .update({
+        crawl_status: 'failed',
+        progress: 0
+      })
+      .eq('id', sourceId);
+    
+    throw error;
+  }
+}
+
+async function processMultiplePages(
+  sourceId: string,
+  agentId: string, 
+  teamId: string,
+  initialUrl: string,
+  options: {
+    maxPages: number;
+    maxDepth: number;
+    concurrency: number;
+    enableContentPipeline: boolean;
+  }
+) {
+  try {
+    console.log(`Processing multiple pages starting from: ${initialUrl}`);
+    
+    const discoveredUrls = await discoverUrls(initialUrl, options.maxDepth, options.maxPages);
+    const totalPages = Math.min(discoveredUrls.length, options.maxPages);
+    
+    console.log(`Found ${discoveredUrls.length} URLs, processing ${totalPages} pages`);
+
+    let processedCount = 0;
+    const batchSize = options.concurrency;
+
+    // Process URLs in batches
+    for (let i = 0; i < totalPages; i += batchSize) {
+      const batch = discoveredUrls.slice(i, i + batchSize);
+      
+      const batchPromises = batch.map(async (url) => {
+        try {
+          // Create child source for each URL
+          const { data: childSource } = await supabase
+            .from('agent_sources')
+            .insert({
+              agent_id: agentId,
+              team_id: teamId,
+              parent_source_id: sourceId,
+              source_type: 'website',
+              title: url,
+              url: url,
+              crawl_status: 'in_progress'
+            })
+            .select('id')
+            .single();
+
+          if (childSource) {
+            // Fetch and process the page
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; WonderwaveBot/1.0)',
+              },
+            });
+
+            if (response.ok) {
+              const htmlContent = await response.text();
+              
+              if (options.enableContentPipeline) {
+                await processWithContentPipeline(childSource.id, agentId, teamId, url, htmlContent);
+              } else {
+                await processBasicContent(childSource.id, url, htmlContent);
+              }
+
+              await supabase
+                .from('agent_sources')
+                .update({ crawl_status: 'completed' })
+                .eq('id', childSource.id);
+            } else {
+              await supabase
+                .from('agent_sources')
+                .update({ crawl_status: 'failed' })
+                .eq('id', childSource.id);
+            }
+          }
+          
+          processedCount++;
+          
+          // Update parent source progress
+          const progress = Math.round((processedCount / totalPages) * 100);
+          await supabase
+            .from('agent_sources')
+            .update({
+              progress,
+              links_count: processedCount
+            })
+            .eq('id', sourceId);
+
+        } catch (error) {
+          console.error(`Error processing URL ${url}:`, error);
+        }
+      });
+
+      await Promise.allSettled(batchPromises);
+    }
+
+    // Update final status
+    await supabase
+      .from('agent_sources')
+      .update({
+        crawl_status: 'completed',
+        progress: 100,
+        links_count: processedCount
+      })
+      .eq('id', sourceId);
+
+  } catch (error) {
+    console.error('Error in processMultiplePages:', error);
+    
+    await supabase
+      .from('agent_sources')
+      .update({
+        crawl_status: 'failed',
+        progress: 0
+      })
+      .eq('id', sourceId);
+    
+    throw error;
+  }
+}
+
+async function processWithContentPipeline(
+  sourceId: string,
+  agentId: string,
+  teamId: string,
+  url: string,
+  htmlContent: string
+) {
+  try {
+    // Extract main content using readability-like algorithm
+    const extractedContent = await extractMainContent(htmlContent, url);
+    
+    // Compress extracted content
+    const compressedContent = await compressText(extractedContent.content);
+    
+    // Generate summary and keywords
+    const summary = generateSummary(extractedContent.content);
+    const keywords = extractKeywords(extractedContent.content);
+    
+    // Update source with compressed archived content
+    await supabase
+      .from('agent_sources')
+      .update({
+        title: extractedContent.title,
+        content: cleanContentForChunking(extractedContent.content),
+        raw_text: compressedContent.compressed,
+        content_summary: summary,
+        keywords: keywords,
+        extraction_method: 'readability',
+        compression_ratio: compressedContent.ratio,
+        original_size: compressedContent.originalSize,
+        compressed_size: compressedContent.compressedSize
+      })
+      .eq('id', sourceId);
+
+    // Create semantic chunks
+    const chunks = createSemanticChunks(cleanContentForChunking(extractedContent.content));
+    
+    // Process chunks for deduplication and insert
+    if (chunks.length > 0) {
+      const chunksToInsert = chunks.map((chunk, index) => ({
+        source_id: sourceId,
+        chunk_index: index,
+        content: chunk.content,
+        token_count: chunk.tokenCount,
+        metadata: chunk.metadata
+      }));
+
+      // Insert chunks (deduplication will be handled by the trigger)
+      await supabase
+        .from('source_chunks')
+        .insert(chunksToInsert);
+    }
+
+  } catch (error) {
+    console.error('Error in content pipeline:', error);
+    throw error;
+  }
+}
+
+async function processBasicContent(sourceId: string, url: string, htmlContent: string) {
+  // Basic text extraction for fallback
+  const textContent = htmlContent
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<style[^>]*>.*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  await supabase
+    .from('agent_sources')
+    .update({
+      title: url,
+      content: textContent.substring(0, 10000) // Limit basic content
+    })
+    .eq('id', sourceId);
+}
+
+// Helper functions for content processing
+async function extractMainContent(html: string, url: string) {
+  // Simple content extraction (production would use a proper readability library)
+  const textContent = html
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<style[^>]*>.*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>.*?<\/nav>/gi, '')
+    .replace(/<header[^>]*>.*?<\/header>/gi, '')
+    .replace(/<footer[^>]*>.*?<\/footer>/gi, '')
+    .replace(/<aside[^>]*>.*?<\/aside>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].trim() : new URL(url).hostname;
+
+  return {
+    title,
+    content: textContent,
+    length: textContent.length
+  };
+}
+
+function compressText(text: string) {
+  // Simple compression simulation (production would use actual compression)
+  const originalSize = new TextEncoder().encode(text).length;
+  const compressed = new TextEncoder().encode(text); // Placeholder
+  
+  return {
+    compressed: Array.from(compressed),
+    originalSize,
+    compressedSize: compressed.length,
+    ratio: compressed.length / originalSize
+  };
+}
+
+function generateSummary(content: string): string {
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  return sentences.slice(0, 3).join('. ').substring(0, 200) + '...';
+}
+
+function extractKeywords(content: string): string[] {
+  const words = content.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 3);
+
+  const wordFreq: Record<string, number> = {};
+  words.forEach(word => {
+    wordFreq[word] = (wordFreq[word] || 0) + 1;
+  });
+
+  return Object.entries(wordFreq)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 10)
+    .map(([word]) => word);
+}
+
+function cleanContentForChunking(content: string): string {
+  return content
+    .replace(/\b(Advertisement|Sponsored|Ad)\b/gi, '')
+    .replace(/\b(Click here|Read more|Learn more)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function createSemanticChunks(content: string) {
+  const targetChunkSize = 500; // tokens
+  const estimatedTokens = Math.ceil(content.length / 4);
+  
+  if (estimatedTokens <= targetChunkSize) {
+    return [{
+      content,
+      tokenCount: estimatedTokens,
+      metadata: {
+        startPosition: 0,
+        endPosition: content.length,
+        sentences: content.split(/[.!?]+/).length,
+        semanticBoundary: true
+      }
+    }];
+  }
+
+  // Split by paragraphs
+  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+  const chunks = [];
+  let currentChunk = '';
+  let currentTokens = 0;
+
+  for (const paragraph of paragraphs) {
+    const paragraphTokens = Math.ceil(paragraph.length / 4);
+    
+    if (currentTokens + paragraphTokens > targetChunkSize && currentChunk.length > 0) {
+      chunks.push({
+        content: currentChunk.trim(),
+        tokenCount: currentTokens,
+        metadata: {
+          startPosition: 0,
+          endPosition: currentChunk.length,
+          sentences: currentChunk.split(/[.!?]+/).length,
+          semanticBoundary: true
+        }
+      });
+      currentChunk = paragraph;
+      currentTokens = paragraphTokens;
+    } else {
+      if (currentChunk.length > 0) {
+        currentChunk += '\n\n' + paragraph;
+      } else {
+        currentChunk = paragraph;
+      }
+      currentTokens += paragraphTokens;
+    }
+  }
+
+  if (currentChunk.trim().length > 0) {
+    chunks.push({
+      content: currentChunk.trim(),
+      tokenCount: currentTokens,
+      metadata: {
+        startPosition: 0,
+        endPosition: currentChunk.length,
+        sentences: currentChunk.split(/[.!?]+/).length,
+        semanticBoundary: true
+      }
+    });
+  }
+
+  return chunks;
+}
+
+async function discoverUrls(startUrl: string, maxDepth: number, maxPages: number): Promise<string[]> {
+  const urls = new Set<string>([startUrl]);
+  const visited = new Set<string>();
+  const queue = [{ url: startUrl, depth: 0 }];
+
+  while (queue.length > 0 && urls.size < maxPages) {
+    const { url, depth } = queue.shift()!;
+    
+    if (visited.has(url) || depth >= maxDepth) {
+      continue;
+    }
+    
+    visited.add(url);
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; WonderwaveBot/1.0)',
+        },
+      });
+      
+      if (!response.ok) {
+        continue;
+      }
+      
+      const html = await response.text();
+      const linkMatches = html.match(/href="([^"]+)"/g) || [];
+      
+      const baseUrl = new URL(url);
+      
+      for (const linkMatch of linkMatches) {
+        if (urls.size >= maxPages) break;
+        
+        const href = linkMatch.match(/href="([^"]+)"/)?.[1];
+        if (!href) continue;
+        
+        try {
+          const fullUrl = new URL(href, url).toString();
+          const urlObj = new URL(fullUrl);
+          
+          // Only include URLs from the same domain
+          if (urlObj.hostname === baseUrl.hostname && 
+              !urls.has(fullUrl) && 
+              !fullUrl.includes('#') &&
+              !fullUrl.match(/\.(pdf|jpg|jpeg|png|gif|mp4|mp3|zip|doc|docx)$/i)) {
+            urls.add(fullUrl);
+            
+            if (depth + 1 < maxDepth) {
+              queue.push({ url: fullUrl, depth: depth + 1 });
+            }
+          }
+        } catch (e) {
+          // Invalid URL, skip
+        }
+      }
+    } catch (error) {
+      console.error(`Error processing URL ${url}:`, error);
+    }
+  }
+
+  return Array.from(urls);
+}
