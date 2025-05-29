@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 
 // Import pages
+import Register from "./pages/Register";
 import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
@@ -43,7 +44,7 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <Toaster />
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Register />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/embed/:agentId" element={<EmbeddedChat />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
