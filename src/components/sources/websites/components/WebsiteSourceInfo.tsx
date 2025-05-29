@@ -10,6 +10,7 @@ interface WebsiteSourceInfoProps {
   linksCount?: number;
   lastCrawledAt?: string;
   isChild?: boolean;
+  crawlStatus?: string;
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -17,12 +18,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   url,
   linksCount,
   lastCrawledAt,
-  isChild = false
+  isChild = false,
+  crawlStatus
 }) => {
   const iconSize = isChild ? 'h-4 w-4' : 'h-5 w-5';
   const iconPadding = isChild ? 'p-1' : 'p-2';
   const titleSize = isChild ? 'text-sm' : '';
   const metaSize = isChild ? 'text-xs' : 'text-sm';
+
+  // Only show metadata when crawling is completed
+  const isCrawling = crawlStatus === 'in_progress' || crawlStatus === 'pending';
+  const showMetadata = !isCrawling && crawlStatus === 'completed';
 
   return (
     <div className="flex items-center flex-1">
@@ -32,17 +38,19 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
       
       <div className="flex-1">
         <div className={`font-medium ${titleSize}`}>{title || url}</div>
-        <div className={`flex items-center gap-2 ${metaSize} text-gray-500`}>
-          {linksCount && linksCount > 0 && (
-            <span>{linksCount} links</span>
-          )}
-          {lastCrawledAt && (
-            <>
-              {linksCount && linksCount > 0 && <span>•</span>}
-              <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
-            </>
-          )}
-        </div>
+        {showMetadata && (
+          <div className={`flex items-center gap-2 ${metaSize} text-gray-500`}>
+            {linksCount && linksCount > 0 && (
+              <span>{linksCount} links</span>
+            )}
+            {lastCrawledAt && (
+              <>
+                {linksCount && linksCount > 0 && <span>•</span>}
+                <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -44,24 +44,13 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             className="rounded border-gray-300 text-black focus:ring-black mr-4" 
           />
           
-          {showToggle && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 mr-2"
-              onClick={() => setIsExpanded(!isExpanded)}
-              disabled={!hasChildSources && !isCrawling}
-            >
-              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </Button>
-          )}
-          
           <WebsiteSourceInfo
             title={source.title}
             url={source.url}
             createdAt={source.created_at}
             linksCount={source.links_count}
             lastCrawledAt={source.last_crawled_at}
+            crawlStatus={source.crawl_status}
           />
           
           <WebsiteSourceStatus
@@ -71,13 +60,27 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           />
         </div>
         
-        <WebsiteSourceActions
-          source={source}
-          onEdit={onEdit}
-          onExclude={onExclude}
-          onDelete={onDelete}
-          onRecrawl={onRecrawl}
-        />
+        <div className="flex items-center gap-2">
+          <WebsiteSourceActions
+            source={source}
+            onEdit={onEdit}
+            onExclude={onExclude}
+            onDelete={onDelete}
+            onRecrawl={onRecrawl}
+          />
+          
+          {showToggle && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setIsExpanded(!isExpanded)}
+              disabled={!hasChildSources && !isCrawling}
+            >
+              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </Button>
+          )}
+        </div>
       </div>
       
       {/* Child sources (crawled links) or loading state */}
