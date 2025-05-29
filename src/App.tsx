@@ -1,11 +1,10 @@
 
 import React from "react";
-import { Routes, Route, BrowserRouter } from "react-router-dom";
+import { Routes, Route, BrowserRouter, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 
 // Import pages
-import Index from "./pages/Index";
 import SignIn from "./pages/SignIn";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
@@ -44,7 +43,7 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <Toaster />
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/embed/:agentId" element={<EmbeddedChat />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
