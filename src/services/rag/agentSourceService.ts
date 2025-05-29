@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AgentSource, SourceType } from "@/types/rag";
 
@@ -52,12 +51,13 @@ export class AgentSourceService {
     }
   }
 
-  // Get all sources for an agent with aggressive optimization
+  // Get all sources for an agent with ultra-aggressive optimization
   static async getSourcesByAgent(agentId: string): Promise<AgentSource[]> {
+    const startTime = Date.now();
     try {
-      console.log(`Fetching sources for agent: ${agentId}`);
+      console.log(`🚀 Starting fetch for agent: ${agentId}`);
       
-      // Use very small limit and select all columns to prevent timeout and type errors
+      // Use ultra-small limit and optimized query structure
       const { data: sources, error } = await supabase
         .from('agent_sources')
         .select(`
@@ -91,29 +91,40 @@ export class AgentSourceService {
         .eq('agent_id', agentId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(50); // Very conservative limit
+        .limit(30); // Even more conservative limit
+
+      const endTime = Date.now();
+      console.log(`⏱️ Query completed in ${endTime - startTime}ms`);
 
       if (error) {
-        console.error('Database error fetching sources:', error);
+        console.error('❌ Database error fetching sources:', error);
+        // Don't throw on timeout/500 errors, return empty array as fallback
+        if (error.message?.includes('timeout') || error.message?.includes('500')) {
+          console.log('🔄 Returning empty array due to timeout');
+          return [];
+        }
         throw new Error(`Failed to fetch sources: ${error.message}`);
       }
 
-      console.log(`Successfully fetched ${sources?.length || 0} sources`);
+      const resultCount = sources?.length || 0;
+      console.log(`✅ Successfully fetched ${resultCount} sources in ${endTime - startTime}ms`);
       
       return (sources || []).map(source => ({
         ...source,
         metadata: source.metadata as Record<string, any> || {}
       }));
     } catch (error) {
-      console.error('Error in getSourcesByAgent:', error);
+      const endTime = Date.now();
+      console.error(`❌ Error in getSourcesByAgent after ${endTime - startTime}ms:`, error);
       // Return empty array as fallback to prevent app crashes
       return [];
     }
   }
 
   static async getSourcesByType(agentId: string, sourceType: SourceType): Promise<AgentSource[]> {
+    const startTime = Date.now();
     try {
-      console.log(`Fetching ${sourceType} sources for agent: ${agentId}`);
+      console.log(`🚀 Starting fetch for ${sourceType} sources, agent: ${agentId}`);
       
       const { data: sources, error } = await supabase
         .from('agent_sources')
@@ -149,21 +160,31 @@ export class AgentSourceService {
         .eq('source_type', sourceType)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(25); // Even smaller limit for type-specific queries
+        .limit(20); // Even smaller limit for type-specific queries
+
+      const endTime = Date.now();
+      console.log(`⏱️ Type-specific query completed in ${endTime - startTime}ms`);
 
       if (error) {
-        console.error(`Database error fetching ${sourceType} sources:`, error);
+        console.error(`❌ Database error fetching ${sourceType} sources:`, error);
+        // Don't throw on timeout/500 errors, return empty array as fallback
+        if (error.message?.includes('timeout') || error.message?.includes('500')) {
+          console.log(`🔄 Returning empty array for ${sourceType} due to timeout`);
+          return [];
+        }
         throw new Error(`Failed to fetch sources by type: ${error.message}`);
       }
 
-      console.log(`Successfully fetched ${sources?.length || 0} ${sourceType} sources`);
+      const resultCount = sources?.length || 0;
+      console.log(`✅ Successfully fetched ${resultCount} ${sourceType} sources in ${endTime - startTime}ms`);
       
       return (sources || []).map(source => ({
         ...source,
         metadata: source.metadata as Record<string, any> || {}
       }));
     } catch (error) {
-      console.error(`Error in getSourcesByType for ${sourceType}:`, error);
+      const endTime = Date.now();
+      console.error(`❌ Error in getSourcesByType for ${sourceType} after ${endTime - startTime}ms:`, error);
       // Return empty array as fallback
       return [];
     }
@@ -217,7 +238,7 @@ export class AgentSourceService {
         .from('agent_sources')
         .select('id')
         .eq('parent_source_id', id)
-        .limit(10); // Small limit to check existence
+        .limit(5); // Small limit to check existence
 
       if (childError) throw new Error(`Failed to check child sources: ${childError.message}`);
 

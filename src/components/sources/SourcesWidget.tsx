@@ -14,8 +14,10 @@ interface SourcesWidgetProps {
 
 const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { agentId } = useParams();
-  const { sources: sourcesData, loading } = useAgentSources();
+  const { sources: sourcesData, loading, error } = useAgentSources();
   const [realtimeSize, setRealtimeSize] = useState(0);
+
+  console.log(`📊 SourcesWidget render: tab=${currentTab}, sources=${sourcesData.length}, loading=${loading}, error=${error}`);
 
   // Set up real-time subscription for content size updates
   useEffect(() => {
@@ -32,7 +34,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
           filter: `agent_id=eq.${agentId}`
         },
         () => {
-          // Recalculate size when any source changes
+          console.log('📡 Sources size update triggered');
           setRealtimeSize(Date.now()); // Force recalculation
         }
       )
@@ -45,6 +47,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
 
   // Calculate total stats and filter sources for display
   const { totalSources, totalSize, sourcesByType } = useMemo(() => {
+    console.log(`🧮 Calculating stats for ${sourcesData.length} sources`);
+    
     // For total stats calculation, include all sources
     let sourcesToCount = sourcesData;
     let sourcesToSize = sourcesData;
@@ -61,6 +65,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       
       sourcesToCount = [...websiteParents, ...nonWebsiteSources];
       sourcesToSize = sourcesData; // Include all for size calculation
+      
+      console.log(`🌐 Website tab stats: ${websiteParents.length} parents, ${websiteChildren.length} children, ${nonWebsiteSources.length} non-website`);
     }
     
     // Calculate total size including content from database and metadata
@@ -90,7 +96,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     else if (totalBytes < 1024 * 1024) formattedTotalSize = `${Math.round(totalBytes / 1024)} KB`;
     else formattedTotalSize = `${Math.round(totalBytes / (1024 * 1024))} MB`;
 
-    // Create source sections - filter website sources for display but keep all others
+    // Create source sections - always show all types for consistency
     const sourceTypes: SourceType[] = ['text', 'file', 'website', 'qa'];
     const sourcesByType = sourceTypes.map(type => {
       let sources;
@@ -104,28 +110,54 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         sources = sourcesData.filter(source => source.source_type === type);
       }
       
+      console.log(`📝 Type ${type}: ${sources.length} sources`);
       return { type, sources };
     });
 
-    return {
+    const stats = {
       totalSources: sourcesToCount.length,
       totalSize: formattedTotalSize,
       sourcesByType
     };
+
+    console.log(`📊 Final stats:`, stats);
+    return stats;
   }, [sourcesData, currentTab, realtimeSize]);
 
   if (loading) {
+    console.log('⏳ SourcesWidget showing loading state');
     return (
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Sources</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-gray-500">Loading...</div>
+          <div className="text-sm text-gray-500">Loading sources...</div>
         </CardContent>
       </Card>
     );
   }
+
+  if (error) {
+    console.log('❌ SourcesWidget showing error state:', error);
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sources</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-red-500">
+            Error loading sources: {error}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Please try refreshing the page
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  console.log('✅ SourcesWidget rendering normal content');
 
   return (
     <Card>
