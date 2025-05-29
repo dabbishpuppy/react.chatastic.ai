@@ -20,7 +20,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Configurable crawl limits
 const DEFAULT_MAX_PAGES = parseInt(Deno.env.get('MAX_CRAWL_PAGES') || '1000');
 const DEFAULT_MAX_DEPTH = parseInt(Deno.env.get('MAX_CRAWL_DEPTH') || '10');
-const DEFAULT_CONCURRENCY = parseInt(Deno.env.get('CRAWL_CONCURRENCY') || '10');
+const DEFAULT_CONCURRENCY = parseInt(Deno.env.get('CRAWL_CONCURRENCY') || '5');
 
 // Track shutdown state
 let isShuttingDown = false;
@@ -31,7 +31,7 @@ addEventListener('beforeunload', (ev) => {
   isShuttingDown = true;
 });
 
-// Enhanced recursive crawling function with real-time progress updates
+// Enhanced recursive crawling function with immediate status updates
 async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
   console.log(`🕷️ Starting enhanced crawl for ${url} with type ${crawlType}`);
   
@@ -39,7 +39,8 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
     const normalizedUrl = normalizeUrl(url);
     console.log(`🔧 Normalized URL: ${normalizedUrl}`);
     
-    await updateSourceProgress(sourceId, 'in_progress', 0, 0, 0);
+    // IMMEDIATELY update status to in_progress
+    await updateSourceProgress(sourceId, 'in_progress', 5, 0, 0);
 
     const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
@@ -80,6 +81,9 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       maxDepthReached: false,
       completionReason: 'completed'
     };
+
+    // Update status again to confirm we're starting
+    await updateSourceProgress(sourceId, 'in_progress', 10, 0, maxPages);
 
     if (crawlType === 'individual-link') {
       console.log(`📄 Processing individual link: ${normalizedUrl}`);
@@ -145,7 +149,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       console.log(`📝 Creating ${discoveredUrls.size} child sources`);
       const urlsArray = Array.from(discoveredUrls);
       
-      const batchSize = 100;
+      const batchSize = 50; // Smaller batches for better performance
       for (let i = 0; i < urlsArray.length; i += batchSize) {
         if (isShuttingDown) {
           console.log('⚠️ Shutdown detected during child source creation');
@@ -231,7 +235,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   }
 }
 
-// Helper function to update source progress with detailed info
+// Helper function to update source progress with better frequency
 async function updateSourceProgress(sourceId: string, status: string, progress: number, currentCount: number, maxPages: number): Promise<void> {
   const { error } = await supabase
     .from('agent_sources')
@@ -254,7 +258,7 @@ async function updateSourceProgress(sourceId: string, status: string, progress: 
   }
 }
 
-// Enhanced recursive crawl with concurrency control and real-time progress
+// Enhanced recursive crawl with more frequent progress updates
 async function enhancedRecursiveCrawlWithConcurrency(
   sourceId: string,
   startUrl: string,
@@ -305,11 +309,9 @@ async function enhancedRecursiveCrawlWithConcurrency(
           }
         }
         
-        // Update progress every few pages
-        if (discoveredUrls.size % 5 === 0) {
-          const progressPercent = Math.min((discoveredUrls.size / maxPages) * 70, 70);
-          await updateSourceProgress(sourceId, 'in_progress', Math.round(progressPercent), discoveredUrls.size, maxPages);
-        }
+        // Update progress more frequently (every page)
+        const progressPercent = Math.min(10 + (discoveredUrls.size / maxPages) * 60, 70);
+        await updateSourceProgress(sourceId, 'in_progress', Math.round(progressPercent), discoveredUrls.size, maxPages);
         
         return validNewUrls;
       } catch (error) {
@@ -333,8 +335,8 @@ async function enhancedRecursiveCrawlWithConcurrency(
       break;
     }
     
-    // Rate limiting between batches
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Shorter rate limiting between batches
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
   
   if (isShuttingDown) {
@@ -512,12 +514,11 @@ serve(async (req) => {
           concurrency: concurrency || DEFAULT_CONCURRENCY
         },
         features: [
+          'Immediate status updates',
           'Customer-facing link extraction',
-          'Semantic HTML parsing',
-          'Configurable limits and concurrency',
-          'Advanced filtering',
-          'Real-time progress tracking',
-          'Graceful shutdown handling'
+          'Frequent progress tracking',
+          'Graceful shutdown handling',
+          'Smaller batch processing'
         ]
       }), 
       { 

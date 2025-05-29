@@ -2,7 +2,6 @@
 import React from 'react';
 import { Link } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import WebsiteSourceStatus from './WebsiteSourceStatus';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -27,8 +26,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const metaSize = isChild ? 'text-xs' : 'text-sm';
 
   // Only show metadata when crawling is completed
-  const isCrawling = crawlStatus === 'in_progress' || crawlStatus === 'pending';
-  const showMetadata = !isCrawling && crawlStatus === 'completed';
+  const showMetadata = crawlStatus === 'completed';
 
   // Fixed width containers to prevent layout shifts
   const containerWidth = isChild ? 'w-full max-w-md' : 'flex-1';
@@ -49,14 +47,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           {displayUrl}
         </div>
         
-        {/* Show status for parent sources when crawling */}
-        {!isChild && isCrawling && (
-          <div className="mt-1">
-            <WebsiteSourceStatus status={crawlStatus} />
-          </div>
-        )}
-        
-        {/* Show metadata when crawling is completed */}
+        {/* Show metadata only when crawling is completed */}
         {showMetadata && (
           <div className={`flex items-center gap-2 ${metaSize} text-gray-500 mt-1`}>
             {linksCount && linksCount > 0 && (
