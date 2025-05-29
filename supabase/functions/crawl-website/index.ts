@@ -14,10 +14,11 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
-  console.log(`Starting crawl for ${url} with type ${crawlType}`);
+  console.log(`🕷️ Starting crawl for ${url} with type ${crawlType}`);
   
   try {
     // Update status to in_progress
+    console.log(`📝 Updating source ${sourceId} status to in_progress`);
     await supabase
       .from('agent_sources')
       .update({ 
@@ -28,31 +29,36 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
       .eq('id', sourceId);
 
     // Get the source to access agent_id and team_id
-    const { data: source } = await supabase
+    const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
       .select('agent_id, team_id, metadata')
       .eq('id', sourceId)
       .single();
 
-    if (!source) {
-      throw new Error('Source not found');
+    if (sourceError || !source) {
+      throw new Error(`Source not found: ${sourceError?.message}`);
     }
+
+    console.log(`📊 Source found: agent_id=${source.agent_id}, team_id=${source.team_id}`);
 
     // Simulate crawling process with real-time updates
     let discoveredLinks: string[] = [];
     
     if (crawlType === 'individual-link') {
       // For individual links, just process the single URL
+      console.log(`📄 Processing individual link: ${url}`);
       discoveredLinks = [url];
     } else if (crawlType === 'sitemap') {
       // For sitemap, fetch and parse the sitemap
+      console.log(`🗺️ Fetching sitemap from: ${url}`);
       discoveredLinks = await fetchSitemapLinks(url);
     } else {
       // For crawl-links, discover links from the page
+      console.log(`🔍 Discovering links from page: ${url}`);
       discoveredLinks = await discoverLinksFromPage(url, source.metadata);
     }
 
-    console.log(`Discovered ${discoveredLinks.length} links`);
+    console.log(`✅ Discovered ${discoveredLinks.length} links`);
 
     // Update progress to 50%
     await supabase
@@ -64,27 +70,33 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
       .eq('id', sourceId);
 
     // Create child sources for discovered links
-    const childSources = discoveredLinks.map((link, index) => ({
-      agent_id: source.agent_id,
-      team_id: source.team_id,
-      source_type: 'website' as const,
-      title: link,
-      url: link,
-      parent_source_id: sourceId,
-      crawl_status: 'completed',
-      metadata: {
-        crawlType: 'individual-link',
-        parentUrl: url,
-        discoveredAt: new Date().toISOString()
-      },
-      created_by: null
-    }));
+    if (discoveredLinks.length > 0) {
+      console.log(`📝 Creating ${discoveredLinks.length} child sources`);
+      const childSources = discoveredLinks.map((link, index) => ({
+        agent_id: source.agent_id,
+        team_id: source.team_id,
+        source_type: 'website' as const,
+        title: link,
+        url: link,
+        parent_source_id: sourceId,
+        crawl_status: 'completed',
+        metadata: {
+          crawlType: 'individual-link',
+          parentUrl: url,
+          discoveredAt: new Date().toISOString()
+        },
+        created_by: null
+      }));
 
-    // Insert child sources in batches
-    if (childSources.length > 0) {
-      await supabase
+      // Insert child sources in batches
+      const { error: insertError } = await supabase
         .from('agent_sources')
         .insert(childSources);
+
+      if (insertError) {
+        console.error('❌ Error inserting child sources:', insertError);
+        throw new Error(`Failed to insert child sources: ${insertError.message}`);
+      }
     }
 
     // Update progress to 90%
@@ -104,10 +116,10 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
       })
       .eq('id', sourceId);
 
-    console.log(`Crawl completed for ${url}`);
+    console.log(`✅ Crawl completed for ${url} - found ${discoveredLinks.length} links`);
     
   } catch (error) {
-    console.error(`Crawl failed for ${url}:`, error);
+    console.error(`❌ Crawl failed for ${url}:`, error);
     
     // Update status to failed
     await supabase
@@ -125,31 +137,52 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
 
 async function fetchSitemapLinks(sitemapUrl: string): Promise<string[]> {
   try {
+    console.log(`🌐 Fetching sitemap from: ${sitemapUrl}`);
     const response = await fetch(sitemapUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const sitemapContent = await response.text();
     
     // Simple XML parsing to extract URLs
     const urlMatches = sitemapContent.match(/<loc>(.*?)<\/loc>/g);
-    if (!urlMatches) return [];
+    if (!urlMatches) {
+      console.log('📄 No URLs found in sitemap');
+      return [];
+    }
     
-    return urlMatches
+    const links = urlMatches
       .map(match => match.replace(/<\/?loc>/g, ''))
       .filter(url => url.startsWith('http'))
       .slice(0, 50); // Limit to 50 URLs
+    
+    console.log(`📊 Extracted ${links.length} URLs from sitemap`);
+    return links;
   } catch (error) {
-    console.error('Error fetching sitemap:', error);
+    console.error('❌ Error fetching sitemap:', error);
     return [];
   }
 }
 
 async function discoverLinksFromPage(url: string, metadata: any): Promise<string[]> {
   try {
+    console.log(`🌐 Fetching page content from: ${url}`);
     const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const html = await response.text();
     
     // Simple regex to find links
     const linkMatches = html.match(/href=["'](https?:\/\/[^"']+)["']/g);
-    if (!linkMatches) return [];
+    if (!linkMatches) {
+      console.log('📄 No links found on page');
+      return [];
+    }
     
     let links = linkMatches
       .map(match => match.replace(/href=["']/, '').replace(/["']$/, ''))
@@ -171,6 +204,7 @@ async function discoverLinksFromPage(url: string, metadata: any): Promise<string
           link.includes(pattern.replace('*', ''))
         )
       );
+      console.log(`🔍 Applied include filters, ${links.length} links remaining`);
     }
 
     if (excludePaths.length > 0) {
@@ -179,18 +213,23 @@ async function discoverLinksFromPage(url: string, metadata: any): Promise<string
           link.includes(pattern.replace('*', ''))
         )
       );
+      console.log(`🚫 Applied exclude filters, ${links.length} links remaining`);
     }
 
     // Remove duplicates and limit
-    return [...new Set(links)].slice(0, 25);
+    const uniqueLinks = [...new Set(links)].slice(0, 25);
+    console.log(`📊 Final result: ${uniqueLinks.length} unique links`);
+    return uniqueLinks;
     
   } catch (error) {
-    console.error('Error discovering links:', error);
+    console.error('❌ Error discovering links:', error);
     return [];
   }
 }
 
 serve(async (req) => {
+  console.log(`📥 ${req.method} request received`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -199,13 +238,30 @@ serve(async (req) => {
   try {
     const { source_id, url, crawl_type } = await req.json();
     
-    console.log('Received crawl request:', { source_id, url, crawl_type });
+    console.log('📝 Received crawl request:', { source_id, url, crawl_type });
+
+    if (!source_id || !url || !crawl_type) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameters: source_id, url, crawl_type' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
     // Start crawling in the background
-    EdgeRuntime.waitUntil(crawlWebsite(source_id, url, crawl_type));
+    crawlWebsite(source_id, url, crawl_type).catch(error => {
+      console.error('🔥 Uncaught crawl error:', error);
+    });
 
     return new Response(
-      JSON.stringify({ message: 'Crawling started' }), 
+      JSON.stringify({ 
+        message: 'Crawling started successfully',
+        source_id,
+        url,
+        crawl_type 
+      }), 
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
@@ -213,7 +269,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in crawl-website function:', error);
+    console.error('❌ Error in crawl-website function:', error);
     return new Response(
       JSON.stringify({ error: error.message }), 
       { 

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface WebsiteFormData {
   url: string;
@@ -72,6 +73,45 @@ export const useWebsiteSubmission = (refetch: () => void) => {
       });
 
       console.log('✅ New website source created:', newSource);
+
+      // Trigger the crawling process via edge function
+      try {
+        console.log('🚀 Triggering crawl for source:', newSource.id);
+        
+        const { data: crawlResponse, error: crawlError } = await supabase.functions.invoke('crawl-website', {
+          body: {
+            source_id: newSource.id,
+            url: url,
+            crawl_type: formData.crawlType
+          }
+        });
+
+        if (crawlError) {
+          console.error('❌ Crawl trigger error:', crawlError);
+          // Update source status to failed
+          await sources.updateSource(newSource.id, {
+            crawl_status: 'failed',
+            metadata: {
+              ...metadata,
+              error: `Failed to start crawl: ${crawlError.message}`,
+              failedAt: new Date().toISOString()
+            }
+          });
+        } else {
+          console.log('✅ Crawl triggered successfully:', crawlResponse);
+        }
+      } catch (crawlTriggerError) {
+        console.error('❌ Failed to trigger crawl:', crawlTriggerError);
+        // Update source status to failed
+        await sources.updateSource(newSource.id, {
+          crawl_status: 'failed',
+          metadata: {
+            ...metadata,
+            error: `Failed to start crawl: ${crawlTriggerError instanceof Error ? crawlTriggerError.message : 'Unknown error'}`,
+            failedAt: new Date().toISOString()
+          }
+        });
+      }
 
       toast({
         title: "Website source added",
