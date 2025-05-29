@@ -12,6 +12,41 @@ interface WebsiteSubmissionData {
   crawlType: 'crawl-links' | 'sitemap' | 'individual-link';
 }
 
+// Helper function to normalize URL
+const normalizeUrl = (url: string): string => {
+  // Remove any whitespace
+  url = url.trim();
+  
+  // Add protocol if missing
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://' + url;
+  }
+  
+  try {
+    const urlObj = new URL(url);
+    return urlObj.toString();
+  } catch {
+    // If still invalid, try with http://
+    try {
+      const httpUrl = url.startsWith('http') ? url : 'http://' + url;
+      return new URL(httpUrl).toString();
+    } catch {
+      return url;
+    }
+  }
+};
+
+// Helper function to get domain from URL for display
+const getDomainFromUrl = (url: string): string => {
+  try {
+    const normalizedUrl = normalizeUrl(url);
+    const urlObj = new URL(normalizedUrl);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
 export const useWebsiteSubmission = (onSuccess?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { agentId } = useParams();
@@ -23,12 +58,23 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
     setIsSubmitting(true);
     
     try {
-      // Create the parent source with just the URL as title
+      // Normalize the URL first
+      const normalizedUrl = normalizeUrl(data.url);
+      const domain = getDomainFromUrl(normalizedUrl);
+      
+      console.log('📝 Submitting website source:', {
+        originalUrl: data.url,
+        normalizedUrl,
+        domain,
+        crawlType: data.crawlType
+      });
+
+      // Create the parent source with the domain as title and normalized URL
       const source = await sourceService.createSource({
         agent_id: agentId,
         source_type: 'website',
-        title: data.url,
-        url: data.url,
+        title: domain,
+        url: normalizedUrl,
         crawl_status: 'pending',
         progress: 0,
         links_count: 0,
@@ -46,7 +92,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
         WebsiteCrawlService.startEnhancedCrawl(
           agentId,
           source.id,
-          data.url,
+          normalizedUrl,
           {
             maxDepth: 3,
             maxPages: Infinity, // Infinite crawling
@@ -72,7 +118,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
         WebsiteCrawlService.startEnhancedCrawl(
           agentId,
           source.id,
-          data.url,
+          normalizedUrl,
           {
             maxDepth: 0, // Only crawl the single page
             maxPages: 1
@@ -90,7 +136,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
         WebsiteCrawlService.startEnhancedCrawl(
           agentId,
           source.id,
-          data.url,
+          normalizedUrl,
           {
             maxDepth: 0,
             maxPages: Infinity
@@ -111,6 +157,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
 
       return source;
     } catch (error: any) {
+      console.error('Website submission error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to start website crawling",

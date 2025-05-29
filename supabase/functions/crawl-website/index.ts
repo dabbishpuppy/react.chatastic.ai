@@ -59,17 +59,13 @@ const TRACKING_PARAMS = [
   'fbclid', 'gclid', 'mc_cid', 'mc_eid', '_ga', '_gl'
 ];
 
-function extractDomain(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return '';
-  }
-}
-
 function normalizeUrl(url: string): string {
   try {
+    // Add protocol if missing
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    
     const urlObj = new URL(url);
     
     // Remove tracking parameters
@@ -87,13 +83,30 @@ function normalizeUrl(url: string): string {
     
     return urlObj.toString();
   } catch {
-    return url;
+    // If still invalid, try with http://
+    try {
+      const httpUrl = url.startsWith('http') ? url : 'http://' + url;
+      return new URL(httpUrl).toString();
+    } catch {
+      return url;
+    }
+  }
+}
+
+function extractDomain(url: string): string {
+  try {
+    const normalizedUrl = normalizeUrl(url);
+    const urlObj = new URL(normalizedUrl);
+    return urlObj.hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
   }
 }
 
 function isValidFrontendUrl(url: string, baseDomain: string): boolean {
   try {
-    const urlObj = new URL(url);
+    const normalizedUrl = normalizeUrl(url);
+    const urlObj = new URL(normalizedUrl);
     const urlDomain = urlObj.hostname.toLowerCase().replace(/^www\./, '');
     
     // Must be same domain
@@ -137,6 +150,10 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   console.log(`🕷️ Starting recursive crawl for ${url} with type ${crawlType}`);
   
   try {
+    // Normalize URL first
+    const normalizedUrl = normalizeUrl(url);
+    console.log(`🔧 Normalized URL: ${normalizedUrl}`);
+    
     // Update status to in_progress
     console.log(`📝 Updating source ${sourceId} status to in_progress`);
     await supabase
@@ -144,7 +161,8 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       .update({ 
         crawl_status: 'in_progress', 
         progress: 10,
-        last_crawled_at: new Date().toISOString()
+        last_crawled_at: new Date().toISOString(),
+        url: normalizedUrl  // Update with normalized URL
       })
       .eq('id', sourceId);
 
@@ -162,8 +180,12 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
     console.log(`📊 Source found: agent_id=${source.agent_id}, team_id=${source.team_id}`);
 
     // Extract base domain for filtering
-    const baseDomain = extractDomain(url);
+    const baseDomain = extractDomain(normalizedUrl);
     console.log(`🌐 Base domain: ${baseDomain}`);
+
+    if (!baseDomain) {
+      throw new Error(`Invalid domain extracted from URL: ${normalizedUrl}`);
+    }
 
     // Initialize crawling state
     const crawledUrls = new Set<string>();
@@ -172,17 +194,17 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
 
     if (crawlType === 'individual-link') {
       // For individual links, just process the single URL
-      console.log(`📄 Processing individual link: ${url}`);
-      discoveredLinks.add(url);
+      console.log(`📄 Processing individual link: ${normalizedUrl}`);
+      discoveredLinks.add(normalizedUrl);
     } else if (crawlType === 'sitemap') {
       // For sitemap, fetch and parse the sitemap
-      console.log(`🗺️ Fetching sitemap from: ${url}`);
-      const sitemapLinks = await fetchSitemapLinks(url, baseDomain);
+      console.log(`🗺️ Fetching sitemap from: ${normalizedUrl}`);
+      const sitemapLinks = await fetchSitemapLinks(normalizedUrl, baseDomain);
       sitemapLinks.forEach(link => discoveredLinks.add(link));
     } else {
       // For crawl-links, start recursive discovery
-      console.log(`🔍 Starting recursive link discovery from: ${url}`);
-      await discoverLinksRecursively(url, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, 3);
+      console.log(`🔍 Starting recursive link discovery from: ${normalizedUrl}`);
+      await discoverLinksRecursively(normalizedUrl, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, 3);
     }
 
     console.log(`✅ Discovered ${discoveredLinks.size} unique links total`);
@@ -215,7 +237,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
           crawl_status: 'completed',
           metadata: {
             crawlType: 'individual-link',
-            parentUrl: url,
+            parentUrl: normalizedUrl,
             discoveredAt: new Date().toISOString()
           },
           created_by: null
@@ -251,7 +273,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       })
       .eq('id', sourceId);
 
-    console.log(`✅ Crawl completed for ${url} - found ${discoveredLinks.size} unique links`);
+    console.log(`✅ Crawl completed for ${normalizedUrl} - found ${discoveredLinks.size} unique links`);
     
   } catch (error) {
     console.error(`❌ Crawl failed for ${url}:`, error);
@@ -315,8 +337,9 @@ async function discoverLinksRecursively(
 
 async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promise<string[]> {
   try {
-    console.log(`🌐 Fetching sitemap from: ${sitemapUrl}`);
-    const response = await fetch(sitemapUrl);
+    const normalizedUrl = normalizeUrl(sitemapUrl);
+    console.log(`🌐 Fetching sitemap from: ${normalizedUrl}`);
+    const response = await fetch(normalizedUrl);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -351,8 +374,9 @@ async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promis
 
 async function discoverLinksFromPage(url: string, metadata: any, baseDomain: string): Promise<string[]> {
   try {
-    console.log(`🌐 Fetching page content from: ${url}`);
-    const response = await fetch(url, {
+    const normalizedUrl = normalizeUrl(url);
+    console.log(`🌐 Fetching page content from: ${normalizedUrl}`);
+    const response = await fetch(normalizedUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; WebCrawler/1.0)'
       }
