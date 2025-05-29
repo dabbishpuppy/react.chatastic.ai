@@ -25,6 +25,41 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   loading,
   error
 }) => {
+  // Calculate total content size
+  const calculateTotalSize = () => {
+    let totalBytes = 0;
+    
+    parentSources.forEach(parent => {
+      // Add parent content size
+      if (parent.content) {
+        totalBytes += new Blob([parent.content]).size;
+      }
+      if (parent.metadata?.total_content_size) {
+        totalBytes += parent.metadata.total_content_size;
+      }
+      
+      // Add child sources content size
+      const children = getChildSources(parent.id);
+      children.forEach(child => {
+        if (child.content) {
+          totalBytes += new Blob([child.content]).size;
+        }
+        if (child.metadata?.content_size) {
+          totalBytes += child.metadata.content_size;
+        }
+      });
+    });
+    
+    return totalBytes;
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '';
+    if (bytes < 1024) return ` • ${bytes}B`;
+    if (bytes < 1024 * 1024) return ` • ${Math.round(bytes / 1024)}KB`;
+    return ` • ${Math.round(bytes / (1024 * 1024))}MB`;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -51,12 +86,15 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     );
   }
 
+  const totalSize = calculateTotalSize();
+  const sizeText = formatSize(totalSize);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center mb-3">
         <input type="checkbox" id="select-all" className="rounded border-gray-300 text-black focus:ring-black mr-2" />
         <label htmlFor="select-all" className="text-lg font-medium">
-          Link sources ({parentSources.length})
+          Link sources ({parentSources.length}){sizeText}
         </label>
       </div>
       

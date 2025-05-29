@@ -1,3 +1,4 @@
+
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SourceType } from "@/types/rag";
@@ -32,9 +33,26 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       sourcesToSize = sourcesData; // Include all for size calculation
     }
     
+    // Calculate total size including content from database and metadata
     const totalBytes = sourcesToSize.reduce((total, source) => {
-      if (!source.content) return total;
-      return total + new Blob([source.content]).size;
+      let sourceSize = 0;
+      
+      // Check for content in the source
+      if (source.content) {
+        sourceSize += new Blob([source.content]).size;
+      }
+      
+      // Check for content size in metadata (for crawled sources)
+      if (source.metadata?.content_size) {
+        sourceSize += source.metadata.content_size;
+      }
+      
+      // Check for total content size in metadata (for parent sources)
+      if (source.metadata?.total_content_size) {
+        sourceSize += source.metadata.total_content_size;
+      }
+      
+      return total + sourceSize;
     }, 0);
     
     let formattedTotalSize;

@@ -64,6 +64,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               linksCount={source.links_count}
               metadata={source.metadata}
               showProgressBar={true}
+              isChild={!isParentSource}
             />
           </div>
         </div>
