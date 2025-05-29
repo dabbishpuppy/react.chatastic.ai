@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -12,38 +13,30 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Comprehensive file extensions to exclude
+// Reduced list of file extensions to exclude - only actual files, not pages
 const EXCLUDED_EXTENSIONS = [
   // Images
   'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'ico', 'bmp', 'tiff', 'avif',
-  // Scripts
-  'js', 'min.js', 'ts', 'coffee', 'map',
-  // Styles
-  'css', 'scss', 'sass', 'less', 'min.css',
   // Documents
-  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
   // Archives
   'zip', 'rar', 'tar', 'gz', '7z', 'bz2',
   // Media
   'mp4', 'mp3', 'wav', 'avi', 'mov', 'webm', 'flv', 'mkv', 'wmv',
   // Fonts
-  'woff', 'woff2', 'ttf', 'otf', 'eot',
-  // Other
-  'xml', 'json', 'csv', 'rss', 'atom'
+  'woff', 'woff2', 'ttf', 'otf', 'eot'
 ];
 
-// Path patterns to exclude (reduced restrictions)
+// Reduced and more specific path patterns to exclude
 const EXCLUDED_PATH_PATTERNS = [
-  // API endpoints
+  // API endpoints only
   '/api/', '/rest/', '/graphql/', '/wp-json/',
-  // Admin areas
-  '/admin/', '/dashboard/', '/backend/', '/control-panel/',
-  // WordPress specific
-  '/wp-content/', '/wp-admin/', '/wp-includes/',
-  // System files
+  // Admin areas only
+  '/wp-admin/', '/admin/wp-admin/',
+  // System files only
   '/robots.txt', '/sitemap.xml', '/favicon.ico', '/.well-known/',
-  // Common utility paths
-  '/login/', '/register/', '/checkout/', '/cart/'
+  // Authentication only
+  '/wp-login.php'
 ];
 
 // Tracking parameters to remove
@@ -114,21 +107,20 @@ function isValidFrontendUrl(url: string, baseDomain: string): boolean {
       return false;
     }
     
-    // Check for excluded path patterns (reduced restrictions)
+    // Check for excluded path patterns - now much more restrictive
     for (const pattern of EXCLUDED_PATH_PATTERNS) {
       if (pathname.includes(pattern.toLowerCase())) {
         return false;
       }
     }
     
-    // Exclude very long URLs (increased limit)
-    if (url.length > 300) {
+    // Allow longer URLs and more path segments
+    if (url.length > 500) {
       return false;
     }
     
-    // Exclude URLs with too many path segments (increased limit)
     const pathSegments = pathname.split('/').filter(Boolean);
-    if (pathSegments.length > 8) {
+    if (pathSegments.length > 15) {
       return false;
     }
     
@@ -138,28 +130,24 @@ function isValidFrontendUrl(url: string, baseDomain: string): boolean {
   }
 }
 
-// Enhanced recursive crawling function with no depth limits
+// Enhanced recursive crawling function
 async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
   console.log(`🕷️ Starting recursive crawl for ${url} with type ${crawlType}`);
   
   try {
-    // Normalize URL first
     const normalizedUrl = normalizeUrl(url);
     console.log(`🔧 Normalized URL: ${normalizedUrl}`);
     
-    // Update status to in_progress
-    console.log(`📝 Updating source ${sourceId} status to in_progress`);
     await supabase
       .from('agent_sources')
       .update({ 
         crawl_status: 'in_progress', 
         progress: 10,
         last_crawled_at: new Date().toISOString(),
-        url: normalizedUrl  // Update with normalized URL
+        url: normalizedUrl
       })
       .eq('id', sourceId);
 
-    // Get the source to access agent_id and team_id
     const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
       .select('agent_id, team_id, metadata')
@@ -172,7 +160,6 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
 
     console.log(`📊 Source found: agent_id=${source.agent_id}, team_id=${source.team_id}`);
 
-    // Extract base domain for filtering
     const baseDomain = extractDomain(normalizedUrl);
     console.log(`🌐 Base domain: ${baseDomain}`);
 
@@ -180,29 +167,23 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       throw new Error(`Invalid domain extracted from URL: ${normalizedUrl}`);
     }
 
-    // Initialize crawling state
     const crawledUrls = new Set<string>();
     const discoveredLinks = new Set<string>();
-    let totalProcessed = 0;
 
     if (crawlType === 'individual-link') {
-      // For individual links, just process the single URL
       console.log(`📄 Processing individual link: ${normalizedUrl}`);
       discoveredLinks.add(normalizedUrl);
     } else if (crawlType === 'sitemap') {
-      // For sitemap, fetch and parse the sitemap
       console.log(`🗺️ Fetching sitemap from: ${normalizedUrl}`);
       const sitemapLinks = await fetchSitemapLinks(normalizedUrl, baseDomain);
       sitemapLinks.forEach(link => discoveredLinks.add(link));
     } else {
-      // For crawl-links, start recursive discovery with no depth limit
-      console.log(`🔍 Starting unlimited recursive link discovery from: ${normalizedUrl}`);
-      await discoverLinksRecursively(normalizedUrl, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, Infinity);
+      console.log(`🔍 Starting enhanced recursive link discovery from: ${normalizedUrl}`);
+      await discoverLinksRecursively(normalizedUrl, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, 5);
     }
 
     console.log(`✅ Discovered ${discoveredLinks.size} unique links total`);
 
-    // Update progress to 50%
     await supabase
       .from('agent_sources')
       .update({ 
@@ -211,12 +192,11 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       })
       .eq('id', sourceId);
 
-    // Create child sources for all discovered links in larger batches
+    // Create child sources for all discovered links
     if (discoveredLinks.size > 0) {
       console.log(`📝 Creating ${discoveredLinks.size} child sources`);
       const linksArray = Array.from(discoveredLinks);
       
-      // Process in larger batches to improve performance
       const batchSize = 100;
       for (let i = 0; i < linksArray.length; i += batchSize) {
         const batch = linksArray.slice(i, i + batchSize);
@@ -246,7 +226,6 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
           console.log(`✅ Created batch ${i}-${i + batch.length} of child sources`);
         }
 
-        // Update progress incrementally
         const progressPercent = Math.min(50 + (i / linksArray.length) * 40, 90);
         await supabase
           .from('agent_sources')
@@ -255,7 +234,6 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       }
     }
 
-    // Final update - mark as completed
     await supabase
       .from('agent_sources')
       .update({ 
@@ -271,7 +249,6 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   } catch (error) {
     console.error(`❌ Crawl failed for ${url}:`, error);
     
-    // Update status to failed
     await supabase
       .from('agent_sources')
       .update({ 
@@ -285,7 +262,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   }
 }
 
-// Recursive link discovery function with no depth limits and more aggressive crawling
+// Enhanced recursive link discovery with better depth control and link extraction
 async function discoverLinksRecursively(
   url: string, 
   baseDomain: string, 
@@ -295,8 +272,7 @@ async function discoverLinksRecursively(
   currentDepth: number,
   maxDepth: number
 ): Promise<void> {
-  // Stop if we've already crawled this URL
-  if (crawledUrls.has(url)) {
+  if (crawledUrls.has(url) || currentDepth > maxDepth) {
     return;
   }
 
@@ -306,19 +282,16 @@ async function discoverLinksRecursively(
   try {
     const pageLinks = await discoverLinksFromPage(url, metadata, baseDomain);
     
-    // Add all discovered links
     pageLinks.forEach(link => discoveredLinks.add(link));
     console.log(`📊 Found ${pageLinks.length} new links on ${url}`);
 
-    // If we haven't reached max depth, recursively crawl more links
+    // Recursively crawl more pages, with increased breadth per page
     if (currentDepth < maxDepth) {
-      // Crawl more links from each page (increased from 5 to 20)
-      const linksToRecurse = pageLinks.slice(0, 20);
+      const linksToRecurse = pageLinks.slice(0, 30); // Increased from 20 to 30
       
       for (const link of linksToRecurse) {
         if (!crawledUrls.has(link)) {
-          // Reduced delay between requests for faster crawling
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 100)); // Slightly slower to be respectful
           await discoverLinksRecursively(link, baseDomain, crawledUrls, discoveredLinks, metadata, currentDepth + 1, maxDepth);
         }
       }
@@ -340,7 +313,6 @@ async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promis
     
     const sitemapContent = await response.text();
     
-    // Simple XML parsing to extract URLs
     const urlMatches = sitemapContent.match(/<loc>(.*?)<\/loc>/g);
     if (!urlMatches) {
       console.log('📄 No URLs found in sitemap');
@@ -351,11 +323,10 @@ async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promis
       .map(match => match.replace(/<\/?loc>/g, ''))
       .filter(url => url.startsWith('http'));
     
-    // Filter and normalize links
     const validLinks = rawLinks
       .filter(link => isValidFrontendUrl(link, baseDomain))
       .map(link => normalizeUrl(link))
-      .filter((link, index, array) => array.indexOf(link) === index); // Remove duplicates
+      .filter((link, index, array) => array.indexOf(link) === index);
     
     console.log(`📊 Filtered ${rawLinks.length} raw URLs to ${validLinks.length} valid frontend URLs from sitemap`);
     return validLinks;
@@ -371,7 +342,11 @@ async function discoverLinksFromPage(url: string, metadata: any, baseDomain: str
     console.log(`🌐 Fetching page content from: ${normalizedUrl}`);
     const response = await fetch(normalizedUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; WebCrawler/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; WebCrawler/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate',
+        'Cache-Control': 'no-cache'
       }
     });
     
@@ -381,21 +356,50 @@ async function discoverLinksFromPage(url: string, metadata: any, baseDomain: str
     
     const html = await response.text();
     
-    // Enhanced regex to find links with better accuracy
-    const linkMatches = html.match(/href=["'](https?:\/\/[^"'>\s]+)["']/gi);
-    if (!linkMatches) {
-      console.log('📄 No links found on page');
-      return [];
+    // Enhanced link extraction with multiple patterns
+    const linkPatterns = [
+      // Standard href links
+      /href=["'](https?:\/\/[^"'>\s]+)["']/gi,
+      // Relative links with href
+      /href=["']([^"'>\s]+)["']/gi,
+      // Links in navigation or menu structures
+      /<a[^>]*href=["']([^"']+)["'][^>]*>/gi,
+      // WordPress specific links
+      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["']/gi
+    ];
+    
+    let allMatches: string[] = [];
+    
+    for (const pattern of linkPatterns) {
+      const matches = Array.from(html.matchAll(pattern));
+      allMatches.push(...matches.map(match => match[1]));
     }
     
-    let rawLinks = linkMatches
-      .map(match => match.replace(/href=["']/i, '').replace(/["']$/, ''))
-      .filter(link => link.startsWith('http'));
+    console.log(`🔍 Found ${allMatches.length} potential links on page`);
 
-    console.log(`🔍 Found ${rawLinks.length} raw links on page`);
+    // Process and normalize all found links
+    let processedLinks = allMatches
+      .map(link => {
+        // Handle relative URLs
+        if (link.startsWith('/')) {
+          const baseUrl = new URL(normalizedUrl);
+          return `${baseUrl.protocol}//${baseUrl.host}${link}`;
+        } else if (link.startsWith('./')) {
+          const baseUrl = new URL(normalizedUrl);
+          return `${baseUrl.protocol}//${baseUrl.host}${baseUrl.pathname}/${link.substring(2)}`;
+        } else if (!link.startsWith('http')) {
+          // Handle other relative formats
+          const baseUrl = new URL(normalizedUrl);
+          return `${baseUrl.protocol}//${baseUrl.host}/${link}`;
+        }
+        return link;
+      })
+      .filter(link => link && link.startsWith('http'));
+
+    console.log(`🔧 Processed to ${processedLinks.length} absolute URLs`);
 
     // Filter for valid frontend URLs
-    let validLinks = rawLinks.filter(link => isValidFrontendUrl(link, baseDomain));
+    let validLinks = processedLinks.filter(link => isValidFrontendUrl(link, baseDomain));
     console.log(`✅ Filtered to ${validLinks.length} valid frontend links`);
 
     // Normalize URLs and remove duplicates
@@ -439,7 +443,6 @@ async function discoverLinksFromPage(url: string, metadata: any, baseDomain: str
 serve(async (req) => {
   console.log(`📥 ${req.method} request received`);
   
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -459,7 +462,6 @@ serve(async (req) => {
       );
     }
 
-    // Start recursive crawling in the background
     recursiveCrawlWebsite(source_id, url, crawl_type).catch(error => {
       console.error('🔥 Uncaught crawl error:', error);
     });
