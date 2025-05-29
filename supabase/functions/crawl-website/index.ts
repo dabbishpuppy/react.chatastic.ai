@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -131,8 +132,9 @@ function isValidFrontendUrl(url: string, baseDomain: string): boolean {
   }
 }
 
-async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
-  console.log(`🕷️ Starting crawl for ${url} with type ${crawlType}`);
+// Enhanced recursive crawling function
+async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
+  console.log(`🕷️ Starting recursive crawl for ${url} with type ${crawlType}`);
   
   try {
     // Update status to in_progress
@@ -163,69 +165,80 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
     const baseDomain = extractDomain(url);
     console.log(`🌐 Base domain: ${baseDomain}`);
 
-    // Simulate crawling process with real-time updates
-    let discoveredLinks: string[] = [];
-    
+    // Initialize crawling state
+    const crawledUrls = new Set<string>();
+    const discoveredLinks = new Set<string>();
+    let totalProcessed = 0;
+
     if (crawlType === 'individual-link') {
       // For individual links, just process the single URL
       console.log(`📄 Processing individual link: ${url}`);
-      discoveredLinks = [url];
+      discoveredLinks.add(url);
     } else if (crawlType === 'sitemap') {
       // For sitemap, fetch and parse the sitemap
       console.log(`🗺️ Fetching sitemap from: ${url}`);
-      discoveredLinks = await fetchSitemapLinks(url, baseDomain);
+      const sitemapLinks = await fetchSitemapLinks(url, baseDomain);
+      sitemapLinks.forEach(link => discoveredLinks.add(link));
     } else {
-      // For crawl-links, discover links from the page
-      console.log(`🔍 Discovering links from page: ${url}`);
-      discoveredLinks = await discoverLinksFromPage(url, source.metadata, baseDomain);
+      // For crawl-links, start recursive discovery
+      console.log(`🔍 Starting recursive link discovery from: ${url}`);
+      await discoverLinksRecursively(url, baseDomain, crawledUrls, discoveredLinks, source.metadata, 0, 3);
     }
 
-    console.log(`✅ Discovered ${discoveredLinks.length} valid frontend links`);
+    console.log(`✅ Discovered ${discoveredLinks.size} unique links total`);
 
     // Update progress to 50%
     await supabase
       .from('agent_sources')
       .update({ 
         progress: 50,
-        links_count: discoveredLinks.length
+        links_count: discoveredLinks.size
       })
       .eq('id', sourceId);
 
-    // Create child sources for discovered links
-    if (discoveredLinks.length > 0) {
-      console.log(`📝 Creating ${discoveredLinks.length} child sources`);
-      const childSources = discoveredLinks.map((link, index) => ({
-        agent_id: source.agent_id,
-        team_id: source.team_id,
-        source_type: 'website' as const,
-        title: link,
-        url: link,
-        parent_source_id: sourceId,
-        crawl_status: 'completed',
-        metadata: {
-          crawlType: 'individual-link',
-          parentUrl: url,
-          discoveredAt: new Date().toISOString()
-        },
-        created_by: null
-      }));
+    // Create child sources for all discovered links
+    if (discoveredLinks.size > 0) {
+      console.log(`📝 Creating ${discoveredLinks.size} child sources`);
+      const linksArray = Array.from(discoveredLinks);
+      
+      // Process in batches to avoid overwhelming the database
+      const batchSize = 50;
+      for (let i = 0; i < linksArray.length; i += batchSize) {
+        const batch = linksArray.slice(i, i + batchSize);
+        const childSources = batch.map(link => ({
+          agent_id: source.agent_id,
+          team_id: source.team_id,
+          source_type: 'website' as const,
+          title: link,
+          url: link,
+          parent_source_id: sourceId,
+          crawl_status: 'completed',
+          metadata: {
+            crawlType: 'individual-link',
+            parentUrl: url,
+            discoveredAt: new Date().toISOString()
+          },
+          created_by: null
+        }));
 
-      // Insert child sources in batches
-      const { error: insertError } = await supabase
-        .from('agent_sources')
-        .insert(childSources);
+        const { error: insertError } = await supabase
+          .from('agent_sources')
+          .insert(childSources);
 
-      if (insertError) {
-        console.error('❌ Error inserting child sources:', insertError);
-        throw new Error(`Failed to insert child sources: ${insertError.message}`);
+        if (insertError) {
+          console.error(`❌ Error inserting batch ${i}-${i + batch.length}:`, insertError);
+        } else {
+          console.log(`✅ Created batch ${i}-${i + batch.length} of child sources`);
+        }
+
+        // Update progress incrementally
+        const progressPercent = Math.min(50 + (i / linksArray.length) * 40, 90);
+        await supabase
+          .from('agent_sources')
+          .update({ progress: Math.round(progressPercent) })
+          .eq('id', sourceId);
       }
     }
-
-    // Update progress to 90%
-    await supabase
-      .from('agent_sources')
-      .update({ progress: 90 })
-      .eq('id', sourceId);
 
     // Final update - mark as completed
     await supabase
@@ -233,12 +246,12 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
       .update({ 
         crawl_status: 'completed',
         progress: 100,
-        links_count: discoveredLinks.length,
+        links_count: discoveredLinks.size,
         last_crawled_at: new Date().toISOString()
       })
       .eq('id', sourceId);
 
-    console.log(`✅ Crawl completed for ${url} - found ${discoveredLinks.length} valid frontend links`);
+    console.log(`✅ Crawl completed for ${url} - found ${discoveredLinks.size} unique links`);
     
   } catch (error) {
     console.error(`❌ Crawl failed for ${url}:`, error);
@@ -254,6 +267,49 @@ async function crawlWebsite(sourceId: string, url: string, crawlType: string) {
         }
       })
       .eq('id', sourceId);
+  }
+}
+
+// Recursive link discovery function
+async function discoverLinksRecursively(
+  url: string, 
+  baseDomain: string, 
+  crawledUrls: Set<string>, 
+  discoveredLinks: Set<string>,
+  metadata: any,
+  currentDepth: number,
+  maxDepth: number
+): Promise<void> {
+  // Stop if we've reached max depth or already crawled this URL
+  if (currentDepth > maxDepth || crawledUrls.has(url)) {
+    return;
+  }
+
+  console.log(`🔍 Crawling depth ${currentDepth}: ${url}`);
+  crawledUrls.add(url);
+
+  try {
+    const pageLinks = await discoverLinksFromPage(url, metadata, baseDomain);
+    
+    // Add all discovered links
+    pageLinks.forEach(link => discoveredLinks.add(link));
+    console.log(`📊 Found ${pageLinks.length} new links on ${url}`);
+
+    // If we haven't reached max depth, recursively crawl some of the discovered links
+    if (currentDepth < maxDepth) {
+      // Limit the number of links we recursively crawl from each page to prevent explosion
+      const linksToRecurse = pageLinks.slice(0, 5);
+      
+      for (const link of linksToRecurse) {
+        if (!crawledUrls.has(link)) {
+          // Add small delay between requests
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await discoverLinksRecursively(link, baseDomain, crawledUrls, discoveredLinks, metadata, currentDepth + 1, maxDepth);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`❌ Error crawling ${url}:`, error);
   }
 }
 
@@ -279,7 +335,7 @@ async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promis
       .map(match => match.replace(/<\/?loc>/g, ''))
       .filter(url => url.startsWith('http'));
     
-    // Filter and normalize links - Remove artificial limits
+    // Filter and normalize links
     const validLinks = rawLinks
       .filter(link => isValidFrontendUrl(link, baseDomain))
       .map(link => normalizeUrl(link))
@@ -296,7 +352,11 @@ async function fetchSitemapLinks(sitemapUrl: string, baseDomain: string): Promis
 async function discoverLinksFromPage(url: string, metadata: any, baseDomain: string): Promise<string[]> {
   try {
     console.log(`🌐 Fetching page content from: ${url}`);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; WebCrawler/1.0)'
+      }
+    });
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -329,13 +389,13 @@ async function discoverLinksFromPage(url: string, metadata: any, baseDomain: str
     console.log(`🔧 After normalization: ${validLinks.length} unique links`);
 
     // Apply include/exclude filters from metadata
-    const includePaths = metadata?.includePaths || [];
-    const excludePaths = metadata?.excludePaths || [];
+    const includePaths = metadata?.include_paths ? metadata.include_paths.split('\n').filter(p => p.trim()) : [];
+    const excludePaths = metadata?.exclude_paths ? metadata.exclude_paths.split('\n').filter(p => p.trim()) : [];
 
     if (includePaths.length > 0) {
       validLinks = validLinks.filter(link => 
         includePaths.some((pattern: string) => 
-          link.includes(pattern.replace('*', ''))
+          link.includes(pattern.trim())
         )
       );
       console.log(`🔍 Applied include filters, ${validLinks.length} links remaining`);
@@ -344,14 +404,13 @@ async function discoverLinksFromPage(url: string, metadata: any, baseDomain: str
     if (excludePaths.length > 0) {
       validLinks = validLinks.filter(link => 
         !excludePaths.some((pattern: string) => 
-          link.includes(pattern.replace('*', ''))
+          link.includes(pattern.trim())
         )
       );
       console.log(`🚫 Applied exclude filters, ${validLinks.length} links remaining`);
     }
 
-    // Remove artificial limits for infinite crawling
-    console.log(`📊 Final result: ${validLinks.length} quality frontend links (no limits applied)`);
+    console.log(`📊 Final result: ${validLinks.length} quality frontend links`);
     return validLinks;
     
   } catch (error) {
@@ -383,8 +442,8 @@ serve(async (req) => {
       );
     }
 
-    // Start crawling in the background
-    crawlWebsite(source_id, url, crawl_type).catch(error => {
+    // Start recursive crawling in the background
+    recursiveCrawlWebsite(source_id, url, crawl_type).catch(error => {
       console.error('🔥 Uncaught crawl error:', error);
     });
 

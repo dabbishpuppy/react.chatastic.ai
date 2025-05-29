@@ -23,11 +23,11 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
     setIsSubmitting(true);
     
     try {
-      // Create the parent source without "Crawl:" prefix
+      // Create the parent source with just the URL as title
       const source = await sourceService.createSource({
         agent_id: agentId,
         source_type: 'website',
-        title: data.url, // Just use the URL without "Crawl:" prefix
+        title: data.url,
         url: data.url,
         crawl_status: 'pending',
         progress: 0,
@@ -42,7 +42,7 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
 
       // Start enhanced crawling based on type
       if (data.crawlType === 'crawl-links') {
-        // Start background crawling with infinite capability
+        // Start background crawling with recursive capability
         WebsiteCrawlService.startEnhancedCrawl(
           agentId,
           source.id,
@@ -86,10 +86,22 @@ export const useWebsiteSubmission = (onSuccess?: () => void) => {
           description: "Individual link is being processed",
         });
       } else if (data.crawlType === 'sitemap') {
-        // TODO: Implement sitemap crawling
+        // For sitemap crawling
+        WebsiteCrawlService.startEnhancedCrawl(
+          agentId,
+          source.id,
+          data.url,
+          {
+            maxDepth: 0,
+            maxPages: Infinity
+          }
+        ).catch(error => {
+          console.error('Sitemap crawl failed:', error);
+        });
+
         toast({
-          title: "Sitemap crawling",
-          description: "Sitemap crawling will be implemented soon",
+          title: "Sitemap crawling started",
+          description: "Sitemap is being processed in the background",
         });
       }
 
