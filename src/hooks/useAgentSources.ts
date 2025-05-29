@@ -13,6 +13,7 @@ export const useAgentSources = (sourceType?: string) => {
   const { sources: sourceService } = useRAGServices();
   const channelRef = useRef<any>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Memoize source filtering
   const filteredSources = useMemo(() => {
@@ -21,19 +22,35 @@ export const useAgentSources = (sourceType?: string) => {
       : sources;
   }, [sources, sourceType]);
 
-  const fetchSources = useCallback(async () => {
+  const fetchSources = useCallback(async (retryCount = 0) => {
     if (!agentId) return;
 
     try {
       setLoading(true);
       setError(null);
+      console.log(`Fetching sources (attempt ${retryCount + 1})...`);
+      
       const fetchedSources = sourceType 
         ? await sourceService.getSourcesByType(agentId, sourceType as any)
         : await sourceService.getSourcesByAgent(agentId);
+      
       setSources(fetchedSources);
+      console.log(`Successfully loaded ${fetchedSources.length} sources`);
     } catch (err: any) {
       console.error('Error fetching sources:', err);
+      
+      // Implement retry logic for timeout errors
+      if ((err.message?.includes('timeout') || err.message?.includes('500')) && retryCount < 2) {
+        console.log(`Retrying fetch in ${(retryCount + 1) * 2} seconds...`);
+        retryTimeoutRef.current = setTimeout(() => {
+          fetchSources(retryCount + 1);
+        }, (retryCount + 1) * 2000);
+        return;
+      }
+      
       setError(err.message || 'Failed to fetch sources');
+      // Set empty sources on persistent errors to prevent UI crashes
+      setSources([]);
     } finally {
       setLoading(false);
     }
@@ -49,6 +66,13 @@ export const useAgentSources = (sourceType?: string) => {
 
   useEffect(() => {
     fetchSources();
+    
+    // Cleanup retry timeout on unmount or dependency change
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
   }, [fetchSources]);
 
   // Set up real-time subscription for agent sources
@@ -74,27 +98,31 @@ export const useAgentSources = (sourceType?: string) => {
           console.log('Real-time agent sources update:', payload);
           
           debouncedUpdate(() => {
-            if (payload.eventType === 'INSERT') {
-              const newSource = payload.new as AgentSource;
-              if (!sourceType || newSource.source_type === sourceType) {
-                setSources(prev => {
-                  // Check if source already exists to avoid duplicates
-                  if (prev.some(source => source.id === newSource.id)) {
-                    return prev;
-                  }
-                  return [...prev, newSource];
-                });
+            try {
+              if (payload.eventType === 'INSERT') {
+                const newSource = payload.new as AgentSource;
+                if (!sourceType || newSource.source_type === sourceType) {
+                  setSources(prev => {
+                    // Check if source already exists to avoid duplicates
+                    if (prev.some(source => source.id === newSource.id)) {
+                      return prev;
+                    }
+                    return [...prev, newSource];
+                  });
+                }
+              } else if (payload.eventType === 'UPDATE') {
+                const updatedSource = payload.new as AgentSource;
+                if (!sourceType || updatedSource.source_type === sourceType) {
+                  setSources(prev => prev.map(source => 
+                    source.id === updatedSource.id ? updatedSource : source
+                  ));
+                }
+              } else if (payload.eventType === 'DELETE') {
+                const deletedSource = payload.old as AgentSource;
+                setSources(prev => prev.filter(source => source.id !== deletedSource.id));
               }
-            } else if (payload.eventType === 'UPDATE') {
-              const updatedSource = payload.new as AgentSource;
-              if (!sourceType || updatedSource.source_type === sourceType) {
-                setSources(prev => prev.map(source => 
-                  source.id === updatedSource.id ? updatedSource : source
-                ));
-              }
-            } else if (payload.eventType === 'DELETE') {
-              const deletedSource = payload.old as AgentSource;
-              setSources(prev => prev.filter(source => source.id !== deletedSource.id));
+            } catch (error) {
+              console.error('Error handling real-time update:', error);
             }
           });
         }
@@ -106,6 +134,9 @@ export const useAgentSources = (sourceType?: string) => {
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
       }
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
