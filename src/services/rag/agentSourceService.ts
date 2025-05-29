@@ -51,27 +51,7 @@ export class AgentSourceService {
   static async getSourcesByAgent(agentId: string): Promise<AgentSource[]> {
     const { data: sources, error } = await supabase
       .from('agent_sources')
-      .select(`
-        id,
-        agent_id,
-        source_type,
-        title,
-        content,
-        metadata,
-        file_path,
-        url,
-        is_active,
-        created_at,
-        updated_at,
-        created_by,
-        team_id,
-        crawl_status,
-        progress,
-        links_count,
-        parent_source_id,
-        is_excluded,
-        last_crawled_at
-      `)
+      .select('*')
       .eq('agent_id', agentId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -87,27 +67,7 @@ export class AgentSourceService {
   static async getSourcesByType(agentId: string, sourceType: SourceType): Promise<AgentSource[]> {
     const { data: sources, error } = await supabase
       .from('agent_sources')
-      .select(`
-        id,
-        agent_id,
-        source_type,
-        title,
-        content,
-        metadata,
-        file_path,
-        url,
-        is_active,
-        created_at,
-        updated_at,
-        created_by,
-        team_id,
-        crawl_status,
-        progress,
-        links_count,
-        parent_source_id,
-        is_excluded,
-        last_crawled_at
-      `)
+      .select('*')
       .eq('agent_id', agentId)
       .eq('source_type', sourceType)
       .eq('is_active', true)
