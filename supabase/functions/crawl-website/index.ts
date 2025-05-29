@@ -12,12 +12,23 @@ interface CrawlRequest {
   enable_content_pipeline?: boolean;
 }
 
+// CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const { source_id, url, crawl_type, max_pages = 100, max_depth = 3, concurrency = 2, enable_content_pipeline = false }: CrawlRequest = await req.json();
     
@@ -70,7 +81,7 @@ serve(async (req) => {
         contentPipelineEnabled: enable_content_pipeline
       }),
       { 
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200 
       }
     );
@@ -84,7 +95,7 @@ serve(async (req) => {
         success: false 
       }),
       { 
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500 
       }
     );
@@ -289,7 +300,7 @@ async function processWithContentPipeline(
       .update({
         title: extractedContent.title,
         content: cleanContentForChunking(extractedContent.content),
-        raw_text: compressedContent.compressed,
+        raw_text: compressedContent.compressed.join(','), // Store as string
         content_summary: summary,
         keywords: keywords,
         extraction_method: 'readability',

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { AgentSource } from "@/types/rag";
 import { ContentExtractionService } from "./contentExtractionService";
@@ -116,11 +117,14 @@ export class WebsiteCrawlService {
         extractedContent.content
       );
 
+      // Convert compressed data to string for storage
+      const compressedDataString = Array.from(compressionResult.compressed).join(',');
+
       // Update the source with archived content and metadata
       await supabase
         .from('agent_sources')
         .update({
-          raw_text: Array.from(compressionResult.compressed), // Store as number array for BYTEA
+          raw_text: compressedDataString, // Store as string representation
           content_summary: summary,
           keywords: keywords,
           extraction_method: 'readability',

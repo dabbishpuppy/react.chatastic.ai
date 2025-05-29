@@ -197,7 +197,24 @@ export class PerformanceMetricsService {
         return [];
       }
 
-      return data || [];
+      // Map database fields to interface fields
+      return (data || []).map(row => ({
+        id: row.id,
+        sourceId: row.source_id,
+        agentId: row.agent_id,
+        teamId: row.team_id,
+        phase: row.phase,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        durationMs: row.duration_ms,
+        inputSize: row.input_size,
+        outputSize: row.output_size,
+        itemsProcessed: row.items_processed,
+        successRate: row.success_rate,
+        errorMessage: row.error_message,
+        metadata: row.metadata as Record<string, any>,
+        createdAt: row.created_at
+      }));
     } catch (error) {
       console.error('Error in getAgentMetrics:', error);
       return [];
