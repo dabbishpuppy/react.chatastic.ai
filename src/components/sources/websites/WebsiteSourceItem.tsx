@@ -55,16 +55,17 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             />
           </div>
           
-          {/* Show status and progress for completed sources */}
-          {source.crawl_status === 'completed' && (
-            <div className="ml-4 flex-shrink-0">
-              <WebsiteSourceStatus
-                status={source.crawl_status}
-                progress={source.progress}
-                showProgressBar={true}
-              />
-            </div>
-          )}
+          {/* Show status and progress with real-time updates */}
+          <div className="ml-4 flex-shrink-0">
+            <WebsiteSourceStatus
+              sourceId={source.id}
+              status={source.crawl_status}
+              progress={source.progress}
+              linksCount={source.links_count}
+              metadata={source.metadata}
+              showProgressBar={true}
+            />
+          </div>
         </div>
         
         <div className="flex items-center gap-2 flex-shrink-0">

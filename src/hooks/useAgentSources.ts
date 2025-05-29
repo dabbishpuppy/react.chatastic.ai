@@ -1,57 +1,41 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRAGServices } from './useRAGServices';
-import { AgentSource, SourceType } from '@/types/rag';
+import { AgentSource } from '@/types/rag';
 import { supabase } from '@/integrations/supabase/client';
 
-export const useAgentSources = (sourceType?: SourceType) => {
+export const useAgentSources = (sourceType?: string) => {
   const { agentId } = useParams();
   const [sources, setSources] = useState<AgentSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { sources: sourceService } = useRAGServices();
 
-  const fetchSources = useCallback(async () => {
+  const fetchSources = async () => {
     if (!agentId) return;
 
     try {
       setLoading(true);
       setError(null);
-      
-      console.log('Fetching sources with useAgentSources hook...');
-      let data: AgentSource[];
-      if (sourceType) {
-        data = await sourceService.getSourcesByType(agentId, sourceType);
-      } else {
-        data = await sourceService.getSourcesByAgent(agentId);
-      }
-      
-      console.log('Sources fetched by hook:', data.length);
-      setSources(data);
-    } catch (err) {
+      const fetchedSources = await sourceService.getAgentSources(agentId, sourceType);
+      setSources(fetchedSources);
+    } catch (err: any) {
       console.error('Error fetching sources:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch sources');
+      setError(err.message || 'Failed to fetch sources');
     } finally {
       setLoading(false);
     }
-  }, [agentId, sourceType, sourceService]);
-
-  // Helper function to remove source from local state
-  const removeSourceFromState = useCallback((sourceId: string) => {
-    setSources(prevSources => prevSources.filter(source => source.id !== sourceId));
-  }, []);
+  };
 
   useEffect(() => {
     fetchSources();
-  }, [fetchSources]);
+  }, [agentId, sourceType]);
 
-  // Set up real-time subscription for sources with improved handling
+  // Set up real-time subscription for agent sources
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('Setting up real-time subscription for agent sources');
-    
     const channel = supabase
       .channel(`agent-sources-${agentId}`)
       .on(
@@ -63,69 +47,46 @@ export const useAgentSources = (sourceType?: SourceType) => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          console.log('Source change detected by hook:', payload);
+          console.log('Real-time agent sources update:', payload);
           
-          // Handle different types of changes more efficiently
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const newSource = {
-              ...payload.new,
-              metadata: payload.new.metadata as Record<string, any> || {}
-            } as AgentSource;
-            
-            // Only add if it matches our filter (if any)
+          if (payload.eventType === 'INSERT') {
+            const newSource = payload.new as AgentSource;
             if (!sourceType || newSource.source_type === sourceType) {
-              setSources(prevSources => {
-                // Check if the source already exists to avoid duplicates
-                const exists = prevSources.some(s => s.id === newSource.id);
-                if (exists) return prevSources;
-                
-                return [newSource, ...prevSources];
-              });
+              setSources(prev => [...prev, newSource]);
             }
-          } else if (payload.eventType === 'UPDATE' && payload.new) {
-            const updatedSource = {
-              ...payload.new,
-              metadata: payload.new.metadata as Record<string, any> || {}
-            } as AgentSource;
-            
-            // For crawling status changes, update immediately without debounce
-            const isStatusChange = payload.old && 
-              payload.new.crawl_status !== payload.old.crawl_status;
-            
-            setSources(prevSources => 
-              prevSources.map(source => 
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedSource = payload.new as AgentSource;
+            if (!sourceType || updatedSource.source_type === sourceType) {
+              setSources(prev => prev.map(source => 
                 source.id === updatedSource.id ? updatedSource : source
-              )
-            );
-            
-            // For major status changes (completed, failed), trigger a refetch to ensure data consistency
-            if (isStatusChange && (updatedSource.crawl_status === 'completed' || updatedSource.crawl_status === 'failed')) {
-              console.log('Major status change detected, triggering refetch');
-              setTimeout(() => fetchSources(), 1000); // Small delay to ensure database is fully updated
+              ));
             }
-          } else if (payload.eventType === 'DELETE' && payload.old) {
-            // Remove the deleted source from state
-            setSources(prevSources => 
-              prevSources.filter(source => source.id !== payload.old.id)
-            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedSource = payload.old as AgentSource;
+            setSources(prev => prev.filter(source => source.id !== deletedSource.id));
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Hook subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('Cleaning up hook subscription');
       supabase.removeChannel(channel);
     };
-  }, [agentId, sourceType, fetchSources]);
+  }, [agentId, sourceType]);
+
+  const removeSourceFromState = (sourceId: string) => {
+    setSources(prev => prev.filter(source => source.id !== sourceId));
+  };
+
+  const refetch = () => {
+    fetchSources();
+  };
 
   return {
     sources,
     loading,
     error,
-    refetch: fetchSources,
-    removeSourceFromState
+    removeSourceFromState,
+    refetch
   };
 };

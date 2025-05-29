@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,6 +21,7 @@ const WebsiteTab: React.FC = () => {
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
+  const [stalledSources, setStalledSources] = useState<Set<string>>(new Set());
 
   // Group sources by parent-child relationships
   const parentSources = websiteSources.filter(source => !source.parent_source_id);
@@ -39,6 +41,29 @@ const WebsiteTab: React.FC = () => {
       });
       setExpandedSources(newExpandedSources);
     }
+  }, [parentSources]);
+
+  // Monitor for stalled crawling processes
+  useEffect(() => {
+    const crawlingSources = parentSources.filter(
+      source => source.crawl_status === 'in_progress'
+    );
+
+    crawlingSources.forEach(source => {
+      const lastUpdate = source.metadata?.last_progress_update;
+      if (lastUpdate) {
+        const timeSinceUpdate = Date.now() - new Date(lastUpdate).getTime();
+        if (timeSinceUpdate > 45000) { // 45 seconds threshold
+          setStalledSources(prev => new Set([...prev, source.id]));
+          
+          // Auto-restart stalled crawls
+          if (timeSinceUpdate > 60000) { // 1 minute
+            console.log(`Auto-restarting stalled crawl for source ${source.id}`);
+            handleRecrawl(source);
+          }
+        }
+      }
+    });
   }, [parentSources]);
 
   const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link', options?: { maxPages?: number; maxDepth?: number; concurrency?: number }) => {
@@ -133,10 +158,23 @@ const WebsiteTab: React.FC = () => {
 
   const handleRecrawl = async (source: AgentSource) => {
     try {
+      // Clear stalled status
+      setStalledSources(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(source.id);
+        return newSet;
+      });
+
       await sourceService.updateSource(source.id, {
         crawl_status: 'pending',
         progress: 0,
-        last_crawled_at: new Date().toISOString()
+        links_count: 0,
+        last_crawled_at: new Date().toISOString(),
+        metadata: {
+          ...source.metadata,
+          last_progress_update: new Date().toISOString(),
+          restart_count: (source.metadata?.restart_count || 0) + 1
+        }
       });
       
       // Auto-expand the source that is being recrawled

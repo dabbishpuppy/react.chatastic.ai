@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -21,9 +20,18 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Configurable crawl limits
 const DEFAULT_MAX_PAGES = parseInt(Deno.env.get('MAX_CRAWL_PAGES') || '1000');
 const DEFAULT_MAX_DEPTH = parseInt(Deno.env.get('MAX_CRAWL_DEPTH') || '10');
-const DEFAULT_CONCURRENCY = parseInt(Deno.env.get('CRAWL_CONCURRENCY') || '5');
+const DEFAULT_CONCURRENCY = parseInt(Deno.env.get('CRAWL_CONCURRENCY') || '10');
 
-// Enhanced recursive crawling function with configurable limits and concurrency
+// Track shutdown state
+let isShuttingDown = false;
+
+// Handle graceful shutdown
+addEventListener('beforeunload', (ev) => {
+  console.log('Function shutdown due to:', ev.detail?.reason);
+  isShuttingDown = true;
+});
+
+// Enhanced recursive crawling function with real-time progress updates
 async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: string) {
   console.log(`🕷️ Starting enhanced crawl for ${url} with type ${crawlType}`);
   
@@ -31,15 +39,7 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
     const normalizedUrl = normalizeUrl(url);
     console.log(`🔧 Normalized URL: ${normalizedUrl}`);
     
-    await supabase
-      .from('agent_sources')
-      .update({ 
-        crawl_status: 'in_progress', 
-        progress: 10,
-        last_crawled_at: new Date().toISOString(),
-        url: normalizedUrl
-      })
-      .eq('id', sourceId);
+    await updateSourceProgress(sourceId, 'in_progress', 0, 0, 0);
 
     const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
@@ -86,11 +86,14 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       const validation = isCustomerFacingUrl(normalizedUrl, baseDomain);
       if (validation.valid) {
         discoveredUrls.add(normalizedUrl);
+        await updateSourceProgress(sourceId, 'in_progress', 50, 1, maxPages);
       } else {
         console.log(`❌ Individual link failed validation: ${validation.reason}`);
       }
     } else if (crawlType === 'sitemap') {
       console.log(`🗺️ Fetching sitemap from: ${normalizedUrl}`);
+      await updateSourceProgress(sourceId, 'in_progress', 20, 0, maxPages);
+      
       const sitemapUrls = await fetchSitemapLinks(normalizedUrl);
       
       // Apply filtering to sitemap URLs
@@ -107,9 +110,12 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       
       console.log(`✅ Sitemap: ${limitedUrls.length} valid (limited from ${filterResults.valid.length}), ${filterResults.stats.total - filterResults.stats.validCount} filtered`);
       Object.assign(crawlStats, filterResults.stats);
+      
+      await updateSourceProgress(sourceId, 'in_progress', 70, discoveredUrls.size, maxPages);
     } else {
       console.log(`🔍 Starting enhanced recursive crawl from: ${normalizedUrl}`);
       await enhancedRecursiveCrawlWithConcurrency(
+        sourceId,
         normalizedUrl, 
         baseDomain, 
         includePatterns, 
@@ -123,28 +129,16 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       );
     }
 
+    if (isShuttingDown) {
+      console.log('⚠️ Function is shutting down, saving progress...');
+      await updateSourceProgress(sourceId, 'pending', 50, discoveredUrls.size, maxPages);
+      return;
+    }
+
     console.log(`✅ Discovery complete: ${discoveredUrls.size} valid URLs found`);
     console.log(`📊 Crawl stats:`, crawlStats);
 
-    await supabase
-      .from('agent_sources')
-      .update({ 
-        progress: 50,
-        links_count: discoveredUrls.size,
-        metadata: {
-          ...source.metadata,
-          crawl_stats: crawlStats,
-          last_crawl_summary: {
-            urls_discovered: discoveredUrls.size,
-            pages_visited: crawlStats.pagesVisited,
-            links_filtered: crawlStats.linksFiltered,
-            completion_reason: crawlStats.completionReason,
-            max_pages_reached: crawlStats.maxPagesReached,
-            max_depth_reached: crawlStats.maxDepthReached
-          }
-        }
-      })
-      .eq('id', sourceId);
+    await updateSourceProgress(sourceId, 'in_progress', 80, discoveredUrls.size, maxPages);
 
     // Create child sources for valid URLs
     if (discoveredUrls.size > 0) {
@@ -153,6 +147,11 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
       
       const batchSize = 100;
       for (let i = 0; i < urlsArray.length; i += batchSize) {
+        if (isShuttingDown) {
+          console.log('⚠️ Shutdown detected during child source creation');
+          break;
+        }
+
         const batch = urlsArray.slice(i, i + batchSize);
         const childSources = batch.map(link => ({
           agent_id: source.agent_id,
@@ -181,19 +180,19 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
           console.log(`✅ Created batch ${i}-${i + batch.length} of child sources`);
         }
 
-        const progressPercent = Math.min(50 + (i / urlsArray.length) * 40, 90);
-        await supabase
-          .from('agent_sources')
-          .update({ progress: Math.round(progressPercent) })
-          .eq('id', sourceId);
+        const progressPercent = Math.min(80 + (i / urlsArray.length) * 15, 95);
+        await updateSourceProgress(sourceId, 'in_progress', Math.round(progressPercent), discoveredUrls.size, maxPages);
       }
     }
 
+    const finalStatus = isShuttingDown ? 'pending' : 'completed';
+    const finalProgress = isShuttingDown ? 50 : 100;
+    
     await supabase
       .from('agent_sources')
       .update({ 
-        crawl_status: 'completed',
-        progress: 100,
+        crawl_status: finalStatus,
+        progress: finalProgress,
         links_count: discoveredUrls.size,
         last_crawled_at: new Date().toISOString(),
         metadata: {
@@ -202,13 +201,19 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
           completion_summary: {
             total_urls: discoveredUrls.size,
             completion_time: new Date().toISOString(),
-            completion_reason: crawlStats.completionReason
+            completion_reason: isShuttingDown ? 'function_shutdown' : crawlStats.completionReason,
+            max_pages: maxPages,
+            pages_crawled: discoveredUrls.size
           }
         }
       })
       .eq('id', sourceId);
 
-    console.log(`✅ Enhanced crawl completed for ${normalizedUrl} - found ${discoveredUrls.size} customer-facing URLs`);
+    const statusMessage = isShuttingDown ? 
+      `⚠️ Crawl paused due to function shutdown for ${normalizedUrl} - found ${discoveredUrls.size} URLs` :
+      `✅ Enhanced crawl completed for ${normalizedUrl} - found ${discoveredUrls.size} customer-facing URLs`;
+    
+    console.log(statusMessage);
     
   } catch (error) {
     console.error(`❌ Crawl failed for ${url}:`, error);
@@ -226,8 +231,32 @@ async function recursiveCrawlWebsite(sourceId: string, url: string, crawlType: s
   }
 }
 
-// Enhanced recursive crawl with concurrency control and configurable limits
+// Helper function to update source progress with detailed info
+async function updateSourceProgress(sourceId: string, status: string, progress: number, currentCount: number, maxPages: number): Promise<void> {
+  const { error } = await supabase
+    .from('agent_sources')
+    .update({
+      crawl_status: status,
+      progress,
+      links_count: currentCount,
+      metadata: {
+        current_crawled: currentCount,
+        max_pages: maxPages,
+        last_progress_update: new Date().toISOString()
+      }
+    })
+    .eq('id', sourceId);
+
+  if (error) {
+    console.error('Error updating progress:', error);
+  } else {
+    console.log(`📊 Progress update: ${status} ${progress}% (${currentCount}/${maxPages})`);
+  }
+}
+
+// Enhanced recursive crawl with concurrency control and real-time progress
 async function enhancedRecursiveCrawlWithConcurrency(
+  sourceId: string,
   startUrl: string,
   baseDomain: string,
   includePatterns: string[],
@@ -245,13 +274,13 @@ async function enhancedRecursiveCrawlWithConcurrency(
   
   console.log(`🚀 Starting concurrent crawl: maxDepth=${maxDepth}, maxPages=${maxPages}, concurrency=${concurrency}`);
 
-  while (urlQueue.length > 0 && discoveredUrls.size < maxPages) {
+  while (urlQueue.length > 0 && discoveredUrls.size < maxPages && !isShuttingDown) {
     // Take up to 'concurrency' URLs from the queue
     const currentBatch = urlQueue.splice(0, concurrency);
     
     // Process batch concurrently
     const batchPromises = currentBatch.map(async ({url, depth}) => {
-      if (processingUrls.has(url) || processedUrls.has(url) || depth > maxDepth) {
+      if (processingUrls.has(url) || processedUrls.has(url) || depth > maxDepth || isShuttingDown) {
         if (depth > maxDepth) {
           crawlStats.maxDepthReached = true;
         }
@@ -274,6 +303,12 @@ async function enhancedRecursiveCrawlWithConcurrency(
               validNewUrls.push({url: newUrl, depth: depth + 1});
             }
           }
+        }
+        
+        // Update progress every few pages
+        if (discoveredUrls.size % 5 === 0) {
+          const progressPercent = Math.min((discoveredUrls.size / maxPages) * 70, 70);
+          await updateSourceProgress(sourceId, 'in_progress', Math.round(progressPercent), discoveredUrls.size, maxPages);
         }
         
         return validNewUrls;
@@ -302,7 +337,9 @@ async function enhancedRecursiveCrawlWithConcurrency(
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   
-  if (urlQueue.length === 0) {
+  if (isShuttingDown) {
+    crawlStats.completionReason = 'function_shutdown';
+  } else if (urlQueue.length === 0) {
     crawlStats.completionReason = 'all_pages_crawled';
   }
   
@@ -451,10 +488,17 @@ serve(async (req) => {
       }
     }
 
-    // Start enhanced crawling process
-    recursiveCrawlWebsite(source_id, url, crawl_type).catch(error => {
-      console.error('🔥 Uncaught enhanced crawl error:', error);
-    });
+    // Use EdgeRuntime.waitUntil to prevent premature shutdown
+    const crawlPromise = recursiveCrawlWebsite(source_id, url, crawl_type);
+    
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      EdgeRuntime.waitUntil(crawlPromise);
+    } else {
+      // Fallback for environments without EdgeRuntime
+      crawlPromise.catch(error => {
+        console.error('🔥 Uncaught enhanced crawl error:', error);
+      });
+    }
 
     return new Response(
       JSON.stringify({ 
@@ -472,7 +516,8 @@ serve(async (req) => {
           'Semantic HTML parsing',
           'Configurable limits and concurrency',
           'Advanced filtering',
-          'Include/exclude pattern support'
+          'Real-time progress tracking',
+          'Graceful shutdown handling'
         ]
       }), 
       { 
