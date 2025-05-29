@@ -64,13 +64,27 @@ const WebsiteTab: React.FC = () => {
     }
   };
 
-  const handleEdit = useCallback((source: AgentSource) => {
-    // TODO: Implement edit functionality
-    toast({
-      title: "Edit functionality",
-      description: "Edit functionality will be implemented soon"
-    });
-  }, []);
+  const handleEdit = useCallback(async (sourceId: string, newUrl: string) => {
+    try {
+      await sourceService.updateSource(sourceId, {
+        url: newUrl,
+        title: newUrl // Update title to match new URL
+      });
+      
+      toast({
+        title: "Success",
+        description: "URL updated successfully"
+      });
+      
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update URL",
+        variant: "destructive"
+      });
+    }
+  }, [sourceService, refetch]);
 
   const handleExclude = useCallback(async (source: AgentSource) => {
     try {
