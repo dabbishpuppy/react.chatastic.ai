@@ -17,13 +17,6 @@ export type AuditAction = Database['public']['Enums']['audit_action'];
 
 export interface AgentSource extends Omit<DbAgentSource, 'metadata'> {
   metadata?: Record<string, any>;
-  // Add the new crawl-related fields
-  crawl_status?: string | null;
-  progress?: number | null;
-  links_count?: number | null;
-  parent_source_id?: string | null;
-  is_excluded?: boolean | null;
-  last_crawled_at?: string | null;
 }
 
 export interface SourceChunk extends Omit<DbSourceChunk, 'metadata'> {
