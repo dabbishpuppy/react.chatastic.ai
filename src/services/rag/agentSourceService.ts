@@ -47,14 +47,35 @@ export class AgentSourceService {
     };
   }
 
-  // Get all sources for an agent
+  // Get all sources for an agent - optimized query
   static async getSourcesByAgent(agentId: string): Promise<AgentSource[]> {
     const { data: sources, error } = await supabase
       .from('agent_sources')
-      .select('*')
+      .select(`
+        id,
+        agent_id,
+        source_type,
+        title,
+        content,
+        metadata,
+        file_path,
+        url,
+        is_active,
+        created_at,
+        updated_at,
+        created_by,
+        team_id,
+        crawl_status,
+        progress,
+        links_count,
+        parent_source_id,
+        is_excluded,
+        last_crawled_at
+      `)
       .eq('agent_id', agentId)
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(100); // Add reasonable limit to prevent timeouts
 
     if (error) throw new Error(`Failed to fetch sources: ${error.message}`);
     return (sources || []).map(source => ({
@@ -66,11 +87,32 @@ export class AgentSourceService {
   static async getSourcesByType(agentId: string, sourceType: SourceType): Promise<AgentSource[]> {
     const { data: sources, error } = await supabase
       .from('agent_sources')
-      .select('*')
+      .select(`
+        id,
+        agent_id,
+        source_type,
+        title,
+        content,
+        metadata,
+        file_path,
+        url,
+        is_active,
+        created_at,
+        updated_at,
+        created_by,
+        team_id,
+        crawl_status,
+        progress,
+        links_count,
+        parent_source_id,
+        is_excluded,
+        last_crawled_at
+      `)
       .eq('agent_id', agentId)
       .eq('source_type', sourceType)
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(50); // Smaller limit for type-specific queries
 
     if (error) throw new Error(`Failed to fetch sources by type: ${error.message}`);
     return (sources || []).map(source => ({
@@ -140,21 +182,25 @@ export class AgentSourceService {
   }
 
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
-    const { data, error } = await supabase
+    // Simplified query to avoid complex joins that might timeout
+    const { data: source, error } = await supabase
       .from('agent_sources')
-      .select(`
-        *,
-        source_chunks(count)
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
-    if (error) throw new Error(`Failed to fetch source with stats: ${error.message}`);
+    if (error) throw new Error(`Failed to fetch source: ${error.message}`);
+    
+    // Get chunk count separately to avoid timeout
+    const { count: chunksCount } = await supabase
+      .from('source_chunks')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_id', id);
     
     return {
-      ...data,
-      metadata: data.metadata as Record<string, any> || {},
-      chunks_count: data.source_chunks?.[0]?.count || 0
+      ...source,
+      metadata: source.metadata as Record<string, any> || {},
+      chunks_count: chunksCount || 0
     };
   }
 }

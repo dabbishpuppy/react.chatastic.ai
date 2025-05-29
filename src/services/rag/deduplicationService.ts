@@ -21,7 +21,7 @@ interface DeduplicationResult {
 }
 
 export class DeduplicationService {
-  // Process chunks for deduplication using the new optimized content_hash system
+  // Process chunks for deduplication using content hash system
   static async processChunksForDeduplication(
     chunks: ChunkForDeduplication[],
     agentId: string
@@ -107,18 +107,49 @@ export class DeduplicationService {
     deduplicationRate: number;
     spaceSaved: number;
   }> {
-    const { data: stats, error } = await supabase
-      .from('source_chunks')
-      .select(`
-        id,
-        is_duplicate,
-        content,
-        agent_sources!inner(agent_id)
-      `)
-      .eq('agent_sources.agent_id', agentId);
+    try {
+      // Use simpler query to avoid timeouts
+      const { data: stats, error } = await supabase
+        .from('source_chunks')
+        .select(`
+          id,
+          is_duplicate,
+          content,
+          agent_sources!inner(agent_id)
+        `)
+        .eq('agent_sources.agent_id', agentId)
+        .limit(1000); // Add limit to prevent timeouts
 
-    if (error || !stats) {
-      console.error('Error fetching deduplication stats:', error);
+      if (error || !stats) {
+        console.error('Error fetching deduplication stats:', error);
+        return {
+          totalChunks: 0,
+          uniqueChunks: 0,
+          duplicateChunks: 0,
+          deduplicationRate: 0,
+          spaceSaved: 0
+        };
+      }
+
+      const totalChunks = stats.length;
+      const duplicateChunks = stats.filter(chunk => chunk.is_duplicate).length;
+      const uniqueChunks = totalChunks - duplicateChunks;
+      const deduplicationRate = totalChunks > 0 ? duplicateChunks / totalChunks : 0;
+      
+      // Calculate approximate space saved (content length of duplicates)
+      const spaceSaved = stats
+        .filter(chunk => chunk.is_duplicate)
+        .reduce((sum, chunk) => sum + (chunk.content?.length || 0), 0);
+
+      return {
+        totalChunks,
+        uniqueChunks,
+        duplicateChunks,
+        deduplicationRate,
+        spaceSaved
+      };
+    } catch (error) {
+      console.error('Error getting deduplication stats:', error);
       return {
         totalChunks: 0,
         uniqueChunks: 0,
@@ -127,39 +158,26 @@ export class DeduplicationService {
         spaceSaved: 0
       };
     }
-
-    const totalChunks = stats.length;
-    const duplicateChunks = stats.filter(chunk => chunk.is_duplicate).length;
-    const uniqueChunks = totalChunks - duplicateChunks;
-    const deduplicationRate = totalChunks > 0 ? duplicateChunks / totalChunks : 0;
-    
-    // Calculate approximate space saved (content length of duplicates)
-    const spaceSaved = stats
-      .filter(chunk => chunk.is_duplicate)
-      .reduce((sum, chunk) => sum + (chunk.content?.length || 0), 0);
-
-    return {
-      totalChunks,
-      uniqueChunks,
-      duplicateChunks,
-      deduplicationRate,
-      spaceSaved
-    };
   }
 
-  // Cleanup orphaned chunks using the new maintenance function
+  // Cleanup orphaned chunks using the database function
   static async cleanupOrphanedChunks(): Promise<number> {
     console.log('🧹 Cleaning up orphaned chunks...');
     
-    const { data: deletedCount, error } = await supabase
-      .rpc('cleanup_orphaned_chunks');
+    try {
+      const { data: deletedCount, error } = await supabase
+        .rpc('cleanup_orphaned_chunks');
 
-    if (error) {
+      if (error) {
+        console.error('Error cleaning up orphaned chunks:', error);
+        return 0;
+      }
+
+      console.log(`✅ Cleaned up ${deletedCount} orphaned chunks`);
+      return deletedCount;
+    } catch (error) {
       console.error('Error cleaning up orphaned chunks:', error);
       return 0;
     }
-
-    console.log(`✅ Cleaned up ${deletedCount} orphaned chunks`);
-    return deletedCount;
   }
 }
