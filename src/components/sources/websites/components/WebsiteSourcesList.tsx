@@ -25,32 +25,37 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   loading,
   error
 }) => {
-  // Calculate total content size
+  // Calculate total content size safely
   const calculateTotalSize = () => {
-    let totalBytes = 0;
-    
-    parentSources.forEach(parent => {
-      // Add parent content size
-      if (parent.content) {
-        totalBytes += new Blob([parent.content]).size;
-      }
-      if (parent.metadata?.total_content_size) {
-        totalBytes += parent.metadata.total_content_size;
-      }
+    try {
+      let totalBytes = 0;
       
-      // Add child sources content size
-      const children = getChildSources(parent.id);
-      children.forEach(child => {
-        if (child.content) {
-          totalBytes += new Blob([child.content]).size;
+      parentSources.forEach(parent => {
+        // Add parent content size
+        if (parent.content) {
+          totalBytes += new Blob([parent.content]).size;
         }
-        if (child.metadata?.content_size) {
-          totalBytes += child.metadata.content_size;
+        if (parent.metadata?.total_content_size) {
+          totalBytes += parent.metadata.total_content_size;
         }
+        
+        // Add child sources content size
+        const children = getChildSources(parent.id);
+        children.forEach(child => {
+          if (child.content) {
+            totalBytes += new Blob([child.content]).size;
+          }
+          if (child.metadata?.content_size) {
+            totalBytes += child.metadata.content_size;
+          }
+        });
       });
-    });
-    
-    return totalBytes;
+      
+      return totalBytes;
+    } catch (error) {
+      console.error('Error calculating total size:', error);
+      return 0;
+    }
   };
 
   const formatSize = (bytes: number) => {
@@ -99,17 +104,20 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       </div>
       
       <div className="space-y-3">
-        {parentSources.map(source => (
-          <WebsiteSourceItem
-            key={source.id}
-            source={source}
-            childSources={getChildSources(source.id)}
-            onEdit={onEdit}
-            onExclude={onExclude}
-            onDelete={onDelete}
-            onRecrawl={onRecrawl}
-          />
-        ))}
+        {parentSources.map(source => {
+          const childSources = getChildSources(source.id);
+          return (
+            <WebsiteSourceItem
+              key={source.id}
+              source={source}
+              childSources={childSources}
+              onEdit={onEdit}
+              onExclude={onExclude}
+              onDelete={onDelete}
+              onRecrawl={onRecrawl}
+            />
+          );
+        })}
       </div>
     </div>
   );

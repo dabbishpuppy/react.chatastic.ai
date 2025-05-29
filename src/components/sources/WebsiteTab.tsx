@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
@@ -22,6 +22,9 @@ const WebsiteTab: React.FC = () => {
   const [excludePaths, setExcludePaths] = useState("");
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
   const [stalledSources, setStalledSources] = useState<Set<string>>(new Set());
+  
+  // Add ref to track ongoing recrawl operations
+  const recrawlInProgressRef = useRef<Set<string>>(new Set());
 
   // Group sources by parent-child relationships
   const parentSources = websiteSources.filter(source => !source.parent_source_id);
@@ -156,8 +159,17 @@ const WebsiteTab: React.FC = () => {
     }
   };
 
-  const handleRecrawl = async (source: AgentSource) => {
+  const handleRecrawl = useCallback(async (source: AgentSource) => {
+    // Prevent multiple recrawl operations on the same source
+    if (recrawlInProgressRef.current.has(source.id)) {
+      console.log(`Recrawl already in progress for source ${source.id}`);
+      return;
+    }
+
     try {
+      // Mark recrawl as in progress
+      recrawlInProgressRef.current.add(source.id);
+
       // Clear stalled status
       setStalledSources(prev => {
         const newSet = new Set(prev);
@@ -187,13 +199,19 @@ const WebsiteTab: React.FC = () => {
       
       refetch();
     } catch (error) {
+      console.error('Recrawl error:', error);
       toast({
         title: "Error",
         description: "Failed to initiate recrawl",
         variant: "destructive"
       });
+    } finally {
+      // Clear the in-progress flag after a delay to prevent rapid successive calls
+      setTimeout(() => {
+        recrawlInProgressRef.current.delete(source.id);
+      }, 2000);
     }
-  };
+  }, [sourceService, refetch]);
 
   return (
     <div className="space-y-6 mt-4">
