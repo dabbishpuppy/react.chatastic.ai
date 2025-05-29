@@ -14,7 +14,7 @@ import WebsiteChildSources from './components/WebsiteChildSources';
 interface WebsiteSourceItemProps {
   source: AgentSource;
   childSources?: AgentSource[];
-  onEdit: (source: AgentSource) => void;
+  onEdit: (sourceId: string, newUrl: string) => void;
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
   onRecrawl: (source: AgentSource) => void;

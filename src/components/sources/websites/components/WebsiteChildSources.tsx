@@ -11,7 +11,7 @@ interface WebsiteChildSourcesProps {
   childSources: AgentSource[];
   parentSourceId: string;
   isCrawling: boolean;
-  onEdit: (source: AgentSource) => void;
+  onEdit: (sourceId: string, newUrl: string) => void;
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
   onRecrawl: (source: AgentSource) => void;
