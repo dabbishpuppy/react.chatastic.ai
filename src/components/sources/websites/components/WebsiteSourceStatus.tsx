@@ -77,6 +77,36 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
     return () => clearTimeout(stallTimer);
   }, [realtimeData.status, realtimeData.progress, realtimeData.linksCount]);
 
+  // Determine the effective status - handle pending with found pages as completed
+  const getEffectiveStatus = () => {
+    const currentStatus = realtimeData.status;
+    const currentCount = realtimeData.linksCount || 0;
+    
+    // If status is pending but we have found pages and no recent activity, treat as completed
+    if (currentStatus === 'pending' && currentCount > 0) {
+      // Check if this seems like a completed crawl
+      const maxPages = realtimeData.metadata?.max_pages || 1000;
+      const lastUpdate = realtimeData.metadata?.last_progress_update;
+      
+      if (lastUpdate) {
+        const timeSinceLastUpdate = Date.now() - new Date(lastUpdate).getTime();
+        // If it's been more than 10 seconds since last update and we have pages, consider it completed
+        if (timeSinceLastUpdate > 10000) {
+          return 'completed';
+        }
+      }
+      
+      // If we've reached a substantial number of pages, likely completed
+      if (currentCount >= 10 || currentCount >= maxPages) {
+        return 'completed';
+      }
+    }
+    
+    return currentStatus;
+  };
+
+  const effectiveStatus = getEffectiveStatus();
+
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -105,17 +135,23 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
       case 'failed': 
         return 'Failed';
       case 'pending': 
-        return `Pending (${currentCount} found)`;
+        // Better handling for pending states
+        if (currentCount === 0) {
+          return 'Pending';
+        } else {
+          // If we have pages found but still pending, show as finalizing
+          return `Finalizing (${currentCount} found)`;
+        }
       default: 
         return 'Unknown';
     }
   };
 
-  const isCrawling = realtimeData.status === 'in_progress' || realtimeData.status === 'pending';
+  const isCrawling = effectiveStatus === 'in_progress' || (effectiveStatus === 'pending' && realtimeData.linksCount === 0);
 
   return (
     <div className="flex items-center gap-2">
-      <Badge className={getStatusColor(realtimeData.status)}>
+      <Badge className={getStatusColor(effectiveStatus)}>
         {isCrawling && (
           <>
             {isStalled ? (
@@ -125,10 +161,10 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
             )}
           </>
         )}
-        {getStatusText(realtimeData.status)}
+        {getStatusText(effectiveStatus)}
       </Badge>
       
-      {showProgressBar && realtimeData.status === 'in_progress' && realtimeData.progress && (
+      {showProgressBar && effectiveStatus === 'in_progress' && realtimeData.progress && (
         <div className="w-20 bg-gray-200 rounded-full h-2">
           <div 
             className={`h-2 rounded-full transition-all duration-300 ${
