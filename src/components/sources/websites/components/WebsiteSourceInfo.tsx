@@ -43,7 +43,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const displayText = isChild ? url : (title || url);
   const displayUrl = isChild && url.length > 45 ? `${url.substring(0, 45)}...` : displayText;
 
-  // Calculate content size
+  // Calculate content size more accurately
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '';
     if (bytes < 1024) return `${bytes}B`;
@@ -79,13 +79,12 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           
           return total + childSize;
         }, 0);
-      } else {
-        // Fallback to metadata if no child sources available
-        if (metadata?.total_content_size) {
-          size += metadata.total_content_size;
-        } else if (content) {
-          size += new Blob([content]).size;
-        }
+      } else if (metadata?.total_content_size) {
+        // Use cached total from metadata if available
+        size = metadata.total_content_size;
+      } else if (content) {
+        // Fallback to own content if no children
+        size = new Blob([content]).size;
       }
     }
     
@@ -120,7 +119,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             )}
             {lastCrawledAt && (
               <>
-                {(linksCount && linksCount > 0) || sizeText ? <span>•</span> : null}
+                {((linksCount && linksCount > 0) || sizeText) && <span>•</span>}
                 <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
               </>
             )}

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SourceType } from "@/types/rag";
@@ -68,13 +69,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
           
           return total + childSize;
         }, 0);
-      } else {
-        // Fallback to parent's own metadata if no children found
-        if (source.metadata?.total_content_size) {
-          sourceSize += source.metadata.total_content_size;
-        } else if (source.content) {
-          sourceSize += new Blob([source.content]).size;
-        }
+      } else if (source.metadata?.total_content_size) {
+        // Use cached total if available
+        sourceSize = source.metadata.total_content_size;
+      } else if (source.content) {
+        // Fallback to parent's own content
+        sourceSize = new Blob([source.content]).size;
       }
     } else if (source.source_type !== 'website' || source.parent_source_id) {
       // For non-website sources or website child sources, use individual size
@@ -118,8 +118,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     
     // Calculate total size using enhanced calculation
     const totalBytes = sourcesToCount.reduce((total, source) => {
-      return total + calculateSourceSize(source, sourcesData);
+      const sourceSize = calculateSourceSize(source, sourcesData);
+      console.log(`📏 Source ${source.title || source.url}: ${sourceSize} bytes`);
+      return total + sourceSize;
     }, 0);
+    
+    console.log(`📊 Total calculated size: ${totalBytes} bytes`);
     
     let formattedTotalSize;
     if (totalBytes < 1024) formattedTotalSize = `${totalBytes} B`;

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { AgentSource, SourceType } from "@/types/rag";
 
@@ -215,8 +216,10 @@ export class AgentSourceService {
               childSize += new Blob([child.content]).size;
             }
             
-            if (child.metadata?.content_size) {
-              childSize += child.metadata.content_size;
+            // Fix TypeScript error by properly typing metadata access
+            const metadata = child.metadata as Record<string, any> | null;
+            if (metadata && typeof metadata.content_size === 'number') {
+              childSize += metadata.content_size;
             }
             
             return total + childSize;
