@@ -65,8 +65,11 @@ export class WebsiteCrawlService {
 
     if (fetchError) throw fetchError;
 
+    // Safely handle metadata by ensuring it's always an object
+    const existingMetadata = currentSource.metadata as Record<string, any> || {};
+    
     const updatedMetadata = {
-      ...(currentSource.metadata || {}),
+      ...existingMetadata,
       max_pages: options.maxPages || 100,
       max_depth: options.maxDepth || 3,
       concurrency: options.concurrency || 2,
