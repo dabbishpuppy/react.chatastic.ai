@@ -66,7 +66,7 @@ export class WebsiteCrawlService {
     if (fetchError) throw fetchError;
 
     const updatedMetadata = {
-      ...currentSource.metadata,
+      ...(currentSource.metadata || {}),
       max_pages: options.maxPages || 100,
       max_depth: options.maxDepth || 3,
       concurrency: options.concurrency || 2,
