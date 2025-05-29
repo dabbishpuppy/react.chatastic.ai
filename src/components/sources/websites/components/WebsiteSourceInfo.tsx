@@ -22,8 +22,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   isChild = false,
   crawlStatus
 }) => {
-  const iconSize = isChild ? 'h-4 w-4' : 'h-5 w-5';
-  const iconPadding = isChild ? 'p-1' : 'p-2';
+  const iconSize = isChild ? 'h-3 w-3' : 'h-4 w-4';
   const titleSize = isChild ? 'text-sm' : '';
   const metaSize = isChild ? 'text-xs' : 'text-sm';
 
@@ -31,16 +30,19 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const isCrawling = crawlStatus === 'in_progress' || crawlStatus === 'pending';
   const showMetadata = !isCrawling && crawlStatus === 'completed';
 
-  // Truncate URL for child sources to prevent width changes
-  const displayUrl = isChild && url.length > 50 ? `${url.substring(0, 50)}...` : url;
+  // Fixed width containers to prevent layout shifts
+  const containerWidth = isChild ? 'w-full max-w-md' : 'flex-1';
+  
+  // Truncate URL for child sources with ellipsis
+  const displayUrl = isChild && url.length > 45 ? `${url.substring(0, 45)}...` : url;
 
   return (
     <div className="flex items-center flex-1 min-w-0">
-      <div className={`bg-gray-100 rounded-full ${iconPadding} mr-3 flex-shrink-0`}>
-        <Link className={`${iconSize} text-gray-600`} />
+      <div className={`mr-3 flex-shrink-0`}>
+        <Link className={`${iconSize} text-purple-600`} />
       </div>
       
-      <div className="flex-1 min-w-0">
+      <div className={`${containerWidth} min-w-0`}>
         <div className={`font-medium ${titleSize} truncate`} title={title || url}>
           {title || (isChild ? displayUrl : url)}
         </div>

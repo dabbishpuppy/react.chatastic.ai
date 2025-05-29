@@ -3,135 +3,108 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
-import { supabase } from '@/integrations/supabase/client';
+import { WebsiteCrawlService } from '@/services/rag/websiteCrawlService';
 
-export interface WebsiteFormData {
+interface WebsiteSubmissionData {
   url: string;
   includePaths?: string;
   excludePaths?: string;
   crawlType: 'crawl-links' | 'sitemap' | 'individual-link';
 }
 
-export const useWebsiteSubmission = (refetch: () => void) => {
-  const { agentId } = useParams();
+export const useWebsiteSubmission = (onSuccess?: () => void) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { sources } = useRAGServices();
+  const { agentId } = useParams();
+  const { sources: sourceService } = useRAGServices();
 
-  const submitWebsiteSource = async (formData: WebsiteFormData) => {
-    if (!agentId) {
-      toast({
-        title: "Error",
-        description: "Agent ID is required",
-        variant: "destructive"
-      });
-      return;
-    }
+  const submitWebsiteSource = async (data: WebsiteSubmissionData) => {
+    if (!agentId) return null;
 
-    if (!formData.url) {
-      toast({
-        title: "URL required",
-        description: "Please enter a URL",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    setIsSubmitting(true);
+    
     try {
-      setIsSubmitting(true);
-
-      // Ensure URL starts with http:// or https://
-      let url = formData.url;
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url;
-      }
-
-      // Prepare metadata based on crawl type
-      const metadata = {
-        crawlType: formData.crawlType,
-        includePaths: formData.includePaths?.split(',').map(p => p.trim()).filter(Boolean) || [],
-        excludePaths: formData.excludePaths?.split(',').map(p => p.trim()).filter(Boolean) || [],
-        submittedAt: new Date().toISOString()
-      };
-
-      // Determine title based on crawl type
-      let title = url;
-      if (formData.crawlType === 'crawl-links') {
-        title = `Crawl: ${url}`;
-      } else if (formData.crawlType === 'sitemap') {
-        title = `Sitemap: ${url}`;
-      }
-
-      const newSource = await sources.createSource({
+      // Create the parent source
+      const source = await sourceService.createSource({
         agent_id: agentId,
         source_type: 'website',
-        title,
-        url,
-        metadata,
+        title: data.url,
+        url: data.url,
         crawl_status: 'pending',
         progress: 0,
-        links_count: 0
+        links_count: 0,
+        metadata: {
+          crawl_type: data.crawlType,
+          include_paths: data.includePaths,
+          exclude_paths: data.excludePaths,
+          created_at: new Date().toISOString()
+        }
       });
 
-      console.log('✅ New website source created:', newSource);
-
-      // Trigger the crawling process via edge function
-      try {
-        console.log('🚀 Triggering crawl for source:', newSource.id);
-        
-        const { data: crawlResponse, error: crawlError } = await supabase.functions.invoke('crawl-website', {
-          body: {
-            source_id: newSource.id,
-            url: url,
-            crawl_type: formData.crawlType
+      // Start enhanced crawling based on type
+      if (data.crawlType === 'crawl-links') {
+        // Start background crawling with enhanced service
+        WebsiteCrawlService.startEnhancedCrawl(
+          agentId,
+          source.id,
+          data.url,
+          {
+            maxDepth: 3,
+            maxPages: 1000, // Remove the 50-link limit
+            includePaths: data.includePaths,
+            excludePaths: data.excludePaths,
+            respectRobots: true
           }
+        ).catch(error => {
+          console.error('Background crawl failed:', error);
+          toast({
+            title: "Crawling error",
+            description: "An error occurred during crawling, but it will continue in the background",
+            variant: "destructive"
+          });
         });
 
-        if (crawlError) {
-          console.error('❌ Crawl trigger error:', crawlError);
-          // Update source status to failed
-          await sources.updateSource(newSource.id, {
-            crawl_status: 'failed',
-            metadata: {
-              ...metadata,
-              error: `Failed to start crawl: ${crawlError.message}`,
-              failedAt: new Date().toISOString()
-            }
-          });
-        } else {
-          console.log('✅ Crawl triggered successfully:', crawlResponse);
-        }
-      } catch (crawlTriggerError) {
-        console.error('❌ Failed to trigger crawl:', crawlTriggerError);
-        // Update source status to failed
-        await sources.updateSource(newSource.id, {
-          crawl_status: 'failed',
-          metadata: {
-            ...metadata,
-            error: `Failed to start crawl: ${crawlTriggerError instanceof Error ? crawlTriggerError.message : 'Unknown error'}`,
-            failedAt: new Date().toISOString()
+        toast({
+          title: "Crawling started",
+          description: "Website crawling has started and will continue in the background",
+        });
+      } else if (data.crawlType === 'individual-link') {
+        // For individual links, just crawl the single page
+        WebsiteCrawlService.startEnhancedCrawl(
+          agentId,
+          source.id,
+          data.url,
+          {
+            maxDepth: 0, // Only crawl the single page
+            maxPages: 1
           }
+        ).catch(error => {
+          console.error('Single page crawl failed:', error);
+        });
+
+        toast({
+          title: "Link added",
+          description: "Individual link is being processed",
+        });
+      } else if (data.crawlType === 'sitemap') {
+        // TODO: Implement sitemap crawling
+        toast({
+          title: "Sitemap crawling",
+          description: "Sitemap crawling will be implemented soon",
         });
       }
 
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      return source;
+    } catch (error: any) {
       toast({
-        title: "Website source added",
-        description: `${title} has been added and will be processed shortly`
-      });
-
-      // Trigger refetch to update the UI
-      setTimeout(() => {
-        refetch();
-      }, 500);
-
-      return newSource;
-
-    } catch (error) {
-      console.error('Error creating website source:', error);
-      toast({
-        title: "Failed to add website source",
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        title: "Error",
+        description: error.message || "Failed to start website crawling",
         variant: "destructive"
       });
+      return null;
     } finally {
       setIsSubmitting(false);
     }

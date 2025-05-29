@@ -36,22 +36,24 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   return (
     <div className="border border-gray-200 rounded-lg">
-      {/* Main source item */}
-      <div className="flex items-center justify-between p-4">
-        <div className="flex items-center flex-1 min-w-0">
+      {/* Main source item with fixed width container */}
+      <div className="flex items-center justify-between p-4 min-h-[60px]">
+        <div className="flex items-center flex-1 min-w-0 pr-4">
           <input 
             type="checkbox" 
             className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0" 
           />
           
-          <WebsiteSourceInfo
-            title={source.title}
-            url={source.url}
-            createdAt={source.created_at}
-            linksCount={source.links_count}
-            lastCrawledAt={source.last_crawled_at}
-            crawlStatus={source.crawl_status}
-          />
+          <div className="flex-1 min-w-0 max-w-none">
+            <WebsiteSourceInfo
+              title={source.title}
+              url={source.url}
+              createdAt={source.created_at}
+              linksCount={source.links_count}
+              lastCrawledAt={source.last_crawled_at}
+              crawlStatus={source.crawl_status}
+            />
+          </div>
           
           {/* Show status and progress for completed sources */}
           {source.crawl_status === 'completed' && (

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,6 +6,7 @@ import { useAgentSources } from "@/hooks/useAgentSources";
 import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import { useRAGServices } from "@/hooks/useRAGServices";
 import { AgentSource } from "@/types/rag";
+import { supabase } from "@/integrations/supabase/client";
 import WebsiteCrawlForm from "./websites/components/WebsiteCrawlForm";
 import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
 
@@ -40,6 +40,31 @@ const WebsiteTab: React.FC = () => {
       setExpandedSources(newExpandedSources);
     }
   }, [parentSources]);
+
+  // Real-time updates for crawling progress
+  useEffect(() => {
+    const channel = supabase
+      .channel('website-crawl-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `source_type=eq.website`
+        },
+        (payload) => {
+          console.log('Real-time crawl update:', payload);
+          // Refetch sources when there are changes
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link') => {
     if (!url) {
