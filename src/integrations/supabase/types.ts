@@ -13,12 +13,18 @@ export type Database = {
         Row: {
           agent_id: string
           content: string | null
+          crawl_status: string | null
           created_at: string
           created_by: string | null
           file_path: string | null
           id: string
           is_active: boolean
+          is_excluded: boolean | null
+          last_crawled_at: string | null
+          links_count: number | null
           metadata: Json | null
+          parent_source_id: string | null
+          progress: number | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
           title: string
@@ -28,12 +34,18 @@ export type Database = {
         Insert: {
           agent_id: string
           content?: string | null
+          crawl_status?: string | null
           created_at?: string
           created_by?: string | null
           file_path?: string | null
           id?: string
           is_active?: boolean
+          is_excluded?: boolean | null
+          last_crawled_at?: string | null
+          links_count?: number | null
           metadata?: Json | null
+          parent_source_id?: string | null
+          progress?: number | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
           title: string
@@ -43,12 +55,18 @@ export type Database = {
         Update: {
           agent_id?: string
           content?: string | null
+          crawl_status?: string | null
           created_at?: string
           created_by?: string | null
           file_path?: string | null
           id?: string
           is_active?: boolean
+          is_excluded?: boolean | null
+          last_crawled_at?: string | null
+          links_count?: number | null
           metadata?: Json | null
+          parent_source_id?: string | null
+          progress?: number | null
           source_type?: Database["public"]["Enums"]["source_type"]
           team_id?: string
           title?: string
@@ -61,6 +79,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_sources_parent_source_id_fkey"
+            columns: ["parent_source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
             referencedColumns: ["id"]
           },
           {

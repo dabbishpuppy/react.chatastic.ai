@@ -1,63 +1,147 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { ExternalLink, MoreHorizontal, ChevronRight, Info, Link } from "lucide-react";
+import { Info } from "lucide-react";
+import { useAgentSources } from "@/hooks/useAgentSources";
+import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
+import WebsiteSourceItem from "./websites/WebsiteSourceItem";
+import { useRAGServices } from "@/hooks/useRAGServices";
+import { AgentSource } from "@/types/rag";
+
 const WebsiteTab: React.FC = () => {
-  const [url, setUrl] = useState("");
+  const { sources: websiteSources, loading, error, removeSourceFromState, refetch } = useAgentSources('website');
+  const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission(refetch);
+  const { sources: sourceService } = useRAGServices();
+  
   const [activeSubTab, setActiveSubTab] = useState("crawl-links");
+  const [url, setUrl] = useState("");
   const [includePaths, setIncludePaths] = useState("");
   const [excludePaths, setExcludePaths] = useState("");
 
-  // Mock data for website sources
-  const websites = [{
-    id: "1",
-    url: "https://wonderwave.no/terms",
-    lastScraped: "15 days ago",
-    size: "7 KB"
-  }, {
-    id: "2",
-    url: "https://wonderwave.no/privacy",
-    lastScraped: "15 days ago",
-    size: "5 KB"
-  }, {
-    id: "3",
-    url: "https://wonderwave.no/confidentiality",
-    lastScraped: "15 days ago",
-    size: "3 KB"
-  }, {
-    id: "4",
-    url: "https://wonderwave.no/",
-    lastScraped: "15 days ago",
-    size: "8 KB"
-  }];
-  const handleFetchLinks = () => {
+  // Group sources by parent-child relationships
+  const parentSources = websiteSources.filter(source => !source.parent_source_id);
+  const getChildSources = (parentId: string) => 
+    websiteSources.filter(source => source.parent_source_id === parentId);
+
+  const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link') => {
     if (!url) {
       toast({
         title: "URL required",
-        description: "Please enter a URL to fetch links from",
+        description: "Please enter a URL",
         variant: "destructive"
       });
       return;
     }
+
+    const result = await submitWebsiteSource({
+      url,
+      includePaths,
+      excludePaths,
+      crawlType
+    });
+
+    if (result) {
+      // Clear form on success
+      setUrl("");
+      setIncludePaths("");
+      setExcludePaths("");
+    }
+  };
+
+  const handleEdit = (source: AgentSource) => {
+    // TODO: Implement edit functionality
     toast({
-      title: "Links fetching initiated",
-      description: "Your request is being processed"
+      title: "Edit functionality",
+      description: "Edit functionality will be implemented soon"
     });
   };
-  return <div className="space-y-6">
+
+  const handleExclude = async (source: AgentSource) => {
+    try {
+      await sourceService.updateSource(source.id, {
+        is_excluded: !source.is_excluded
+      });
+      
+      toast({
+        title: "Success",
+        description: `Link ${source.is_excluded ? 'included' : 'excluded'} successfully`
+      });
+      
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update link status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async (source: AgentSource) => {
+    try {
+      await sourceService.deleteSource(source.id);
+      removeSourceFromState(source.id);
+      
+      toast({
+        title: "Success",
+        description: "Source deleted successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete source",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRecrawl = async (source: AgentSource) => {
+    try {
+      await sourceService.updateSource(source.id, {
+        crawl_status: 'pending',
+        progress: 0,
+        last_crawled_at: new Date().toISOString()
+      });
+      
+      toast({
+        title: "Recrawl initiated",
+        description: "The website will be recrawled shortly"
+      });
+      
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to initiate recrawl",
+        variant: "destructive"
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 mt-4">
+        <div>
+          <h2 className="text-2xl font-semibold">Website Training</h2>
+        </div>
+        <div className="flex items-center justify-center p-8">
+          <div className="text-gray-500">Loading website sources...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 mt-4">
       <div>
         <h2 className="text-2xl font-semibold">Website Training</h2>
       </div>
 
       <div className="space-y-4">
-        <div>
-          
-        </div>
-
         <Card className="border border-gray-200">
           <CardContent className="p-6">
             <h3 className="text-xl font-semibold mb-4">Link</h3>
@@ -92,7 +176,13 @@ const WebsiteTab: React.FC = () => {
                           </svg>
                         </div>
                       </div>
-                      <Input id="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="www.example.com" className="flex-1 rounded-l-none border-l-0" />
+                      <Input 
+                        id="url" 
+                        value={url} 
+                        onChange={e => setUrl(e.target.value)} 
+                        placeholder="www.example.com" 
+                        className="flex-1 rounded-l-none border-l-0" 
+                      />
                     </div>
                   </div>
 
@@ -108,19 +198,33 @@ const WebsiteTab: React.FC = () => {
                       <label htmlFor="include-paths" className="block text-sm font-medium text-gray-700 mb-1">
                         Include only paths
                       </label>
-                      <Input id="include-paths" value={includePaths} onChange={e => setIncludePaths(e.target.value)} placeholder="Ex: blog/*, dev/*" />
+                      <Input 
+                        id="include-paths" 
+                        value={includePaths} 
+                        onChange={e => setIncludePaths(e.target.value)} 
+                        placeholder="Ex: blog/*, dev/*" 
+                      />
                     </div>
                     <div>
                       <label htmlFor="exclude-paths" className="block text-sm font-medium text-gray-700 mb-1">
                         Exclude paths
                       </label>
-                      <Input id="exclude-paths" value={excludePaths} onChange={e => setExcludePaths(e.target.value)} placeholder="Ex: blog/*, dev/*" />
+                      <Input 
+                        id="exclude-paths" 
+                        value={excludePaths} 
+                        onChange={e => setExcludePaths(e.target.value)} 
+                        placeholder="Ex: blog/*, dev/*" 
+                      />
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <Button onClick={handleFetchLinks} className="bg-gray-800 hover:bg-gray-700">
-                      Fetch links
+                    <Button 
+                      onClick={() => handleSubmit('crawl-links')} 
+                      className="bg-gray-800 hover:bg-gray-700"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Processing...' : 'Fetch links'}
                     </Button>
                   </div>
                 </div>
@@ -131,10 +235,19 @@ const WebsiteTab: React.FC = () => {
                   <p className="text-gray-600">
                     Upload your sitemap XML file or provide a URL to your sitemap.
                   </p>
-                  <Input placeholder="https://example.com/sitemap.xml" className="w-full" />
+                  <Input 
+                    placeholder="https://example.com/sitemap.xml" 
+                    className="w-full" 
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                  />
                   <div className="text-right">
-                    <Button className="bg-gray-800 hover:bg-gray-700">
-                      Upload sitemap
+                    <Button 
+                      className="bg-gray-800 hover:bg-gray-700"
+                      onClick={() => handleSubmit('sitemap')}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Processing...' : 'Upload sitemap'}
                     </Button>
                   </div>
                 </div>
@@ -145,10 +258,19 @@ const WebsiteTab: React.FC = () => {
                   <p className="text-gray-600">
                     Add specific links manually.
                   </p>
-                  <Input placeholder="https://example.com/page" className="w-full" />
+                  <Input 
+                    placeholder="https://example.com/page" 
+                    className="w-full" 
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                  />
                   <div className="text-right">
-                    <Button className="bg-gray-800 hover:bg-gray-700">
-                      Add link
+                    <Button 
+                      className="bg-gray-800 hover:bg-gray-700"
+                      onClick={() => handleSubmit('individual-link')}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Processing...' : 'Add link'}
                     </Button>
                   </div>
                 </div>
@@ -157,40 +279,47 @@ const WebsiteTab: React.FC = () => {
           </CardContent>
         </Card>
 
-        {websites.length > 0 && <div>
+        {/* Website Sources List */}
+        {parentSources.length > 0 && (
+          <div className="space-y-4">
             <div className="flex items-center mb-3">
               <input type="checkbox" id="select-all" className="rounded border-gray-300 text-black focus:ring-black mr-2" />
               <label htmlFor="select-all" className="text-lg font-medium">
-                Link sources
+                Link sources ({parentSources.length})
               </label>
             </div>
             
-            {websites.map(website => <div key={website.id} className="flex items-center justify-between py-4 border-b border-gray-200">
-                <div className="flex items-center">
-                  <input type="checkbox" id={`website-${website.id}`} className="rounded border-gray-300 text-black focus:ring-black mr-4" />
-                  <div className="flex items-center">
-                    <div className="bg-gray-100 rounded-full p-2 mr-3">
-                      <Link className="h-5 w-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <div className="font-medium">{website.url}</div>
-                      <div className="text-sm text-gray-500">
-                        Last scraped {website.lastScraped} • {website.size}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal size={18} />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ChevronRight size={18} />
-                  </Button>
-                </div>
-              </div>)}
-          </div>}
+            <div className="space-y-3">
+              {parentSources.map(source => (
+                <WebsiteSourceItem
+                  key={source.id}
+                  source={source}
+                  childSources={getChildSources(source.id)}
+                  onEdit={handleEdit}
+                  onExclude={handleExclude}
+                  onDelete={handleDelete}
+                  onRecrawl={handleRecrawl}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center text-red-500 p-4">
+            Error loading website sources: {error}
+          </div>
+        )}
+
+        {!loading && parentSources.length === 0 && (
+          <div className="text-center text-gray-500 p-8">
+            <p>No website sources found</p>
+            <p className="text-sm mt-1">Add your first website source using the form above</p>
+          </div>
+        )}
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default WebsiteTab;

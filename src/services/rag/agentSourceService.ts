@@ -12,6 +12,11 @@ export class AgentSourceService {
     metadata?: Record<string, any>;
     file_path?: string;
     url?: string;
+    crawl_status?: string;
+    progress?: number;
+    links_count?: number;
+    parent_source_id?: string;
+    is_excluded?: boolean;
   }): Promise<AgentSource> {
     // Get the team_id from the agent
     const { data: agent, error: agentError } = await supabase
@@ -74,7 +79,13 @@ export class AgentSourceService {
     }));
   }
 
-  static async updateSource(id: string, updates: Partial<AgentSource>): Promise<AgentSource> {
+  static async updateSource(id: string, updates: Partial<AgentSource & {
+    crawl_status?: string;
+    progress?: number;
+    links_count?: number;
+    is_excluded?: boolean;
+    last_crawled_at?: string;
+  }>): Promise<AgentSource> {
     const { data: source, error } = await supabase
       .from('agent_sources')
       .update(updates)
