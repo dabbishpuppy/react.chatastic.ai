@@ -22,6 +22,9 @@ export class WebsiteCrawlService {
     console.log('🚀 Starting enhanced crawl via edge function');
     
     try {
+      // Update the source metadata with the new crawl parameters before starting
+      await this.updateSourceCrawlMetadata(sourceId, options);
+
       // Call the edge function to handle the crawling
       const { data, error } = await supabase.functions.invoke('crawl-website', {
         body: { 
@@ -47,6 +50,40 @@ export class WebsiteCrawlService {
       await this.updateSourceStatus(sourceId, 'failed', 0);
       throw error;
     }
+  }
+
+  // Update source metadata with crawl parameters
+  private static async updateSourceCrawlMetadata(
+    sourceId: string,
+    options: CrawlOptions
+  ): Promise<void> {
+    const { data: currentSource, error: fetchError } = await supabase
+      .from('agent_sources')
+      .select('metadata')
+      .eq('id', sourceId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const updatedMetadata = {
+      ...currentSource.metadata,
+      max_pages: options.maxPages || 100,
+      max_depth: options.maxDepth || 3,
+      concurrency: options.concurrency || 2,
+      last_progress_update: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('agent_sources')
+      .update({
+        metadata: updatedMetadata,
+        crawl_status: 'pending',
+        progress: 0,
+        links_count: 0
+      })
+      .eq('id', sourceId);
+
+    if (error) throw error;
   }
 
   // Update source crawl status and progress
