@@ -111,6 +111,25 @@ export class AgentSourceService {
   }
 
   static async deleteSource(id: string): Promise<boolean> {
+    // First check if this source has child sources
+    const { data: childSources, error: childError } = await supabase
+      .from('agent_sources')
+      .select('id')
+      .eq('parent_source_id', id);
+
+    if (childError) throw new Error(`Failed to check child sources: ${childError.message}`);
+
+    // If there are child sources, delete them first
+    if (childSources && childSources.length > 0) {
+      const { error: deleteChildrenError } = await supabase
+        .from('agent_sources')
+        .delete()
+        .eq('parent_source_id', id);
+
+      if (deleteChildrenError) throw new Error(`Failed to delete child sources: ${deleteChildrenError.message}`);
+    }
+
+    // Now delete the parent source
     const { error } = await supabase
       .from('agent_sources')
       .delete()
