@@ -31,14 +31,6 @@ export class DeduplicationService {
     const uniqueChunks: ChunkForDeduplication[] = [];
     const duplicateChunks: Array<ChunkForDeduplication & { duplicateOfChunkId: string }> = [];
 
-    // Enable bulk mode for performance during deduplication
-    try {
-      await supabase.from('_temp_config').select('*').limit(1);
-    } catch {
-      // If temp config access fails, continue without bulk mode optimization
-      console.log('Bulk mode not available, proceeding with standard processing');
-    }
-
     try {
       for (const chunk of chunks) {
         // Calculate content hash using the database function
