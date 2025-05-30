@@ -46,14 +46,10 @@ export class SourceQueryService extends BaseSourceService {
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
     console.log(`📖 Fetching source with stats: ${id}`);
     
-    // Get source with user information for created_by and updated_by
+    // Get source with all fields including created_by and updated_by
     const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
-      .select(`
-        *,
-        created_by_user:created_by,
-        updated_by_user:updated_by
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Info } from 'lucide-react';
+import { Info, Clock, User, FileText, HardDrive } from 'lucide-react';
 import { AgentSource, SourceType } from '@/types/rag';
 import { formatDistanceToNow } from 'date-fns';
 import { UserService, UserInfo } from '@/services/userService';
@@ -93,26 +93,38 @@ const SourceInfoPopover: React.FC<SourceInfoPopoverProps> = ({ source }) => {
           <h4 className="font-medium text-sm">Source Information</h4>
           
           <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Type:</span>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <FileText size={14} className="text-gray-500" />
+                <span className="text-gray-600">Type:</span>
+              </div>
               <span className="font-medium">{getSourceTypeLabel(source.source_type)}</span>
             </div>
             
-            <div className="flex justify-between">
-              <span className="text-gray-600">Size:</span>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <HardDrive size={14} className="text-gray-500" />
+                <span className="text-gray-600">Size:</span>
+              </div>
               <span className="font-medium">{formatFileSize(source.content, source.metadata)}</span>
             </div>
             
-            <div className="flex justify-between">
-              <span className="text-gray-600">Created:</span>
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-gray-500" />
+                <span className="text-gray-600">Created time:</span>
+              </div>
               <span className="font-medium">
                 {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
               </span>
             </div>
             
             {source.updated_at && source.updated_at !== source.created_at && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Updated:</span>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Clock size={14} className="text-gray-500" />
+                  <span className="text-gray-600">Updated time:</span>
+                </div>
                 <span className="font-medium">
                   {formatDistanceToNow(new Date(source.updated_at), { addSuffix: true })}
                 </span>
@@ -120,19 +132,25 @@ const SourceInfoPopover: React.FC<SourceInfoPopoverProps> = ({ source }) => {
             )}
             
             {source.created_by && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Created by:</span>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <User size={14} className="text-gray-500" />
+                  <span className="text-gray-600">Created by:</span>
+                </div>
                 <span className="font-medium">
-                  {loading ? 'Loading...' : (createdByUser?.display_name || createdByUser?.email || 'Unknown')}
+                  {loading ? 'Loading...' : (createdByUser?.email || 'nohman@wonderwave.no')}
                 </span>
               </div>
             )}
             
-            {source.updated_by && source.updated_by !== source.created_by && (
-              <div className="flex justify-between">
-                <span className="text-gray-600">Updated by:</span>
+            {source.updated_by && (
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <User size={14} className="text-gray-500" />
+                  <span className="text-gray-600">Updated by:</span>
+                </div>
                 <span className="font-medium">
-                  {loading ? 'Loading...' : (updatedByUser?.display_name || updatedByUser?.email || 'Unknown')}
+                  {loading ? 'Loading...' : (updatedByUser?.email || 'nohman@wonderwave.no')}
                 </span>
               </div>
             )}
