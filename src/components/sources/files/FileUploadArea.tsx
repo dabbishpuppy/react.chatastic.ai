@@ -8,7 +8,7 @@ interface FileUploadAreaProps {
   isUploading: boolean;
   supportedTypes: string[];
   maxFileSize: number;
-  onFileSelect: (files: FileList) => void;
+  onFileSelect: () => void; // This will be the handleFileSelect from the hook
   onUploadComplete: (results: any[]) => void;
   onError: (error: string) => void;
 }
@@ -22,13 +22,6 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   onUploadComplete,
   onError
 }) => {
-  const handleFileInput = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      onFileSelect(files);
-    }
-  }, [onFileSelect]);
-
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -65,20 +58,12 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
                     Supported: {supportedTypes.join(', ')} (max {formatFileSize(maxFileSize)})
                   </p>
                 </div>
-                <input
-                  type="file"
-                  multiple
-                  accept={supportedTypes.join(',')}
-                  onChange={handleFileInput}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
+                <button
+                  onClick={onFileSelect}
                   className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
                 >
                   Choose Files
-                </label>
+                </button>
               </>
             )}
           </div>

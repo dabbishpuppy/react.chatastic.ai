@@ -1,8 +1,9 @@
 
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React from "react";
 import { useFileSourcesPaginated } from "@/hooks/useSourcesPaginated";
+import { useFileUpload } from "./files/useFileUpload";
 import FileUploadArea from "./files/FileUploadArea";
+import FileUploadProgress from "./files/FileUploadProgress";
 import SourcesListPaginated from "./SourcesListPaginated";
 import ErrorBoundary from "./ErrorBoundary";
 
@@ -10,37 +11,22 @@ const FilesTab: React.FC = () => {
   const {
     data: paginatedData,
     isLoading,
-    error
+    error,
+    refetch
   } = useFileSourcesPaginated(1, 25);
 
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-
-  const handleFileSelect = (fileId: string, selected: boolean) => {
-    setSelectedFiles(prev => {
-      const newSet = new Set(prev);
-      if (selected) {
-        newSet.add(fileId);
-      } else {
-        newSet.delete(fileId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleFileUpload = (files: FileList) => {
-    console.log('Files selected:', files);
-    // TODO: Implement file upload logic
-  };
-
-  const handleUploadComplete = (results: any[]) => {
-    console.log('Upload completed:', results);
-    // TODO: Handle upload completion
-  };
-
-  const handleUploadError = (error: string) => {
-    console.error('Upload error:', error);
-    // TODO: Show error toast
-  };
+  const {
+    isDragging,
+    uploadedFiles,
+    isUploading,
+    supportedTypes,
+    maxFileSize,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleFileSelect,
+    removeUploadedFile
+  } = useFileUpload(refetch);
 
   const sources = paginatedData?.sources || [];
 
@@ -52,22 +38,36 @@ const FilesTab: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          <FileUploadArea 
-            isDragging={false}
-            isUploading={false}
-            supportedTypes={['.pdf', '.doc', '.docx', '.txt']}
-            maxFileSize={10 * 1024 * 1024}
-            onFileSelect={handleFileUpload}
-            onUploadComplete={handleUploadComplete}
-            onError={handleUploadError}
-          />
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <FileUploadArea 
+              isDragging={isDragging}
+              isUploading={isUploading}
+              supportedTypes={supportedTypes}
+              maxFileSize={maxFileSize * 1024 * 1024} // Convert MB to bytes
+              onFileSelect={handleFileSelect}
+              onUploadComplete={() => {}}
+              onError={() => {}}
+            />
+          </div>
+
+          {uploadedFiles.length > 0 && (
+            <FileUploadProgress
+              uploadedFiles={uploadedFiles}
+              onRemoveFile={removeUploadedFile}
+            />
+          )}
           
           <SourcesListPaginated
             sources={sources}
             loading={isLoading}
             error={error?.message || null}
             onSourceDeleted={(sourceId) => {
-              // Handle source deletion if needed
+              // Refetch the sources list after deletion
+              refetch();
             }}
           />
         </div>
