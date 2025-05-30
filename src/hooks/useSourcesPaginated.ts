@@ -69,8 +69,14 @@ const fetchSourcesPage = async (
       totalPages
     });
 
+    // Cast the data to AgentSource[] to handle the metadata type mismatch
+    const typedSources: AgentSource[] = (allSources || []).map(source => ({
+      ...source,
+      metadata: source.metadata as Record<string, any>
+    }));
+
     return {
-      sources: allSources || [],
+      sources: typedSources,
       totalCount: allSources?.length || 0,
       totalPages,
       currentPage: page,
@@ -131,8 +137,14 @@ const fetchSourcesPage = async (
 
   console.log(`✅ Fetched ${data?.length || 0} sources, page ${page} of ${totalPages}`);
   
+  // Cast the data to AgentSource[] to handle the metadata type mismatch
+  const typedSources: AgentSource[] = (data || []).map(source => ({
+    ...source,
+    metadata: source.metadata as Record<string, any>
+  }));
+  
   return {
-    sources: (data || []) as AgentSource[],
+    sources: typedSources,
     totalCount,
     totalPages,
     currentPage: page,
