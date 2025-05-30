@@ -1,10 +1,10 @@
-
 import React, { useState } from "react";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,34 @@ const MembersSettings: React.FC = () => {
   const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [availableTeams, setAvailableTeams] = useState<Array<{id: string, name: string}>>([]);
   const { toast } = useToast();
+
+  // Fetch available teams when invite dialog opens
+  React.useEffect(() => {
+    if (isInviteDialogOpen) {
+      fetchAvailableTeams();
+    }
+  }, [isInviteDialogOpen]);
+
+  const fetchAvailableTeams = async () => {
+    try {
+      const { data: teams, error } = await supabase
+        .from('teams')
+        .select('id, name');
+
+      if (error) throw error;
+      setAvailableTeams(teams || []);
+    } catch (error: any) {
+      console.error('Error fetching teams:', error);
+      toast({
+        title: "Error loading teams",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleInvite = () => {
     if (!inviteEmail) {
@@ -33,13 +60,23 @@ const MembersSettings: React.FC = () => {
       return;
     }
 
+    if (!selectedTeamId) {
+      toast({
+        title: "Error",
+        description: "Please select a team for the new member.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Here you would normally send an invitation
     toast({
       title: "Invitation sent",
-      description: `Invitation sent to ${inviteEmail}`
+      description: `Invitation sent to ${inviteEmail} for the selected team`
     });
     
     setInviteEmail("");
+    setSelectedTeamId("");
     setIsInviteDialogOpen(false);
   };
 
@@ -196,6 +233,21 @@ const MembersSettings: React.FC = () => {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="team">Team access</Label>
+              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTeams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
