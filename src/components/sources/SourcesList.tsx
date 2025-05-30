@@ -82,33 +82,9 @@ const SourcesList: React.FC<SourcesListProps> = ({
   };
 
   const formatFileSize = (source: AgentSource) => {
-    // For text sources, prioritize metadata sizes first
-    if (source.source_type === 'text' && source.metadata) {
+    // For all source types, prioritize file_size (processed content size) from metadata
+    if (source.metadata) {
       const metadata = source.metadata as any;
-      if (metadata.original_size && typeof metadata.original_size === 'number') {
-        const bytes = metadata.original_size;
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-        return `${Math.round(bytes / (1024 * 1024))} MB`;
-      }
-      if (metadata.file_size && typeof metadata.file_size === 'number') {
-        const bytes = metadata.file_size;
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-        return `${Math.round(bytes / (1024 * 1024))} MB`;
-      }
-    }
-
-    // For file sources, check metadata for original_size first
-    if (source.source_type === 'file' && source.metadata) {
-      const metadata = source.metadata as any;
-      if (metadata.original_size && typeof metadata.original_size === 'number') {
-        const bytes = metadata.original_size;
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-        return `${Math.round(bytes / (1024 * 1024))} MB`;
-      }
-      // Also check for file_size in metadata
       if (metadata.file_size && typeof metadata.file_size === 'number') {
         const bytes = metadata.file_size;
         if (bytes < 1024) return `${bytes} B`;
