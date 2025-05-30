@@ -24,6 +24,30 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Enhanced logging function
+const logCrawlEvent = async (level: 'info' | 'error' | 'debug', message: string, data?: any) => {
+  const timestamp = new Date().toISOString();
+  const logEntry = { timestamp, level, message, data };
+  
+  console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, data ? JSON.stringify(data, null, 2) : '');
+  
+  // Store critical logs in database for debugging
+  if (level === 'error' || level === 'info') {
+    try {
+      await supabase.from('crawl_performance_metrics').insert({
+        phase: 'logging',
+        start_time: timestamp,
+        metadata: logEntry,
+        team_id: data?.team_id || null,
+        agent_id: data?.agent_id || null,
+        source_id: data?.source_id || null
+      });
+    } catch (err) {
+      console.error('Failed to store log entry:', err);
+    }
+  }
+};
+
 // Helper function to ensure JSON response
 const jsonResponse = (data: any, status = 200) => {
   return new Response(
@@ -33,6 +57,40 @@ const jsonResponse = (data: any, status = 200) => {
       status
     }
   );
+};
+
+// Update source status with logging
+const updateSourceStatus = async (sourceId: string, status: string, progress?: number, linksCount?: number, errorMessage?: string) => {
+  const timestamp = new Date().toISOString();
+  
+  await logCrawlEvent('info', `Status transition for source ${sourceId}`, {
+    sourceId,
+    status,
+    progress,
+    linksCount,
+    errorMessage,
+    timestamp
+  });
+
+  const updateData: any = {
+    crawl_status: status,
+    last_crawled_at: timestamp,
+    is_active: true // Ensure source remains visible
+  };
+
+  if (progress !== undefined) updateData.progress = progress;
+  if (linksCount !== undefined) updateData.links_count = linksCount;
+  if (errorMessage) updateData.metadata = { error_message: errorMessage, last_error_at: timestamp };
+
+  const { error } = await supabase
+    .from('agent_sources')
+    .update(updateData)
+    .eq('id', sourceId);
+
+  if (error) {
+    await logCrawlEvent('error', `Failed to update source status`, { sourceId, status, error });
+    throw error;
+  }
 };
 
 serve(async (req) => {
@@ -47,7 +105,7 @@ serve(async (req) => {
     try {
       requestBody = await req.json();
     } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
+      await logCrawlEvent('error', 'Failed to parse request body', { parseError });
       return jsonResponse({ 
         error: 'Invalid JSON in request body',
         success: false 
@@ -66,10 +124,20 @@ serve(async (req) => {
       enable_content_pipeline = false 
     } = requestBody;
     
-    console.log(`Starting crawl for source ${source_id}, URL: ${url}, type: ${crawl_type}`);
-    console.log(`Include paths: ${JSON.stringify(include_paths)}, Exclude paths: ${JSON.stringify(exclude_paths)}`);
+    await logCrawlEvent('info', 'Crawl request received', {
+      source_id,
+      url,
+      crawl_type,
+      max_pages,
+      max_depth,
+      concurrency,
+      include_paths,
+      exclude_paths,
+      enable_content_pipeline
+    });
 
     if (!source_id || !url) {
+      await logCrawlEvent('error', 'Missing required fields', { source_id, url });
       return jsonResponse({
         error: 'Missing required fields: source_id and url',
         success: false
@@ -87,6 +155,7 @@ serve(async (req) => {
       .single();
 
     if (sourceError || !source) {
+      await logCrawlEvent('error', 'Source not found', { source_id, sourceError });
       return jsonResponse({
         error: `Source not found: ${sourceError?.message || 'Unknown error'}`,
         success: false
@@ -96,31 +165,18 @@ serve(async (req) => {
     const agentId = source.agents.id;
     const teamId = source.agents.team_id;
 
-    // Update source status to in_progress and ensure it remains visible
-    await supabase
-      .from('agent_sources')
-      .update({
-        crawl_status: 'in_progress',
-        progress: 0,
-        last_crawled_at: new Date().toISOString(),
-        is_active: true, // Ensure source stays visible
-        metadata: {
-          ...source.metadata,
-          includePaths: include_paths,
-          excludePaths: exclude_paths,
-          maxPages: max_pages,
-          maxDepth: max_depth,
-          concurrency,
-          last_progress_update: new Date().toISOString()
-        }
-      })
-      .eq('id', source_id);
+    await logCrawlEvent('info', 'Source validated, starting crawl', {
+      source_id,
+      agentId,
+      teamId
+    });
+
+    // Update source status to in_progress immediately
+    await updateSourceStatus(source_id, 'in_progress', 0, 0);
 
     if (crawl_type === 'individual-link') {
-      // Process single page with enhanced pipeline
       await processSinglePage(source_id, agentId, teamId, url, enable_content_pipeline);
     } else {
-      // Process multiple pages with enhanced pipeline and path filtering
       await processMultiplePages(source_id, agentId, teamId, url, {
         maxPages: max_pages,
         maxDepth: max_depth,
@@ -131,6 +187,12 @@ serve(async (req) => {
       });
     }
 
+    await logCrawlEvent('info', 'Crawl completed successfully', {
+      source_id,
+      url,
+      crawl_type
+    });
+
     return jsonResponse({ 
       success: true, 
       message: `Crawl completed for ${url}`,
@@ -138,7 +200,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Crawl error:', error);
+    await logCrawlEvent('error', 'Crawl error', { error: error.message, stack: error.stack });
     
     return jsonResponse({ 
       error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -155,7 +217,7 @@ async function processSinglePage(
   enableContentPipeline: boolean
 ) {
   try {
-    console.log(`Processing single page: ${url}`);
+    await logCrawlEvent('info', 'Processing single page', { sourceId, url });
     
     // Fetch the page content
     const response = await fetch(url, {
@@ -171,34 +233,24 @@ async function processSinglePage(
     const htmlContent = await response.text();
 
     if (enableContentPipeline) {
-      // Use the new enhanced content processing pipeline
       await processWithContentPipeline(sourceId, agentId, teamId, url, htmlContent);
     } else {
-      // Fallback to basic content storage
       await processBasicContent(sourceId, url, htmlContent);
     }
 
     // Update source status to completed
-    await supabase
-      .from('agent_sources')
-      .update({
-        crawl_status: 'completed',
-        progress: 100,
-        links_count: 1
-      })
-      .eq('id', sourceId);
+    await updateSourceStatus(sourceId, 'completed', 100, 1);
+
+    await logCrawlEvent('info', 'Single page processing completed', { sourceId, url });
 
   } catch (error) {
-    console.error(`Error processing single page ${url}:`, error);
+    await logCrawlEvent('error', 'Single page processing failed', { 
+      sourceId, 
+      url, 
+      error: error.message 
+    });
     
-    await supabase
-      .from('agent_sources')
-      .update({
-        crawl_status: 'failed',
-        progress: 0
-      })
-      .eq('id', sourceId);
-    
+    await updateSourceStatus(sourceId, 'failed', 0, 0, error.message);
     throw error;
   }
 }
@@ -218,19 +270,26 @@ async function processMultiplePages(
   }
 ) {
   try {
-    console.log(`Processing multiple pages starting from: ${initialUrl}`);
+    await logCrawlEvent('info', 'Starting multiple pages processing', {
+      sourceId,
+      initialUrl,
+      options
+    });
     
     const discoveredUrls = await discoverUrls(initialUrl, options.maxDepth, options.maxPages);
-    console.log(`Discovered ${discoveredUrls.length} URLs before filtering`);
+    await logCrawlEvent('info', 'URLs discovered', { 
+      sourceId, 
+      discoveredCount: discoveredUrls.length 
+    });
     
-    // Filter URLs based on include/exclude paths
     const filteredUrls = filterUrlsByPaths(discoveredUrls, options.includePaths, options.excludePaths);
-    console.log(`Filtered to ${filteredUrls.length} URLs after path filtering`);
+    await logCrawlEvent('info', 'URLs filtered', { 
+      sourceId, 
+      filteredCount: filteredUrls.length,
+      originalCount: discoveredUrls.length
+    });
     
     const totalPages = Math.min(filteredUrls.length, options.maxPages);
-    
-    console.log(`Processing ${totalPages} pages with concurrency ${options.concurrency}`);
-
     let processedCount = 0;
     const batchSize = options.concurrency;
 
@@ -251,7 +310,7 @@ async function processMultiplePages(
               title: url,
               url: url,
               crawl_status: 'in_progress',
-              is_active: true // Ensure child sources are visible
+              is_active: true
             })
             .select('id')
             .single();
@@ -273,42 +332,24 @@ async function processMultiplePages(
                 await processBasicContent(childSource.id, url, htmlContent);
               }
 
-              await supabase
-                .from('agent_sources')
-                .update({ 
-                  crawl_status: 'completed',
-                  is_active: true // Ensure completed sources remain visible
-                })
-                .eq('id', childSource.id);
+              await updateSourceStatus(childSource.id, 'completed');
             } else {
-              await supabase
-                .from('agent_sources')
-                .update({ crawl_status: 'failed' })
-                .eq('id', childSource.id);
+              await updateSourceStatus(childSource.id, 'failed', 0, 0, `HTTP ${response.status}`);
             }
           }
           
           processedCount++;
           
-          // Update parent source progress more frequently
+          // Update parent source progress
           const progress = Math.round((processedCount / totalPages) * 100);
-          await supabase
-            .from('agent_sources')
-            .update({
-              progress,
-              links_count: processedCount,
-              is_active: true, // Keep parent visible
-              metadata: {
-                ...options,
-                last_progress_update: new Date().toISOString(),
-                processed_count: processedCount,
-                total_pages: totalPages
-              }
-            })
-            .eq('id', sourceId);
+          await updateSourceStatus(sourceId, 'in_progress', progress, processedCount);
 
         } catch (error) {
-          console.error(`Error processing URL ${url}:`, error);
+          await logCrawlEvent('error', 'Error processing URL in batch', { 
+            sourceId, 
+            url, 
+            error: error.message 
+          });
         }
       });
 
@@ -316,27 +357,22 @@ async function processMultiplePages(
     }
 
     // Update final status
-    await supabase
-      .from('agent_sources')
-      .update({
-        crawl_status: 'completed',
-        progress: 100,
-        links_count: processedCount,
-        is_active: true // Ensure parent remains visible after completion
-      })
-      .eq('id', sourceId);
+    await updateSourceStatus(sourceId, 'completed', 100, processedCount);
+
+    await logCrawlEvent('info', 'Multiple pages processing completed', {
+      sourceId,
+      totalProcessed: processedCount,
+      totalPages
+    });
 
   } catch (error) {
-    console.error('Error in processMultiplePages:', error);
+    await logCrawlEvent('error', 'Multiple pages processing failed', { 
+      sourceId, 
+      initialUrl, 
+      error: error.message 
+    });
     
-    await supabase
-      .from('agent_sources')
-      .update({
-        crawl_status: 'failed',
-        progress: 0
-      })
-      .eq('id', sourceId);
-    
+    await updateSourceStatus(sourceId, 'failed', 0, 0, error.message);
     throw error;
   }
 }
@@ -347,10 +383,8 @@ function filterUrlsByPaths(urls: string[], includePaths: string[], excludePaths:
       const urlObj = new URL(url);
       const path = urlObj.pathname;
       
-      // If include paths are specified, URL must match at least one
       if (includePaths.length > 0) {
         const matchesInclude = includePaths.some(pattern => {
-          // Simple glob matching - convert * to regex
           const regexPattern = pattern.replace(/\*/g, '.*');
           const regex = new RegExp(`^${regexPattern}`, 'i');
           return regex.test(path);
@@ -361,7 +395,6 @@ function filterUrlsByPaths(urls: string[], includePaths: string[], excludePaths:
         }
       }
       
-      // If exclude paths are specified, URL must not match any
       if (excludePaths.length > 0) {
         const matchesExclude = excludePaths.some(pattern => {
           const regexPattern = pattern.replace(/\*/g, '.*');
@@ -390,23 +423,17 @@ async function processWithContentPipeline(
   htmlContent: string
 ) {
   try {
-    // Extract main content using readability-like algorithm
     const extractedContent = await extractMainContent(htmlContent, url);
-    
-    // Compress extracted content
     const compressedContent = await compressText(extractedContent.content);
-    
-    // Generate summary and keywords
     const summary = generateSummary(extractedContent.content);
     const keywords = extractKeywords(extractedContent.content);
     
-    // Update source with compressed archived content
     await supabase
       .from('agent_sources')
       .update({
         title: extractedContent.title,
         content: cleanContentForChunking(extractedContent.content),
-        raw_text: compressedContent.compressed.join(','), // Store as string
+        raw_text: compressedContent.compressed.join(','),
         content_summary: summary,
         keywords: keywords,
         extraction_method: 'readability',
@@ -416,10 +443,8 @@ async function processWithContentPipeline(
       })
       .eq('id', sourceId);
 
-    // Create semantic chunks
     const chunks = createSemanticChunks(cleanContentForChunking(extractedContent.content));
     
-    // Process chunks for deduplication and insert
     if (chunks.length > 0) {
       const chunksToInsert = chunks.map((chunk, index) => ({
         source_id: sourceId,
@@ -429,7 +454,6 @@ async function processWithContentPipeline(
         metadata: chunk.metadata
       }));
 
-      // Insert chunks (deduplication will be handled by the trigger)
       await supabase
         .from('source_chunks')
         .insert(chunksToInsert);
@@ -442,7 +466,6 @@ async function processWithContentPipeline(
 }
 
 async function processBasicContent(sourceId: string, url: string, htmlContent: string) {
-  // Basic text extraction for fallback
   const textContent = htmlContent
     .replace(/<script[^>]*>.*?<\/script>/gi, '')
     .replace(/<style[^>]*>.*?<\/style>/gi, '')
@@ -456,7 +479,7 @@ async function processBasicContent(sourceId: string, url: string, htmlContent: s
     .from('agent_sources')
     .update({
       title: url,
-      content: textContent.substring(0, 10000), // Limit basic content
+      content: textContent.substring(0, 10000),
       original_size: contentSize,
       compressed_size: Math.min(contentSize, 10000)
     })
@@ -465,7 +488,6 @@ async function processBasicContent(sourceId: string, url: string, htmlContent: s
 
 // Helper functions for content processing
 async function extractMainContent(html: string, url: string) {
-  // Simple content extraction (production would use a proper readability library)
   const textContent = html
     .replace(/<script[^>]*>.*?<\/script>/gi, '')
     .replace(/<style[^>]*>.*?<\/style>/gi, '')
@@ -488,9 +510,8 @@ async function extractMainContent(html: string, url: string) {
 }
 
 function compressText(text: string) {
-  // Simple compression simulation (production would use actual compression)
   const originalSize = new TextEncoder().encode(text).length;
-  const compressed = new TextEncoder().encode(text); // Placeholder
+  const compressed = new TextEncoder().encode(text);
   
   return {
     compressed: Array.from(compressed),
@@ -531,7 +552,7 @@ function cleanContentForChunking(content: string): string {
 }
 
 function createSemanticChunks(content: string) {
-  const targetChunkSize = 500; // tokens
+  const targetChunkSize = 500;
   const estimatedTokens = Math.ceil(content.length / 4);
   
   if (estimatedTokens <= targetChunkSize) {
@@ -548,7 +569,6 @@ function createSemanticChunks(content: string) {
     }];
   }
 
-  // Split by paragraphs
   const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
   const chunks = [];
   let currentChunk = '';
@@ -638,7 +658,6 @@ async function discoverUrls(startUrl: string, maxDepth: number, maxPages: number
           const fullUrl = new URL(href, url).toString();
           const urlObj = new URL(fullUrl);
           
-          // Only include URLs from the same domain
           if (urlObj.hostname === baseUrl.hostname && 
               !urls.has(fullUrl) && 
               !fullUrl.includes('#') &&

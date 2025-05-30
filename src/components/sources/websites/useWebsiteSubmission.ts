@@ -23,6 +23,7 @@ export const useWebsiteSubmission = () => {
 
   const submitWebsiteSource = async (data: WebsiteSubmissionData): Promise<AgentSource | null> => {
     if (!agentId) {
+      console.error('❌ No agent ID found');
       toast({
         title: "Error",
         description: "No agent ID found",
@@ -31,16 +32,26 @@ export const useWebsiteSubmission = () => {
       return null;
     }
 
+    const submissionStartTime = new Date().toISOString();
+    console.log('🚀 Starting website source submission:', {
+      agentId,
+      url: data.url,
+      crawlType: data.crawlType,
+      timestamp: submissionStartTime
+    });
+
     setIsSubmitting(true);
     try {
-      console.log('Submitting website source with data:', data);
-      
-      const result = await sources.createSource({
+      // Create the source with immediate 'pending' status
+      const sourceData = {
         agent_id: agentId,
-        source_type: 'website',
+        source_type: 'website' as const,
         title: data.url,
         url: data.url,
-        crawl_status: 'pending',
+        crawl_status: 'pending', // Immediate pending status
+        progress: 0,
+        links_count: 0,
+        is_active: true, // Ensure it appears in the list immediately
         metadata: {
           crawlType: data.crawlType,
           includePaths: data.includePaths || [],
@@ -48,14 +59,29 @@ export const useWebsiteSubmission = () => {
           maxPages: data.maxPages || 100,
           maxDepth: data.maxDepth || 3,
           concurrency: data.concurrency || 2,
-          last_progress_update: new Date().toISOString()
+          last_progress_update: submissionStartTime,
+          submission_time: submissionStartTime
         }
+      };
+
+      console.log('📝 Creating source with data:', sourceData);
+
+      const result = await sources.createSource(sourceData);
+
+      console.log('✅ Source created successfully:', {
+        sourceId: result.id,
+        status: result.crawl_status,
+        timestamp: new Date().toISOString()
       });
 
-      console.log('Source created:', result);
-
-      // Trigger the actual crawl via edge function using supabase.functions.invoke
+      // Now trigger the actual crawl via edge function
       try {
+        console.log('🔄 Initiating crawl via edge function:', {
+          sourceId: result.id,
+          url: data.url,
+          crawlType: data.crawlType
+        });
+
         const { data: crawlResult, error: crawlError } = await supabase.functions.invoke('crawl-website', {
           body: {
             source_id: result.id,
@@ -71,40 +97,72 @@ export const useWebsiteSubmission = () => {
         });
 
         if (crawlError) {
-          console.error('Crawl initiation failed:', crawlError);
-          await sources.updateSource(result.id, { crawl_status: 'failed' });
-          throw new Error(crawlError.message || 'Failed to start crawl');
+          console.error('❌ Crawl initiation failed:', crawlError);
+          
+          // Update the source status to failed
+          await sources.updateSource(result.id, { 
+            crawl_status: 'failed',
+            metadata: {
+              ...result.metadata,
+              error_message: crawlError.message || 'Failed to start crawl',
+              last_error_at: new Date().toISOString()
+            }
+          });
+          
+          toast({
+            title: "Warning",
+            description: "Source created but crawl failed to start. You can try to recrawl it later.",
+            variant: "destructive"
+          });
+        } else {
+          console.log('✅ Crawl initiated successfully:', crawlResult);
+          
+          toast({
+            title: "Success",
+            description: "Website source created and crawl started",
+          });
         }
-
-        console.log('Crawl initiated successfully:', crawlResult);
       } catch (crawlError) {
-        console.error('Error initiating crawl:', crawlError);
+        console.error('❌ Error initiating crawl:', crawlError);
+        
         // Update the source status to failed but don't prevent the UI from showing it
-        await sources.updateSource(result.id, { crawl_status: 'failed' });
+        await sources.updateSource(result.id, { 
+          crawl_status: 'failed',
+          metadata: {
+            ...result.metadata,
+            error_message: crawlError instanceof Error ? crawlError.message : 'Unknown crawl error',
+            last_error_at: new Date().toISOString()
+          }
+        });
+        
+        toast({
+          title: "Warning", 
+          description: "Source created but crawl failed to start. You can try to recrawl it later.",
+          variant: "destructive"
+        });
       }
-
-      toast({
-        title: "Success",
-        description: "Website source submitted for crawling",
-      });
 
       return result;
     } catch (error) {
-      console.error('Error submitting website source:', error);
+      console.error('❌ Error creating website source:', error);
       toast({
         title: "Error",
-        description: "Failed to submit website source",
+        description: "Failed to create website source",
         variant: "destructive"
       });
       return null;
     } finally {
       setIsSubmitting(false);
+      console.log('🏁 Website submission process completed:', {
+        timestamp: new Date().toISOString(),
+        duration: Date.now() - new Date(submissionStartTime).getTime()
+      });
     }
   };
 
   const refetch = async () => {
     // This will be used by components that need to refresh data
-    // The actual refetching is handled by the components using useSourcesPaginated
+    console.log('🔄 Refetch requested for website sources');
   };
 
   return {

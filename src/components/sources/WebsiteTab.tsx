@@ -5,7 +5,7 @@ import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import { useWebsiteFormState } from "./websites/hooks/useWebsiteFormState";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
 import WebsiteFormSection from "./websites/components/WebsiteFormSection";
-import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
+import WebsiteSourcesListOptimized from "./websites/components/WebsiteSourcesListOptimized";
 import ErrorBoundary from "./ErrorBoundary";
 import { useSourcesPaginated } from "@/hooks/useSourcesPaginated";
 
@@ -49,6 +49,13 @@ const WebsiteTabContent: React.FC = () => {
       return;
     }
 
+    console.log('🚀 Website crawl submission started:', {
+      url,
+      crawlType,
+      options,
+      timestamp: new Date().toISOString()
+    });
+
     // Combine protocol with domain
     const fullUrl = protocol + url.replace(/^https?:\/\//, '');
 
@@ -61,17 +68,39 @@ const WebsiteTabContent: React.FC = () => {
         .filter(path => path.length > 0);
     };
 
-    const result = await submitWebsiteSource({
+    const submissionData = {
       url: fullUrl,
       includePaths: parsePathsString(includePaths),
       excludePaths: parsePathsString(excludePaths),
       crawlType,
       ...options
-    });
+    };
+
+    console.log('📝 Parsed submission data:', submissionData);
+
+    const result = await submitWebsiteSource(submissionData);
 
     if (result) {
+      console.log('✅ Website source created successfully:', {
+        sourceId: result.id,
+        status: result.crawl_status,
+        timestamp: new Date().toISOString()
+      });
+      
       clearForm();
       refetch();
+      
+      toast({
+        title: "Success",
+        description: "Website crawl has been started and will appear in the list below",
+      });
+    } else {
+      console.error('❌ Website source creation failed');
+      toast({
+        title: "Error",
+        description: "Failed to start website crawl",
+        variant: "destructive"
+      });
     }
   };
 
@@ -97,7 +126,7 @@ const WebsiteTabContent: React.FC = () => {
           isSubmitting={isSubmitting}
         />
 
-        <WebsiteSourcesList
+        <WebsiteSourcesListOptimized
           onEdit={handleEdit}
           onExclude={handleExclude}
           onDelete={handleDelete}
