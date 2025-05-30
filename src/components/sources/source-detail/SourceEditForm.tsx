@@ -1,19 +1,10 @@
 
 import React from 'react';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Save, 
-  X,
-  Bold,
-  Italic,
-  List,
-  ListOrdered,
-  Link2,
-  Smile
-} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import RichTextEditor from '@/components/ui/rich-text-editor';
+import RichTextByteCounter from '@/components/sources/text/RichTextByteCounter';
 
 interface SourceEditFormProps {
   editTitle: string;
@@ -37,67 +28,40 @@ const SourceEditForm: React.FC<SourceEditFormProps> = ({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Title
-        </label>
+        <Label htmlFor="edit-title">Title</Label>
         <Input
+          id="edit-title"
           value={editTitle}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="Enter source title"
+          placeholder="Enter title..."
         />
       </div>
       
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Text
-        </label>
-        <Card className="border border-gray-200">
-          <CardContent className="p-0">
-            <div className="flex items-center p-2 border-b border-gray-200">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Bold size={16} />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Italic size={16} />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <ListOrdered size={16} />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <List size={16} />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Link2 size={16} />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Smile size={16} />
-              </Button>
-            </div>
-            <Textarea
-              value={editContent}
-              onChange={(e) => onContentChange(e.target.value)}
-              placeholder="Enter source content"
-              className="border-0 focus-visible:ring-0 min-h-[400px]"
-            />
-          </CardContent>
-        </Card>
+        <div className="flex justify-between items-center mb-2">
+          <Label htmlFor="edit-content">Content</Label>
+          <RichTextByteCounter html={editContent} />
+        </div>
+        <RichTextEditor
+          value={editContent}
+          onChange={onContentChange}
+          placeholder="Enter content..."
+        />
       </div>
-      
-      <div className="flex justify-end space-x-2 pt-4">
+
+      <div className="flex space-x-2">
+        <Button
+          onClick={onSave}
+          disabled={isSaving}
+        >
+          {isSaving ? 'Saving...' : 'Save Changes'}
+        </Button>
         <Button
           variant="outline"
           onClick={onCancel}
           disabled={isSaving}
         >
-          <X size={16} className="mr-2" />
           Cancel
-        </Button>
-        <Button
-          onClick={onSave}
-          disabled={isSaving || !editTitle.trim()}
-        >
-          <Save size={16} className="mr-2" />
-          {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
     </div>

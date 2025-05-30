@@ -3,21 +3,14 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, 
-  Info, 
   FileText,
   File,
   Link,
   MessageCircleQuestion,
   Trash2
 } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { AgentSource, SourceType } from '@/types/rag';
-import { formatDistanceToNow } from 'date-fns';
+import SourceInfoPopover from './SourceInfoPopover';
 
 interface SourceDetailHeaderProps {
   source: AgentSource;
@@ -47,29 +40,6 @@ const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
     }
   };
 
-  const formatFileSize = (content?: string) => {
-    if (!content) return '0 B';
-    const bytes = new Blob([content]).size;
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${Math.round(bytes / (1024 * 1024))} MB`;
-  };
-
-  const getSourceTypeLabel = (type: SourceType) => {
-    switch (type) {
-      case 'text':
-        return 'Text';
-      case 'file':
-        return 'File';
-      case 'website':
-        return 'Website';
-      case 'qa':
-        return 'Q&A';
-      default:
-        return type;
-    }
-  };
-
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between">
@@ -89,22 +59,7 @@ const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
         </div>
         
         <div className="flex items-center space-x-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="bg-white hover:bg-gray-50">
-                  <Info size={18} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="space-y-1 text-xs">
-                  <div><strong>Created:</strong> {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}</div>
-                  <div><strong>Size:</strong> {formatFileSize(source.content)}</div>
-                  <div><strong>Type:</strong> {getSourceTypeLabel(source.source_type)}</div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <SourceInfoPopover source={source} />
           
           <Button 
             variant="ghost" 

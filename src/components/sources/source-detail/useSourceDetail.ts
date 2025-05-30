@@ -57,6 +57,12 @@ export const useSourceDetail = () => {
     }
   };
 
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   const handleSave = async () => {
     if (!source || !editTitle.trim()) {
       toast({
@@ -67,11 +73,27 @@ export const useSourceDetail = () => {
       return;
     }
 
+    // Check if content is HTML or plain text
+    const isHtmlContent = source.metadata?.isHtml || editContent.includes('<');
+    const contentToSave = editContent.trim();
+    
     try {
       setSaving(true);
+      
+      // Calculate size for metadata
+      const plainText = isHtmlContent ? stripHtml(contentToSave) : contentToSave;
+      const byteCount = new TextEncoder().encode(plainText).length;
+      
       await sources.updateSource(source.id, {
         title: editTitle.trim(),
-        content: editContent.trim()
+        content: contentToSave,
+        metadata: {
+          ...source.metadata,
+          original_size: byteCount,
+          file_size: byteCount,
+          content_type: isHtmlContent ? 'text/html' : 'text/plain',
+          isHtml: isHtmlContent
+        }
       });
       
       toast({

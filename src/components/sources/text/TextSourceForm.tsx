@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { useParams } from 'react-router-dom';
-import TextByteCounter from './TextByteCounter';
+import RichTextEditor from '@/components/ui/rich-text-editor';
+import RichTextByteCounter from './RichTextByteCounter';
 
 const TextSourceForm: React.FC = () => {
   const { agentId } = useParams();
@@ -17,10 +17,18 @@ const TextSourceForm: React.FC = () => {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const stripHtml = (html: string) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim() || !content.trim()) {
+    const plainTextContent = stripHtml(content);
+    
+    if (!title.trim() || !plainTextContent.trim()) {
       toast({
         title: "Validation Error",
         description: "Please fill in both title and content",
@@ -41,17 +49,18 @@ const TextSourceForm: React.FC = () => {
     setIsSubmitting(true);
     try {
       // Calculate the byte size for storage
-      const byteCount = new TextEncoder().encode(content.trim()).length;
+      const byteCount = new TextEncoder().encode(plainTextContent).length;
       
       await sources.createSource({
         agent_id: agentId,
         source_type: 'text',
         title: title.trim(),
-        content: content.trim(),
+        content: content.trim(), // Store the HTML content
         metadata: {
           original_size: byteCount,
           file_size: byteCount,
-          content_type: 'text/plain'
+          content_type: 'text/html',
+          isHtml: true
         }
       });
 
@@ -96,15 +105,12 @@ const TextSourceForm: React.FC = () => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <Label htmlFor="content">Content</Label>
-              <TextByteCounter text={content} />
+              <RichTextByteCounter html={content} />
             </div>
-            <Textarea
-              id="content"
+            <RichTextEditor
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={setContent}
               placeholder="Enter your text content..."
-              className="min-h-[200px]"
-              required
             />
           </div>
 

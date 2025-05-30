@@ -36,6 +36,7 @@ export type Database = {
           team_id: string
           title: string
           updated_at: string
+          updated_by: string | null
           url: string | null
         }
         Insert: {
@@ -64,6 +65,7 @@ export type Database = {
           team_id: string
           title: string
           updated_at?: string
+          updated_by?: string | null
           url?: string | null
         }
         Update: {
@@ -92,6 +94,7 @@ export type Database = {
           team_id?: string
           title?: string
           updated_at?: string
+          updated_by?: string | null
           url?: string | null
         }
         Relationships: [

@@ -5,71 +5,126 @@ import { BaseSourceService } from "../base/BaseSourceService";
 
 export class SourceQueryService extends BaseSourceService {
   static async getSourcesByAgent(agentId: string): Promise<AgentSource[]> {
-    try {
-      console.log(`🔍 Fetching ALL sources for agent: ${agentId}`);
-      
-      const { data: sources, error } = await supabase
-        .from('agent_sources')
-        .select('*')
-        .eq('agent_id', agentId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-        // Removed the .limit(50) to fetch all sources
+    console.log(`📖 Fetching sources for agent: ${agentId}`);
+    
+    const { data: sources, error } = await supabase
+      .from('agent_sources')
+      .select('*')
+      .eq('agent_id', agentId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
 
-      if (error) throw new Error(`Failed to fetch sources: ${error.message}`);
-      
-      console.log(`✅ Fetched ${sources?.length || 0} sources for agent ${agentId}`);
-      return this.formatSources(sources || []);
-    } catch (error) {
-      console.error('Error fetching sources by agent:', error);
-      throw error;
+    if (error) {
+      console.error('❌ Error fetching sources:', error);
+      throw new Error(`Failed to fetch sources: ${error.message}`);
     }
+
+    console.log(`✅ Found ${sources?.length || 0} sources`);
+    return this.formatSources(sources || []);
   }
 
   static async getSourcesByType(agentId: string, sourceType: SourceType): Promise<AgentSource[]> {
-    try {
-      const { data: sources, error } = await supabase
-        .from('agent_sources')
-        .select('*')
-        .eq('agent_id', agentId)
-        .eq('source_type', sourceType)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-        // No limit here either for consistency
+    console.log(`📖 Fetching ${sourceType} sources for agent: ${agentId}`);
+    
+    const { data: sources, error } = await supabase
+      .from('agent_sources')
+      .select('*')
+      .eq('agent_id', agentId)
+      .eq('source_type', sourceType)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
 
-      if (error) throw new Error(`Failed to fetch ${sourceType} sources: ${error.message}`);
-      return this.formatSources(sources || []);
-    } catch (error) {
-      console.error(`Error fetching ${sourceType} sources:`, error);
-      throw error;
+    if (error) {
+      console.error('❌ Error fetching sources by type:', error);
+      throw new Error(`Failed to fetch ${sourceType} sources: ${error.message}`);
     }
+
+    console.log(`✅ Found ${sources?.length || 0} ${sourceType} sources`);
+    return this.formatSources(sources || []);
   }
 
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
-    try {
-      const { data: source, error: sourceError } = await supabase
-        .from('agent_sources')
-        .select('*')
-        .eq('id', id)
-        .single();
+    console.log(`📖 Fetching source with stats: ${id}`);
+    
+    // Get source with user information for created_by and updated_by
+    const { data: source, error: sourceError } = await supabase
+      .from('agent_sources')
+      .select(`
+        *,
+        created_by_user:created_by,
+        updated_by_user:updated_by
+      `)
+      .eq('id', id)
+      .single();
 
-      if (sourceError) throw new Error(`Failed to fetch source: ${sourceError.message}`);
-      if (!source) throw new Error('Source not found');
-
-      const { count: chunksCount, error: chunksError } = await supabase
-        .from('source_chunks')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_id', id);
-
-      if (chunksError) throw new Error(`Failed to fetch chunks count: ${chunksError.message}`);
-
-      return {
-        ...this.formatSource(source),
-        chunks_count: chunksCount || 0
-      };
-    } catch (error) {
-      console.error('Error fetching source with stats:', error);
-      throw error;
+    if (sourceError) {
+      console.error('❌ Error fetching source:', sourceError);
+      throw new Error(`Failed to fetch source: ${sourceError.message}`);
     }
+
+    if (!source) {
+      throw new Error('Source not found');
+    }
+
+    // Get chunks count
+    const { count: chunksCount, error: chunksError } = await supabase
+      .from('source_chunks')
+      .select('*', { count: 'exact', head: true })
+      .eq('source_id', id);
+
+    if (chunksError) {
+      console.error('❌ Error counting chunks:', chunksError);
+    }
+
+    const formattedSource = this.formatSource(source);
+    
+    return {
+      ...formattedSource,
+      chunks_count: chunksCount || 0
+    };
+  }
+
+  static async getSourcesPaginated(
+    agentId: string,
+    sourceType?: SourceType,
+    page: number = 1,
+    pageSize: number = 25
+  ): Promise<{
+    sources: AgentSource[];
+    totalCount: number;
+    totalPages: number;
+  }> {
+    console.log(`📖 Fetching paginated sources for agent: ${agentId}, type: ${sourceType}, page: ${page}`);
+    
+    const offset = (page - 1) * pageSize;
+    let query = supabase
+      .from('agent_sources')
+      .select('*', { count: 'exact' })
+      .eq('agent_id', agentId)
+      .eq('is_active', true);
+
+    if (sourceType) {
+      query = query.eq('source_type', sourceType);
+    }
+
+    const { data: sources, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      console.error('❌ Error fetching paginated sources:', error);
+      throw new Error(`Failed to fetch sources: ${error.message}`);
+    }
+
+    const totalCount = count || 0;
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    console.log(`✅ Found ${sources?.length || 0} sources (${totalCount} total)`);
+    
+    return {
+      sources: this.formatSources(sources || []),
+      totalCount,
+      totalPages
+    };
   }
 }
