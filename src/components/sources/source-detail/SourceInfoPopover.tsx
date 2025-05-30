@@ -6,6 +6,7 @@ import { Info, Clock, User, FileText, HardDrive } from 'lucide-react';
 import { AgentSource, SourceType } from '@/types/rag';
 import { formatDistanceToNow } from 'date-fns';
 import { UserService, UserInfo } from '@/services/userService';
+import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
 
 interface SourceInfoPopoverProps {
   source: AgentSource;
@@ -40,31 +41,6 @@ const SourceInfoPopover: React.FC<SourceInfoPopoverProps> = ({ source }) => {
 
     fetchUserInfo();
   }, [source.created_by, source.updated_by]);
-
-  const formatFileSize = (content?: string, metadata?: Record<string, any>) => {
-    // Try to get size from metadata first
-    if (metadata?.original_size) {
-      return formatBytes(metadata.original_size);
-    }
-    
-    if (!content) return '0 B';
-    
-    // For HTML content, calculate size of plain text
-    if (metadata?.isHtml) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = content;
-      const plainText = tmp.textContent || tmp.innerText || '';
-      return formatBytes(new TextEncoder().encode(plainText).length);
-    }
-    
-    return formatBytes(new TextEncoder().encode(content).length);
-  };
-
-  const formatBytes = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${Math.round(bytes / (1024 * 1024))} MB`;
-  };
 
   const getSourceTypeLabel = (type: SourceType) => {
     switch (type) {
@@ -106,7 +82,7 @@ const SourceInfoPopover: React.FC<SourceInfoPopoverProps> = ({ source }) => {
                 <HardDrive size={14} className="text-gray-500" />
                 <span className="text-gray-600">Size:</span>
               </div>
-              <span className="font-medium">{formatFileSize(source.content, source.metadata)}</span>
+              <span className="font-medium">{formatFileSize(source)}</span>
             </div>
             
             <div className="flex justify-between items-center">
