@@ -32,7 +32,10 @@ export const useAgentSourcesRealtime = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          console.log('📡 Real-time source update:', payload.eventType, payload.new?.source_type);
+          const sourceType = payload.new && typeof payload.new === 'object' && 'source_type' in payload.new 
+            ? payload.new.source_type 
+            : 'unknown';
+          console.log('📡 Real-time source update:', payload.eventType, sourceType);
           
           // Invalidate stats query
           queryClient.invalidateQueries({ 

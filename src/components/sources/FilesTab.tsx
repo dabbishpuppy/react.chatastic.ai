@@ -32,7 +32,7 @@ const FilesTabContent: React.FC = () => {
   } = useFileUpload(refetch);
 
   // Flatten all pages into a single array
-  const allSources = data?.pages.flatMap(page => page.sources) || [];
+  const allSources = data?.pages?.flatMap(page => page.sources) || [];
 
   return (
     <div className="space-y-6 mt-4">

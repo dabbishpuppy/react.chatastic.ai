@@ -3,7 +3,7 @@ import React from 'react';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
-  fallback?: React.ComponentType<{error: Error}>;
+  fallback?: React.ComponentType<{error: Error, tabName?: string}>;
   tabName?: string;
 }
 

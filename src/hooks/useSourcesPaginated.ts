@@ -69,10 +69,11 @@ export const useSourcesPaginated = (options: PaginatedSourcesOptions = {}) => {
   const { agentId } = useParams();
   const { sourceType, pageSize = 50 } = options;
 
-  return useInfiniteQuery({
+  return useInfiniteQuery<SourcesPage, Error>({
     queryKey: ['sources-paginated', agentId, sourceType],
-    queryFn: ({ pageParam }) => fetchSourcesPage(agentId!, sourceType, pageParam, pageSize),
-    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
+    queryFn: ({ pageParam }) => fetchSourcesPage(agentId!, sourceType, pageParam as string, pageSize),
+    getNextPageParam: (lastPage: SourcesPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
+    initialPageParam: undefined,
     enabled: !!agentId,
     staleTime: 30000, // Consider data fresh for 30 seconds
   });
