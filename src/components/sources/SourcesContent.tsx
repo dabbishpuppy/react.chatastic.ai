@@ -9,10 +9,10 @@ interface SourcesContentProps {
   totalSources: number;
   totalSize: string;
   sourcesByType: {
-    text: number;
-    file: number;
-    website: number;
-    qa: number;
+    text: { count: number; size: number };
+    file: { count: number; size: number };
+    website: { count: number; size: number };
+    qa: { count: number; size: number };
   };
   currentTab?: string;
 }
@@ -77,17 +77,16 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               key={type}
               role="listitem"
               className="flex items-center justify-between"
-              aria-label={`${getSourceLabel(sourcesByType[type], type)}`}
+              aria-label={`${getSourceLabel(sourcesByType[type].count, type)}`}
             >
               <div className="flex items-center gap-3">
                 {getSourceIcon(type)}
                 <span className="text-sm text-gray-700">
-                  {getSourceLabel(sourcesByType[type], type)}
+                  {getSourceLabel(sourcesByType[type].count, type)}
                 </span>
               </div>
               <span className="text-sm font-semibold text-gray-900">
-                {/* Show 0 B for individual types since we don't have per-type breakdown */}
-                {sourcesByType[type] > 0 ? formatBytes(0) : '0 B'}
+                {formatBytes(sourcesByType[type].size)}
               </span>
             </div>
           ))}

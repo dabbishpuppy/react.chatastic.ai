@@ -8,10 +8,10 @@ interface AgentSourceStats {
   totalSources: number;
   totalBytes: number;
   sourcesByType: {
-    text: number;
-    file: number;
-    website: number;
-    qa: number;
+    text: { count: number; size: number };
+    file: { count: number; size: number };
+    website: { count: number; size: number };
+    qa: { count: number; size: number };
   };
 }
 
@@ -19,10 +19,10 @@ interface RPCResponse {
   total_sources: number;
   total_bytes: number;
   sources_by_type: {
-    text: number;
-    file: number;
-    website: number;
-    qa: number;
+    text: { count: number; size: number };
+    file: { count: number; size: number };
+    website: { count: number; size: number };
+    qa: { count: number; size: number };
   };
 }
 
@@ -44,8 +44,18 @@ const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats>
       totalSources: result.total_sources || 0,
       totalBytes: result.total_bytes || 0,
       sourcesByType: (typeof result.sources_by_type === 'object' && result.sources_by_type !== null) 
-        ? result.sources_by_type as { text: number; file: number; website: number; qa: number; }
-        : { text: 0, file: 0, website: 0, qa: 0 }
+        ? result.sources_by_type as { 
+            text: { count: number; size: number }; 
+            file: { count: number; size: number }; 
+            website: { count: number; size: number }; 
+            qa: { count: number; size: number }; 
+          }
+        : { 
+            text: { count: 0, size: 0 }, 
+            file: { count: 0, size: 0 }, 
+            website: { count: 0, size: 0 }, 
+            qa: { count: 0, size: 0 } 
+          }
     };
     console.log(`✅ Stats fetched:`, stats);
     return stats;
@@ -54,7 +64,12 @@ const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats>
     return {
       totalSources: 0,
       totalBytes: 0,
-      sourcesByType: { text: 0, file: 0, website: 0, qa: 0 }
+      sourcesByType: { 
+        text: { count: 0, size: 0 }, 
+        file: { count: 0, size: 0 }, 
+        website: { count: 0, size: 0 }, 
+        qa: { count: 0, size: 0 } 
+      }
     };
   }
 };
@@ -107,7 +122,12 @@ export const useAgentSourceStats = () => {
     stats: stats || {
       totalSources: 0,
       totalBytes: 0,
-      sourcesByType: { text: 0, file: 0, website: 0, qa: 0 }
+      sourcesByType: { 
+        text: { count: 0, size: 0 }, 
+        file: { count: 0, size: 0 }, 
+        website: { count: 0, size: 0 }, 
+        qa: { count: 0, size: 0 } 
+      }
     },
     loading,
     error: error?.message || null,
