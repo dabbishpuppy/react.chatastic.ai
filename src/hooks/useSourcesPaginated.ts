@@ -37,7 +37,10 @@ const fetchSourcesPage = async (
       .select(`
         id, title, source_type, url, created_at, updated_at, 
         metadata, is_active, parent_source_id, crawl_status, 
-        progress, links_count, last_crawled_at, is_excluded
+        progress, links_count, last_crawled_at, is_excluded,
+        agent_id, team_id, created_by, updated_by, file_path,
+        extraction_method, content_summary, content, raw_text,
+        compression_ratio, keywords, original_size, compressed_size
       `)
       .eq('agent_id', agentId)
       .eq('source_type', 'website')
@@ -102,7 +105,10 @@ const fetchSourcesPage = async (
     .select(`
       id, title, source_type, url, created_at, updated_at, 
       metadata, is_active, parent_source_id, crawl_status, 
-      progress, links_count, last_crawled_at, is_excluded
+      progress, links_count, last_crawled_at, is_excluded,
+      agent_id, team_id, created_by, updated_by, file_path,
+      extraction_method, content_summary, content, raw_text,
+      compression_ratio, keywords, original_size, compressed_size
     `)
     .eq('agent_id', agentId)
     .eq('is_active', true)
