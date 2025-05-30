@@ -26,8 +26,56 @@ const fetchSourcesPage = async (
   page = 1,
   pageSize = 25
 ): Promise<SourcesPageResult> => {
-  console.log(`🔍 Fetching sources page: type=${sourceType}, page=${page}, size=${pageSize}`);
+  console.log(`🔍 Fetching sources page: agentId=${agentId}, type=${sourceType}, page=${page}, size=${pageSize}`);
   
+  // For website sources, we need ALL sources (parents + children) to build the tree structure
+  // But we'll paginate based on parent sources only
+  if (sourceType === 'website') {
+    // First get all website sources for this agent (we need children to build the tree)
+    let allSourcesQuery = supabase
+      .from('agent_sources')
+      .select(`
+        id, title, source_type, url, created_at, updated_at, 
+        metadata, is_active, parent_source_id, crawl_status, 
+        progress, links_count, last_crawled_at, is_excluded
+      `)
+      .eq('agent_id', agentId)
+      .eq('source_type', 'website')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    const { data: allSources, error: allSourcesError } = await allSourcesQuery;
+
+    if (allSourcesError) {
+      console.error('❌ Error fetching all website sources:', allSourcesError);
+      throw allSourcesError;
+    }
+
+    console.log(`✅ Fetched ${allSources?.length || 0} total website sources`);
+    
+    // Count parent sources for pagination
+    const parentSources = (allSources || []).filter(source => !source.parent_source_id);
+    const totalParentCount = parentSources.length;
+    const totalPages = Math.ceil(totalParentCount / pageSize);
+    
+    console.log(`📊 Website sources summary:`, {
+      totalSources: allSources?.length || 0,
+      parentSources: totalParentCount,
+      childSources: (allSources?.length || 0) - totalParentCount,
+      page,
+      totalPages
+    });
+
+    return {
+      sources: allSources || [],
+      totalCount: allSources?.length || 0,
+      totalPages,
+      currentPage: page,
+      pageSize
+    };
+  }
+
+  // For other source types, use the original pagination logic
   const offset = (page - 1) * pageSize;
 
   // First get the total count

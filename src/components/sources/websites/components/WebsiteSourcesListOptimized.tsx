@@ -33,16 +33,15 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
   const { sources: sourceService } = useRAGServices();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [optimisticSources, setOptimisticSources] = useState<AgentSource[]>([]);
 
-  // Enhanced logging for source operations
+  // Enhanced logging for debugging the display issue
   useEffect(() => {
-    console.log('🏗️ WebsiteSourcesList initialized', {
+    console.log('🐛 WebsiteSourcesList Debug Info:', {
       loading,
       error,
       timestamp: new Date().toISOString()
     });
-  }, []);
+  }, [loading, error]);
 
   // Selection state
   const {
@@ -70,7 +69,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
     onPageSizeChange: () => clearSelection()
   });
 
-  // Get paginated data
+  // Get paginated data - fetch ALL website sources
   const { data: paginatedData, refetch } = useSourcesPaginated({
     sourceType: 'website',
     page,
@@ -78,28 +77,37 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
     enabled: !loading
   });
 
-  // Update optimistic sources when data changes
-  useEffect(() => {
-    if (paginatedData?.sources) {
-      console.log('📊 Sources data updated:', {
-        totalSources: paginatedData.sources.length,
-        parentSources: paginatedData.sources.filter(s => !s.parent_source_id).length,
-        timestamp: new Date().toISOString()
-      });
-      setOptimisticSources(paginatedData.sources);
-    }
-  }, [paginatedData?.sources]);
-
-  // Get parent sources - show all website sources including pending ones
-  const parentSources = useMemo(() => {
-    const allSources = optimisticSources || [];
+  // Separate parent sources and all sources
+  const { parentSources, allSources, parentCount } = useMemo(() => {
+    const allSources = paginatedData?.sources || [];
+    
+    console.log('🔍 Processing website sources:', {
+      totalFetched: allSources.length,
+      sources: allSources.map(s => ({
+        id: s.id,
+        title: s.title,
+        url: s.url,
+        parent_source_id: s.parent_source_id,
+        crawl_status: s.crawl_status,
+        is_active: s.is_active
+      })),
+      timestamp: new Date().toISOString()
+    });
+    
     const parents = allSources.filter(source => 
       !source.parent_source_id && 
-      source.source_type === 'website'
+      source.source_type === 'website' &&
+      source.is_active === true
     );
     
-    console.log('🎯 Parent sources filtered:', {
-      totalParents: parents.length,
+    console.log('📊 Parent sources filtered:', {
+      parentCount: parents.length,
+      parents: parents.map(p => ({
+        id: p.id,
+        title: p.title,
+        url: p.url,
+        crawl_status: p.crawl_status
+      })),
       statusBreakdown: parents.reduce((acc, source) => {
         acc[source.crawl_status || 'unknown'] = (acc[source.crawl_status || 'unknown'] || 0) + 1;
         return acc;
@@ -107,32 +115,22 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
       timestamp: new Date().toISOString()
     });
     
-    return parents;
-  }, [optimisticSources]);
+    return {
+      parentSources: parents,
+      allSources,
+      parentCount: parents.length
+    };
+  }, [paginatedData?.sources]);
 
   const getChildSources = useCallback((parentId: string): AgentSource[] => {
-    const children = (optimisticSources || []).filter(source => source.parent_source_id === parentId);
+    const children = allSources.filter(source => source.parent_source_id === parentId);
     console.log(`👶 Child sources for parent ${parentId}:`, {
       count: children.length,
+      children: children.map(c => ({ id: c.id, title: c.title, url: c.url })),
       timestamp: new Date().toISOString()
     });
     return children;
-  }, [optimisticSources]);
-
-  // Add a new pending source optimistically
-  const addOptimisticSource = useCallback((newSource: AgentSource) => {
-    console.log('⚡ Adding optimistic source:', {
-      sourceId: newSource.id,
-      status: newSource.crawl_status,
-      timestamp: new Date().toISOString()
-    });
-    
-    setOptimisticSources(prev => [newSource, ...prev]);
-    toast({
-      title: "Source Added",
-      description: `Website crawl started for ${newSource.url}`
-    });
-  }, []);
+  }, [allSources]);
 
   const currentPageSourceIds = parentSources.map(s => s.id);
   const allCurrentPageSelected = currentPageSourceIds.length > 0 && 
@@ -230,6 +228,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
     }
   }, [selectedArray, sourceService, clearSelection, refetch]);
 
+  // Show loading state
   if (loading && !paginatedData) {
     console.log('⏳ Showing loading state');
     return (
@@ -258,6 +257,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
     );
   }
 
+  // Show error state
   if (error) {
     console.error('❌ Error state in WebsiteSourcesList:', error);
     return (
@@ -271,15 +271,25 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
     );
   }
 
-  const totalCount = paginatedData?.totalCount || 0;
-  const totalPages = paginatedData?.totalPages || 1;
+  const totalPages = Math.ceil(parentCount / pageSize);
+
+  console.log('🎯 Final render state:', {
+    parentSourcesCount: parentSources.length,
+    totalParentCount: parentCount,
+    currentPage: page,
+    totalPages,
+    hasData: !!paginatedData,
+    timestamp: new Date().toISOString()
+  });
 
   return (
     <div className="relative">
       <Card className="border border-gray-200">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Website Sources ({totalCount})</CardTitle>
+            <CardTitle className="text-lg">
+              Website Sources ({parentCount} crawl jobs, {paginatedData?.totalCount || 0} total pages)
+            </CardTitle>
             {parentSources.length > 0 && (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -305,7 +315,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
           <div id="website-sources-list" role="list">
             {parentSources.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No website sources found</p>
+                <p>No website crawl jobs found</p>
                 <p className="text-sm">Add a website URL above to get started</p>
               </div>
             ) : (
@@ -327,12 +337,12 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
             )}
           </div>
 
-          {paginatedData && totalCount > 0 && (
+          {parentCount > pageSize && (
             <PaginationControls
               currentPage={page}
               totalPages={totalPages}
               pageSize={pageSize}
-              totalItems={totalCount}
+              totalItems={parentCount}
               onPageChange={() => {}}
               onPageSizeChange={changePageSize}
               onFirstPage={goToFirstPage}
