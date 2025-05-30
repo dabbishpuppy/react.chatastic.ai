@@ -970,6 +970,17 @@ export type Database = {
         Args: { team_id: string }
         Returns: Database["public"]["Enums"]["team_role"]
       }
+      get_user_email: {
+        Args: { user_id_param: string }
+        Returns: string
+      }
+      get_users_emails: {
+        Args: { user_ids: string[] }
+        Returns: {
+          id: string
+          email: string
+        }[]
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
