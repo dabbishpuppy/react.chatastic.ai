@@ -197,10 +197,33 @@ const fetchSourcesPage = async (
 
   console.log(`✅ Fetched ${data?.length || 0} sources, page ${page} of ${totalPages}`);
   
-  // Convert optimized data to AgentSource format
+  // Convert optimized data to AgentSource format with required fields
   const typedSources: AgentSource[] = (data || []).map(source => ({
-    ...source,
+    id: source.id,
+    title: source.title,
+    source_type: source.source_type,
+    url: source.url,
+    created_at: source.created_at,
+    updated_at: source.updated_at,
     metadata: source.metadata as Record<string, any>,
+    is_active: source.is_active,
+    parent_source_id: source.parent_source_id,
+    crawl_status: source.crawl_status,
+    progress: source.progress,
+    links_count: source.links_count,
+    last_crawled_at: source.last_crawled_at,
+    is_excluded: source.is_excluded,
+    agent_id: source.agent_id,
+    team_id: source.team_id,
+    created_by: source.created_by,
+    updated_by: source.updated_by,
+    file_path: source.file_path,
+    extraction_method: source.extraction_method,
+    content_summary: source.content_summary,
+    keywords: source.keywords,
+    compression_ratio: source.compression_ratio,
+    original_size: source.original_size,
+    compressed_size: source.compressed_size,
     content: null, // Not fetched for performance
     raw_text: null // Not fetched for performance
   }));
