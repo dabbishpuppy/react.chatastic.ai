@@ -44,6 +44,7 @@ export class SourceUpdateService extends BaseSourceService {
         }
       }
 
+      // Note: updated_by and updated_at will be automatically set by the database triggers
       const { data: source, error } = await supabase
         .from('agent_sources')
         .update(updates)

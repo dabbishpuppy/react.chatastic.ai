@@ -24,6 +24,7 @@ export class SourceCreateService extends BaseSourceService {
       const sourceData = {
         ...data,
         team_id
+        // Note: created_by and created_at will be automatically set by the database triggers
       };
 
       const { data: source, error } = await supabase
