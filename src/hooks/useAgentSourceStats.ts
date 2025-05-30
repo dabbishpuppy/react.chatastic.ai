@@ -33,7 +33,10 @@ const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats>
     target_agent_id: agentId
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Error fetching stats:', error);
+    throw error;
+  }
 
   if (data && data.length > 0) {
     const result = data[0] as RPCResponse;
@@ -47,6 +50,7 @@ const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats>
     console.log(`✅ Stats fetched:`, stats);
     return stats;
   } else {
+    console.log('📊 No stats data returned, using defaults');
     return {
       totalSources: 0,
       totalBytes: 0,
@@ -62,7 +66,8 @@ export const useAgentSourceStats = () => {
     queryKey: ['agent-source-stats', agentId],
     queryFn: () => fetchAgentSourceStats(agentId!),
     enabled: !!agentId,
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    staleTime: 1000, // Consider data fresh for only 1 second to ensure quick updates
+    refetchInterval: 2000, // Refetch every 2 seconds as backup
   });
 
   return {

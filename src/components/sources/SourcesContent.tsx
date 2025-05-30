@@ -55,24 +55,12 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     }
   };
 
-  // Calculate individual sizes proportionally based on total
-  const calculateTypeSize = (count: number, type: string) => {
-    if (count === 0) return '0 B';
-    
-    // For real calculation, we would need the actual sizes from the backend
-    // For now, return proportional mock sizes that update with real counts
-    const mockSizePerItem = {
-      file: 4000, // 4KB average
-      text: 500,  // 500B average  
-      website: 12000, // 12KB average
-      qa: 300     // 300B average
-    };
-    
-    const totalBytes = count * (mockSizePerItem[type as keyof typeof mockSizePerItem] || 1000);
-    
-    if (totalBytes < 1024) return `${totalBytes} B`;
-    if (totalBytes < 1024 * 1024) return `${Math.round(totalBytes / 1024)} KB`;
-    return `${Math.round(totalBytes / (1024 * 1024))} MB`;
+  // Format bytes helper function
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
   const sourceTypes = ['file', 'text', 'website', 'qa'] as const;
@@ -89,7 +77,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               key={type}
               role="listitem"
               className="flex items-center justify-between"
-              aria-label={`${getSourceLabel(sourcesByType[type], type)}, ${calculateTypeSize(sourcesByType[type], type)}`}
+              aria-label={`${getSourceLabel(sourcesByType[type], type)}`}
             >
               <div className="flex items-center gap-3">
                 {getSourceIcon(type)}
@@ -98,7 +86,8 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
                 </span>
               </div>
               <span className="text-sm font-semibold text-gray-900">
-                {calculateTypeSize(sourcesByType[type], type)}
+                {/* Show 0 B for individual types since we don't have per-type breakdown */}
+                {sourcesByType[type] > 0 ? formatBytes(0) : '0 B'}
               </span>
             </div>
           ))}
