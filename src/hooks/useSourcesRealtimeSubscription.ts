@@ -1,8 +1,9 @@
-
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
+// This hook is now deprecated in favor of useAgentSourceStats
+// Keep it for backward compatibility but it returns a simple timestamp
 export const useSourcesRealtimeSubscription = () => {
   const { agentId } = useParams();
   const [realtimeSize, setRealtimeSize] = useState(0);
@@ -10,26 +11,13 @@ export const useSourcesRealtimeSubscription = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    const channel = supabase
-      .channel(`sources-size-${agentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sources',
-          filter: `agent_id=eq.${agentId}`
-        },
-        (payload) => {
-          console.log('📡 Sources size update triggered', payload);
-          setRealtimeSize(Date.now()); // Force recalculation
-        }
-      )
-      .subscribe();
+    console.log('⚠️ useSourcesRealtimeSubscription is deprecated, use useAgentSourceStats instead');
+    
+    // Just return a timestamp to satisfy existing consumers
+    setRealtimeSize(Date.now());
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // No subscription needed since useAgentSourceStats handles this
+    return () => {};
   }, [agentId]);
 
   return realtimeSize;

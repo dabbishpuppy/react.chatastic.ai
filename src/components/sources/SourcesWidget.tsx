@@ -1,8 +1,8 @@
 
 import React from "react";
 import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
+import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useSourceSizeCalculations } from "@/hooks/useSourceSizeCalculations";
-import { useSourcesRealtimeSubscription } from "@/hooks/useSourcesRealtimeSubscription";
 import SourcesLoadingState from "./SourcesLoadingState";
 import SourcesErrorState from "./SourcesErrorState";
 import SourcesContent from "./SourcesContent";
@@ -12,30 +12,39 @@ interface SourcesWidgetProps {
 }
 
 const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
-  const { sources: sourcesData, loading, error } = useOptimizedAgentSources();
-  const realtimeSize = useSourcesRealtimeSubscription();
+  const { sources: sourcesData, loading: sourcesLoading, error: sourcesError } = useOptimizedAgentSources();
+  const { stats, loading: statsLoading, error: statsError } = useAgentSourceStats();
 
-  console.log(`📊 SourcesWidget render: tab=${currentTab}, sources=${sourcesData.length}, loading=${loading}, error=${error}`);
+  console.log(`📊 SourcesWidget render: tab=${currentTab}, sources=${sourcesData.length}, stats=${JSON.stringify(stats)}`);
 
-  // Calculate total stats - show all source types regardless of current tab
-  const { totalSources, totalSize, sourcesByType } = useSourceSizeCalculations(
+  // Use stats for total counts and sizes, but still use individual sources for display
+  const { sourcesByType } = useSourceSizeCalculations(
     sourcesData, 
     undefined, // Don't pass currentTab to ensure all types are always shown
-    realtimeSize
+    0 // We don't need realtime size updates since we have stats
   );
 
-  if (loading) {
+  // Format total size from stats
+  const formatTotalSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
+  };
+
+  // Show loading if either sources or stats are loading
+  if (sourcesLoading || statsLoading) {
     return <SourcesLoadingState />;
   }
 
-  if (error) {
-    return <SourcesErrorState error={error} />;
+  // Show error if either sources or stats have errors
+  if (sourcesError || statsError) {
+    return <SourcesErrorState error={sourcesError || statsError || 'Unknown error'} />;
   }
 
   return (
     <SourcesContent
-      totalSources={totalSources}
-      totalSize={totalSize}
+      totalSources={stats.totalSources}
+      totalSize={formatTotalSize(stats.totalBytes)}
       sourcesByType={sourcesByType}
       currentTab={currentTab}
       sourcesLength={sourcesData.length}

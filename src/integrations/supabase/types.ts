@@ -942,6 +942,14 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: Json
       }
+      get_agent_source_stats: {
+        Args: { target_agent_id: string }
+        Returns: {
+          total_sources: number
+          total_bytes: number
+          sources_by_type: Json
+        }[]
+      }
       get_compression_stats: {
         Args: Record<PropertyKey, never>
         Returns: {
