@@ -3,14 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { X } from 'lucide-react';
-
-export interface UploadedFile {
-  file: File;
-  id: string;
-  status: 'pending' | 'uploading' | 'processing' | 'complete' | 'error';
-  progress: number;
-  error?: string;
-}
+import { UploadedFile } from './types';
 
 interface FileUploadProgressProps {
   uploadedFiles: UploadedFile[];
