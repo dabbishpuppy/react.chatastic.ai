@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AgentSourceStats {
@@ -61,14 +61,47 @@ const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats>
 
 export const useAgentSourceStats = () => {
   const { agentId } = useParams();
+  const queryClient = useQueryClient();
 
   const { data: stats, isLoading: loading, error, refetch } = useQuery({
     queryKey: ['agent-source-stats', agentId],
     queryFn: () => fetchAgentSourceStats(agentId!),
     enabled: !!agentId,
-    staleTime: 500, // Consider data fresh for only 500ms to ensure quick updates
-    refetchInterval: 1000, // Refetch every 1 second for real-time updates
+    staleTime: 0, // Always consider data stale to ensure fresh fetches
+    refetchInterval: 2000, // Refetch every 2 seconds for real-time updates
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
+
+  // Set up real-time subscription for agent_sources table changes
+  useEffect(() => {
+    if (!agentId) return;
+
+    console.log(`🔄 Setting up real-time subscription for agent sources: ${agentId}`);
+
+    const channel = supabase
+      .channel('agent-sources-stats')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `agent_id=eq.${agentId}`
+        },
+        (payload) => {
+          console.log('📡 Real-time agent_sources change detected:', payload);
+          // Invalidate and refetch the stats query
+          queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔌 Cleaning up agent sources stats subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [agentId, queryClient]);
 
   return {
     stats: stats || {
