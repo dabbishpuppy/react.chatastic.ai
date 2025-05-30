@@ -14,6 +14,17 @@ interface AgentSourceStats {
   };
 }
 
+interface RPCResponse {
+  total_sources: number;
+  total_bytes: number;
+  sources_by_type: {
+    text: number;
+    file: number;
+    website: number;
+    qa: number;
+  };
+}
+
 export const useAgentSourceStats = () => {
   const { agentId } = useParams();
   const [stats, setStats] = useState<AgentSourceStats>({
@@ -40,11 +51,13 @@ export const useAgentSourceStats = () => {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const result = data[0];
+        const result = data[0] as RPCResponse;
         setStats({
           totalSources: result.total_sources || 0,
           totalBytes: result.total_bytes || 0,
-          sourcesByType: result.sources_by_type || { text: 0, file: 0, website: 0, qa: 0 }
+          sourcesByType: (typeof result.sources_by_type === 'object' && result.sources_by_type !== null) 
+            ? result.sources_by_type as { text: number; file: number; website: number; qa: number; }
+            : { text: 0, file: 0, website: 0, qa: 0 }
         });
         console.log(`✅ Stats updated:`, result);
       } else {
