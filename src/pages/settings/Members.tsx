@@ -6,16 +6,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MoreVertical, UserPlus, Settings } from "lucide-react";
+import { MoreVertical, UserPlus, Settings, UserMinus } from "lucide-react";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import ManageTeamAccessDialog from "@/components/settings/ManageTeamAccessDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 const MembersSettings: React.FC = () => {
   const { members, loading, refetch } = useTeamMembers();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [isManageTeamDialogOpen, setIsManageTeamDialogOpen] = useState(false);
+  const [isRemoveConfirmOpen, setIsRemoveConfirmOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const { toast } = useToast();
@@ -43,6 +46,40 @@ const MembersSettings: React.FC = () => {
   const handleManageTeams = (member: any) => {
     setSelectedMember(member);
     setIsManageTeamDialogOpen(true);
+  };
+
+  const handleRemoveMember = (member: any) => {
+    setSelectedMember(member);
+    setIsRemoveConfirmOpen(true);
+  };
+
+  const confirmRemoveMember = async () => {
+    if (!selectedMember) return;
+
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('user_id', selectedMember.user_id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Member removed",
+        description: `${selectedMember.email} has been removed from all teams.`,
+      });
+
+      refetch();
+      setIsRemoveConfirmOpen(false);
+      setSelectedMember(null);
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      toast({
+        title: "Error removing member",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const getRoleColor = (role: string) => {
@@ -120,9 +157,21 @@ const MembersSettings: React.FC = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleManageTeams(member)}>
+                    <DropdownMenuItem 
+                      onClick={() => handleManageTeams(member)}
+                      className="text-sm"
+                      style={{ fontSize: '0.875rem' }}
+                    >
                       <Settings className="mr-2 h-4 w-4" />
                       Manage Teams
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRemoveMember(member)}
+                      className="text-sm text-red-600 hover:text-red-700"
+                      style={{ fontSize: '0.875rem' }}
+                    >
+                      <UserMinus className="mr-2 h-4 w-4" />
+                      Remove member
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -157,6 +206,23 @@ const MembersSettings: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isRemoveConfirmOpen} onOpenChange={setIsRemoveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {selectedMember?.email} from all teams? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemoveMember} className="bg-red-600 hover:bg-red-700">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedMember && (
         <ManageTeamAccessDialog

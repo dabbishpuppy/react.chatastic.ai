@@ -40,6 +40,8 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchAvailableTeams();
+      setSelectedTeamId("");
+      setSelectedRole("member");
     }
   }, [isOpen, member.teams]);
 
@@ -68,7 +70,14 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
   };
 
   const handleAddTeamAccess = async () => {
-    if (!selectedTeamId) return;
+    if (!selectedTeamId) {
+      toast({
+        title: "Please select a team",
+        description: "You must select a team before adding access.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -87,8 +96,14 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
         description: "User has been added to the team successfully.",
       });
 
+      // Reset form
+      setSelectedTeamId("");
+      setSelectedRole("member");
+      
+      // Refresh available teams
+      await fetchAvailableTeams();
+      
       onSuccess();
-      onClose();
     } catch (error: any) {
       console.error('Error adding team access:', error);
       toast({
@@ -135,6 +150,9 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
         description: "User has been removed from the team successfully.",
       });
 
+      // Refresh available teams
+      await fetchAvailableTeams();
+      
       onSuccess();
     } catch (error: any) {
       console.error('Error removing team access:', error);
@@ -220,7 +238,7 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
           </Button>
           {selectedTeamId && (
             <Button onClick={handleAddTeamAccess} disabled={loading}>
-              Add to Team
+              {loading ? "Adding..." : "Add to Team"}
             </Button>
           )}
         </DialogFooter>
