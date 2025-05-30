@@ -82,9 +82,39 @@ const SourcesList: React.FC<SourcesListProps> = ({
     }
   };
 
-  const formatFileSize = (content?: string) => {
-    if (!content) return '0 B';
-    const bytes = new Blob([content]).size;
+  const formatFileSize = (source: AgentSource) => {
+    // For file sources, check metadata for original_size first
+    if (source.source_type === 'file' && source.metadata) {
+      const metadata = source.metadata as any;
+      if (metadata.original_size && typeof metadata.original_size === 'number') {
+        const bytes = metadata.original_size;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${Math.round(bytes / (1024 * 1024))} MB`;
+      }
+      // Also check for file_size in metadata
+      if (metadata.file_size && typeof metadata.file_size === 'number') {
+        const bytes = metadata.file_size;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${Math.round(bytes / (1024 * 1024))} MB`;
+      }
+    }
+
+    // For website sources with child content, check total_content_size
+    if (source.source_type === 'website' && source.metadata) {
+      const metadata = source.metadata as any;
+      if (metadata.total_content_size && typeof metadata.total_content_size === 'number') {
+        const bytes = metadata.total_content_size;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${Math.round(bytes / (1024 * 1024))} MB`;
+      }
+    }
+
+    // Fall back to content length calculation for text and other types
+    if (!source.content) return '0 B';
+    const bytes = new TextEncoder().encode(source.content).length;
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${Math.round(bytes / (1024 * 1024))} MB`;
@@ -214,7 +244,7 @@ const SourcesList: React.FC<SourcesListProps> = ({
                     {getSourceTypeLabel(source.source_type)}
                   </Badge>
                 </TableCell>
-                <TableCell>{formatFileSize(source.content)}</TableCell>
+                <TableCell>{formatFileSize(source)}</TableCell>
                 <TableCell className="text-gray-500">
                   {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
                 </TableCell>
