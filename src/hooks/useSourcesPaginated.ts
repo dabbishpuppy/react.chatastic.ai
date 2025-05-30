@@ -19,6 +19,35 @@ interface SourcesPageResult {
   pageSize: number;
 }
 
+// Type for optimized source data (without heavy fields)
+interface OptimizedSourceData {
+  id: string;
+  title: string;
+  source_type: SourceType;
+  url: string | null;
+  created_at: string;
+  updated_at: string;
+  metadata: any;
+  is_active: boolean;
+  parent_source_id: string | null;
+  crawl_status: string | null;
+  progress: number | null;
+  links_count: number | null;
+  last_crawled_at: string | null;
+  is_excluded: boolean | null;
+  agent_id: string;
+  team_id: string;
+  created_by: string | null;
+  updated_by: string | null;
+  file_path: string | null;
+  extraction_method: string | null;
+  content_summary: string | null;
+  keywords: string[] | null;
+  compression_ratio: number | null;
+  original_size: number | null;
+  compressed_size: number | null;
+}
+
 // Optimized source query - excludes heavy content fields for performance
 const fetchSourcesPage = async (
   agentId: string, 
@@ -72,7 +101,7 @@ const fetchSourcesPage = async (
     }
 
     // For each parent source, also fetch its children (but still no heavy content)
-    const allSources: any[] = [...(parentSources || [])];
+    const allSources: OptimizedSourceData[] = [...(parentSources || [])];
     
     if (parentSources && parentSources.length > 0) {
       const parentIds = parentSources.map(p => p.id);
@@ -98,10 +127,12 @@ const fetchSourcesPage = async (
 
     console.log(`✅ Fetched ${parentSources?.length || 0} parent sources and ${allSources.length - (parentSources?.length || 0)} child sources`);
     
-    // Cast the data to AgentSource[] to handle the metadata type mismatch
+    // Convert optimized data to AgentSource format
     const typedSources: AgentSource[] = allSources.map(source => ({
       ...source,
-      metadata: source.metadata as Record<string, any>
+      metadata: source.metadata as Record<string, any>,
+      content: null, // Not fetched for performance
+      raw_text: null // Not fetched for performance
     }));
 
     return {
@@ -166,10 +197,12 @@ const fetchSourcesPage = async (
 
   console.log(`✅ Fetched ${data?.length || 0} sources, page ${page} of ${totalPages}`);
   
-  // Cast the data to AgentSource[] to handle the metadata type mismatch
+  // Convert optimized data to AgentSource format
   const typedSources: AgentSource[] = (data || []).map(source => ({
     ...source,
-    metadata: source.metadata as Record<string, any>
+    metadata: source.metadata as Record<string, any>,
+    content: null, // Not fetched for performance
+    raw_text: null // Not fetched for performance
   }));
   
   return {
