@@ -27,6 +27,21 @@ const FilesTab: React.FC = () => {
     });
   };
 
+  const handleFileUpload = (files: FileList) => {
+    console.log('Files selected:', files);
+    // TODO: Implement file upload logic
+  };
+
+  const handleUploadComplete = (results: any[]) => {
+    console.log('Upload completed:', results);
+    // TODO: Handle upload completion
+  };
+
+  const handleUploadError = (error: string) => {
+    console.error('Upload error:', error);
+    // TODO: Show error toast
+  };
+
   const sources = paginatedData?.sources || [];
 
   return (
@@ -42,9 +57,9 @@ const FilesTab: React.FC = () => {
             isUploading={false}
             supportedTypes={['.pdf', '.doc', '.docx', '.txt']}
             maxFileSize={10 * 1024 * 1024}
-            onFileSelect={(files) => {}}
-            onUploadComplete={(results) => {}}
-            onError={(error) => {}}
+            onFileSelect={handleFileUpload}
+            onUploadComplete={handleUploadComplete}
+            onError={handleUploadError}
           />
           
           <SourcesListPaginated

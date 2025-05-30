@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WebsiteSourceStatusProps {
@@ -46,7 +46,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
           filter: `id=eq.${sourceId}`
         },
         (payload) => {
-          console.log('Real-time update:', payload);
+          console.log('Real-time update for source:', sourceId, payload);
           const newData = payload.new as any;
           setRealtimeData({
             status: newData.crawl_status,
@@ -54,6 +54,9 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
             linksCount: newData.links_count,
             metadata: newData.metadata
           });
+          
+          // Reset stalled state on any update
+          setIsStalled(false);
         }
       )
       .subscribe();
@@ -85,7 +88,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
     // If status is pending but we have found pages and no recent activity, treat as completed
     if (currentStatus === 'pending' && currentCount > 0) {
       // Check if this seems like a completed crawl
-      const maxPages = realtimeData.metadata?.max_pages || 1000;
+      const maxPages = realtimeData.metadata?.maxPages || realtimeData.metadata?.max_pages || 1000;
       const lastUpdate = realtimeData.metadata?.last_progress_update;
       
       if (lastUpdate) {
@@ -109,16 +112,33 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in_progress': return isStalled ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'in_progress': return isStalled ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'failed': return 'bg-red-100 text-red-800 border-red-200';
+      case 'pending': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'completed': 
+        return <CheckCircle size={14} className="mr-1" />;
+      case 'in_progress': 
+        return isStalled ? 
+          <AlertTriangle size={14} className="mr-1" /> : 
+          <Loader2 size={14} className="mr-1 animate-spin" />;
+      case 'failed': 
+        return <AlertTriangle size={14} className="mr-1" />;
+      case 'pending': 
+        return <Clock size={14} className="mr-1" />;
+      default: 
+        return null;
     }
   };
 
   const getStatusText = (status?: string) => {
-    const maxPages = realtimeData.metadata?.max_pages || 1000;
+    const maxPages = realtimeData.metadata?.maxPages || realtimeData.metadata?.max_pages || 100;
     const currentCount = realtimeData.linksCount || 0;
 
     switch (status) {
@@ -129,15 +149,15 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
         return `Completed (${currentCount} pages)`;
       case 'in_progress': 
         if (isStalled) {
-          return `Crawling stalled ${currentCount}/${maxPages}`;
+          return `Crawling stalled (${currentCount}/${maxPages})`;
         }
-        return `Crawling ${currentCount}/${maxPages}`;
+        return `Crawling (${currentCount}/${maxPages})`;
       case 'failed': 
         return 'Failed';
       case 'pending': 
         // Better handling for pending states
         if (currentCount === 0) {
-          return 'Pending';
+          return 'Starting...';
         } else {
           // If we have pages found but still pending, show as finalizing
           return `Finalizing (${currentCount} found)`;
@@ -151,16 +171,8 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
 
   return (
     <div className="flex items-center gap-2">
-      <Badge className={getStatusColor(effectiveStatus)}>
-        {isCrawling && (
-          <>
-            {isStalled ? (
-              <AlertTriangle size={14} className="mr-1" />
-            ) : (
-              <Loader2 size={14} className="mr-1 animate-spin" />
-            )}
-          </>
-        )}
+      <Badge className={`${getStatusColor(effectiveStatus)} border`}>
+        {getStatusIcon(effectiveStatus)}
         {getStatusText(effectiveStatus)}
       </Badge>
       
@@ -170,7 +182,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
             className={`h-2 rounded-full transition-all duration-300 ${
               isStalled ? 'bg-yellow-600' : 'bg-blue-600'
             }`}
-            style={{ width: `${realtimeData.progress}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, realtimeData.progress))}%` }}
           />
         </div>
       )}

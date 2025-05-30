@@ -19,10 +19,10 @@ export const useAgentSourcesRealtime = () => {
       supabase.removeChannel(channelRef.current);
     }
 
-    console.log(`🔄 Setting up real-time subscription for agent: ${agentId}`);
+    console.log(`🔄 Setting up enhanced real-time subscription for agent: ${agentId}`);
 
     const channel = supabase
-      .channel(`agent-sources-${agentId}`)
+      .channel(`agent-sources-enhanced-${agentId}`)
       .on(
         'postgres_changes',
         {
@@ -35,7 +35,16 @@ export const useAgentSourcesRealtime = () => {
           const sourceType = payload.new && typeof payload.new === 'object' && 'source_type' in payload.new 
             ? payload.new.source_type 
             : 'unknown';
-          console.log('📡 Real-time source update:', payload.eventType, sourceType);
+          const crawlStatus = payload.new && typeof payload.new === 'object' && 'crawl_status' in payload.new
+            ? payload.new.crawl_status
+            : 'unknown';
+          
+          console.log('📡 Enhanced real-time source update:', {
+            event: payload.eventType,
+            sourceType,
+            crawlStatus,
+            sourceId: payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown'
+          });
           
           // Invalidate stats query
           queryClient.invalidateQueries({ 
@@ -46,6 +55,13 @@ export const useAgentSourcesRealtime = () => {
           queryClient.invalidateQueries({ 
             queryKey: ['sources-paginated', agentId] 
           });
+
+          // For status updates, also trigger immediate refetch for better UX
+          if (payload.eventType === 'UPDATE' && crawlStatus) {
+            queryClient.refetchQueries({
+              queryKey: ['sources-paginated', agentId, 'website']
+            });
+          }
         }
       )
       .subscribe();
@@ -54,7 +70,7 @@ export const useAgentSourcesRealtime = () => {
 
     return () => {
       if (channelRef.current) {
-        console.log('🔌 Cleaning up real-time subscription');
+        console.log('🔌 Cleaning up enhanced real-time subscription');
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }

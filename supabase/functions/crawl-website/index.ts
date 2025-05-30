@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -9,6 +8,8 @@ interface CrawlRequest {
   max_pages?: number;
   max_depth?: number;
   concurrency?: number;
+  include_paths?: string[];
+  exclude_paths?: string[];
   enable_content_pipeline?: boolean;
 }
 
@@ -30,9 +31,20 @@ serve(async (req) => {
   }
 
   try {
-    const { source_id, url, crawl_type, max_pages = 100, max_depth = 3, concurrency = 2, enable_content_pipeline = false }: CrawlRequest = await req.json();
+    const { 
+      source_id, 
+      url, 
+      crawl_type, 
+      max_pages = 100, 
+      max_depth = 3, 
+      concurrency = 2, 
+      include_paths = [],
+      exclude_paths = [],
+      enable_content_pipeline = false 
+    }: CrawlRequest = await req.json();
     
     console.log(`Starting crawl for source ${source_id}, URL: ${url}, type: ${crawl_type}`);
+    console.log(`Include paths: ${JSON.stringify(include_paths)}, Exclude paths: ${JSON.stringify(exclude_paths)}`);
 
     // Get source info and agent details
     const { data: source, error: sourceError } = await supabase
@@ -57,7 +69,16 @@ serve(async (req) => {
       .update({
         crawl_status: 'in_progress',
         progress: 0,
-        last_crawled_at: new Date().toISOString()
+        last_crawled_at: new Date().toISOString(),
+        metadata: {
+          ...source.metadata,
+          includePaths: include_paths,
+          excludePaths: exclude_paths,
+          maxPages: max_pages,
+          maxDepth: max_depth,
+          concurrency,
+          last_progress_update: new Date().toISOString()
+        }
       })
       .eq('id', source_id);
 
@@ -65,11 +86,13 @@ serve(async (req) => {
       // Process single page with enhanced pipeline
       await processSinglePage(source_id, agentId, teamId, url, enable_content_pipeline);
     } else {
-      // Process multiple pages with enhanced pipeline
+      // Process multiple pages with enhanced pipeline and path filtering
       await processMultiplePages(source_id, agentId, teamId, url, {
         maxPages: max_pages,
         maxDepth: max_depth,
         concurrency,
+        includePaths: include_paths,
+        excludePaths: exclude_paths,
         enableContentPipeline: enable_content_pipeline
       });
     }
@@ -167,6 +190,8 @@ async function processMultiplePages(
     maxPages: number;
     maxDepth: number;
     concurrency: number;
+    includePaths: string[];
+    excludePaths: string[];
     enableContentPipeline: boolean;
   }
 ) {
@@ -174,16 +199,22 @@ async function processMultiplePages(
     console.log(`Processing multiple pages starting from: ${initialUrl}`);
     
     const discoveredUrls = await discoverUrls(initialUrl, options.maxDepth, options.maxPages);
-    const totalPages = Math.min(discoveredUrls.length, options.maxPages);
+    console.log(`Discovered ${discoveredUrls.length} URLs before filtering`);
     
-    console.log(`Found ${discoveredUrls.length} URLs, processing ${totalPages} pages`);
+    // Filter URLs based on include/exclude paths
+    const filteredUrls = filterUrlsByPaths(discoveredUrls, options.includePaths, options.excludePaths);
+    console.log(`Filtered to ${filteredUrls.length} URLs after path filtering`);
+    
+    const totalPages = Math.min(filteredUrls.length, options.maxPages);
+    
+    console.log(`Processing ${totalPages} pages with concurrency ${options.concurrency}`);
 
     let processedCount = 0;
     const batchSize = options.concurrency;
 
     // Process URLs in batches
     for (let i = 0; i < totalPages; i += batchSize) {
-      const batch = discoveredUrls.slice(i, i + batchSize);
+      const batch = filteredUrls.slice(i, i + batchSize);
       
       const batchPromises = batch.map(async (url) => {
         try {
@@ -239,7 +270,13 @@ async function processMultiplePages(
             .from('agent_sources')
             .update({
               progress,
-              links_count: processedCount
+              links_count: processedCount,
+              metadata: {
+                ...options,
+                last_progress_update: new Date().toISOString(),
+                processed_count: processedCount,
+                total_pages: totalPages
+              }
             })
             .eq('id', sourceId);
 
@@ -274,6 +311,47 @@ async function processMultiplePages(
     
     throw error;
   }
+}
+
+function filterUrlsByPaths(urls: string[], includePaths: string[], excludePaths: string[]): string[] {
+  return urls.filter(url => {
+    try {
+      const urlObj = new URL(url);
+      const path = urlObj.pathname;
+      
+      // If include paths are specified, URL must match at least one
+      if (includePaths.length > 0) {
+        const matchesInclude = includePaths.some(pattern => {
+          // Simple glob matching - convert * to regex
+          const regexPattern = pattern.replace(/\*/g, '.*');
+          const regex = new RegExp(`^${regexPattern}`, 'i');
+          return regex.test(path);
+        });
+        
+        if (!matchesInclude) {
+          return false;
+        }
+      }
+      
+      // If exclude paths are specified, URL must not match any
+      if (excludePaths.length > 0) {
+        const matchesExclude = excludePaths.some(pattern => {
+          const regexPattern = pattern.replace(/\*/g, '.*');
+          const regex = new RegExp(`^${regexPattern}`, 'i');
+          return regex.test(path);
+        });
+        
+        if (matchesExclude) {
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error(`Error filtering URL ${url}:`, error);
+      return false;
+    }
+  });
 }
 
 async function processWithContentPipeline(

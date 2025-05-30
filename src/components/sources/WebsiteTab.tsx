@@ -53,10 +53,19 @@ const WebsiteTabContent: React.FC = () => {
     // Combine protocol with domain
     const fullUrl = protocol + url.replace(/^https?:\/\//, '');
 
+    // Parse include and exclude paths
+    const parsePathsString = (pathsString: string): string[] => {
+      if (!pathsString || pathsString.trim() === '') return [];
+      return pathsString
+        .split(',')
+        .map(path => path.trim())
+        .filter(path => path.length > 0);
+    };
+
     const result = await submitWebsiteSource({
       url: fullUrl,
-      includePaths: Array.isArray(includePaths) ? includePaths : [includePaths].filter(Boolean),
-      excludePaths: Array.isArray(excludePaths) ? excludePaths : [excludePaths].filter(Boolean),
+      includePaths: parsePathsString(includePaths),
+      excludePaths: parsePathsString(excludePaths),
       crawlType,
       ...options
     });

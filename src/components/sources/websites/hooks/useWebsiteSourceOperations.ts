@@ -51,20 +51,10 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
     }
   }, [sourceService, refetch]);
 
-  const handleDelete = useCallback(async (source: AgentSource, parentSources: AgentSource[], getChildSources: (parentId: string) => AgentSource[]) => {
+  const handleDelete = useCallback(async (source: AgentSource) => {
     try {
       await sourceService.deleteSource(source.id);
       removeSourceFromState(source.id);
-      
-      if (source.parent_source_id) {
-        const parentSource = parentSources.find(p => p.id === source.parent_source_id);
-        if (parentSource) {
-          const remainingChildSources = getChildSources(source.parent_source_id).filter(c => c.id !== source.id);
-          await sourceService.updateSource(source.parent_source_id, {
-            links_count: remainingChildSources.length
-          });
-        }
-      }
       
       toast({
         title: "Success",
