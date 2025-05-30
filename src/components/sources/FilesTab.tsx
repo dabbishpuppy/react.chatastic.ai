@@ -1,78 +1,53 @@
-
-import React from "react";
-import ErrorBoundary from "./ErrorBoundary";
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFileSourcesPaginated } from "@/hooks/useSourcesPaginated";
-import SourcesListPaginated from "./SourcesListPaginated";
 import FileUploadArea from "./files/FileUploadArea";
-import FileUploadProgress from "./files/FileUploadProgress";
-import { useFileUpload } from "./files/useFileUpload";
-
-const FilesTabContent: React.FC = () => {
-  const { 
-    data, 
-    isLoading, 
-    error, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage,
-    refetch 
-  } = useFileSourcesPaginated();
-  
-  const {
-    isDragging,
-    uploadedFiles,
-    isUploading,
-    supportedTypes,
-    maxFileSize,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    handleFileSelect,
-    removeUploadedFile
-  } = useFileUpload(refetch);
-
-  // Flatten all pages into a single array
-  const allSources = data?.pages?.flatMap(page => page.sources) || [];
-
-  return (
-    <div className="space-y-6 mt-4">
-      <div>
-        <h2 className="text-2xl font-semibold">Files</h2>
-      </div>
-
-      <FileUploadArea
-        isDragging={isDragging}
-        isUploading={isUploading}
-        supportedTypes={supportedTypes}
-        maxFileSize={maxFileSize}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onFileSelect={handleFileSelect}
-      />
-
-      <FileUploadProgress
-        uploadedFiles={uploadedFiles}
-        onRemoveFile={removeUploadedFile}
-      />
-
-      <SourcesListPaginated 
-        sources={allSources} 
-        loading={isLoading} 
-        error={error?.message || null}
-        onLoadMore={fetchNextPage}
-        hasMore={hasNextPage}
-        isLoadingMore={isFetchingNextPage}
-        onSourceDeleted={() => refetch()}
-      />
-    </div>
-  );
-};
+import SourcesListPaginated from "./SourcesListPaginated";
+import ErrorBoundary from "./ErrorBoundary";
 
 const FilesTab: React.FC = () => {
+  const {
+    data: paginatedData,
+    isLoading,
+    error
+  } = useFileSourcesPaginated(1, 25);
+
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+
+  const handleFileSelect = (fileId: string, selected: boolean) => {
+    setSelectedFiles(prev => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(fileId);
+      } else {
+        newSet.delete(fileId);
+      }
+      return newSet;
+    });
+  };
+
+  const sources = paginatedData?.sources || [];
+
   return (
     <ErrorBoundary tabName="Files">
-      <FilesTabContent />
+      <div className="space-y-6 mt-4">
+        <div>
+          <h2 className="text-2xl font-semibold">File Training</h2>
+        </div>
+
+        <div className="space-y-4">
+          <FileUploadArea />
+          
+          <SourcesListPaginated
+            sources={sources}
+            loading={isLoading}
+            error={error?.message || null}
+            onSourceDeleted={(sourceId) => {
+              // Handle source deletion if needed
+            }}
+          />
+        </div>
+      </div>
     </ErrorBoundary>
   );
 };

@@ -8,9 +8,10 @@ import WebsiteFormSection from "./websites/components/WebsiteFormSection";
 import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
 import WebsiteEmptyState from "./websites/components/WebsiteEmptyState";
 import ErrorBoundary from "./ErrorBoundary";
+import { useSourcesPaginated } from "@/hooks/useSourcesPaginated";
 
 const WebsiteTabContent: React.FC = () => {
-  const { isSubmitting, submitWebsiteSource, refetch } = useWebsiteSubmission();
+  const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission();
   
   const {
     activeSubTab,
@@ -26,10 +27,15 @@ const WebsiteTabContent: React.FC = () => {
     clearForm
   } = useWebsiteFormState();
 
+  const { refetch } = useSourcesPaginated({
+    sourceType: 'website',
+    page: 1,
+    pageSize: 25
+  });
+
   const { handleEdit, handleExclude, handleDelete, handleRecrawl } = useWebsiteSourceOperations(
     refetch, 
     (sourceId: string) => {
-      // Optimistic update would go here if needed
       refetch();
     }
   );
@@ -57,6 +63,7 @@ const WebsiteTabContent: React.FC = () => {
 
     if (result) {
       clearForm();
+      refetch();
     }
   };
 
@@ -83,8 +90,6 @@ const WebsiteTabContent: React.FC = () => {
         />
 
         <WebsiteSourcesList
-          parentSources={[]}
-          getChildSources={() => []}
           onEdit={handleEdit}
           onExclude={handleExclude}
           onDelete={handleDelete}

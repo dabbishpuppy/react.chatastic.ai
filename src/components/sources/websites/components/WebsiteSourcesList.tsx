@@ -1,5 +1,5 @@
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,8 +14,6 @@ import BulkActionBar from '../../BulkActionBar';
 import PaginationControls from '../../PaginationControls';
 
 interface WebsiteSourcesListProps {
-  parentSources: AgentSource[];
-  getChildSources: (parentId: string) => AgentSource[];
   onEdit: (sourceId: string, newUrl: string) => void;
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
@@ -25,8 +23,6 @@ interface WebsiteSourcesListProps {
 }
 
 const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
-  parentSources,
-  getChildSources,
   onEdit,
   onExclude,
   onDelete,
@@ -72,7 +68,16 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     enabled: !loading
   });
 
-  const currentPageSourceIds = paginatedData?.sources?.map(s => s.id) || [];
+  // Get parent sources and child sources logic
+  const parentSources = useMemo(() => {
+    return (paginatedData?.sources || []).filter(source => !source.parent_source_id);
+  }, [paginatedData?.sources]);
+
+  const getChildSources = useCallback((parentId: string): AgentSource[] => {
+    return (paginatedData?.sources || []).filter(source => source.parent_source_id === parentId);
+  }, [paginatedData?.sources]);
+
+  const currentPageSourceIds = parentSources.map(s => s.id);
   const allCurrentPageSelected = currentPageSourceIds.length > 0 && 
     currentPageSourceIds.every(id => isSelected(id));
   const someCurrentPageSelected = currentPageSourceIds.some(id => isSelected(id));
@@ -178,8 +183,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     );
   }
 
-  const sources = paginatedData?.sources || parentSources;
-  const totalCount = paginatedData?.totalCount || sources.length;
+  const totalCount = paginatedData?.totalCount || 0;
   const totalPages = paginatedData?.totalPages || 1;
 
   return (
@@ -188,14 +192,11 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Website Sources</CardTitle>
-            {sources.length > 0 && (
+            {parentSources.length > 0 && (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Checkbox
                     checked={allCurrentPageSelected}
-                    ref={someCurrentPageSelected && !allCurrentPageSelected ? (el) => {
-                      if (el) el.indeterminate = true;
-                    } : undefined}
                     onCheckedChange={handleSelectAll}
                     aria-controls="website-sources-list"
                   />
@@ -203,9 +204,9 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
                     Select all
                   </label>
                 </div>
-                {allCurrentPageSelected && sources.length > 0 && (
+                {allCurrentPageSelected && parentSources.length > 0 && (
                   <span className="text-sm text-blue-600">
-                    All {sources.length} items on this page are selected
+                    All {parentSources.length} items on this page are selected
                   </span>
                 )}
               </div>
@@ -214,7 +215,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div id="website-sources-list" role="list">
-            {sources.map((source) => (
+            {parentSources.map((source) => (
               <WebsiteSourceItem
                 key={source.id}
                 source={source}
@@ -225,11 +226,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
                 onRecrawl={onRecrawl}
                 isSelected={isSelected(source.id)}
                 onSelectionChange={(selected) => {
-                  if (selected) {
-                    toggleItem(source.id);
-                  } else {
-                    toggleItem(source.id);
-                  }
+                  toggleItem(source.id);
                 }}
               />
             ))}
