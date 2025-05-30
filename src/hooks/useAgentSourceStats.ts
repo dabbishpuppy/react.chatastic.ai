@@ -66,8 +66,8 @@ export const useAgentSourceStats = () => {
     queryKey: ['agent-source-stats', agentId],
     queryFn: () => fetchAgentSourceStats(agentId!),
     enabled: !!agentId,
-    staleTime: 1000, // Consider data fresh for only 1 second to ensure quick updates
-    refetchInterval: 2000, // Refetch every 2 seconds as backup
+    staleTime: 500, // Consider data fresh for only 500ms to ensure quick updates
+    refetchInterval: 1000, // Refetch every 1 second for real-time updates
   });
 
   return {

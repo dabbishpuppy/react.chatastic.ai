@@ -68,9 +68,14 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     enabled: !loading
   });
 
-  // Get parent sources and child sources logic
+  // Get parent sources and child sources logic - show all website sources including those in progress
   const parentSources = useMemo(() => {
-    return (paginatedData?.sources || []).filter(source => !source.parent_source_id);
+    const allSources = paginatedData?.sources || [];
+    // Include all parent sources (those without parent_source_id) regardless of status
+    return allSources.filter(source => 
+      !source.parent_source_id && 
+      source.source_type === 'website'
+    );
   }, [paginatedData?.sources]);
 
   const getChildSources = useCallback((parentId: string): AgentSource[] => {
@@ -215,24 +220,31 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div id="website-sources-list" role="list">
-            {parentSources.map((source) => (
-              <WebsiteSourceItem
-                key={source.id}
-                source={source}
-                childSources={getChildSources(source.id)}
-                onEdit={onEdit}
-                onExclude={onExclude}
-                onDelete={onDelete}
-                onRecrawl={onRecrawl}
-                isSelected={isSelected(source.id)}
-                onSelectionChange={(selected) => {
-                  toggleItem(source.id);
-                }}
-              />
-            ))}
+            {parentSources.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No website sources found</p>
+                <p className="text-sm">Add a website URL above to get started</p>
+              </div>
+            ) : (
+              parentSources.map((source) => (
+                <WebsiteSourceItem
+                  key={source.id}
+                  source={source}
+                  childSources={getChildSources(source.id)}
+                  onEdit={onEdit}
+                  onExclude={onExclude}
+                  onDelete={onDelete}
+                  onRecrawl={onRecrawl}
+                  isSelected={isSelected(source.id)}
+                  onSelectionChange={(selected) => {
+                    toggleItem(source.id);
+                  }}
+                />
+              ))
+            )}
           </div>
 
-          {paginatedData && (
+          {paginatedData && totalCount > 0 && (
             <PaginationControls
               currentPage={page}
               totalPages={totalPages}

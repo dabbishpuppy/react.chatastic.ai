@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -97,13 +96,14 @@ serve(async (req) => {
     const agentId = source.agents.id;
     const teamId = source.agents.team_id;
 
-    // Update source status to in_progress
+    // Update source status to in_progress and ensure it remains visible
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'in_progress',
         progress: 0,
         last_crawled_at: new Date().toISOString(),
+        is_active: true, // Ensure source stays visible
         metadata: {
           ...source.metadata,
           includePaths: include_paths,
@@ -250,7 +250,8 @@ async function processMultiplePages(
               source_type: 'website',
               title: url,
               url: url,
-              crawl_status: 'in_progress'
+              crawl_status: 'in_progress',
+              is_active: true // Ensure child sources are visible
             })
             .select('id')
             .single();
@@ -274,7 +275,10 @@ async function processMultiplePages(
 
               await supabase
                 .from('agent_sources')
-                .update({ crawl_status: 'completed' })
+                .update({ 
+                  crawl_status: 'completed',
+                  is_active: true // Ensure completed sources remain visible
+                })
                 .eq('id', childSource.id);
             } else {
               await supabase
@@ -286,13 +290,14 @@ async function processMultiplePages(
           
           processedCount++;
           
-          // Update parent source progress
+          // Update parent source progress more frequently
           const progress = Math.round((processedCount / totalPages) * 100);
           await supabase
             .from('agent_sources')
             .update({
               progress,
               links_count: processedCount,
+              is_active: true, // Keep parent visible
               metadata: {
                 ...options,
                 last_progress_update: new Date().toISOString(),
@@ -316,7 +321,8 @@ async function processMultiplePages(
       .update({
         crawl_status: 'completed',
         progress: 100,
-        links_count: processedCount
+        links_count: processedCount,
+        is_active: true // Ensure parent remains visible after completion
       })
       .eq('id', sourceId);
 
@@ -444,11 +450,15 @@ async function processBasicContent(sourceId: string, url: string, htmlContent: s
     .replace(/\s+/g, ' ')
     .trim();
 
+  const contentSize = new TextEncoder().encode(textContent).length;
+
   await supabase
     .from('agent_sources')
     .update({
       title: url,
-      content: textContent.substring(0, 10000) // Limit basic content
+      content: textContent.substring(0, 10000), // Limit basic content
+      original_size: contentSize,
+      compressed_size: Math.min(contentSize, 10000)
     })
     .eq('id', sourceId);
 }
@@ -528,6 +538,7 @@ function createSemanticChunks(content: string) {
     return [{
       content,
       tokenCount: estimatedTokens,
+      chunkIndex: 0,
       metadata: {
         startPosition: 0,
         endPosition: content.length,
@@ -550,6 +561,7 @@ function createSemanticChunks(content: string) {
       chunks.push({
         content: currentChunk.trim(),
         tokenCount: currentTokens,
+        chunkIndex: chunks.length,
         metadata: {
           startPosition: 0,
           endPosition: currentChunk.length,
@@ -573,6 +585,7 @@ function createSemanticChunks(content: string) {
     chunks.push({
       content: currentChunk.trim(),
       tokenCount: currentTokens,
+      chunkIndex: chunks.length,
       metadata: {
         startPosition: 0,
         endPosition: currentChunk.length,

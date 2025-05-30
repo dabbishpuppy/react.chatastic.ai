@@ -38,11 +38,15 @@ export const useAgentSourcesRealtime = () => {
           const crawlStatus = payload.new && typeof payload.new === 'object' && 'crawl_status' in payload.new
             ? payload.new.crawl_status
             : 'unknown';
+          const isParent = payload.new && typeof payload.new === 'object' && 'parent_source_id' in payload.new
+            ? !payload.new.parent_source_id
+            : true;
           
           console.log('📡 Enhanced real-time source update:', {
             event: payload.eventType,
             sourceType,
             crawlStatus,
+            isParent,
             sourceId: payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown'
           });
           
@@ -59,22 +63,29 @@ export const useAgentSourcesRealtime = () => {
             queryKey: ['sources-paginated', agentId] 
           });
 
-          // For text sources specifically, ensure immediate refetch
-          if (sourceType === 'text') {
+          // For website sources, ensure immediate refetch
+          if (sourceType === 'website') {
             queryClient.refetchQueries({
-              queryKey: ['sources-paginated', agentId, 'text']
+              queryKey: ['sources-paginated', agentId, 'website']
             });
           }
 
           // For status updates, also trigger immediate refetch for better UX
-          if (payload.eventType === 'UPDATE' && crawlStatus) {
-            queryClient.refetchQueries({
-              queryKey: ['sources-paginated', agentId, sourceType]
-            });
+          if (payload.eventType === 'UPDATE' && (crawlStatus === 'completed' || crawlStatus === 'failed')) {
+            console.log('🔄 Crawl status changed, triggering comprehensive refresh');
+            // Force refetch both stats and paginated data for completion events
+            setTimeout(() => {
+              queryClient.refetchQueries({
+                queryKey: ['agent-source-stats', agentId]
+              });
+              queryClient.refetchQueries({
+                queryKey: ['sources-paginated', agentId, 'website']
+              });
+            }, 100);
           }
 
-          // For new sources, immediately refetch to show them with correct sizes
-          if (payload.eventType === 'INSERT') {
+          // For new sources or content updates, immediately refetch to show them
+          if (payload.eventType === 'INSERT' || (payload.eventType === 'UPDATE' && crawlStatus === 'completed')) {
             // Force refetch both stats and paginated data
             setTimeout(() => {
               queryClient.refetchQueries({
@@ -83,7 +94,7 @@ export const useAgentSourcesRealtime = () => {
               queryClient.refetchQueries({
                 queryKey: ['sources-paginated', agentId, sourceType]
               });
-            }, 100); // Small delay to ensure DB is consistent
+            }, 200); // Slightly longer delay to ensure DB consistency
           }
         }
       )
