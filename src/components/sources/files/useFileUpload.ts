@@ -59,10 +59,10 @@ export const useFileUpload = (refetch: () => void) => {
         content: result.content,
         metadata: {
           filename: uploadedFile.file.name,
-          fileSize: uploadedFile.file.size,
+          original_size: uploadedFile.file.size, // Use original_size instead of fileSize
+          file_size: contentSize, // Use file_size instead of content_size
           fileType: uploadedFile.file.type,
           uploadedAt: new Date().toISOString(),
-          content_size: contentSize,
           ...result.metadata
         }
       });
