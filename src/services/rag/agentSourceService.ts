@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { AgentSource, SourceType } from "@/types/rag";
 
@@ -52,13 +51,13 @@ export class AgentSourceService {
     }
   }
 
-  // Get all sources for an agent with ultra-aggressive optimization
+  // Get all sources for an agent with improved error handling
   static async getSourcesByAgent(agentId: string): Promise<AgentSource[]> {
     const startTime = Date.now();
     try {
       console.log(`🚀 Starting fetch for agent: ${agentId}`);
       
-      // Use ultra-small limit and optimized query structure
+      // Use optimized query with reasonable timeout
       const { data: sources, error } = await supabase
         .from('agent_sources')
         .select(`
@@ -92,19 +91,15 @@ export class AgentSourceService {
         .eq('agent_id', agentId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(30); // Even more conservative limit
+        .limit(50); // Reasonable limit
 
       const endTime = Date.now();
       console.log(`⏱️ Query completed in ${endTime - startTime}ms`);
 
       if (error) {
         console.error('❌ Database error fetching sources:', error);
-        // Don't throw on timeout/500 errors, return empty array as fallback
-        if (error.message?.includes('timeout') || error.message?.includes('500')) {
-          console.log('🔄 Returning empty array due to timeout');
-          return [];
-        }
-        throw new Error(`Failed to fetch sources: ${error.message}`);
+        // Return empty array on error to prevent crashes
+        return [];
       }
 
       const resultCount = sources?.length || 0;
@@ -161,19 +156,14 @@ export class AgentSourceService {
         .eq('source_type', sourceType)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(20); // Even smaller limit for type-specific queries
+        .limit(30);
 
       const endTime = Date.now();
       console.log(`⏱️ Type-specific query completed in ${endTime - startTime}ms`);
 
       if (error) {
         console.error(`❌ Database error fetching ${sourceType} sources:`, error);
-        // Don't throw on timeout/500 errors, return empty array as fallback
-        if (error.message?.includes('timeout') || error.message?.includes('500')) {
-          console.log(`🔄 Returning empty array for ${sourceType} due to timeout`);
-          return [];
-        }
-        throw new Error(`Failed to fetch sources by type: ${error.message}`);
+        return [];
       }
 
       const resultCount = sources?.length || 0;
@@ -186,7 +176,6 @@ export class AgentSourceService {
     } catch (error) {
       const endTime = Date.now();
       console.error(`❌ Error in getSourcesByType for ${sourceType} after ${endTime - startTime}ms:`, error);
-      // Return empty array as fallback
       return [];
     }
   }
@@ -269,16 +258,14 @@ export class AgentSourceService {
 
   static async deleteSource(id: string): Promise<boolean> {
     try {
-      // First check if this source has child sources with minimal query
       const { data: childSources, error: childError } = await supabase
         .from('agent_sources')
         .select('id')
         .eq('parent_source_id', id)
-        .limit(5); // Small limit to check existence
+        .limit(5);
 
       if (childError) throw new Error(`Failed to check child sources: ${childError.message}`);
 
-      // If there are child sources, delete them first
       if (childSources && childSources.length > 0) {
         const { error: deleteChildrenError } = await supabase
           .from('agent_sources')
@@ -288,7 +275,6 @@ export class AgentSourceService {
         if (deleteChildrenError) throw new Error(`Failed to delete child sources: ${deleteChildrenError.message}`);
       }
 
-      // Now delete the parent source
       const { error } = await supabase
         .from('agent_sources')
         .delete()
@@ -304,7 +290,6 @@ export class AgentSourceService {
 
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
     try {
-      // Get source with all required columns
       const { data: source, error } = await supabase
         .from('agent_sources')
         .select(`
@@ -340,7 +325,6 @@ export class AgentSourceService {
 
       if (error) throw new Error(`Failed to fetch source: ${error.message}`);
       
-      // Get chunk count separately with timeout protection
       let chunksCount = 0;
       try {
         const { count } = await supabase

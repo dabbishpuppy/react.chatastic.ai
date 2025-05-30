@@ -2,7 +2,7 @@
 import React, { useMemo, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SourceType } from "@/types/rag";
-import { useAgentSources } from "@/hooks/useAgentSources";
+import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
 import { supabase } from "@/integrations/supabase/client";
 import { useParams } from "react-router-dom";
 import TotalStatsSection from "./TotalStatsSection";
@@ -14,7 +14,7 @@ interface SourcesWidgetProps {
 
 const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { agentId } = useParams();
-  const { sources: sourcesData, loading, error } = useAgentSources();
+  const { sources: sourcesData, loading, error } = useOptimizedAgentSources();
   const [realtimeSize, setRealtimeSize] = useState(0);
 
   console.log(`📊 SourcesWidget render: tab=${currentTab}, sources=${sourcesData.length}, loading=${loading}, error=${error}`);

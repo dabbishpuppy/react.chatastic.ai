@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { useAgentSources } from "@/hooks/useAgentSources";
+import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
 import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import { useRAGServices } from "@/hooks/useRAGServices";
 import { AgentSource } from "@/types/rag";
@@ -10,7 +10,7 @@ import WebsiteCrawlForm from "./websites/components/WebsiteCrawlForm";
 import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
 
 const WebsiteTab: React.FC = () => {
-  const { sources: websiteSources, loading, error, removeSourceFromState, refetch } = useAgentSources('website');
+  const { sources: websiteSources, loading, error, removeSourceFromState, refetch } = useOptimizedAgentSources('website');
   const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission(refetch);
   const { sources: sourceService } = useRAGServices();
   
@@ -68,7 +68,7 @@ const WebsiteTab: React.FC = () => {
     try {
       await sourceService.updateSource(sourceId, {
         url: newUrl,
-        title: newUrl // Update title to match new URL
+        title: newUrl
       });
       
       toast({
@@ -112,7 +112,6 @@ const WebsiteTab: React.FC = () => {
       await sourceService.deleteSource(source.id);
       removeSourceFromState(source.id);
       
-      // If deleting a child source, update parent's links_count
       if (source.parent_source_id) {
         const parentSource = parentSources.find(p => p.id === source.parent_source_id);
         if (parentSource) {
@@ -139,14 +138,12 @@ const WebsiteTab: React.FC = () => {
   }, [sourceService, removeSourceFromState, parentSources, getChildSources, refetch]);
 
   const handleRecrawl = useCallback(async (source: AgentSource) => {
-    // Prevent multiple recrawl operations on the same source
     if (recrawlInProgressRef.current.has(source.id)) {
       console.log(`Recrawl already in progress for source ${source.id}`);
       return;
     }
 
     try {
-      // Mark recrawl as in progress
       recrawlInProgressRef.current.add(source.id);
 
       await sourceService.updateSource(source.id, {
@@ -175,7 +172,6 @@ const WebsiteTab: React.FC = () => {
         variant: "destructive"
       });
     } finally {
-      // Clear the in-progress flag after a delay to prevent rapid successive calls
       setTimeout(() => {
         recrawlInProgressRef.current.delete(source.id);
       }, 2000);
