@@ -4,6 +4,7 @@ import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { AgentSource } from '@/types/rag';
 import { useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface WebsiteSubmissionData {
   url: string;
@@ -53,15 +54,10 @@ export const useWebsiteSubmission = () => {
 
       console.log('Source created:', result);
 
-      // Trigger the actual crawl via edge function
+      // Trigger the actual crawl via edge function using supabase.functions.invoke
       try {
-        const { data: crawlResult, error: crawlError } = await fetch('/functions/v1/crawl-website', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify({
+        const { data: crawlResult, error: crawlError } = await supabase.functions.invoke('crawl-website', {
+          body: {
             source_id: result.id,
             url: data.url,
             crawl_type: data.crawlType,
@@ -71,8 +67,8 @@ export const useWebsiteSubmission = () => {
             include_paths: data.includePaths,
             exclude_paths: data.excludePaths,
             enable_content_pipeline: true
-          })
-        }).then(res => res.json());
+          }
+        });
 
         if (crawlError) {
           console.error('Crawl initiation failed:', crawlError);

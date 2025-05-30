@@ -46,9 +46,12 @@ export const useAgentSourcesRealtime = () => {
             sourceId: payload.new && typeof payload.new === 'object' && 'id' in payload.new ? payload.new.id : 'unknown'
           });
           
-          // Invalidate stats query
+          // Immediately invalidate and refetch stats to update the widget
           queryClient.invalidateQueries({ 
             queryKey: ['agent-source-stats', agentId] 
+          });
+          queryClient.refetchQueries({
+            queryKey: ['agent-source-stats', agentId]
           });
           
           // Invalidate all paginated source queries for this agent
@@ -59,7 +62,14 @@ export const useAgentSourcesRealtime = () => {
           // For status updates, also trigger immediate refetch for better UX
           if (payload.eventType === 'UPDATE' && crawlStatus) {
             queryClient.refetchQueries({
-              queryKey: ['sources-paginated', agentId, 'website']
+              queryKey: ['sources-paginated', agentId, sourceType]
+            });
+          }
+
+          // For new sources, immediately refetch to show them
+          if (payload.eventType === 'INSERT') {
+            queryClient.refetchQueries({
+              queryKey: ['sources-paginated', agentId, sourceType]
             });
           }
         }

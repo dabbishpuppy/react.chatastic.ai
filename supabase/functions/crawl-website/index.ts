@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -24,6 +25,17 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper function to ensure JSON response
+const jsonResponse = (data: any, status = 200) => {
+  return new Response(
+    JSON.stringify(data),
+    { 
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status
+    }
+  );
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -31,6 +43,18 @@ serve(async (req) => {
   }
 
   try {
+    let requestBody: CrawlRequest;
+    
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return jsonResponse({ 
+        error: 'Invalid JSON in request body',
+        success: false 
+      }, 400);
+    }
+
     const { 
       source_id, 
       url, 
@@ -41,10 +65,17 @@ serve(async (req) => {
       include_paths = [],
       exclude_paths = [],
       enable_content_pipeline = false 
-    }: CrawlRequest = await req.json();
+    } = requestBody;
     
     console.log(`Starting crawl for source ${source_id}, URL: ${url}, type: ${crawl_type}`);
     console.log(`Include paths: ${JSON.stringify(include_paths)}, Exclude paths: ${JSON.stringify(exclude_paths)}`);
+
+    if (!source_id || !url) {
+      return jsonResponse({
+        error: 'Missing required fields: source_id and url',
+        success: false
+      }, 400);
+    }
 
     // Get source info and agent details
     const { data: source, error: sourceError } = await supabase
@@ -57,7 +88,10 @@ serve(async (req) => {
       .single();
 
     if (sourceError || !source) {
-      throw new Error(`Source not found: ${sourceError?.message}`);
+      return jsonResponse({
+        error: `Source not found: ${sourceError?.message || 'Unknown error'}`,
+        success: false
+      }, 404);
     }
 
     const agentId = source.agents.id;
@@ -97,31 +131,19 @@ serve(async (req) => {
       });
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Crawl completed for ${url}`,
-        contentPipelineEnabled: enable_content_pipeline
-      }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200 
-      }
-    );
+    return jsonResponse({ 
+      success: true, 
+      message: `Crawl completed for ${url}`,
+      contentPipelineEnabled: enable_content_pipeline
+    });
 
   } catch (error) {
     console.error('Crawl error:', error);
     
-    return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        success: false 
-      }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500 
-      }
-    );
+    return jsonResponse({ 
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      success: false 
+    }, 500);
   }
 });
 

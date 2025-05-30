@@ -23,18 +23,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   sourcesByType,
   currentTab
 }) => {
-  console.log('✅ SourcesWidget rendering with new list-style content');
-
-  const formatSize = (count: number, type: string) => {
-    // Mock sizes for now - in reality these would come from the stats
-    const mockSizes = {
-      file: count > 0 ? '4 KB' : '0 B',
-      text: count > 0 ? '40 B' : '0 B', 
-      website: count > 0 ? '23 KB' : '0 B',
-      qa: count > 0 ? '269 B' : '0 B'
-    };
-    return mockSizes[type as keyof typeof mockSizes] || '0 B';
-  };
+  console.log('✅ SourcesWidget rendering with real-time content');
 
   const getSourceLabel = (count: number, type: string) => {
     switch (type) {
@@ -66,6 +55,26 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     }
   };
 
+  // Calculate individual sizes proportionally based on total
+  const calculateTypeSize = (count: number, type: string) => {
+    if (count === 0) return '0 B';
+    
+    // For real calculation, we would need the actual sizes from the backend
+    // For now, return proportional mock sizes that update with real counts
+    const mockSizePerItem = {
+      file: 4000, // 4KB average
+      text: 500,  // 500B average  
+      website: 12000, // 12KB average
+      qa: 300     // 300B average
+    };
+    
+    const totalBytes = count * (mockSizePerItem[type as keyof typeof mockSizePerItem] || 1000);
+    
+    if (totalBytes < 1024) return `${totalBytes} B`;
+    if (totalBytes < 1024 * 1024) return `${Math.round(totalBytes / 1024)} KB`;
+    return `${Math.round(totalBytes / (1024 * 1024))} MB`;
+  };
+
   const sourceTypes = ['file', 'text', 'website', 'qa'] as const;
 
   return (
@@ -80,7 +89,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               key={type}
               role="listitem"
               className="flex items-center justify-between"
-              aria-label={`${getSourceLabel(sourcesByType[type], type)}, ${formatSize(sourcesByType[type], type)}`}
+              aria-label={`${getSourceLabel(sourcesByType[type], type)}, ${calculateTypeSize(sourcesByType[type], type)}`}
             >
               <div className="flex items-center gap-3">
                 {getSourceIcon(type)}
@@ -89,7 +98,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
                 </span>
               </div>
               <span className="text-sm font-semibold text-gray-900">
-                {formatSize(sourcesByType[type], type)}
+                {calculateTypeSize(sourcesByType[type], type)}
               </span>
             </div>
           ))}

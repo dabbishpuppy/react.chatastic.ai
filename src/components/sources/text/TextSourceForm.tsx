@@ -1,13 +1,18 @@
 
 import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
+import { useRAGServices } from '@/hooks/useRAGServices';
+import { useParams } from 'react-router-dom';
+import TextByteCounter from './TextByteCounter';
 
 const TextSourceForm: React.FC = () => {
+  const { agentId } = useParams();
+  const { sources } = useRAGServices();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -17,8 +22,17 @@ const TextSourceForm: React.FC = () => {
     
     if (!title.trim() || !content.trim()) {
       toast({
+        title: "Validation Error",
+        description: "Please fill in both title and content",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!agentId) {
+      toast({
         title: "Error",
-        description: "Please provide both title and content",
+        description: "No agent ID found",
         variant: "destructive"
       });
       return;
@@ -26,17 +40,26 @@ const TextSourceForm: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // TODO: Implement text source creation
+      await sources.createSource({
+        agent_id: agentId,
+        source_type: 'text',
+        title: title.trim(),
+        content: content.trim()
+      });
+
       toast({
         title: "Success",
-        description: "Text source added successfully"
+        description: "Text source created successfully"
       });
+
+      // Clear form
       setTitle('');
       setContent('');
     } catch (error) {
+      console.error('Error creating text source:', error);
       toast({
         title: "Error",
-        description: "Failed to add text source",
+        description: "Failed to create text source",
         variant: "destructive"
       });
     } finally {
@@ -46,8 +69,8 @@ const TextSourceForm: React.FC = () => {
 
   return (
     <Card className="border border-gray-200">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg">Add Text Content</CardTitle>
+      <CardHeader>
+        <CardTitle className="text-lg">Add Text Source</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -57,25 +80,32 @@ const TextSourceForm: React.FC = () => {
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter title..."
-              disabled={isSubmitting}
+              placeholder="Enter a title for this text..."
+              required
             />
           </div>
           
           <div>
-            <Label htmlFor="content">Content</Label>
+            <div className="flex justify-between items-center mb-2">
+              <Label htmlFor="content">Content</Label>
+              <TextByteCounter text={content} />
+            </div>
             <Textarea
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Enter your text content..."
-              rows={6}
-              disabled={isSubmitting}
+              className="min-h-[200px]"
+              required
             />
           </div>
-          
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Adding..." : "Add Text Source"}
+
+          <Button 
+            type="submit" 
+            disabled={isSubmitting}
+            className="w-full"
+          >
+            {isSubmitting ? 'Adding...' : 'Add Text Source'}
           </Button>
         </form>
       </CardContent>
