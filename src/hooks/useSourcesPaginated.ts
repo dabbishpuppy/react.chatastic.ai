@@ -19,7 +19,7 @@ interface SourcesPageResult {
   pageSize: number;
 }
 
-// Lightweight source query - excludes content field for performance
+// Optimized source query - excludes heavy content fields for performance
 const fetchSourcesPage = async (
   agentId: string, 
   sourceType?: SourceType, 
@@ -28,63 +28,92 @@ const fetchSourcesPage = async (
 ): Promise<SourcesPageResult> => {
   console.log(`🔍 Fetching sources page: agentId=${agentId}, type=${sourceType}, page=${page}, size=${pageSize}`);
   
-  // For website sources, we need ALL sources (parents + children) to build the tree structure
-  // But we'll paginate based on parent sources only
+  // For website sources, implement proper pagination for parent sources only
   if (sourceType === 'website') {
-    // First get all website sources for this agent (we need children to build the tree)
-    let allSourcesQuery = supabase
+    // First get count of parent sources for pagination
+    const { count: parentCount, error: countError } = await supabase
+      .from('agent_sources')
+      .select('*', { count: 'exact', head: true })
+      .eq('agent_id', agentId)
+      .eq('source_type', 'website')
+      .eq('is_active', true)
+      .is('parent_source_id', null);
+
+    if (countError) {
+      console.error('❌ Error fetching parent sources count:', countError);
+      throw countError;
+    }
+
+    const totalParentCount = parentCount || 0;
+    const totalPages = Math.ceil(totalParentCount / pageSize);
+    const offset = (page - 1) * pageSize;
+
+    // Fetch only parent sources for this page (no heavy content fields)
+    const { data: parentSources, error: parentError } = await supabase
       .from('agent_sources')
       .select(`
         id, title, source_type, url, created_at, updated_at, 
         metadata, is_active, parent_source_id, crawl_status, 
         progress, links_count, last_crawled_at, is_excluded,
         agent_id, team_id, created_by, updated_by, file_path,
-        extraction_method, content_summary, content, raw_text,
-        compression_ratio, keywords, original_size, compressed_size
+        extraction_method, content_summary, keywords, 
+        compression_ratio, original_size, compressed_size
       `)
       .eq('agent_id', agentId)
       .eq('source_type', 'website')
       .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .is('parent_source_id', null)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
 
-    const { data: allSources, error: allSourcesError } = await allSourcesQuery;
-
-    if (allSourcesError) {
-      console.error('❌ Error fetching all website sources:', allSourcesError);
-      throw allSourcesError;
+    if (parentError) {
+      console.error('❌ Error fetching parent sources:', parentError);
+      throw parentError;
     }
 
-    console.log(`✅ Fetched ${allSources?.length || 0} total website sources`);
+    // For each parent source, also fetch its children (but still no heavy content)
+    const allSources: any[] = [...(parentSources || [])];
     
-    // Count parent sources for pagination
-    const parentSources = (allSources || []).filter(source => !source.parent_source_id);
-    const totalParentCount = parentSources.length;
-    const totalPages = Math.ceil(totalParentCount / pageSize);
-    
-    console.log(`📊 Website sources summary:`, {
-      totalSources: allSources?.length || 0,
-      parentSources: totalParentCount,
-      childSources: (allSources?.length || 0) - totalParentCount,
-      page,
-      totalPages
-    });
+    if (parentSources && parentSources.length > 0) {
+      const parentIds = parentSources.map(p => p.id);
+      
+      const { data: childSources, error: childError } = await supabase
+        .from('agent_sources')
+        .select(`
+          id, title, source_type, url, created_at, updated_at, 
+          metadata, is_active, parent_source_id, crawl_status, 
+          progress, links_count, last_crawled_at, is_excluded,
+          agent_id, team_id, created_by, updated_by, file_path,
+          extraction_method, content_summary, keywords, 
+          compression_ratio, original_size, compressed_size
+        `)
+        .in('parent_source_id', parentIds)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
+      if (!childError && childSources) {
+        allSources.push(...childSources);
+      }
+    }
+
+    console.log(`✅ Fetched ${parentSources?.length || 0} parent sources and ${allSources.length - (parentSources?.length || 0)} child sources`);
+    
     // Cast the data to AgentSource[] to handle the metadata type mismatch
-    const typedSources: AgentSource[] = (allSources || []).map(source => ({
+    const typedSources: AgentSource[] = allSources.map(source => ({
       ...source,
       metadata: source.metadata as Record<string, any>
     }));
 
     return {
       sources: typedSources,
-      totalCount: allSources?.length || 0,
+      totalCount: allSources.length,
       totalPages,
       currentPage: page,
       pageSize
     };
   }
 
-  // For other source types, use the original pagination logic
+  // For other source types, use optimized pagination (no heavy content fields)
   const offset = (page - 1) * pageSize;
 
   // First get the total count
@@ -105,7 +134,7 @@ const fetchSourcesPage = async (
     throw countError;
   }
 
-  // Then get the actual data
+  // Then get the actual data (excluding heavy content fields)
   let dataQuery = supabase
     .from('agent_sources')
     .select(`
@@ -113,8 +142,8 @@ const fetchSourcesPage = async (
       metadata, is_active, parent_source_id, crawl_status, 
       progress, links_count, last_crawled_at, is_excluded,
       agent_id, team_id, created_by, updated_by, file_path,
-      extraction_method, content_summary, content, raw_text,
-      compression_ratio, keywords, original_size, compressed_size
+      extraction_method, content_summary, keywords, 
+      compression_ratio, original_size, compressed_size
     `)
     .eq('agent_id', agentId)
     .eq('is_active', true)
@@ -161,6 +190,14 @@ export const useSourcesPaginated = (options: PaginatedSourcesOptions = {}) => {
     queryFn: () => fetchSourcesPage(agentId!, sourceType, page, pageSize),
     enabled: !!agentId && enabled,
     staleTime: 30000, // Consider data fresh for 30 seconds
+    retry: (failureCount, error) => {
+      // Don't retry on timeout errors, but retry on other errors
+      if (error?.message?.includes('timeout') || error?.message?.includes('AbortError')) {
+        console.log('⏰ Query timeout - not retrying');
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 };
 

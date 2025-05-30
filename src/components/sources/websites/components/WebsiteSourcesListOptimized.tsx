@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,8 +68,8 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
     onPageSizeChange: () => clearSelection()
   });
 
-  // Get paginated data - fetch ALL website sources
-  const { data: paginatedData, refetch } = useSourcesPaginated({
+  // Get paginated data with optimized query
+  const { data: paginatedData, refetch, isLoading, error: queryError } = useSourcesPaginated({
     sourceType: 'website',
     page,
     pageSize,
@@ -81,16 +80,9 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
   const { parentSources, allSources, parentCount } = useMemo(() => {
     const allSources = paginatedData?.sources || [];
     
-    console.log('🔍 Processing website sources:', {
+    console.log('🔍 Processing optimized website sources:', {
       totalFetched: allSources.length,
-      sources: allSources.map(s => ({
-        id: s.id,
-        title: s.title,
-        url: s.url,
-        parent_source_id: s.parent_source_id,
-        crawl_status: s.crawl_status,
-        is_active: s.is_active
-      })),
+      page,
       timestamp: new Date().toISOString()
     });
     
@@ -100,18 +92,10 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
       source.is_active === true
     );
     
-    console.log('📊 Parent sources filtered:', {
+    console.log('📊 Parent sources on this page:', {
       parentCount: parents.length,
-      parents: parents.map(p => ({
-        id: p.id,
-        title: p.title,
-        url: p.url,
-        crawl_status: p.crawl_status
-      })),
-      statusBreakdown: parents.reduce((acc, source) => {
-        acc[source.crawl_status || 'unknown'] = (acc[source.crawl_status || 'unknown'] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
+      totalPages: paginatedData?.totalPages || 0,
+      currentPage: page,
       timestamp: new Date().toISOString()
     });
     
@@ -120,13 +104,12 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
       allSources,
       parentCount: parents.length
     };
-  }, [paginatedData?.sources]);
+  }, [paginatedData?.sources, page]);
 
   const getChildSources = useCallback((parentId: string): AgentSource[] => {
     const children = allSources.filter(source => source.parent_source_id === parentId);
     console.log(`👶 Child sources for parent ${parentId}:`, {
       count: children.length,
-      children: children.map(c => ({ id: c.id, title: c.title, url: c.url })),
       timestamp: new Date().toISOString()
     });
     return children;
@@ -229,7 +212,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
   }, [selectedArray, sourceService, clearSelection, refetch]);
 
   // Show loading state
-  if (loading && !paginatedData) {
+  if ((loading || isLoading) && !paginatedData) {
     console.log('⏳ Showing loading state');
     return (
       <Card className="border border-gray-200">
@@ -258,26 +241,31 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
   }
 
   // Show error state
-  if (error) {
-    console.error('❌ Error state in WebsiteSourcesList:', error);
+  if (error || queryError) {
+    const errorMessage = error || queryError?.message || 'Unknown error';
+    console.error('❌ Error state in WebsiteSourcesList:', errorMessage);
     return (
       <Card className="border border-gray-200">
         <CardContent className="p-6">
           <div className="text-center text-red-600">
-            <p>Error loading website sources: {error}</p>
+            <p>Error loading website sources: {errorMessage}</p>
+            {errorMessage.includes('timeout') && (
+              <p className="text-sm mt-2 text-gray-600">
+                The query took too long to complete. Please try again.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  const totalPages = Math.ceil(parentCount / pageSize);
+  const totalPages = paginatedData?.totalPages || 1;
 
   console.log('🎯 Final render state:', {
     parentSourcesCount: parentSources.length,
-    totalParentCount: parentCount,
-    currentPage: page,
     totalPages,
+    currentPage: page,
     hasData: !!paginatedData,
     timestamp: new Date().toISOString()
   });
@@ -288,7 +276,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
-              Website Sources ({parentCount} crawl jobs, {paginatedData?.totalCount || 0} total pages)
+              Website Sources (Page {page} of {totalPages})
             </CardTitle>
             {parentSources.length > 0 && (
               <div className="flex items-center gap-3">
@@ -315,7 +303,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
           <div id="website-sources-list" role="list">
             {parentSources.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No website crawl jobs found</p>
+                <p>No website crawl jobs found on this page</p>
                 <p className="text-sm">Add a website URL above to get started</p>
               </div>
             ) : (
@@ -337,12 +325,12 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
             )}
           </div>
 
-          {parentCount > pageSize && (
+          {totalPages > 1 && (
             <PaginationControls
               currentPage={page}
               totalPages={totalPages}
               pageSize={pageSize}
-              totalItems={parentCount}
+              totalItems={paginatedData?.totalCount || 0}
               onPageChange={() => {}}
               onPageSizeChange={changePageSize}
               onFirstPage={goToFirstPage}
