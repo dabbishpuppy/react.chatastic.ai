@@ -1,14 +1,16 @@
 
 import React from "react";
-import { useParams } from "react-router-dom";
-import { useAgentSources } from "@/hooks/useAgentSources";
+import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
 import SourcesList from "./SourcesList";
 import FileUploadArea from "./files/FileUploadArea";
 import FileUploadProgress from "./files/FileUploadProgress";
 import { useFileUpload } from "./files/useFileUpload";
 
 const FilesTab: React.FC = () => {
-  const { sources: fileSources, loading, error, removeSourceFromState, refetch } = useAgentSources('file');
+  const { sources: allSources, loading, error, removeSourceFromState, refetch, getSourcesByType } = useOptimizedAgentSources();
+  
+  // Filter for file sources only
+  const fileSources = getSourcesByType('file');
   
   const {
     isDragging,

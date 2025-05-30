@@ -41,7 +41,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           displayMode={currentTab === 'website' ? 'crawl-links' : 'default'}
         />
 
-        {sourcesLength === 0 && (
+        {totalSources === 0 && (
           <div className="text-center text-gray-500 text-sm py-4">
             No sources added yet
           </div>

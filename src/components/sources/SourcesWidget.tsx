@@ -17,10 +17,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
 
   console.log(`📊 SourcesWidget render: tab=${currentTab}, sources=${sourcesData.length}, loading=${loading}, error=${error}`);
 
-  // Calculate total stats and filter sources for display
+  // Calculate total stats - show all source types regardless of current tab
   const { totalSources, totalSize, sourcesByType } = useSourceSizeCalculations(
     sourcesData, 
-    currentTab, 
+    undefined, // Don't pass currentTab to ensure all types are always shown
     realtimeSize
   );
 

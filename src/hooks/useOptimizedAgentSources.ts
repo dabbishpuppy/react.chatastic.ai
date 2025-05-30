@@ -1,10 +1,11 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRAGServices } from './useRAGServices';
 import { AgentSource } from '@/types/rag';
 import { supabase } from '@/integrations/supabase/client';
 
-export const useOptimizedAgentSources = (sourceType?: string) => {
+export const useOptimizedAgentSources = () => {
   const { agentId } = useParams();
   const [sources, setSources] = useState<AgentSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,23 +20,20 @@ export const useOptimizedAgentSources = (sourceType?: string) => {
 
     try {
       setError(null);
-      console.log(`🚀 Fetching sources for agent: ${agentId}, type: ${sourceType || 'all'}`);
+      console.log(`🚀 Fetching all sources for agent: ${agentId}`);
       
-      const fetchedSources = sourceType 
-        ? await sourceService.getSourcesByType(agentId, sourceType as any)
-        : await sourceService.getSourcesByAgent(agentId);
+      const fetchedSources = await sourceService.getSourcesByAgent(agentId);
       
-      console.log(`✅ Fetched ${fetchedSources.length} sources`);
+      console.log(`✅ Fetched ${fetchedSources.length} total sources`);
       setSources(fetchedSources);
     } catch (err: any) {
       console.error('❌ Error fetching sources:', err);
       setError(err.message || 'Failed to fetch sources');
-      // Keep previous data on error instead of clearing
     } finally {
       setLoading(false);
       isFirstLoadRef.current = false;
     }
-  }, [agentId, sourceType, sourceService]);
+  }, [agentId, sourceService]);
 
   // Debounced fetch to prevent rapid successive calls
   const debouncedFetch = useCallback(() => {
@@ -62,7 +60,7 @@ export const useOptimizedAgentSources = (sourceType?: string) => {
     }
 
     const channel = supabase
-      .channel(`optimized-sources-${agentId}`)
+      .channel(`unified-sources-${agentId}`)
       .on(
         'postgres_changes',
         {
@@ -104,16 +102,17 @@ export const useOptimizedAgentSources = (sourceType?: string) => {
     fetchSources();
   }, [fetchSources]);
 
-  // Filter sources by type
-  const filteredSources = sourceType 
-    ? sources.filter(source => source.source_type === sourceType)
-    : sources;
+  // Helper functions to filter sources by type
+  const getSourcesByType = useCallback((sourceType: string) => {
+    return sources.filter(source => source.source_type === sourceType);
+  }, [sources]);
 
   return {
-    sources: filteredSources,
+    sources,
     loading,
     error,
     removeSourceFromState,
-    refetch
+    refetch,
+    getSourcesByType
   };
 };

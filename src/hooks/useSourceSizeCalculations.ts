@@ -4,7 +4,7 @@ import { AgentSource, SourceType } from '@/types/rag';
 
 export const useSourceSizeCalculations = (sourcesData: AgentSource[], currentTab?: string, realtimeSize?: number) => {
   return useMemo(() => {
-    console.log(`🧮 Calculating stats for ${sourcesData.length} sources`);
+    console.log(`🧮 Calculating stats for ${sourcesData.length} total sources`);
     
     // Enhanced size calculation that properly handles website parent-child relationships
     const calculateSourceSize = (source: any, allSources: any[]) => {
@@ -31,10 +31,8 @@ export const useSourceSizeCalculations = (sourcesData: AgentSource[], currentTab
             return total + childSize;
           }, 0);
         } else if (source.metadata?.total_content_size) {
-          // Use cached total if available
           sourceSize = source.metadata.total_content_size;
         } else if (source.content) {
-          // Fallback to parent's own content
           sourceSize = new Blob([source.content]).size;
         }
       } else if (source.source_type !== 'website' || source.parent_source_id) {
@@ -55,23 +53,15 @@ export const useSourceSizeCalculations = (sourcesData: AgentSource[], currentTab
       return sourceSize;
     };
 
-    // For total stats calculation, include all sources for counting
-    let sourcesToCount = sourcesData;
+    // For counting sources, use parent sources for websites, all others for non-website
+    const sourcesToCount = sourcesData.filter(source => {
+      if (source.source_type === 'website') {
+        return !source.parent_source_id; // Only count parent website sources
+      }
+      return true; // Count all non-website sources
+    });
     
-    // For website tab in crawl-links mode, count only parent sources but size includes all
-    if (currentTab === 'website') {
-      const websiteParents = sourcesData.filter(source => 
-        source.source_type === 'website' && !source.parent_source_id
-      );
-      const websiteChildren = sourcesData.filter(source => 
-        source.source_type === 'website' && source.parent_source_id
-      );
-      const nonWebsiteSources = sourcesData.filter(source => source.source_type !== 'website');
-      
-      sourcesToCount = [...websiteParents, ...nonWebsiteSources];
-      
-      console.log(`🌐 Website tab stats: ${websiteParents.length} parents, ${websiteChildren.length} children, ${nonWebsiteSources.length} non-website`);
-    }
+    console.log(`📊 Counting ${sourcesToCount.length} sources (${sourcesData.length} total)`);
     
     // Calculate total size using enhanced calculation
     const totalBytes = sourcesToCount.reduce((total, source) => {
@@ -87,17 +77,17 @@ export const useSourceSizeCalculations = (sourcesData: AgentSource[], currentTab
     else if (totalBytes < 1024 * 1024) formattedTotalSize = `${Math.round(totalBytes / 1024)} KB`;
     else formattedTotalSize = `${Math.round(totalBytes / (1024 * 1024))} MB`;
 
-    // Create source sections - always show all types for consistency
+    // Create source sections - ALWAYS show all types regardless of current tab
     const sourceTypes: SourceType[] = ['text', 'file', 'website', 'qa'];
     const sourcesByType = sourceTypes.map(type => {
       let sources;
-      if (type === 'website' && currentTab === 'website') {
-        // For website sources on website tab, only show parent sources
+      if (type === 'website') {
+        // For website sources, only show parent sources in the widget
         sources = sourcesData.filter(source => 
           source.source_type === type && !source.parent_source_id
         );
       } else {
-        // For all other cases, show all sources of that type
+        // For all other types, show all sources
         sources = sourcesData.filter(source => source.source_type === type);
       }
       
@@ -113,5 +103,5 @@ export const useSourceSizeCalculations = (sourcesData: AgentSource[], currentTab
 
     console.log(`📊 Final stats:`, stats);
     return stats;
-  }, [sourcesData, currentTab, realtimeSize]);
+  }, [sourcesData, realtimeSize]); // Removed currentTab dependency to ensure consistency
 };

@@ -8,7 +8,7 @@ import { Bold, Italic, List, ListOrdered, Link2, Smile } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { useRAGServices } from "@/hooks/useRAGServices";
-import { useAgentSources } from "@/hooks/useAgentSources";
+import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
 import SourcesList from "./SourcesList";
 
 const TextTab: React.FC = () => {
@@ -17,7 +17,10 @@ const TextTab: React.FC = () => {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { sources } = useRAGServices();
-  const { sources: textSources, loading, error, removeSourceFromState } = useAgentSources('text');
+  const { sources: allSources, loading, error, removeSourceFromState, getSourcesByType } = useOptimizedAgentSources();
+
+  // Filter for text sources only
+  const textSources = getSourcesByType('text');
 
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) {
@@ -65,9 +68,6 @@ const TextTab: React.FC = () => {
       // Clear the form
       setTitle("");
       setContent("");
-      
-      // The real-time subscription will handle the updates automatically
-      // No need for manual refetch calls
       
     } catch (error) {
       console.error("Error creating text snippet:", error);

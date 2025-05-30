@@ -10,8 +10,11 @@ import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
 import WebsiteEmptyState from "./websites/components/WebsiteEmptyState";
 
 const WebsiteTab: React.FC = () => {
-  const { sources: websiteSources, loading, error, removeSourceFromState, refetch } = useOptimizedAgentSources('website');
+  const { sources: allSources, loading, error, removeSourceFromState, refetch, getSourcesByType } = useOptimizedAgentSources();
   const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission(refetch);
+  
+  // Filter for website sources only
+  const websiteSources = getSourcesByType('website');
   
   const {
     activeSubTab,
