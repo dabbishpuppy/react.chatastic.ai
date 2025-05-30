@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ChevronDown, 
   ChevronRight
@@ -18,6 +19,8 @@ interface WebsiteSourceItemProps {
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
   onRecrawl: (source: AgentSource) => void;
+  isSelected?: boolean;
+  onSelectionChange?: (selected: boolean) => void;
 }
 
 const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
@@ -26,7 +29,9 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   onEdit,
   onExclude,
   onDelete,
-  onRecrawl
+  onRecrawl,
+  isSelected = false,
+  onSelectionChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isParentSource = !source.parent_source_id;
@@ -39,9 +44,11 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
       {/* Main source item with fixed width container */}
       <div className="flex items-center justify-between p-4 min-h-[60px]">
         <div className="flex items-center flex-1 min-w-0 pr-4">
-          <input 
-            type="checkbox" 
-            className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0" 
+          <Checkbox 
+            checked={isSelected}
+            onCheckedChange={onSelectionChange}
+            className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0"
+            aria-label={`Select ${source.title || source.url}`}
           />
           
           <div className="flex-1 min-w-0 max-w-none">
@@ -88,6 +95,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               className="h-6 w-6"
               onClick={() => setIsExpanded(!isExpanded)}
               disabled={!hasChildSources && !isCrawling}
+              aria-label={isExpanded ? "Collapse child sources" : "Expand child sources"}
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </Button>

@@ -1,7 +1,6 @@
 
 import React, { useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
-import { useWebsiteSourcesPaginated } from "@/hooks/useSourcesPaginated";
 import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import { useWebsiteFormState } from "./websites/hooks/useWebsiteFormState";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
@@ -11,23 +10,7 @@ import WebsiteEmptyState from "./websites/components/WebsiteEmptyState";
 import ErrorBoundary from "./ErrorBoundary";
 
 const WebsiteTabContent: React.FC = () => {
-  const { 
-    data, 
-    isLoading, 
-    error, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage,
-    refetch 
-  } = useWebsiteSourcesPaginated();
-  
-  const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission(refetch);
-  
-  // Flatten all pages into a single array
-  const allSources = data?.pages?.flatMap(page => page.sources) || [];
-  
-  // Filter for website sources only and create parent/child relationships
-  const websiteSources = allSources.filter(source => source.source_type === 'website');
+  const { isSubmitting, submitWebsiteSource, refetch } = useWebsiteSubmission();
   
   const {
     activeSubTab,
@@ -42,17 +25,6 @@ const WebsiteTabContent: React.FC = () => {
     setExcludePaths,
     clearForm
   } = useWebsiteFormState();
-
-  // Memoized source grouping to prevent unnecessary recalculations
-  const parentSources = React.useMemo(() => 
-    websiteSources.filter(source => !source.parent_source_id), 
-    [websiteSources]
-  );
-  
-  const getChildSources = useCallback((parentId: string) => 
-    websiteSources.filter(source => source.parent_source_id === parentId),
-    [websiteSources]
-  );
 
   const { handleEdit, handleExclude, handleDelete, handleRecrawl } = useWebsiteSourceOperations(
     refetch, 
@@ -88,13 +60,6 @@ const WebsiteTabContent: React.FC = () => {
     }
   };
 
-  const handleDeleteWithDependencies = useCallback(async (source: any) => {
-    await handleDelete(source, parentSources, getChildSources);
-  }, [handleDelete, parentSources, getChildSources]);
-
-  const loading = isLoading;
-  const errorMessage = error?.message || null;
-
   return (
     <div className="space-y-6 mt-4">
       <div>
@@ -117,37 +82,21 @@ const WebsiteTabContent: React.FC = () => {
           isSubmitting={isSubmitting}
         />
 
-        {/* Website Sources List */}
-        {parentSources.length > 0 && (
-          <WebsiteSourcesList
-            parentSources={parentSources}
-            getChildSources={getChildSources}
-            onEdit={handleEdit}
-            onExclude={handleExclude}
-            onDelete={handleDeleteWithDependencies}
-            onRecrawl={handleRecrawl}
-            loading={loading}
-            error={errorMessage}
-          />
-        )}
-
-        {/* Load More Button */}
-        {hasNextPage && !loading && (
-          <div className="flex justify-center pt-4">
-            <button
-              onClick={() => fetchNextPage()}
-              disabled={isFetchingNextPage}
-              className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
-            >
-              {isFetchingNextPage ? "Loading..." : "Load More"}
-            </button>
-          </div>
-        )}
+        <WebsiteSourcesList
+          parentSources={[]}
+          getChildSources={() => []}
+          onEdit={handleEdit}
+          onExclude={handleExclude}
+          onDelete={handleDelete}
+          onRecrawl={handleRecrawl}
+          loading={isSubmitting}
+          error={null}
+        />
 
         <WebsiteEmptyState 
-          loading={loading}
-          error={errorMessage}
-          hasParentSources={parentSources.length > 0}
+          loading={isSubmitting}
+          error={null}
+          hasParentSources={false}
         />
       </div>
     </div>

@@ -1,30 +1,55 @@
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentSource, SourceType } from '@/types/rag';
 
 interface PaginatedSourcesOptions {
   sourceType?: SourceType;
+  page?: number;
   pageSize?: number;
+  enabled?: boolean;
 }
 
-interface SourcesPage {
+interface SourcesPageResult {
   sources: AgentSource[];
-  nextCursor?: string;
-  hasMore: boolean;
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
 }
 
 // Lightweight source query - excludes content field for performance
 const fetchSourcesPage = async (
   agentId: string, 
   sourceType?: SourceType, 
-  cursor?: string,
+  page = 1,
   pageSize = 25
-): Promise<SourcesPage> => {
-  console.log(`🔍 Fetching sources page: type=${sourceType}, cursor=${cursor}, size=${pageSize}`);
+): Promise<SourcesPageResult> => {
+  console.log(`🔍 Fetching sources page: type=${sourceType}, page=${page}, size=${pageSize}`);
   
-  let query = supabase
+  const offset = (page - 1) * pageSize;
+
+  // First get the total count
+  let countQuery = supabase
+    .from('agent_sources')
+    .select('*', { count: 'exact', head: true })
+    .eq('agent_id', agentId)
+    .eq('is_active', true);
+
+  if (sourceType) {
+    countQuery = countQuery.eq('source_type', sourceType);
+  }
+
+  const { count, error: countError } = await countQuery;
+
+  if (countError) {
+    console.error('❌ Error fetching sources count:', countError);
+    throw countError;
+  }
+
+  // Then get the actual data
+  let dataQuery = supabase
     .from('agent_sources')
     .select(`
       id, title, source_type, url, created_at, updated_at, 
@@ -34,53 +59,54 @@ const fetchSourcesPage = async (
     .eq('agent_id', agentId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
-    .limit(pageSize + 1); // Fetch one extra to check if there are more
+    .range(offset, offset + pageSize - 1);
 
   if (sourceType) {
-    query = query.eq('source_type', sourceType);
+    dataQuery = dataQuery.eq('source_type', sourceType);
   }
 
-  if (cursor) {
-    query = query.lt('created_at', cursor);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await dataQuery;
 
   if (error) {
     console.error('❌ Error fetching sources page:', error);
     throw error;
   }
 
-  const sources = data || [];
-  const hasMore = sources.length > pageSize;
-  const pageData = hasMore ? sources.slice(0, pageSize) : sources;
-  const nextCursor = hasMore ? pageData[pageData.length - 1]?.created_at : undefined;
+  const totalCount = count || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
-  console.log(`✅ Fetched ${pageData.length} sources, hasMore: ${hasMore}`);
+  console.log(`✅ Fetched ${data?.length || 0} sources, page ${page} of ${totalPages}`);
   
   return {
-    sources: pageData as AgentSource[],
-    nextCursor,
-    hasMore
+    sources: (data || []) as AgentSource[],
+    totalCount,
+    totalPages,
+    currentPage: page,
+    pageSize
   };
 };
 
 export const useSourcesPaginated = (options: PaginatedSourcesOptions = {}) => {
   const { agentId } = useParams();
-  const { sourceType, pageSize = 25 } = options;
+  const { sourceType, page = 1, pageSize = 25, enabled = true } = options;
 
-  return useInfiniteQuery<SourcesPage, Error>({
-    queryKey: ['sources-paginated', agentId, sourceType],
-    queryFn: ({ pageParam }) => fetchSourcesPage(agentId!, sourceType, pageParam as string, pageSize),
-    getNextPageParam: (lastPage: SourcesPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
-    initialPageParam: undefined,
-    enabled: !!agentId,
+  return useQuery({
+    queryKey: ['sources-paginated', agentId, sourceType, page, pageSize],
+    queryFn: () => fetchSourcesPage(agentId!, sourceType, page, pageSize),
+    enabled: !!agentId && enabled,
     staleTime: 30000, // Consider data fresh for 30 seconds
   });
 };
 
 // Convenience hooks for specific source types
-export const useFileSourcesPaginated = () => useSourcesPaginated({ sourceType: 'file' });
-export const useWebsiteSourcesPaginated = () => useSourcesPaginated({ sourceType: 'website' });
-export const useTextSourcesPaginated = () => useSourcesPaginated({ sourceType: 'text' });
-export const useQASourcesPaginated = () => useSourcesPaginated({ sourceType: 'qa' });
+export const useFileSourcesPaginated = (page = 1, pageSize = 25) => 
+  useSourcesPaginated({ sourceType: 'file', page, pageSize });
+
+export const useWebsiteSourcesPaginated = (page = 1, pageSize = 25) => 
+  useSourcesPaginated({ sourceType: 'website', page, pageSize });
+
+export const useTextSourcesPaginated = (page = 1, pageSize = 25) => 
+  useSourcesPaginated({ sourceType: 'text', page, pageSize });
+
+export const useQASourcesPaginated = (page = 1, pageSize = 25) => 
+  useSourcesPaginated({ sourceType: 'qa', page, pageSize });
