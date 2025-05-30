@@ -1,16 +1,22 @@
 
 import React from "react";
-import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
-import SourcesList from "./SourcesList";
+import ErrorBoundary from "./ErrorBoundary";
+import { useFileSourcesPaginated } from "@/hooks/useSourcesPaginated";
+import SourcesListPaginated from "./SourcesListPaginated";
 import FileUploadArea from "./files/FileUploadArea";
 import FileUploadProgress from "./files/FileUploadProgress";
 import { useFileUpload } from "./files/useFileUpload";
 
-const FilesTab: React.FC = () => {
-  const { sources: allSources, loading, error, removeSourceFromState, refetch, getSourcesByType } = useOptimizedAgentSources();
-  
-  // Filter for file sources only
-  const fileSources = getSourcesByType('file');
+const FilesTabContent: React.FC = () => {
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage,
+    refetch 
+  } = useFileSourcesPaginated();
   
   const {
     isDragging,
@@ -24,6 +30,9 @@ const FilesTab: React.FC = () => {
     handleFileSelect,
     removeUploadedFile
   } = useFileUpload(refetch);
+
+  // Flatten all pages into a single array
+  const allSources = data?.pages.flatMap(page => page.sources) || [];
 
   return (
     <div className="space-y-6 mt-4">
@@ -47,13 +56,24 @@ const FilesTab: React.FC = () => {
         onRemoveFile={removeUploadedFile}
       />
 
-      <SourcesList 
-        sources={fileSources} 
-        loading={loading} 
-        error={error}
-        onSourceDeleted={removeSourceFromState}
+      <SourcesListPaginated 
+        sources={allSources} 
+        loading={isLoading} 
+        error={error?.message || null}
+        onLoadMore={fetchNextPage}
+        hasMore={hasNextPage}
+        isLoadingMore={isFetchingNextPage}
+        onSourceDeleted={() => refetch()}
       />
     </div>
+  );
+};
+
+const FilesTab: React.FC = () => {
+  return (
+    <ErrorBoundary tabName="Files">
+      <FilesTabContent />
+    </ErrorBoundary>
   );
 };
 

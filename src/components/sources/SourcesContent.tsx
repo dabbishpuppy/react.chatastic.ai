@@ -2,28 +2,27 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TotalStatsSection from './TotalStatsSection';
-import SourceSectionsDisplay from './SourceSectionsDisplay';
-import { SourceType, AgentSource } from '@/types/rag';
+import SourceTypeStatsSection from './SourceTypeStatsSection';
 
 interface SourcesContentProps {
   totalSources: number;
   totalSize: string;
-  sourcesByType: Array<{
-    type: SourceType;
-    sources: AgentSource[];
-  }>;
+  sourcesByType: {
+    text: number;
+    file: number;
+    website: number;
+    qa: number;
+  };
   currentTab?: string;
-  sourcesLength: number;
 }
 
 const SourcesContent: React.FC<SourcesContentProps> = ({
   totalSources,
   totalSize,
   sourcesByType,
-  currentTab,
-  sourcesLength
+  currentTab
 }) => {
-  console.log('✅ SourcesWidget rendering normal content');
+  console.log('✅ SourcesWidget rendering with stats-only content');
 
   return (
     <Card>
@@ -36,9 +35,9 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           totalSize={totalSize}
         />
 
-        <SourceSectionsDisplay 
+        <SourceTypeStatsSection 
           sourcesByType={sourcesByType}
-          displayMode={currentTab === 'website' ? 'crawl-links' : 'default'}
+          currentTab={currentTab}
         />
 
         {totalSources === 0 && (
