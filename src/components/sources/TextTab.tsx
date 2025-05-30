@@ -8,19 +8,29 @@ import { Bold, Italic, List, ListOrdered, Link2, Smile } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { useRAGServices } from "@/hooks/useRAGServices";
-import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
-import SourcesList from "./SourcesList";
+import { useTextSourcesPaginated } from "@/hooks/useSourcesPaginated";
+import SourcesListPaginated from "./SourcesListPaginated";
+import ErrorBoundary from "./ErrorBoundary";
 
-const TextTab: React.FC = () => {
+const TextTabContent: React.FC = () => {
   const { agentId } = useParams();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { sources } = useRAGServices();
-  const { sources: allSources, loading, error, removeSourceFromState, getSourcesByType } = useOptimizedAgentSources();
+  
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage,
+    refetch 
+  } = useTextSourcesPaginated();
 
-  // Filter for text sources only
-  const textSources = getSourcesByType('text');
+  // Flatten all pages into a single array
+  const allSources = data?.pages?.flatMap(page => page.sources) || [];
 
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) {
@@ -65,9 +75,10 @@ const TextTab: React.FC = () => {
         description: "Your text snippet has been successfully saved"
       });
 
-      // Clear the form
+      // Clear the form and refetch data
       setTitle("");
       setContent("");
+      refetch();
       
     } catch (error) {
       console.error("Error creating text snippet:", error);
@@ -160,14 +171,25 @@ const TextTab: React.FC = () => {
           </div>
         </div>
 
-        <SourcesList 
-          sources={textSources} 
-          loading={loading} 
-          error={error}
-          onSourceDeleted={removeSourceFromState}
+        <SourcesListPaginated 
+          sources={allSources} 
+          loading={isLoading} 
+          error={error?.message || null}
+          onLoadMore={fetchNextPage}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+          onSourceDeleted={() => refetch()}
         />
       </div>
     </div>
+  );
+};
+
+const TextTab: React.FC = () => {
+  return (
+    <ErrorBoundary tabName="Text">
+      <TextTabContent />
+    </ErrorBoundary>
   );
 };
 

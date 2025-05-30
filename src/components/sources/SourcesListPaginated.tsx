@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { AgentSource } from '@/types/rag';
 import SourcesList from './SourcesList';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SourcesListPaginatedProps {
   sources: AgentSource[];
@@ -23,11 +24,31 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
   isLoadingMore,
   onSourceDeleted
 }) => {
+  if (loading && sources.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Sources</h3>
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="border rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <SourcesList 
         sources={sources}
-        loading={loading}
+        loading={false} // We handle loading state above
         error={error}
         onSourceDeleted={onSourceDeleted}
       />
@@ -42,6 +63,12 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
           >
             {isLoadingMore ? "Loading..." : "Load More"}
           </Button>
+        </div>
+      )}
+      
+      {isLoadingMore && (
+        <div className="flex justify-center py-4">
+          <div className="text-sm text-gray-500">Loading more sources...</div>
         </div>
       )}
     </div>

@@ -20,7 +20,7 @@ const fetchSourcesPage = async (
   agentId: string, 
   sourceType?: SourceType, 
   cursor?: string,
-  pageSize = 50
+  pageSize = 25
 ): Promise<SourcesPage> => {
   console.log(`🔍 Fetching sources page: type=${sourceType}, cursor=${cursor}, size=${pageSize}`);
   
@@ -67,7 +67,7 @@ const fetchSourcesPage = async (
 
 export const useSourcesPaginated = (options: PaginatedSourcesOptions = {}) => {
   const { agentId } = useParams();
-  const { sourceType, pageSize = 50 } = options;
+  const { sourceType, pageSize = 25 } = options;
 
   return useInfiniteQuery<SourcesPage, Error>({
     queryKey: ['sources-paginated', agentId, sourceType],

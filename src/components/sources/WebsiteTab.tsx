@@ -1,20 +1,33 @@
 
 import React, { useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
-import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
+import { useWebsiteSourcesPaginated } from "@/hooks/useSourcesPaginated";
 import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
 import { useWebsiteFormState } from "./websites/hooks/useWebsiteFormState";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
 import WebsiteFormSection from "./websites/components/WebsiteFormSection";
 import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
 import WebsiteEmptyState from "./websites/components/WebsiteEmptyState";
+import ErrorBoundary from "./ErrorBoundary";
 
-const WebsiteTab: React.FC = () => {
-  const { sources: allSources, loading, error, removeSourceFromState, refetch, getSourcesByType } = useOptimizedAgentSources();
+const WebsiteTabContent: React.FC = () => {
+  const { 
+    data, 
+    isLoading, 
+    error, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage,
+    refetch 
+  } = useWebsiteSourcesPaginated();
+  
   const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission(refetch);
   
-  // Filter for website sources only
-  const websiteSources = getSourcesByType('website');
+  // Flatten all pages into a single array
+  const allSources = data?.pages?.flatMap(page => page.sources) || [];
+  
+  // Filter for website sources only and create parent/child relationships
+  const websiteSources = allSources.filter(source => source.source_type === 'website');
   
   const {
     activeSubTab,
@@ -43,7 +56,10 @@ const WebsiteTab: React.FC = () => {
 
   const { handleEdit, handleExclude, handleDelete, handleRecrawl } = useWebsiteSourceOperations(
     refetch, 
-    removeSourceFromState
+    (sourceId: string) => {
+      // Optimistic update would go here if needed
+      refetch();
+    }
   );
 
   const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link', options?: { maxPages?: number; maxDepth?: number; concurrency?: number }) => {
@@ -75,6 +91,9 @@ const WebsiteTab: React.FC = () => {
   const handleDeleteWithDependencies = useCallback(async (source: any) => {
     await handleDelete(source, parentSources, getChildSources);
   }, [handleDelete, parentSources, getChildSources]);
+
+  const loading = isLoading;
+  const errorMessage = error?.message || null;
 
   return (
     <div className="space-y-6 mt-4">
@@ -108,17 +127,38 @@ const WebsiteTab: React.FC = () => {
             onDelete={handleDeleteWithDependencies}
             onRecrawl={handleRecrawl}
             loading={loading}
-            error={error}
+            error={errorMessage}
           />
+        )}
+
+        {/* Load More Button */}
+        {hasNextPage && !loading && (
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+            >
+              {isFetchingNextPage ? "Loading..." : "Load More"}
+            </button>
+          </div>
         )}
 
         <WebsiteEmptyState 
           loading={loading}
-          error={error}
+          error={errorMessage}
           hasParentSources={parentSources.length > 0}
         />
       </div>
     </div>
+  );
+};
+
+const WebsiteTab: React.FC = () => {
+  return (
+    <ErrorBoundary tabName="Website">
+      <WebsiteTabContent />
+    </ErrorBoundary>
   );
 };
 
