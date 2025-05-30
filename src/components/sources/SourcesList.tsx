@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,6 +82,23 @@ const SourcesList: React.FC<SourcesListProps> = ({
   };
 
   const formatFileSize = (source: AgentSource) => {
+    // For text sources, prioritize metadata sizes first
+    if (source.source_type === 'text' && source.metadata) {
+      const metadata = source.metadata as any;
+      if (metadata.original_size && typeof metadata.original_size === 'number') {
+        const bytes = metadata.original_size;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${Math.round(bytes / (1024 * 1024))} MB`;
+      }
+      if (metadata.file_size && typeof metadata.file_size === 'number') {
+        const bytes = metadata.file_size;
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        return `${Math.round(bytes / (1024 * 1024))} MB`;
+      }
+    }
+
     // For file sources, check metadata for original_size first
     if (source.source_type === 'file' && source.metadata) {
       const metadata = source.metadata as any;
@@ -112,7 +128,7 @@ const SourcesList: React.FC<SourcesListProps> = ({
       }
     }
 
-    // Fall back to content length calculation for text and other types
+    // Fall back to content length calculation for all types
     if (!source.content) return '0 B';
     const bytes = new TextEncoder().encode(source.content).length;
     if (bytes < 1024) return `${bytes} B`;

@@ -40,11 +40,19 @@ const TextSourceForm: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      // Calculate the byte size for storage
+      const byteCount = new TextEncoder().encode(content.trim()).length;
+      
       await sources.createSource({
         agent_id: agentId,
         source_type: 'text',
         title: title.trim(),
-        content: content.trim()
+        content: content.trim(),
+        metadata: {
+          original_size: byteCount,
+          file_size: byteCount,
+          content_type: 'text/plain'
+        }
       });
 
       toast({
