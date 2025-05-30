@@ -6,7 +6,6 @@ import { useWebsiteFormState } from "./websites/hooks/useWebsiteFormState";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
 import WebsiteFormSection from "./websites/components/WebsiteFormSection";
 import WebsiteSourcesList from "./websites/components/WebsiteSourcesList";
-import WebsiteEmptyState from "./websites/components/WebsiteEmptyState";
 import ErrorBoundary from "./ErrorBoundary";
 import { useSourcesPaginated } from "@/hooks/useSourcesPaginated";
 
@@ -105,12 +104,6 @@ const WebsiteTabContent: React.FC = () => {
           onRecrawl={handleRecrawl}
           loading={isSubmitting}
           error={null}
-        />
-
-        <WebsiteEmptyState 
-          loading={isSubmitting}
-          error={null}
-          hasParentSources={false}
         />
       </div>
     </div>
