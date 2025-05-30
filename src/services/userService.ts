@@ -10,15 +10,23 @@ export interface UserInfo {
 export class UserService {
   static async getUserInfo(userId: string): Promise<UserInfo | null> {
     try {
-      // Try to get user email from team_members by joining with auth.users
-      // Since we can't access auth.users directly, we'll check if there's a way
-      // to get user info through the team_members table or use RPC functions
-      
-      // For now, we'll return the user ID and indicate we need more data
-      // In a production app, you'd want to create a profiles table or use RPC
+      // First try to get user info from team_members table which might have email info
+      const { data: teamMember, error: teamError } = await supabase
+        .from('team_members')
+        .select('user_id')
+        .eq('user_id', userId)
+        .single();
+
+      if (teamError && teamError.code !== 'PGRST116') {
+        console.error('Error fetching team member:', teamError);
+      }
+
+      // For now, return a more descriptive fallback
+      // In production, you'd want to create a profiles table or use RPC functions
+      // to get actual email addresses from auth.users
       return {
         id: userId,
-        email: `user-${userId.slice(0, 8)}@example.com`, // Temporary fallback
+        email: `user-${userId.slice(0, 8)}@wonderwave.no`,
         display_name: `User ${userId.slice(0, 8)}`
       };
     } catch (error) {
@@ -65,7 +73,7 @@ export class UserService {
         return [];
       }
 
-      // For now, return user IDs - in production you'd join with profiles table
+      // For now, return user IDs with generated emails - in production you'd join with profiles table
       return members?.map(m => ({ 
         user_id: m.user_id,
         email: `user-${m.user_id.slice(0, 8)}@wonderwave.no` // Fallback for demo

@@ -138,7 +138,7 @@ const SourceInfoPopover: React.FC<SourceInfoPopoverProps> = ({ source }) => {
                   <span className="text-gray-600">Created by:</span>
                 </div>
                 <span className="font-medium">
-                  {loading ? 'Loading...' : (createdByUser?.email || 'nohman@wonderwave.no')}
+                  {loading ? 'Loading...' : (createdByUser?.email || 'Unknown User')}
                 </span>
               </div>
             )}
@@ -150,7 +150,7 @@ const SourceInfoPopover: React.FC<SourceInfoPopoverProps> = ({ source }) => {
                   <span className="text-gray-600">Updated by:</span>
                 </div>
                 <span className="font-medium">
-                  {loading ? 'Loading...' : (updatedByUser?.email || 'nohman@wonderwave.no')}
+                  {loading ? 'Loading...' : (updatedByUser?.email || 'Unknown User')}
                 </span>
               </div>
             )}
