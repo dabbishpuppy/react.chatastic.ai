@@ -5,25 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MoreVertical, UserPlus } from "lucide-react";
-
-interface Member {
-  email: string;
-  joinDate: string;
-  role: "Owner" | "Admin" | "Member";
-}
+import { MoreVertical, UserPlus, Settings } from "lucide-react";
+import { useTeamMembers } from "@/hooks/useTeamMembers";
+import ManageTeamAccessDialog from "@/components/settings/ManageTeamAccessDialog";
 
 const MembersSettings: React.FC = () => {
-  const [members] = useState<Member[]>([
-    {
-      email: "nohman@wonderwave.no",
-      joinDate: "Oct 17, 2024",
-      role: "Owner"
-    }
-  ]);
-
+  const { members, loading, refetch } = useTeamMembers();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isManageTeamDialogOpen, setIsManageTeamDialogOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const { toast } = useToast();
 
@@ -47,11 +40,42 @@ const MembersSettings: React.FC = () => {
     setIsInviteDialogOpen(false);
   };
 
+  const handleManageTeams = (member: any) => {
+    setSelectedMember(member);
+    setIsManageTeamDialogOpen(true);
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return 'bg-purple-100 text-purple-800';
+      case 'admin':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-bold">Members</h2>
+        </div>
+        <div className="flex items-center justify-center py-8">
+          <div className="text-gray-500">Loading members...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg border p-6">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h2 className="text-2xl font-bold">Members <span className="text-sm text-muted-foreground font-normal">1/1</span></h2>
+          <h2 className="text-2xl font-bold">
+            Members <span className="text-sm text-muted-foreground font-normal">{members.length}/{members.length}</span>
+          </h2>
         </div>
         <Button onClick={() => setIsInviteDialogOpen(true)}>
           <UserPlus className="mr-2 h-4 w-4" />
@@ -65,19 +89,43 @@ const MembersSettings: React.FC = () => {
             <TableHead>User</TableHead>
             <TableHead>Member since</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Teams</TableHead>
             <TableHead className="w-10"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {members.map((member, index) => (
-            <TableRow key={index}>
+          {members.map((member) => (
+            <TableRow key={member.user_id}>
               <TableCell>{member.email}</TableCell>
-              <TableCell>{member.joinDate}</TableCell>
-              <TableCell>{member.role}</TableCell>
+              <TableCell>{member.memberSince}</TableCell>
               <TableCell>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
+                <Badge className={getRoleColor(member.role)}>
+                  {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  {member.teams.map((team, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {team}
+                    </Badge>
+                  ))}
+                </div>
+              </TableCell>
+              <TableCell>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleManageTeams(member)}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Manage Teams
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </TableCell>
             </TableRow>
           ))}
@@ -109,6 +157,20 @@ const MembersSettings: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {selectedMember && (
+        <ManageTeamAccessDialog
+          isOpen={isManageTeamDialogOpen}
+          onClose={() => {
+            setIsManageTeamDialogOpen(false);
+            setSelectedMember(null);
+          }}
+          member={selectedMember}
+          onSuccess={() => {
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 };
