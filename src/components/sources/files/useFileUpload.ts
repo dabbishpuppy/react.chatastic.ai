@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -49,6 +48,9 @@ export const useFileUpload = (refetch: () => void) => {
         throw new Error('Agent ID is required');
       }
 
+      // Calculate content size in bytes
+      const contentSize = new Blob([result.content]).size;
+
       // Create the source in the database
       const newSource = await sources.createSource({
         agent_id: agentId,
@@ -60,6 +62,7 @@ export const useFileUpload = (refetch: () => void) => {
           fileSize: uploadedFile.file.size,
           fileType: uploadedFile.file.type,
           uploadedAt: new Date().toISOString(),
+          content_size: contentSize,
           ...result.metadata
         }
       });

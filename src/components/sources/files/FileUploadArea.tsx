@@ -8,9 +8,12 @@ interface FileUploadAreaProps {
   isUploading: boolean;
   supportedTypes: string[];
   maxFileSize: number;
-  onFileSelect: () => void; // This will be the handleFileSelect from the hook
+  onFileSelect: () => void;
   onUploadComplete: (results: any[]) => void;
   onError: (error: string) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
 }
 
 const FileUploadArea: React.FC<FileUploadAreaProps> = ({
@@ -20,7 +23,10 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
   maxFileSize,
   onFileSelect,
   onUploadComplete,
-  onError
+  onError,
+  onDragOver,
+  onDragLeave,
+  onDrop
 }) => {
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -39,6 +45,9 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
               ? 'border-blue-400 bg-blue-50' 
               : 'border-gray-300 hover:border-gray-400'
           }`}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
         >
           <div className="flex flex-col items-center justify-center space-y-4">
             {isUploading ? (
@@ -60,7 +69,7 @@ const FileUploadArea: React.FC<FileUploadAreaProps> = ({
                 </div>
                 <button
                   onClick={onFileSelect}
-                  className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  className="cursor-pointer bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
                 >
                   Choose Files
                 </button>
