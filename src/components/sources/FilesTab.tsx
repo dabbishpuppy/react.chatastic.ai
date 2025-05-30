@@ -38,21 +38,18 @@ const FilesTab: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          <div
+          <FileUploadArea 
+            isDragging={isDragging}
+            isUploading={isUploading}
+            supportedTypes={supportedTypes}
+            maxFileSize={maxFileSize * 1024 * 1024} // Convert MB to bytes
+            onFileSelect={handleFileSelect}
+            onUploadComplete={() => {}}
+            onError={() => {}}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-          >
-            <FileUploadArea 
-              isDragging={isDragging}
-              isUploading={isUploading}
-              supportedTypes={supportedTypes}
-              maxFileSize={maxFileSize * 1024 * 1024} // Convert MB to bytes
-              onFileSelect={handleFileSelect}
-              onUploadComplete={() => {}}
-              onError={() => {}}
-            />
-          </div>
+          />
 
           {uploadedFiles.length > 0 && (
             <FileUploadProgress
