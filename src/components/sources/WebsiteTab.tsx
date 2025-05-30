@@ -55,8 +55,8 @@ const WebsiteTabContent: React.FC = () => {
 
     const result = await submitWebsiteSource({
       url: fullUrl,
-      includePaths,
-      excludePaths,
+      includePaths: Array.isArray(includePaths) ? includePaths : [includePaths].filter(Boolean),
+      excludePaths: Array.isArray(excludePaths) ? excludePaths : [excludePaths].filter(Boolean),
       crawlType,
       ...options
     });

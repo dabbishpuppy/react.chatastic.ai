@@ -1,7 +1,8 @@
+
 import React from "react";
 import QASourceForm from "@/components/sources/QA/QASourceForm";
 import SourcesListPaginated from "@/components/sources/SourcesListPaginated";
-import ErrorBoundary from "@/ErrorBoundary";
+import ErrorBoundary from "@/components/sources/ErrorBoundary";
 import { useQASourcesPaginated } from "@/hooks/useSourcesPaginated";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 

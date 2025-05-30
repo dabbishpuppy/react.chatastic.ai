@@ -17,7 +17,7 @@ const Checkbox = React.forwardRef<
   
   React.useEffect(() => {
     if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = indeterminate || false;
+      (checkboxRef.current as any).indeterminate = indeterminate || false;
     }
   }, [indeterminate]);
 

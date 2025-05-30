@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
@@ -31,14 +32,19 @@ export const useWebsiteSubmission = () => {
 
     setIsSubmitting(true);
     try {
-      const result = await sources.createWebsiteSource(agentId, {
+      const result = await sources.createSource({
+        agent_id: agentId,
+        source_type: 'website',
+        title: data.url,
         url: data.url,
-        crawlType: data.crawlType,
-        includePaths: data.includePaths || [],
-        excludePaths: data.excludePaths || [],
-        maxPages: data.maxPages,
-        maxDepth: data.maxDepth,
-        concurrency: data.concurrency
+        metadata: {
+          crawlType: data.crawlType,
+          includePaths: data.includePaths || [],
+          excludePaths: data.excludePaths || [],
+          maxPages: data.maxPages,
+          maxDepth: data.maxDepth,
+          concurrency: data.concurrency
+        }
       });
 
       toast({

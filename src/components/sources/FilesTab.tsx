@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFileSourcesPaginated } from "@/hooks/useSourcesPaginated";
@@ -36,7 +37,15 @@ const FilesTab: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          <FileUploadArea />
+          <FileUploadArea 
+            isDragging={false}
+            isUploading={false}
+            supportedTypes={['.pdf', '.doc', '.docx', '.txt']}
+            maxFileSize={10 * 1024 * 1024}
+            onFileSelect={(files) => {}}
+            onUploadComplete={(results) => {}}
+            onError={(error) => {}}
+          />
           
           <SourcesListPaginated
             sources={sources}
