@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -80,6 +79,8 @@ serve(async (req) => {
         break;
     }
 
+    console.log(`📊 Discovery completed: ${discoveredUrls.length} URLs found`);
+
     // Create parent source
     const parentSourceData = {
       agent_id: agentId,
@@ -122,32 +123,93 @@ serve(async (req) => {
       throw new Error(`Failed to create parent source: ${sourceError.message}`);
     }
 
-    // Create source_pages (child jobs) for each discovered URL - FIX: Ensure correct data types
-    const sourcePages = discoveredUrls.map((discoveredUrl, index) => ({
-      parent_source_id: parentSource.id,
-      customer_id: agent.team_id,
-      url: discoveredUrl,
-      status: 'pending' as const, // FIX: Ensure this is a string, not boolean
-      priority: priority as string, // FIX: Ensure this is a string, not boolean
-      created_at: new Date().toISOString(),
-      retry_count: 0,
-      max_retries: 3
-    }));
+    console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Insert source pages in batches to avoid timeout
-    const batchSize = 50;
+    // Create source_pages with explicit type validation and detailed logging
+    const sourcePages = discoveredUrls.map((discoveredUrl, index) => {
+      // Ensure all values are exactly the right type
+      const sourcePage = {
+        parent_source_id: parentSource.id, // uuid
+        customer_id: agent.team_id, // uuid  
+        url: String(discoveredUrl), // text
+        status: String('pending'), // text - explicitly cast to string
+        priority: String(priority), // text - explicitly cast to string  
+        created_at: new Date().toISOString(), // timestamp
+        retry_count: Number(0), // integer
+        max_retries: Number(3) // integer
+      };
+      
+      // Log the first few entries for debugging
+      if (index < 3) {
+        console.log(`🔍 Source page ${index + 1} data types:`, {
+          parent_source_id: typeof sourcePage.parent_source_id,
+          customer_id: typeof sourcePage.customer_id,
+          url: typeof sourcePage.url,
+          status: typeof sourcePage.status,
+          priority: typeof sourcePage.priority,
+          retry_count: typeof sourcePage.retry_count,
+          max_retries: typeof sourcePage.max_retries
+        });
+        console.log(`🔍 Source page ${index + 1} values:`, sourcePage);
+      }
+      
+      return sourcePage;
+    });
+
+    console.log(`📝 Preparing to insert ${sourcePages.length} source pages`);
+
+    // Insert source pages in smaller batches with better error handling
+    const batchSize = 25; // Smaller batches for better debugging
     let insertedJobs = 0;
     
     for (let i = 0; i < sourcePages.length; i += batchSize) {
       const batch = sourcePages.slice(i, i + batchSize);
-      const { error: pagesError } = await supabase
-        .from('source_pages')
-        .insert(batch);
+      console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1}: ${batch.length} pages (${i + 1}-${Math.min(i + batchSize, sourcePages.length)})`);
       
-      if (pagesError) {
-        console.error('Error inserting source pages batch:', pagesError);
-      } else {
-        insertedJobs += batch.length;
+      try {
+        const { data: insertedPages, error: pagesError } = await supabase
+          .from('source_pages')
+          .insert(batch)
+          .select('id');
+        
+        if (pagesError) {
+          console.error(`❌ Error inserting source pages batch ${Math.floor(i/batchSize) + 1}:`, {
+            error: pagesError,
+            batchSize: batch.length,
+            firstUrl: batch[0]?.url,
+            sampleData: batch[0]
+          });
+          
+          // Try inserting individual rows to isolate the problem
+          console.log('🔧 Attempting individual row insertion for debugging...');
+          for (let j = 0; j < Math.min(batch.length, 3); j++) {
+            try {
+              const singleRow = batch[j];
+              console.log(`🔍 Attempting to insert single row ${j + 1}:`, singleRow);
+              
+              const { data: singleResult, error: singleError } = await supabase
+                .from('source_pages')
+                .insert([singleRow])
+                .select('id');
+                
+              if (singleError) {
+                console.error(`❌ Single row ${j + 1} failed:`, singleError);
+              } else {
+                console.log(`✅ Single row ${j + 1} succeeded:`, singleResult);
+              }
+            } catch (individualError) {
+              console.error(`❌ Individual insertion ${j + 1} exception:`, individualError);
+            }
+          }
+          
+          throw new Error(`Batch insertion failed: ${pagesError.message}`);
+        } else {
+          insertedJobs += batch.length;
+          console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} inserted successfully: ${batch.length} pages`);
+        }
+      } catch (batchError) {
+        console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} exception:`, batchError);
+        throw batchError;
       }
     }
 
@@ -183,7 +245,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in enhanced crawl:', error);
+    console.error('❌ Error in enhanced crawl:', error);
     
     return new Response(
       JSON.stringify({ 
