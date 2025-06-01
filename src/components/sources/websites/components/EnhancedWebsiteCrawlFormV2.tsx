@@ -1,371 +1,376 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Globe, Settings, Zap, Filter, RefreshCw } from 'lucide-react';
-import { useParams } from 'react-router-dom';
-import { useRAGServices } from '@/hooks/useRAGServices';
-import { useParentChildWorkflow } from '@/hooks/useParentChildWorkflow';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useEnhancedCrawl } from "@/hooks/useEnhancedCrawl";
+import { ProductionRateLimiting } from "@/services/rag/enhanced/productionRateLimiting";
+import { RobotsComplianceChecker } from "@/services/rag/enhanced/robotsCompliance";
+import { useParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { 
+  AlertCircle, 
+  CheckCircle, 
+  Clock, 
+  Globe, 
+  Settings, 
+  Shield,
+  Zap,
+  TrendingUp
+} from "lucide-react";
 
-const DEFAULT_EXCLUDE_PATHS = [
-  '/wp-json/*', '/wp-admin/*', '/xmlrpc.php', '/checkout/*', 
-  '/cart/*', '/admin/*', '/api/*', '*.json', '*.xml', '*.rss',
-  '/feed/*', '/sitemap*', '/search*', '/tag/*', '/category/*',
-  '/author/*', '/comments/*', '/trackback/*', '/wp-content/uploads/*'
-];
+interface EnhancedCrawlResult {
+  parentSourceId: string;
+  discoveredCount: number;
+  spawnedJobs: number;
+}
+
+interface EnhancedCrawlRequest {
+  agentId: string;
+  url: string;
+  maxPages: number;
+  excludePaths: string[];
+  includePaths: string[];
+  respectRobots: boolean;
+  enableCompression: boolean;
+  enableDeduplication: boolean;
+}
 
 interface EnhancedWebsiteCrawlFormV2Props {
-  onCrawlStarted?: (parentSourceId: string) => void;
+  onCrawlStarted: (parentSourceId: string) => void;
 }
 
 export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Props> = ({
   onCrawlStarted
 }) => {
   const { agentId } = useParams();
-  const { sources } = useRAGServices();
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { submitEnhancedCrawl, isSubmitting } = useEnhancedCrawl();
   
-  // Form state
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [maxPages, setMaxPages] = useState(100);
-  const [priority, setPriority] = useState<'normal' | 'high' | 'slow'>('normal');
-  const [excludePaths, setExcludePaths] = useState(DEFAULT_EXCLUDE_PATHS.join('\n'));
-  const [includePaths, setIncludePaths] = useState('');
+  const [excludePaths, setExcludePaths] = useState([
+    "/wp-json/*",
+    "/wp-admin/*", 
+    "/xmlrpc.php",
+    "/checkout/*",
+    "/cart/*",
+    "/admin/*"
+  ]);
+  const [includePaths, setIncludePaths] = useState<string[]>([]);
   const [respectRobots, setRespectRobots] = useState(true);
-  const [enableCompression, setEnableCompression] = useState(true);
-  const [enableDeduplication, setEnableDeduplication] = useState(true);
+  const [customerUsage, setCustomerUsage] = useState<any>(null);
+  const [rateLimitStatus, setRateLimitStatus] = useState<any>(null);
+  const [robotsStatus, setRobotsStatus] = useState<any>(null);
+
+  // Get customer usage and rate limits
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      if (!agentId) return;
+
+      try {
+        // Get team_id from agent
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('team_id')
+          .eq('id', agentId)
+          .single();
+
+        if (agent?.team_id) {
+          const [usage, rateLimitCheck] = await Promise.all([
+            ProductionRateLimiting.getCustomerUsage(agent.team_id),
+            ProductionRateLimiting.checkRateLimit(agent.team_id, maxPages)
+          ]);
+          
+          setCustomerUsage(usage);
+          setRateLimitStatus(rateLimitCheck);
+        }
+      } catch (error) {
+        console.error('Error fetching customer data:', error);
+      }
+    };
+
+    fetchCustomerData();
+  }, [agentId, maxPages]);
+
+  // Check robots.txt when URL changes
+  useEffect(() => {
+    const checkRobots = async () => {
+      if (!url || !respectRobots) {
+        setRobotsStatus(null);
+        return;
+      }
+
+      try {
+        const result = await RobotsComplianceChecker.checkUrlAllowed(url, respectRobots);
+        setRobotsStatus(result);
+      } catch (error) {
+        console.error('Error checking robots.txt:', error);
+        setRobotsStatus({ allowed: true, reason: 'Check failed, defaulting to allowed' });
+      }
+    };
+
+    const timeoutId = setTimeout(checkRobots, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [url, respectRobots]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!agentId || !url) {
-      toast({
-        title: "Validation Error",
-        description: "Please provide a valid URL",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
+    if (!agentId || !url) return;
 
     try {
-      // Get team_id from agent
-      const { data: agent, error: agentError } = await sources.supabase
-        .from('agents')
-        .select('team_id')
-        .eq('id', agentId)
-        .single();
-
-      if (agentError || !agent) {
-        throw new Error('Agent not found');
-      }
-
-      const customerId = agent.team_id;
-
-      // Create parent source with enhanced metadata
-      const parentSourceData = {
-        agent_id: agentId,
-        team_id: customerId,
-        source_type: 'website' as const,
-        title: url,
-        url: url,
-        crawl_status: 'pending' as const,
-        exclude_paths: excludePaths.split('\n').filter(p => p.trim()),
-        include_paths: includePaths.split('\n').filter(p => p.trim()),
-        respect_robots: respectRobots,
-        max_concurrent_jobs: priority === 'high' ? 10 : priority === 'slow' ? 2 : 5,
-        progress: 0,
-        total_children: 0,
-        children_completed: 0,
-        children_failed: 0,
-        children_pending: 0,
-        discovery_completed: false,
-        avg_compression_ratio: 0,
-        total_processing_time_ms: 0,
-        metadata: {
-          enhanced_pipeline: true,
-          parent_child_workflow: true,
-          compression_enabled: enableCompression,
-          deduplication_enabled: enableDeduplication,
-          priority,
-          max_pages: maxPages,
-          crawl_initiated_at: new Date().toISOString(),
-          exclude_paths: excludePaths.split('\n').filter(p => p.trim()),
-          include_paths: includePaths.split('\n').filter(p => p.trim())
-        }
-      };
-
-      console.log('🚀 Creating enhanced parent source:', parentSourceData);
-
-      const parentSource = await sources.createSource(parentSourceData);
-
-      console.log('✅ Enhanced parent source created:', parentSource.id);
-
-      // Start enhanced link discovery workflow
-      try {
-        const { data: discoveryResult, error: discoveryError } = await sources.supabase.functions.invoke('link-discovery', {
-          body: {
-            parentSourceId: parentSource.id,
-            customerId,
-            url,
-            excludePaths: excludePaths.split('\n').filter(p => p.trim()),
-            includePaths: includePaths.split('\n').filter(p => p.trim()),
-            maxPages,
-            priority,
-            enableEnhancedProcessing: true
-          }
-        });
-
-        if (discoveryError) {
-          console.error('❌ Link discovery failed:', discoveryError);
-          
-          // Update parent status to failed
-          await sources.updateSource(parentSource.id, { 
-            crawl_status: 'failed',
-            metadata: {
-              ...parentSource.metadata,
-              error_message: discoveryError.message || 'Link discovery failed',
-              last_error_at: new Date().toISOString()
-            }
-          });
-          
-          throw new Error(`Link discovery failed: ${discoveryError.message}`);
-        }
-
-        console.log('✅ Enhanced link discovery completed:', discoveryResult);
-        
-        toast({
-          title: "Enhanced Crawl Initiated",
-          description: `Link discovery started. Found ${discoveryResult?.discoveredCount || 'unknown'} pages to process.`,
-        });
-
-      } catch (discoveryError) {
-        console.error('❌ Error in enhanced link discovery:', discoveryError);
-        
-        // Update parent status but don't prevent UI from showing it
-        await sources.updateSource(parentSource.id, { 
-          crawl_status: 'failed',
-          metadata: {
-            ...parentSource.metadata,
-            error_message: discoveryError instanceof Error ? discoveryError.message : 'Enhanced discovery failed',
-            last_error_at: new Date().toISOString()
-          }
-        });
-        
-        toast({
-          title: "Enhanced Crawl Warning", 
-          description: "Source created but enhanced discovery failed. You can try to recrawl it later.",
-          variant: "destructive"
-        });
-      }
-
-      // Reset form
-      setUrl('');
-      setMaxPages(100);
-      setPriority('normal');
-      setExcludePaths(DEFAULT_EXCLUDE_PATHS.join('\n'));
-      setIncludePaths('');
-
-      // Notify parent component
-      if (onCrawlStarted) {
-        onCrawlStarted(parentSource.id);
-      }
-
-    } catch (error) {
-      console.error('❌ Error starting enhanced crawl:', error);
-      toast({
-        title: "Enhanced Crawl Failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive"
+      const result = await submitEnhancedCrawl({
+        agentId,
+        url,
+        maxPages,
+        excludePaths,
+        includePaths,
+        respectRobots,
+        enableCompression: true,
+        enableDeduplication: true
       });
-    } finally {
-      setIsSubmitting(false);
+
+      if (result?.parentSourceId) {
+        onCrawlStarted(result.parentSourceId);
+        
+        // Reset form
+        setUrl("");
+        setMaxPages(100);
+      }
+    } catch (error) {
+      console.error('Crawl submission failed:', error);
     }
+  };
+
+  const renderUsageStatus = () => {
+    if (!customerUsage) return null;
+
+    const { tier, quotas, usage } = customerUsage;
+    
+    const getUsageColor = (used: number, limit: number) => {
+      const percentage = used / limit;
+      if (percentage >= 0.9) return "text-red-600";
+      if (percentage >= 0.7) return "text-yellow-600";
+      return "text-green-600";
+    };
+
+    return (
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <TrendingUp className="w-4 h-4" />
+            Usage & Limits ({tier.name.toUpperCase()} Plan)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Daily Pages</div>
+              <div className={`font-semibold ${getUsageColor(usage.dailyPages, tier.pagesPerDay)}`}>
+                {usage.dailyPages} / {tier.pagesPerDay}
+              </div>
+              <div className="text-xs text-gray-500">{quotas.dailyRemaining} remaining</div>
+            </div>
+            
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Hourly Pages</div>
+              <div className={`font-semibold ${getUsageColor(usage.hourlyPages, tier.pagesPerHour)}`}>
+                {usage.hourlyPages} / {tier.pagesPerHour}
+              </div>
+              <div className="text-xs text-gray-500">{quotas.hourlyRemaining} remaining</div>
+            </div>
+            
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Active Jobs</div>
+              <div className={`font-semibold ${getUsageColor(usage.activeJobs, tier.concurrentJobs)}`}>
+                {usage.activeJobs} / {tier.concurrentJobs}
+              </div>
+              <div className="text-xs text-gray-500">{quotas.concurrentRemaining} available</div>
+            </div>
+            
+            <div>
+              <div className="text-xs text-gray-500 uppercase tracking-wide">Storage</div>
+              <div className={`font-semibold ${getUsageColor(usage.storageUsedGB, tier.storageQuotaGB)}`}>
+                {usage.storageUsedGB.toFixed(2)} / {tier.storageQuotaGB} GB
+              </div>
+              <div className="text-xs text-gray-500">{quotas.storageRemaining.toFixed(2)} GB remaining</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderRateLimitAlert = () => {
+    if (!rateLimitStatus || rateLimitStatus.allowed) return null;
+
+    return (
+      <Alert className="mb-4" variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>Rate Limit Exceeded:</strong> {rateLimitStatus.reason}
+          {rateLimitStatus.retryAfter && (
+            <div className="mt-1 text-sm">
+              Try again in {Math.ceil(rateLimitStatus.retryAfter / 60)} minutes.
+            </div>
+          )}
+        </AlertDescription>
+      </Alert>
+    );
+  };
+
+  const renderRobotsAlert = () => {
+    if (!robotsStatus) return null;
+
+    if (!robotsStatus.allowed) {
+      return (
+        <Alert className="mb-4" variant="destructive">
+          <Shield className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Robots.txt Restriction:</strong> {robotsStatus.reason}
+            <div className="mt-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!respectRobots}
+                  onChange={(e) => setRespectRobots(!e.target.checked)}
+                />
+                Override robots.txt (not recommended)
+              </label>
+            </div>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    if (robotsStatus.crawlDelay && robotsStatus.crawlDelay > 1000) {
+      return (
+        <Alert className="mb-4">
+          <Clock className="h-4 w-4" />
+          <AlertDescription>
+            Robots.txt specifies a {robotsStatus.crawlDelay / 1000}s crawl delay. 
+            We'll respect this to be polite.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    return null;
   };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-blue-500" />
-          Enhanced Website Crawler
-          <Badge variant="secondary">Parent-Child Workflow</Badge>
+          <Zap className="w-5 h-5" />
+          Enhanced Website Crawl
+          <Badge variant="outline" className="ml-2">Production Ready</Badge>
         </CardTitle>
       </CardHeader>
-      
       <CardContent>
+        {renderUsageStatus()}
+        {renderRateLimitAlert()}
+        {renderRobotsAlert()}
+        
         <form onSubmit={handleSubmit} className="space-y-6">
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="basic" className="flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Basic
-              </TabsTrigger>
-              <TabsTrigger value="filtering" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Path Filtering
-              </TabsTrigger>
-              <TabsTrigger value="advanced" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Advanced
-              </TabsTrigger>
-            </TabsList>
+          <div>
+            <Label htmlFor="url">Website URL</Label>
+            <Input
+              id="url"
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com"
+              required
+              disabled={isSubmitting}
+            />
+          </div>
 
-            <TabsContent value="basic" className="space-y-4">
-              <div>
-                <Label htmlFor="url">Website URL *</Label>
-                <Input
-                  id="url"
-                  type="url"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  required
-                />
+          <div>
+            <Label htmlFor="maxPages">Max Pages to Crawl</Label>
+            <Input
+              id="maxPages"
+              type="number"
+              value={maxPages}
+              onChange={(e) => setMaxPages(parseInt(e.target.value) || 100)}
+              min={1}
+              max={customerUsage?.tier.pagesPerDay || 1000}
+              disabled={isSubmitting}
+            />
+            {customerUsage && maxPages > customerUsage.quotas.dailyRemaining && (
+              <div className="text-sm text-red-600 mt-1">
+                Exceeds daily quota. Max allowed: {customerUsage.quotas.dailyRemaining}
               </div>
+            )}
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="maxPages">Max Pages</Label>
+          <div>
+            <Label>Exclude Paths (Pre-filled with common patterns)</Label>
+            <div className="space-y-2">
+              {excludePaths.map((path, index) => (
+                <div key={index} className="flex items-center gap-2">
                   <Input
-                    id="maxPages"
-                    type="number"
-                    value={maxPages}
-                    onChange={(e) => setMaxPages(parseInt(e.target.value) || 100)}
-                    min="1"
-                    max="1000"
+                    value={path}
+                    onChange={(e) => {
+                      const newPaths = [...excludePaths];
+                      newPaths[index] = e.target.value;
+                      setExcludePaths(newPaths);
+                    }}
+                    disabled={isSubmitting}
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setExcludePaths(excludePaths.filter((_, i) => i !== index));
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Remove
+                  </Button>
                 </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setExcludePaths([...excludePaths, ""])}
+                disabled={isSubmitting}
+              >
+                Add Exclude Path
+              </Button>
+            </div>
+          </div>
 
-                <div>
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select value={priority} onValueChange={(value: 'normal' | 'high' | 'slow') => setPriority(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">High Priority</SelectItem>
-                      <SelectItem value="normal">Normal Priority</SelectItem>
-                      <SelectItem value="slow">Slow/Large Sites</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="filtering" className="space-y-4">
-              <div>
-                <Label htmlFor="excludePaths">Exclude Paths (one per line)</Label>
-                <Textarea
-                  id="excludePaths"
-                  value={excludePaths}
-                  onChange={(e) => setExcludePaths(e.target.value)}
-                  placeholder="/wp-json/*&#10;/wp-admin/*&#10;/checkout/*"
-                  rows={8}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Default patterns exclude common boilerplate endpoints (WordPress admin, APIs, etc.)
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="includePaths">Include Paths (optional, one per line)</Label>
-                <Textarea
-                  id="includePaths"
-                  value={includePaths}
-                  onChange={(e) => setIncludePaths(e.target.value)}
-                  placeholder="/blog/*&#10;/products/*&#10;/docs/*"
-                  rows={4}
-                  className="font-mono text-sm"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  If specified, only these paths will be crawled (in addition to exclude filters)
-                </p>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="advanced" className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="respectRobots">Respect robots.txt</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Follow robots.txt rules (recommended)
-                    </p>
-                  </div>
-                  <Switch
-                    id="respectRobots"
-                    checked={respectRobots}
-                    onCheckedChange={setRespectRobots}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="enableCompression">High-Efficiency Compression</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Use Zstd compression for ~75% size reduction
-                    </p>
-                  </div>
-                  <Switch
-                    id="enableCompression"
-                    checked={enableCompression}
-                    onCheckedChange={setEnableCompression}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label htmlFor="enableDeduplication">Global Deduplication</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Share content across customers for efficiency
-                    </p>
-                  </div>
-                  <Switch
-                    id="enableDeduplication"
-                    checked={enableDeduplication}
-                    onCheckedChange={setEnableDeduplication}
-                  />
-                </div>
-              </div>
-
-              <div className="bg-blue-50 p-4 rounded-lg space-y-2">
-                <h4 className="font-medium text-blue-900">Enhanced Pipeline Features</h4>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• Two-phase workflow with real-time parent-child status tracking</li>
-                  <li>• Automatic boilerplate removal and content cleaning</li>
-                  <li>• Semantic chunking with global deduplication</li>
-                  <li>• Zstd compression achieving ~1-2KB per page</li>
-                  <li>• Scalable worker fleet with automatic retries</li>
-                </ul>
-              </div>
-            </TabsContent>
-          </Tabs>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="respectRobots"
+              checked={respectRobots}
+              onChange={(e) => setRespectRobots(e.target.checked)}
+              disabled={isSubmitting}
+            />
+            <Label htmlFor="respectRobots">Respect robots.txt</Label>
+            <Badge variant="outline" className="text-xs">Recommended</Badge>
+          </div>
 
           <Button 
             type="submit" 
-            className="w-full" 
-            disabled={isSubmitting || !url}
+            disabled={isSubmitting || !rateLimitStatus?.allowed || (!robotsStatus?.allowed && respectRobots)}
+            className="w-full"
           >
             {isSubmitting ? (
               <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <Clock className="w-4 h-4 mr-2 animate-spin" />
                 Starting Enhanced Crawl...
               </>
             ) : (
               <>
-                <Zap className="h-4 w-4 mr-2" />
-                Start Enhanced Crawl
+                <Globe className="w-4 h-4 mr-2" />
+                Start Production Crawl
               </>
             )}
           </Button>
