@@ -2,7 +2,7 @@
 import React from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card } from '@/components/ui/card';
-import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Loader2, Trash } from 'lucide-react';
@@ -110,14 +110,26 @@ const SourcesListView: React.FC<SourcesListViewProps> = ({
           </TableHeader>
           <TableBody>
             {sources.map((source) => (
-              <SourceTableRow
-                key={source.id}
-                source={source}
-                onToggleSelection={() => onToggleSelection(source.id)}
-                onRowClick={() => {}}
-                onDeleteClick={onDelete ? () => onDelete(source) : undefined}
-                onNavigateClick={() => {}}
-              />
+              <TableRow key={source.id} className="hover:bg-gray-50">
+                <TableCell>
+                  <Checkbox
+                    checked={selectedItems.includes(source.id)}
+                    onCheckedChange={() => onToggleSelection(source.id)}
+                    aria-label={`Select ${source.title}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <SourceTableRow
+                    source={source}
+                    onRowClick={() => {}}
+                    onDeleteClick={onDelete ? (source, e) => {
+                      e.stopPropagation();
+                      onDelete(source);
+                    } : (source, e) => {}}
+                    onNavigateClick={() => {}}
+                  />
+                </TableCell>
+              </TableRow>
             ))}
           </TableBody>
         </Table>
