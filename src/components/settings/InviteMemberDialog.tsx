@@ -19,6 +19,13 @@ interface InviteMemberDialogProps {
   onClose: () => void;
 }
 
+interface InvitationResponse {
+  success: boolean;
+  error?: string;
+  invitation_id?: string;
+  message?: string;
+}
+
 const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
   isOpen,
   onClose
@@ -91,7 +98,9 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
 
       if (error) throw error;
 
-      if (data.success) {
+      const response = data as InvitationResponse;
+
+      if (response.success) {
         toast({
           title: "Invitation sent",
           description: `Invitation sent to ${inviteEmail} with ${selectedRole} role`
@@ -104,7 +113,7 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
       } else {
         toast({
           title: "Error sending invitation",
-          description: data.error,
+          description: response.error || "Unknown error occurred",
           variant: "destructive"
         });
       }

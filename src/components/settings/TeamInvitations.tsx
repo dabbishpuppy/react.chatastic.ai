@@ -19,6 +19,14 @@ interface TeamInvitation {
   };
 }
 
+interface AcceptInvitationResponse {
+  success: boolean;
+  error?: string;
+  team_id?: string;
+  role?: string;
+  message?: string;
+}
+
 const TeamInvitations: React.FC = () => {
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +81,9 @@ const TeamInvitations: React.FC = () => {
 
       if (error) throw error;
 
-      if (data.success) {
+      const response = data as AcceptInvitationResponse;
+
+      if (response.success) {
         toast({
           title: "Invitation accepted",
           description: "You've successfully joined the team!",
@@ -84,7 +94,7 @@ const TeamInvitations: React.FC = () => {
       } else {
         toast({
           title: "Error accepting invitation",
-          description: data.error,
+          description: response.error || "Unknown error occurred",
           variant: "destructive",
         });
       }
