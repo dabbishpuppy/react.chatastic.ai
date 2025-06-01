@@ -141,16 +141,18 @@ export class EnhancedContentProcessor {
     let finalChunks: string[];
     
     if (options.enableAdvancedPruning) {
-      // Use advanced pruning with TF-IDF
+      // Use advanced pruning with TF-IDF - extract content from semantic chunks
+      const chunkContents = initialChunks.map(chunk => chunk.content);
       const prunedChunks = await AdvancedChunkPruningService.pruneChunksAdvanced(
-        initialChunks,
+        chunkContents,
         options.maxChunksPerPage,
         false // No summary mode in full processing
       );
       finalChunks = prunedChunks.map(chunk => chunk.content);
     } else {
-      // Use basic pruning
-      const prunedChunks = AdvancedChunkPruningService.pruneChunks(initialChunks, options.maxChunksPerPage);
+      // Use basic pruning - extract content from semantic chunks
+      const chunkContents = initialChunks.map(chunk => chunk.content);
+      const prunedChunks = AdvancedChunkPruningService.pruneChunks(chunkContents, options.maxChunksPerPage);
       finalChunks = prunedChunks.filter(chunk => chunk.isHighValue).map(chunk => chunk.content);
     }
 

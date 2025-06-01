@@ -21,7 +21,7 @@ export class ChunkPruningService {
     return prunedChunks;
   }
 
-  private static scoreChunk(content: string): PrunedChunk {
+  protected static scoreChunk(content: string): PrunedChunk {
     const tokenCount = Math.ceil(content.length / 4);
     let score = 0;
     
