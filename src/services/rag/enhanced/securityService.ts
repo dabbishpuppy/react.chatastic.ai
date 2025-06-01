@@ -135,19 +135,35 @@ export class SecurityService {
   private static async checkXSSVulnerabilities(teamId: string): Promise<SecurityVulnerability[]> {
     const vulnerabilities: SecurityVulnerability[] = [];
 
+    // Get agent IDs for this team first
+    const { data: agents } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('team_id', teamId);
+
+    if (!agents || agents.length === 0) {
+      return vulnerabilities;
+    }
+
+    const agentIds = agents.map(agent => agent.id);
+
+    // Get conversations for these agents
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('id')
+      .in('agent_id', agentIds);
+
+    if (!conversations || conversations.length === 0) {
+      return vulnerabilities;
+    }
+
+    const conversationIds = conversations.map(conv => conv.id);
+
     // Check conversation messages for XSS patterns
     const { data: messages } = await supabase
       .from('messages')
       .select('id, content, conversation_id')
-      .in('conversation_id', 
-        supabase.from('conversations')
-          .select('id')
-          .in('agent_id', 
-            supabase.from('agents')
-              .select('id')
-              .eq('team_id', teamId)
-          )
-      );
+      .in('conversation_id', conversationIds);
 
     if (messages) {
       for (const message of messages) {
