@@ -26,3 +26,13 @@ export interface CrawlStatus {
     spaceSavedGB: number;
   };
 }
+
+export interface CompressionStats {
+  totalOriginalSize: number;
+  totalCompressedSize: number;
+  totalUniqueChunks: number;
+  totalDuplicateChunks: number;
+  avgCompressionRatio: number;
+  spaceSavedBytes: number;
+  spaceSavedPercentage: number;
+}

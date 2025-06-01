@@ -96,7 +96,12 @@ const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
           />
 
           {crawlStatus.compressionStats && (
-            <CompressionStatsDisplay compressionStats={crawlStatus.compressionStats} />
+            <CompressionStatsDisplay compressionStats={{
+              avgCompressionRatio: crawlStatus.compressionStats.avgCompressionRatio,
+              totalContentSize: crawlStatus.compressionStats.totalContentSize,
+              totalUniqueChunks: 0,
+              totalDuplicateChunks: 0
+            }} />
           )}
 
           <FailedJobsPanel 

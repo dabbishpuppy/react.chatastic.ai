@@ -1,7 +1,8 @@
+
 import React, { useCallback, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
-import { EnhancedWebsiteCrawlFormV3 } from "./websites/components/EnhancedWebsiteCrawlFormV3";
+import EnhancedWebsiteCrawlFormV3 from "./websites/components/EnhancedWebsiteCrawlFormV3";
 import WebsiteSourcesListOptimized from "./websites/components/WebsiteSourcesListOptimized";
 import ErrorBoundary from "./ErrorBoundary";
 import { useSourcesPaginated } from "@/hooks/useSourcesPaginated";

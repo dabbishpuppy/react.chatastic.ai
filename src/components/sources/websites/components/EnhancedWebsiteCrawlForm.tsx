@@ -25,8 +25,7 @@ const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({
     url: '',
     excludePaths: '/wp-json/*\n/wp-admin/*\n/xmlrpc.php\n/checkout/*\n/cart/*\n/admin/*\n/api/*\n*.json\n*.xml\n*.rss',
     includePaths: '',
-    respectRobots: true,
-    maxConcurrentJobs: 5
+    respectRobots: true
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -42,10 +41,6 @@ const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({
       } catch {
         newErrors.url = 'Please enter a valid URL';
       }
-    }
-
-    if (formData.maxConcurrentJobs < 1 || formData.maxConcurrentJobs > 20) {
-      newErrors.maxConcurrentJobs = 'Concurrent jobs must be between 1 and 20';
     }
 
     setErrors(newErrors);
@@ -69,8 +64,7 @@ const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({
           .split('\n')
           .map(path => path.trim())
           .filter(path => path.length > 0),
-        respectRobots: formData.respectRobots,
-        maxConcurrentJobs: formData.maxConcurrentJobs
+        respectRobots: formData.respectRobots
       };
 
       await initiateCrawl(request);
@@ -80,8 +74,7 @@ const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({
         url: '',
         excludePaths: '/wp-json/*\n/wp-admin/*\n/xmlrpc.php\n/checkout/*\n/cart/*\n/admin/*\n/api/*\n*.json\n*.xml\n*.rss',
         includePaths: '',
-        respectRobots: true,
-        maxConcurrentJobs: 5
+        respectRobots: true
       });
       
       onCrawlInitiated?.();
@@ -176,29 +169,6 @@ const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({
                     setFormData({ ...formData, respectRobots: checked })
                   }
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="maxConcurrentJobs">
-                  Max Concurrent Jobs (1-20)
-                </Label>
-                <Input
-                  id="maxConcurrentJobs"
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={formData.maxConcurrentJobs}
-                  onChange={(e) => 
-                    setFormData({ 
-                      ...formData, 
-                      maxConcurrentJobs: parseInt(e.target.value) || 5 
-                    })
-                  }
-                  className={errors.maxConcurrentJobs ? 'border-red-500' : ''}
-                />
-                {errors.maxConcurrentJobs && (
-                  <p className="text-sm text-red-500">{errors.maxConcurrentJobs}</p>
-                )}
               </div>
             </div>
           </div>

@@ -51,7 +51,6 @@ const ChatBehaviorSettings: React.FC<ChatBehaviorSettingsProps> = ({
           onChange={(e) => updateSetting("footer", e.target.value)}
           placeholder="You can use this to add a disclaimer or a link to your privacy policy."
           className="h-24"
-          preventFocusScroll={true}
         />
         <p className="text-xs text-gray-500">{(draftSettings.footer || "").length}/200 characters</p>
       </div>

@@ -98,7 +98,12 @@ const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
         {/* Compression Stats */}
         {crawlStatus.compressionStats && (
           <CompressionStatsDisplay
-            compressionStats={crawlStatus.compressionStats}
+            compressionStats={{
+              avgCompressionRatio: crawlStatus.compressionStats.avgCompressionRatio,
+              totalContentSize: crawlStatus.compressionStats.totalContentSize,
+              totalUniqueChunks: 0,
+              totalDuplicateChunks: 0
+            }}
           />
         )}
 
