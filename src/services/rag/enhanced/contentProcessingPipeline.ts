@@ -11,6 +11,19 @@ export interface ProcessingResult {
   error?: string;
 }
 
+interface SemanticChunk {
+  content: string;
+  tokenCount: number;
+  chunkIndex: number;
+}
+
+interface CompressionResult {
+  compressed: string;
+  originalSize: number;
+  compressedSize: number;
+  ratio: number;
+}
+
 export class ContentProcessingPipeline {
   // Extract main content and remove boilerplate
   static extractMainContent(html: string): string {
@@ -46,13 +59,9 @@ export class ContentProcessingPipeline {
   }
 
   // Create semantic chunks with proper token counting
-  static createSemanticChunks(content: string, maxTokens: number = 150): Array<{
-    content: string;
-    tokenCount: number;
-    chunkIndex: number;
-  }> {
+  static createSemanticChunks(content: string, maxTokens: number = 150): SemanticChunk[] {
     const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15);
-    const chunks: Array<{ content: string; tokenCount: number; chunkIndex: number }> = [];
+    const chunks: SemanticChunk[] = [];
     let currentChunk = '';
     let tokenCount = 0;
     let chunkIndex = 0;
@@ -88,12 +97,7 @@ export class ContentProcessingPipeline {
   }
 
   // Simulate Zstd compression (in production, this would use actual Zstd)
-  static compressContent(content: string): {
-    compressed: string;
-    originalSize: number;
-    compressedSize: number;
-    ratio: number;
-  } {
+  static compressContent(content: string): CompressionResult {
     const originalSize = new TextEncoder().encode(content).length;
     
     // Simulate high compression ratio (~75% reduction)
@@ -129,7 +133,7 @@ export class ContentProcessingPipeline {
 
   // Process chunks for global deduplication
   static async processChunksWithDeduplication(
-    chunks: Array<{ content: string; tokenCount: number; chunkIndex: number }>,
+    chunks: SemanticChunk[],
     sourceId: string,
     customerId: string
   ): Promise<{
@@ -142,13 +146,13 @@ export class ContentProcessingPipeline {
     let totalCompressedSize = 0;
 
     for (const chunk of chunks) {
-      const hash = await this.calculateContentHash(chunk.content);
+      const contentHash = await this.calculateContentHash(chunk.content);
       
       // Check if chunk already exists globally
       const { data: existingChunk, error } = await supabase
         .from('semantic_chunks')
         .select('id, ref_count')
-        .eq('hash', hash)
+        .eq('content_hash', contentHash)
         .single();
 
       if (existingChunk && !error) {
@@ -175,11 +179,10 @@ export class ContentProcessingPipeline {
         const { data: newChunk, error: insertError } = await supabase
           .from('semantic_chunks')
           .insert({
-            hash,
+            content_hash: contentHash,
             compressed_blob: compressed.compressed,
             token_count: chunk.tokenCount,
-            ref_count: 1,
-            customer_id: customerId
+            ref_count: 1
           })
           .select('id')
           .single();
