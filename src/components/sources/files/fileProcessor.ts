@@ -47,6 +47,7 @@ export const useFileProcessor = (
       // Create the source in the database
       const newSource = await sources.createSource({
         agent_id: agentId,
+        team_id: agent.team_id,
         source_type: 'file',
         title: uploadedFile.file.name,
         content: result.content,

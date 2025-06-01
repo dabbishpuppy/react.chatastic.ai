@@ -65,6 +65,7 @@ const TextSourceForm: React.FC = () => {
       
       await sources.createSource({
         agent_id: agentId,
+        team_id: agent.team_id,
         source_type: 'text',
         title: title.trim(),
         content: content.trim(), // Store the HTML content

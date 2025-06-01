@@ -56,6 +56,7 @@ export const useWebsiteSubmission = () => {
       // Create the source with immediate 'pending' status
       const sourceData = {
         agent_id: agentId,
+        team_id: agent.team_id,
         source_type: 'website' as const,
         title: data.url,
         url: data.url,
