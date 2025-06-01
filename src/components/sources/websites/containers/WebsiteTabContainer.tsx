@@ -6,12 +6,9 @@ import { useWebsiteSourceOperations } from "../hooks/useWebsiteSourceOperations"
 import { ProductionWorkerQueue } from "@/services/rag/enhanced/productionWorkerQueue";
 import EnhancedWebsiteCrawlFormV3 from "../components/EnhancedWebsiteCrawlFormV3";
 import WebsiteSourcesListOptimized from "../components/WebsiteSourcesListOptimized";
-import CrawlProgressTracker from "../components/crawl-tracker/CrawlProgressTracker";
 import QueueStatusDashboard from "../components/QueueStatusDashboard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const WebsiteTabContainer: React.FC = () => {
-  const [trackingCrawlId, setTrackingCrawlId] = useState<string | null>(null);
   const [queueMetrics, setQueueMetrics] = useState<any>(null);
   const [healthStatus, setHealthStatus] = useState<any>(null);
 
@@ -62,7 +59,6 @@ const WebsiteTabContainer: React.FC = () => {
   }, []);
 
   const handleCrawlStarted = useCallback((parentSourceId: string) => {
-    setTrackingCrawlId(parentSourceId);
     refetch();
     
     toast({
@@ -89,29 +85,6 @@ const WebsiteTabContainer: React.FC = () => {
 
         {/* Enhanced Crawl Form V3 */}
         <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />
-
-        {/* Progress Tracker */}
-        {trackingCrawlId && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Active Crawl Progress
-                <button 
-                  onClick={() => setTrackingCrawlId(null)}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  Hide
-                </button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CrawlProgressTracker 
-                parentSourceId={trackingCrawlId}
-                onClose={() => setTrackingCrawlId(null)}
-              />
-            </CardContent>
-          </Card>
-        )}
 
         {/* Sources List */}
         <WebsiteSourcesListOptimized
