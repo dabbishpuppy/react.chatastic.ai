@@ -1,8 +1,6 @@
 
 import React from 'react';
-import { Link } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { AgentSource } from '@/types/rag';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -10,119 +8,94 @@ interface WebsiteSourceInfoProps {
   createdAt: string;
   linksCount?: number;
   lastCrawledAt?: string;
-  isChild?: boolean;
   crawlStatus?: string;
   metadata?: any;
   content?: string;
-  childSources?: AgentSource[];
+  childSources?: any[];
+  isChild?: boolean;
+  sourcePages?: { id: string; status: string }[];
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   title,
   url,
+  createdAt,
   linksCount,
   lastCrawledAt,
-  isChild = false,
   crawlStatus,
   metadata,
   content,
-  childSources = []
+  childSources = [],
+  isChild = false,
+  sourcePages = []
 }) => {
-  const iconSize = isChild ? 'h-3 w-3' : 'h-4 w-4';
-  const titleSize = isChild ? 'text-sm' : '';
-  const metaSize = isChild ? 'text-xs' : 'text-sm';
-
-  // Only show metadata when crawling is completed
-  const showMetadata = crawlStatus === 'completed';
-
-  // Fixed width containers to prevent layout shifts
-  const containerWidth = isChild ? 'w-full max-w-md' : 'flex-1';
+  // For parent sources, show count from sourcePages if available, otherwise use linksCount
+  const displayLinksCount = !isChild ? (sourcePages?.length || linksCount || 0) : undefined;
   
-  // For child sources, show the full URL with protocol
-  // For parent sources, show the title (domain) but ensure URL is complete
-  const displayText = isChild ? url : (title || url);
-  const displayUrl = isChild && url.length > 45 ? `${url.substring(0, 45)}...` : displayText;
+  // Calculate status counts from sourcePages for parent sources
+  const statusCounts = !isChild && sourcePages?.length ? {
+    completed: sourcePages.filter(p => p.status === 'completed').length,
+    failed: sourcePages.filter(p => p.status === 'failed').length,
+    pending: sourcePages.filter(p => p.status === 'pending').length,
+    in_progress: sourcePages.filter(p => p.status === 'in_progress').length
+  } : null;
 
-  // Calculate content size more accurately
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '';
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
-    return `${Math.round(bytes / (1024 * 1024))}MB`;
+  const formatUrl = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname + urlObj.pathname;
+    } catch {
+      return url;
+    }
   };
 
-  const getContentSize = () => {
-    let size = 0;
+  const getStatusText = () => {
+    if (isChild) return null;
     
-    if (isChild) {
-      // For child sources, calculate individual size
-      if (content) {
-        size += new Blob([content]).size;
-      }
+    if (statusCounts && displayLinksCount > 0) {
+      const parts = [];
+      if (statusCounts.completed > 0) parts.push(`${statusCounts.completed} completed`);
+      if (statusCounts.failed > 0) parts.push(`${statusCounts.failed} failed`);
+      if (statusCounts.in_progress > 0) parts.push(`${statusCounts.in_progress} in progress`);
+      if (statusCounts.pending > 0) parts.push(`${statusCounts.pending} pending`);
       
-      if (metadata?.content_size) {
-        size += metadata.content_size;
-      }
-    } else {
-      // For parent sources, calculate total size from all child sources
-      if (childSources && childSources.length > 0) {
-        size = childSources.reduce((total, child) => {
-          let childSize = 0;
-          
-          if (child.content) {
-            childSize += new Blob([child.content]).size;
-          }
-          
-          if (child.metadata?.content_size) {
-            childSize += child.metadata.content_size;
-          }
-          
-          return total + childSize;
-        }, 0);
-      } else if (metadata?.total_content_size) {
-        // Use cached total from metadata if available
-        size = metadata.total_content_size;
-      } else if (content) {
-        // Fallback to own content if no children
-        size = new Blob([content]).size;
+      if (parts.length > 0) {
+        return parts.join(', ');
       }
     }
     
-    return size;
+    return null;
   };
 
-  const contentSize = getContentSize();
-  const sizeText = formatSize(contentSize);
-
   return (
-    <div className="flex items-center flex-1 min-w-0">
-      <div className={`mr-3 flex-shrink-0`}>
-        <Link className={`${iconSize} text-purple-600`} />
-      </div>
-      
-      <div className={`${containerWidth} min-w-0`}>
-        <div className={`font-medium ${titleSize} truncate`} title={displayText}>
-          {displayUrl}
+    <div className="flex items-center">
+      <div className="w-3 h-3 rounded-full bg-blue-500 mr-3 flex-shrink-0"></div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-sm font-medium text-gray-900 truncate" title={url}>
+            {title || formatUrl(url)}
+          </p>
         </div>
         
-        {/* Show metadata only when crawling is completed */}
-        {showMetadata && (
-          <div className={`flex items-center gap-2 ${metaSize} text-gray-500 mt-1`}>
-            {linksCount && linksCount > 0 && (
-              <span>{linksCount} links</span>
-            )}
-            {sizeText && (
-              <>
-                {linksCount && linksCount > 0 && <span>•</span>}
-                <span>{sizeText}</span>
-              </>
-            )}
-            {lastCrawledAt && (
-              <>
-                {((linksCount && linksCount > 0) || sizeText) && <span>•</span>}
-                <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
-              </>
-            )}
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+          
+          {!isChild && displayLinksCount > 0 && (
+            <span>{displayLinksCount} links</span>
+          )}
+          
+          {lastCrawledAt && (
+            <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
+          )}
+          
+          {content && (
+            <span>{Math.round(content.length / 1024)} KB</span>
+          )}
+        </div>
+        
+        {getStatusText() && (
+          <div className="text-xs text-gray-600 mt-1">
+            {getStatusText()}
           </div>
         )}
       </div>

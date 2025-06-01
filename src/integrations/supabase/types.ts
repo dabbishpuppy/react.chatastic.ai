@@ -1986,8 +1986,8 @@ export type Database = {
         Returns: Json
       }
       aggregate_parent_status: {
-        Args: { parent_source_id_param: string }
-        Returns: Json
+        Args: { parent_id: string }
+        Returns: undefined
       }
       assign_customer_to_pool: {
         Args: { target_customer_id: string }

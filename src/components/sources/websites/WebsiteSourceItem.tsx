@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
@@ -7,6 +7,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
+import { supabase } from '@/integrations/supabase/client';
 import WebsiteSourceInfo from './components/WebsiteSourceInfo';
 import WebsiteSourceStatus from './components/WebsiteSourceStatus';
 import WebsiteSourceActions from './components/WebsiteSourceActions';
@@ -34,10 +35,68 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   onSelectionChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [sourcePages, setSourcePages] = useState<any[]>([]);
+  const [sourcePagesLoading, setSourcePagesLoading] = useState(false);
+  
   const isParentSource = !source.parent_source_id;
   const showToggle = isParentSource;
-  const hasChildSources = childSources.length > 0;
   const isCrawling = source.crawl_status === 'in_progress' || source.crawl_status === 'pending';
+
+  // Fetch source pages count for parent sources
+  useEffect(() => {
+    if (isParentSource) {
+      fetchSourcePages();
+    }
+  }, [source.id, isParentSource]);
+
+  const fetchSourcePages = async () => {
+    setSourcePagesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('source_pages')
+        .select('id, status')
+        .eq('parent_source_id', source.id);
+
+      if (error) {
+        console.error('Error fetching source pages:', error);
+        return;
+      }
+
+      setSourcePages(data || []);
+    } catch (error) {
+      console.error('Error in fetchSourcePages:', error);
+    } finally {
+      setSourcePagesLoading(false);
+    }
+  };
+
+  // Real-time subscription for source_pages changes
+  useEffect(() => {
+    if (!isParentSource) return;
+
+    const channel = supabase
+      .channel(`source-pages-count-${source.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `parent_source_id=eq.${source.id}`
+        },
+        () => {
+          // Refetch source pages when changes occur
+          fetchSourcePages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [source.id, isParentSource]);
+
+  const hasSourcePages = sourcePages.length > 0;
 
   return (
     <div className="border border-gray-200 rounded-lg">
@@ -62,6 +121,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               metadata={source.metadata}
               content={source.content}
               childSources={childSources}
+              sourcePages={sourcePages}
             />
           </div>
           
@@ -71,7 +131,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               sourceId={source.id}
               status={source.crawl_status}
               progress={source.progress}
-              linksCount={source.links_count}
+              linksCount={sourcePages.length || source.links_count}
               metadata={source.metadata}
               showProgressBar={true}
               isChild={!isParentSource}
@@ -94,7 +154,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               size="icon"
               className="h-6 w-6"
               onClick={() => setIsExpanded(!isExpanded)}
-              disabled={!hasChildSources && !isCrawling}
+              disabled={!hasSourcePages && !isCrawling}
               aria-label={isExpanded ? "Collapse child sources" : "Expand child sources"}
             >
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -106,7 +166,6 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
       {/* Child sources (crawled links) or loading state */}
       {isExpanded && (
         <WebsiteChildSources
-          childSources={childSources}
           parentSourceId={source.id}
           isCrawling={isCrawling}
           onEdit={onEdit}
