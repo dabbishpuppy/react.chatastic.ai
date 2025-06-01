@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,13 +136,15 @@ const AcceptInvitation: React.FC = () => {
 
         const acceptResponse = acceptData as unknown as AcceptInvitationResponse;
 
-        // Add user to team
+        // Add user to team - cast role to proper type
+        const roleValue = acceptResponse.role as "owner" | "admin" | "member";
+        
         const { error: teamError } = await supabase
           .from('team_members')
           .insert({
-            team_id: acceptResponse.team_id,
+            team_id: acceptResponse.team_id!,
             user_id: signUpData.user.id,
-            role: acceptResponse.role
+            role: roleValue
           });
 
         if (teamError && !teamError.message.includes('duplicate')) {
