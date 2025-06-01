@@ -23,18 +23,18 @@ export async function insertSourcePagesInBatches(
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
     
-    // Create batch records with simplified, type-safe construction
+    // Create batch records with explicit type safety
     const batchRecords = batch.map((url) => {
-      // Use plain primitive values to avoid any type coercion issues
+      // Ensure all values are explicitly typed correctly
       const record = {
-        parent_source_id: parentSourceId,        // string UUID (already validated)
-        customer_id: teamId,                     // string UUID (already validated)
-        url: url,                                // string URL
-        status: 'pending',                       // plain string literal
-        priority: priority,                      // plain string literal ('normal', 'high', 'slow')
-        retry_count: 0,                          // plain number
-        max_retries: 3,                          // plain number
-        created_at: new Date().toISOString()     // ISO string format
+        parent_source_id: String(parentSourceId),     // Ensure string
+        customer_id: String(teamId),                  // Ensure string
+        url: String(url),                             // Ensure string
+        status: 'pending',                            // Explicit string literal
+        priority: String(priority),                   // Ensure string (convert any boolean/other type)
+        retry_count: Number(0),                       // Ensure number
+        max_retries: Number(3),                       // Ensure number
+        created_at: new Date().toISOString()          // ISO string format
       };
       
       // Validate the record before proceeding
@@ -56,20 +56,13 @@ export async function insertSourcePagesInBatches(
 
     console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
     
-    // Log detailed type information for debugging
-    if (batchRecords.length > 0) {
-      const sampleRecord = batchRecords[0];
-      console.log('🔍 Sample record for type verification:', {
-        parent_source_id: `${typeof sampleRecord.parent_source_id} (${sampleRecord.parent_source_id})`,
-        customer_id: `${typeof sampleRecord.customer_id} (${sampleRecord.customer_id})`,
-        url: `${typeof sampleRecord.url} (${sampleRecord.url.substring(0, 50)}...)`,
-        status: `${typeof sampleRecord.status} (${sampleRecord.status})`,
-        priority: `${typeof sampleRecord.priority} (${sampleRecord.priority})`,
-        retry_count: `${typeof sampleRecord.retry_count} (${sampleRecord.retry_count})`,
-        max_retries: `${typeof sampleRecord.max_retries} (${sampleRecord.max_retries})`,
-        created_at: `${typeof sampleRecord.created_at} (${sampleRecord.created_at})`
+    // DETAILED PER-FIELD LOGGING - Log every field and its type
+    batchRecords.forEach((row, idx) => {
+      console.log(`🔍 [Batch ${Math.floor(i/batchSize)+1}, Record ${idx+1}]`);
+      Object.entries(row).forEach(([field, value]) => {
+        console.log(`   • ${field}:`, value, `(JS type: ${typeof value})`);
       });
-    }
+    });
 
     try {
       const { data: batchResult, error: batchError } = await supabase

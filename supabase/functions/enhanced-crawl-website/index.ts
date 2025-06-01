@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { EnhancedCrawlRequest } from './types.ts';
@@ -42,16 +43,25 @@ serve(async (req) => {
       throw new Error('Missing required fields: agentId and url');
     }
 
-    // Validate input parameters early to catch type issues
+    // Validate input parameters early to catch type issues - ensure strings
     if (typeof agentId !== 'string') {
       throw new Error(`agentId must be a string, got ${typeof agentId}`);
     }
     if (typeof url !== 'string') {
       throw new Error(`url must be a string, got ${typeof url}`);
     }
-    if (typeof priority !== 'string' || !['normal', 'high', 'slow'].includes(priority)) {
-      throw new Error(`priority must be one of: normal, high, slow, got ${priority}`);
+    
+    // CRITICAL: Ensure priority is always a string, never boolean
+    const safePriority = String(priority || 'normal');
+    if (!['normal', 'high', 'slow'].includes(safePriority)) {
+      throw new Error(`priority must be one of: normal, high, slow, got ${safePriority}`);
     }
+
+    console.log('🔍 Input type validation passed:', {
+      agentId: `${typeof agentId} (${agentId})`,
+      url: `${typeof url} (${url})`,
+      priority: `${typeof safePriority} (${safePriority})`
+    });
 
     // Get agent and team information
     const { data: agent, error: agentError } = await supabase
@@ -108,7 +118,7 @@ serve(async (req) => {
       crawlMode,
       enableCompression,
       enableDeduplication,
-      priority
+      priority: safePriority  // Use the string-safe priority
     });
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
@@ -127,11 +137,11 @@ serve(async (req) => {
         parentSourceId: `${typeof parentSource.id} (${parentSource.id})`,
         teamId: `${typeof agent.team_id} (${agent.team_id})`,
         urlCount: discoveredUrls.length,
-        priority: `${typeof priority} (${priority})`,
+        priority: `${typeof safePriority} (${safePriority})`,
         sampleUrl: `${typeof discoveredUrls[0]} (${discoveredUrls[0]})`
       });
 
-      await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, priority);
+      await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, safePriority);
 
       // Update parent source status to in_progress
       await updateParentSourceStatus(parentSource.id, 'in_progress', {
