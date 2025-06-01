@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,6 +58,14 @@ interface OptimizedSourceData {
   unique_chunks: number | null;
   duplicate_chunks: number | null;
   global_compression_ratio: number | null;
+  // Parent-child tracking fields
+  total_children: number | null;
+  children_completed: number | null;
+  children_failed: number | null;
+  children_pending: number | null;
+  discovery_completed: boolean | null;
+  avg_compression_ratio: number | null;
+  total_processing_time_ms: number | null;
 }
 
 // Optimized source query - excludes heavy content fields for performance
@@ -81,7 +88,8 @@ const fetchSourcesPage = async (
     total_jobs, completed_jobs, failed_jobs, exclude_paths,
     include_paths, respect_robots, max_concurrent_jobs,
     total_content_size, compressed_content_size, unique_chunks,
-    duplicate_chunks, global_compression_ratio
+    duplicate_chunks, global_compression_ratio,
+    total_children, children_completed, children_failed, children_pending, discovery_completed, avg_compression_ratio, total_processing_time_ms
   `;
   
   // For website sources, implement proper pagination for parent sources only
@@ -145,7 +153,14 @@ const fetchSourcesPage = async (
       ...source,
       metadata: source.metadata as Record<string, any>,
       content: null, // Not fetched for performance
-      raw_text: null // Not fetched for performance
+      raw_text: null, // Not fetched for performance
+      // Ensure all required fields are present with defaults
+      avg_compression_ratio: source.avg_compression_ratio || 0,
+      children_completed: source.children_completed || 0,
+      children_failed: source.children_failed || 0,
+      children_pending: source.children_pending || 0,
+      discovery_completed: source.discovery_completed || false,
+      total_processing_time_ms: source.total_processing_time_ms || 0
     }));
 
     return {
@@ -208,7 +223,14 @@ const fetchSourcesPage = async (
     ...source,
     metadata: source.metadata as Record<string, any>,
     content: null, // Not fetched for performance
-    raw_text: null // Not fetched for performance
+    raw_text: null, // Not fetched for performance
+    // Ensure all required fields are present with defaults
+    avg_compression_ratio: source.avg_compression_ratio || 0,
+    children_completed: source.children_completed || 0,
+    children_failed: source.children_failed || 0,
+    children_pending: source.children_pending || 0,
+    discovery_completed: source.discovery_completed || false,
+    total_processing_time_ms: source.total_processing_time_ms || 0
   }));
   
   return {

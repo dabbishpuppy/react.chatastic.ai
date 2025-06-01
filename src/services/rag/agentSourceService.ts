@@ -4,11 +4,18 @@ import { SourceCreateService } from "./operations/SourceCreateService";
 import { SourceQueryService } from "./operations/SourceQueryService";
 import { SourceUpdateService } from "./operations/SourceUpdateService";
 import { SourceDeleteService } from "./operations/SourceDeleteService";
+import { supabase } from "@/integrations/supabase/client";
 
 export class AgentSourceService {
+  // Expose supabase client for direct access when needed
+  static get supabase() {
+    return supabase;
+  }
+
   // Create operations
   static async createSource(data: {
     agent_id: string;
+    team_id: string;
     source_type: SourceType;
     title: string;
     content?: string;
@@ -20,6 +27,11 @@ export class AgentSourceService {
     links_count?: number;
     parent_source_id?: string;
     is_excluded?: boolean;
+    exclude_paths?: string[];
+    include_paths?: string[];
+    respect_robots?: boolean;
+    max_concurrent_jobs?: number;
+    discovery_completed?: boolean;
   }): Promise<AgentSource> {
     return SourceCreateService.createSource(data);
   }

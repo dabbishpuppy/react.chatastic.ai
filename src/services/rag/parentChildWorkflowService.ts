@@ -80,7 +80,7 @@ export class ParentChildWorkflowService {
 
     return {
       parentSourceId,
-      status: parentSource.crawl_status || 'pending',
+      status: (parentSource.crawl_status || 'pending') as 'pending' | 'in_progress' | 'completed' | 'failed',
       totalChildren: parentSource.total_children || 0,
       childrenCompleted: parentSource.children_completed || 0,
       childrenFailed: parentSource.children_failed || 0,
@@ -106,7 +106,7 @@ export class ParentChildWorkflowService {
       id: job.id,
       parentSourceId: job.parent_source_id,
       url: job.url,
-      status: job.status,
+      status: job.status as 'pending' | 'in_progress' | 'completed' | 'failed',
       priority: job.priority || 'normal',
       retryCount: job.retry_count || 0,
       contentSize: job.content_size,

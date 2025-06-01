@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Globe, Settings, Zap, Filter } from 'lucide-react';
+import { Globe, Settings, Zap, Filter, RefreshCw } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { useParentChildWorkflow } from '@/hooks/useParentChildWorkflow';
