@@ -1,6 +1,7 @@
-
-import { useState, useEffect, useCallback } from 'react';
-import { EnhancedCrawlService, EnhancedCrawlRequest, CrawlStatus } from '@/services/rag/enhancedCrawlService';
+import { useState, useCallback } from 'react';
+import { CrawlApiService } from '@/services/rag/enhanced/crawlApi';
+import { CrawlSubscriptionService } from '@/services/rag/enhanced/crawlSubscriptions';
+import { EnhancedCrawlRequest, CrawlStatus } from '@/services/rag/enhanced/crawlTypes';
 import { useToast } from '@/hooks/use-toast';
 
 export const useEnhancedCrawl = () => {
@@ -13,10 +14,18 @@ export const useEnhancedCrawl = () => {
     try {
       console.log('🚀 Starting enhanced crawl:', request);
       
-      const result = await EnhancedCrawlService.initiateCrawl(request);
+      // Validate request before sending
+      if (!request.agentId) {
+        throw new Error('Agent ID is required');
+      }
+      if (!request.url || !request.url.trim()) {
+        throw new Error('URL is required');
+      }
+
+      const result = await CrawlApiService.initiateCrawl(request);
       
       // Set up real-time subscription for this crawl
-      const unsubscribe = await EnhancedCrawlService.subscribeToCrawlUpdates(
+      const unsubscribe = CrawlSubscriptionService.subscribeToCrawlUpdates(
         result.parentSourceId,
         (status) => {
           console.log('📡 Received crawl status update:', status);
@@ -26,7 +35,7 @@ export const useEnhancedCrawl = () => {
           if (status.status === 'completed') {
             toast({
               title: "Crawl Completed",
-              description: `Successfully crawled ${status.completedJobs} pages with ${status.failedJobs} failures. Compression ratio: ${(status.compressionStats?.avgCompressionRatio || 0).toFixed(2)}x`,
+              description: `Successfully crawled ${status.completedJobs} pages with ${status.failedJobs} failures.`,
             });
             
             // Clean up subscription after completion
@@ -49,7 +58,7 @@ export const useEnhancedCrawl = () => {
         }
       );
 
-      // Store the unsubscribe function for cleanup
+      // Store the initial status
       const initialStatus: CrawlStatus = {
         parentSourceId: result.parentSourceId,
         status: 'pending',
@@ -72,7 +81,7 @@ export const useEnhancedCrawl = () => {
       console.error('Enhanced crawl error:', error);
       toast({
         title: "Crawl Error",
-        description: error.message,
+        description: error.message || "Failed to start crawl",
         variant: "destructive",
       });
       throw error;
@@ -83,7 +92,7 @@ export const useEnhancedCrawl = () => {
 
   const retryFailedJobs = useCallback(async (parentSourceId: string) => {
     try {
-      const retriedCount = await EnhancedCrawlService.retryFailedJobs(parentSourceId);
+      const retriedCount = await CrawlApiService.retryFailedJobs(parentSourceId);
       
       toast({
         title: "Jobs Retried",
@@ -103,7 +112,7 @@ export const useEnhancedCrawl = () => {
 
   const getCrawlJobs = useCallback(async (parentSourceId: string) => {
     try {
-      return await EnhancedCrawlService.getCrawlJobs(parentSourceId);
+      return await CrawlApiService.getCrawlJobs(parentSourceId);
     } catch (error: any) {
       toast({
         title: "Error Loading Jobs",
