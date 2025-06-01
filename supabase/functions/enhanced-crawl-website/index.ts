@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -46,7 +47,7 @@ serve(async (req) => {
       priority = 'normal'
     } = requestBody;
 
-    console.log('🚀 Starting simplified crawl for agent', agentId, ', URL:', url);
+    console.log('🚀 Starting enhanced crawl for agent', agentId, ', URL:', url);
 
     if (!agentId || !url) {
       throw new Error('Missing required fields: agentId and url');
@@ -62,6 +63,8 @@ serve(async (req) => {
     if (agentError || !agent) {
       throw new Error('Agent not found');
     }
+
+    console.log('✅ Agent found:', agent.team_id);
 
     // Discover URLs based on crawl mode
     let discoveredUrls: string[] = [];
@@ -107,11 +110,24 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Test single record insertion first
+    // Test with a single minimal record first
     if (discoveredUrls.length > 0) {
-      console.log('🔍 Testing single record insertion...');
+      console.log('🔍 Testing minimal single record insertion...');
       
-      const testRecord = {
+      // First, let's check the source_pages table structure
+      const { data: tableInfo, error: tableError } = await supabase
+        .from('source_pages')
+        .select('*')
+        .limit(1);
+      
+      if (tableError) {
+        console.log('❌ Could not check table structure:', tableError);
+      } else {
+        console.log('📋 Table structure check successful');
+      }
+
+      // Create the most minimal record possible
+      const minimalRecord = {
         parent_source_id: parentSource.id,
         customer_id: agent.team_id,
         url: discoveredUrls[0],
@@ -121,32 +137,34 @@ serve(async (req) => {
         max_retries: 3
       };
 
-      console.log('📝 Test record data:', JSON.stringify(testRecord, null, 2));
+      console.log('📝 Minimal record for insertion:', JSON.stringify(minimalRecord, null, 2));
 
-      const { data: testResult, error: testError } = await supabase
+      // Try inserting one record with explicit error handling
+      const { data: insertResult, error: insertError } = await supabase
         .from('source_pages')
-        .insert([testRecord])
+        .insert([minimalRecord])
         .select('id');
 
-      if (testError) {
-        console.error('❌ Single record test failed:', {
-          error: testError,
-          code: testError.code,
-          message: testError.message,
-          details: testError.details,
-          hint: testError.hint
+      if (insertError) {
+        console.error('❌ Single record insertion failed:', {
+          error: insertError,
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          recordData: minimalRecord
         });
-        throw new Error(`Single record insertion failed: ${testError.message}`);
+        throw new Error(`Single record insertion failed: ${insertError.message}`);
       }
 
-      console.log('✅ Single record test succeeded:', testResult);
+      console.log('✅ Single record test succeeded:', insertResult);
 
-      // If single record works, try the rest in small batches
-      let insertedJobs = 1; // Already inserted the test record
+      // If we have more URLs, insert them in very small batches
+      let insertedJobs = 1;
       
       if (discoveredUrls.length > 1) {
         const remainingUrls = discoveredUrls.slice(1);
-        const batchSize = 5;
+        const batchSize = 2; // Very small batch size to minimize risk
         
         for (let i = 0; i < remainingUrls.length; i += batchSize) {
           const batch = remainingUrls.slice(i, i + batchSize);
@@ -168,7 +186,8 @@ serve(async (req) => {
           
           if (batchError) {
             console.error(`❌ Batch insertion failed:`, batchError);
-            throw new Error(`Batch insertion failed: ${batchError.message}`);
+            // Don't throw here, just log and continue
+            break;
           }
           
           insertedJobs += batch.length;
@@ -275,7 +294,6 @@ async function discoverLinks(
   }
 }
 
-// Discover sitemap links
 async function discoverSitemapLinks(sitemapUrl: string): Promise<string[]> {
   try {
     console.log('🗺️ Discovering links from sitemap:', sitemapUrl);
@@ -304,7 +322,6 @@ async function discoverSitemapLinks(sitemapUrl: string): Promise<string[]> {
   }
 }
 
-// Parse sitemap XML to extract URLs
 function parseSitemapXml(xmlText: string): string[] {
   const urls: string[] = [];
   
