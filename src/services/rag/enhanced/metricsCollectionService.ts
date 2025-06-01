@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface SystemMetrics {
@@ -13,6 +14,7 @@ export interface SystemMetrics {
 }
 
 export interface CrawlMetrics {
+  timestamp: string;
   totalJobs: number;
   completedJobs: number;
   failedJobs: number;
@@ -156,6 +158,7 @@ export class MetricsCollectionService {
     const queueHealth = Math.max(0, 100 - (pendingJobs / 100)); // Simple health calculation
 
     return {
+      timestamp: new Date().toISOString(),
       totalJobs,
       completedJobs,
       failedJobs,
@@ -273,7 +276,7 @@ export class MetricsCollectionService {
     
     return {
       system: this.metricsBuffer.filter(m => new Date(m.timestamp) > cutoff),
-      crawl: this.crawlMetricsBuffer.filter(m => new Date(this.crawlMetricsBuffer[0]?.timestamp || '') > cutoff)
+      crawl: this.crawlMetricsBuffer.filter(m => new Date(m.timestamp) > cutoff)
     };
   }
 
