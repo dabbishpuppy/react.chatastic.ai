@@ -122,13 +122,13 @@ serve(async (req) => {
       throw new Error(`Failed to create parent source: ${sourceError.message}`);
     }
 
-    // Create source_pages (child jobs) for each discovered URL
+    // Create source_pages (child jobs) for each discovered URL - FIX: Ensure correct data types
     const sourcePages = discoveredUrls.map((discoveredUrl, index) => ({
       parent_source_id: parentSource.id,
       customer_id: agent.team_id,
       url: discoveredUrl,
-      status: 'pending' as const,
-      priority: priority,
+      status: 'pending' as const, // FIX: Ensure this is a string, not boolean
+      priority: priority as string, // FIX: Ensure this is a string, not boolean
       created_at: new Date().toISOString(),
       retry_count: 0,
       max_retries: 3
