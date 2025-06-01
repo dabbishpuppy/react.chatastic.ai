@@ -60,12 +60,16 @@ export class EnhancedCrawlService {
 
   static async getCrawlJobs(parentSourceId: string) {
     try {
-      // Use direct query since RPC function isn't available in types yet
-      // This is a temporary workaround until Supabase types are regenerated
-      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/rest/v1/crawl_jobs?parent_source_id=eq.${parentSourceId}&order=created_at.asc`, {
+      // Use direct REST API call as temporary workaround
+      const supabaseUrl = 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk';
+      
+      const url = `${supabaseUrl}/rest/v1/crawl_jobs?parent_source_id=eq.${parentSourceId}&order=created_at.asc`;
+      
+      const response = await fetch(url, {
         headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         }
       });
@@ -85,11 +89,16 @@ export class EnhancedCrawlService {
 
   static async retryFailedJobs(parentSourceId: string): Promise<number> {
     try {
-      // Get failed jobs that haven't exceeded retry limit using REST API
-      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/rest/v1/crawl_jobs?parent_source_id=eq.${parentSourceId}&status=eq.failed&retry_count=lt.3&select=id,retry_count`, {
+      const supabaseUrl = 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk';
+      
+      // Get failed jobs that haven't exceeded retry limit
+      const fetchUrl = `${supabaseUrl}/rest/v1/crawl_jobs?parent_source_id=eq.${parentSourceId}&status=eq.failed&retry_count=lt.3&select=id,retry_count`;
+      
+      const response = await fetch(fetchUrl, {
         headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json'
         }
       });
@@ -106,11 +115,13 @@ export class EnhancedCrawlService {
 
       // Update each job individually
       const updatePromises = failedJobs.map(async (job: any) => {
-        return fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/rest/v1/crawl_jobs?id=eq.${job.id}`, {
+        const updateUrl = `${supabaseUrl}/rest/v1/crawl_jobs?id=eq.${job.id}`;
+        
+        return fetch(updateUrl, {
           method: 'PATCH',
           headers: {
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKXfZXVuF90azFk',
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
