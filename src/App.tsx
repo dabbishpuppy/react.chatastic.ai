@@ -14,6 +14,7 @@ import Dashboard from '@/pages/Dashboard';
 import AgentEnvironment from '@/pages/AgentEnvironment';
 import AnalyticsPage from '@/pages/AnalyticsPage';
 import SourcesPage from '@/pages/SourcesPage';
+import SourceDetailPage from '@/pages/SourceDetailPage';
 import ActionsPage from '@/pages/ActionsPage';
 import ActivityPage from '@/pages/ActivityPage';
 import LeadsPage from '@/pages/LeadsPage';
@@ -71,6 +72,12 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              <Route path="/agent/:agentId/sources/:sourceId" element={
+                <ProtectedRoute>
+                  <SourceDetailPage />
+                </ProtectedRoute>
+              } />
+              
               <Route path="/agent/:agentId/actions" element={
                 <ProtectedRoute>
                   <ActionsPage />
@@ -101,12 +108,13 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Settings routes - properly nested */}
+              {/* Settings routes */}
               <Route path="/settings" element={
                 <ProtectedRoute>
                   <Settings />
                 </ProtectedRoute>
               }>
+                <Route index element={<GeneralSettings />} />
                 <Route path="general" element={<GeneralSettings />} />
                 <Route path="members" element={<MembersSettings />} />
                 <Route path="plans" element={<PlansSettings />} />
