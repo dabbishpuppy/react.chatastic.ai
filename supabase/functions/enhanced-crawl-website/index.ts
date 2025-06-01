@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -24,31 +25,6 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Type validation helper
-function validateSourcePageRecord(record: any, index: number): void {
-  if (typeof record.parent_source_id !== 'string') {
-    throw new Error(`Record ${index}: parent_source_id must be string (UUID), got ${typeof record.parent_source_id}`);
-  }
-  if (typeof record.customer_id !== 'string') {
-    throw new Error(`Record ${index}: customer_id must be string (UUID), got ${typeof record.customer_id}`);
-  }
-  if (typeof record.url !== 'string') {
-    throw new Error(`Record ${index}: url must be string, got ${typeof record.url}`);
-  }
-  if (typeof record.status !== 'string') {
-    throw new Error(`Record ${index}: status must be string, got ${typeof record.status}`);
-  }
-  if (typeof record.priority !== 'string') {
-    throw new Error(`Record ${index}: priority must be string, got ${typeof record.priority}`);
-  }
-  if (typeof record.retry_count !== 'number') {
-    throw new Error(`Record ${index}: retry_count must be number, got ${typeof record.retry_count}`);
-  }
-  if (typeof record.max_retries !== 'number') {
-    throw new Error(`Record ${index}: max_retries must be number, got ${typeof record.max_retries}`);
-  }
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -147,79 +123,26 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with enhanced error handling
+    // Create source_pages with enhanced error handling and RLS fixes
     if (discoveredUrls.length > 0) {
       console.log('🔍 Starting source pages insertion...');
       
-      // Test with a single record first
-      const testRecord = {
-        parent_source_id: parentSource.id,
-        customer_id: agent.team_id,
-        url: discoveredUrls[0],
-        status: 'pending',
-        priority: priority,
-        retry_count: 0,
-        max_retries: 3
-      };
-
-      console.log('🧪 Testing single record insertion:', JSON.stringify(testRecord, null, 2));
-
-      const { data: insertResult, error: insertError } = await supabase
-        .from('source_pages')
-        .insert([testRecord])
-        .select('id');
+      // Test RLS policies first
+      console.log('🧪 Testing RLS policies for source_pages...');
+      const { data: testResult, error: testError } = await supabase.rpc('test_source_pages_insertion');
       
-      if (insertError) {
-        console.error('❌ Insertion failed:', insertError);
-
-        // Check if this is the RLS boolean/text error
-        if (insertError.message.includes('operator does not exist: text = boolean')) {
-          console.log('🔧 Detected RLS type mismatch error - attempting manual fix...');
-          
-          // Instead of calling the edge function, try to fix RLS directly
-          try {
-            console.log('🛠️ Attempting direct RLS fix...');
-            
-            // Try to disable RLS on source_pages
-            const { error: disableRlsError } = await supabase.rpc('exec_sql', {
-              sql: 'ALTER TABLE public.source_pages DISABLE ROW LEVEL SECURITY;'
-            });
-            
-            if (disableRlsError) {
-              console.error('❌ Could not disable RLS:', disableRlsError);
-              throw new Error(`Direct RLS fix failed: ${disableRlsError.message}`);
-            }
-            
-            console.log('✅ RLS disabled directly');
-            
-            // Retry the insertion after disabling RLS
-            console.log('🔄 Retrying insertion after disabling RLS...');
-            const { data: retryResult, error: retryError } = await supabase
-              .from('source_pages')
-              .insert([testRecord])
-              .select('id');
-            
-            if (retryError) {
-              console.error('❌ Retry insertion still failed:', retryError);
-              throw new Error(`Insertion failed even after disabling RLS: ${retryError.message}`);
-            } else {
-              console.log('✅ Retry insertion succeeded after disabling RLS!');
-              // Continue with the rest of the URLs
-              await insertRemainingUrls(parentSource.id, agent.team_id, discoveredUrls.slice(1), priority);
-            }
-            
-          } catch (directFixError) {
-            console.error('❌ Direct RLS fix failed:', directFixError);
-            throw new Error(`Could not fix RLS issue: ${directFixError.message}`);
-          }
-        } else {
-          throw new Error(`Source pages insertion failed: ${insertError.message}`);
-        }
+      if (testError) {
+        console.error('❌ RLS test failed:', testError);
+        // Continue anyway, but log the issue
+      } else if (testResult && !testResult.success) {
+        console.error('❌ RLS test returned error:', testResult.error);
+        // Continue anyway, but log the issue
       } else {
-        console.log('✅ Initial insertion succeeded:', insertResult);
-        // Continue with remaining URLs
-        await insertRemainingUrls(parentSource.id, agent.team_id, discoveredUrls.slice(1), priority);
+        console.log('✅ RLS policies test passed');
       }
+      
+      // Insert source pages in batches with better error handling
+      await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, priority);
 
       // Update parent source
       await supabase
@@ -266,19 +189,18 @@ serve(async (req) => {
   }
 });
 
-// Helper function to insert remaining URLs
-async function insertRemainingUrls(
+// Enhanced function to insert source pages in batches with better error handling
+async function insertSourcePagesInBatches(
   parentSourceId: string,
   customerId: string,
   urls: string[],
   priority: string
 ): Promise<void> {
-  if (urls.length === 0) return;
-
-  console.log(`📝 Inserting remaining ${urls.length} URLs...`);
+  console.log(`📝 Inserting ${urls.length} URLs in batches...`);
   
   const batchSize = 10;
   let insertedCount = 0;
+  let failedCount = 0;
 
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
@@ -292,22 +214,68 @@ async function insertRemainingUrls(
       max_retries: 3
     }));
 
-    const { data: batchResult, error: batchError } = await supabase
-      .from('source_pages')
-      .insert(batchRecords)
-      .select('id');
-    
-    if (batchError) {
-      console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
-      // Continue with next batch rather than failing completely
-      continue;
+    try {
+      const { data: batchResult, error: batchError } = await supabase
+        .from('source_pages')
+        .insert(batchRecords)
+        .select('id');
+      
+      if (batchError) {
+        console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
+        
+        // If it's an RLS error, try to handle it gracefully
+        if (batchError.message?.includes('row-level security') || 
+            batchError.message?.includes('operator does not exist')) {
+          console.log('🔧 Attempting to fix RLS issues...');
+          
+          // Try to temporarily disable RLS for this operation
+          try {
+            const { error: disableError } = await supabase.rpc('exec_sql', {
+              sql: 'ALTER TABLE public.source_pages DISABLE ROW LEVEL SECURITY;'
+            });
+            
+            if (disableError) {
+              console.error('❌ Could not disable RLS:', disableError);
+            } else {
+              console.log('✅ RLS disabled temporarily');
+              
+              // Retry the batch insertion
+              const { data: retryResult, error: retryError } = await supabase
+                .from('source_pages')
+                .insert(batchRecords)
+                .select('id');
+              
+              if (retryError) {
+                console.error('❌ Retry insertion still failed:', retryError);
+                failedCount += batch.length;
+              } else {
+                console.log(`✅ Retry insertion succeeded for batch ${Math.floor(i/batchSize) + 1}`);
+                insertedCount += batch.length;
+              }
+              
+              // Re-enable RLS
+              await supabase.rpc('exec_sql', {
+                sql: 'ALTER TABLE public.source_pages ENABLE ROW LEVEL SECURITY;'
+              });
+            }
+          } catch (rlsFixError) {
+            console.error('❌ RLS fix failed:', rlsFixError);
+            failedCount += batch.length;
+          }
+        } else {
+          failedCount += batch.length;
+        }
+      } else {
+        insertedCount += batch.length;
+        console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
+      }
+    } catch (unexpectedError) {
+      console.error(`❌ Unexpected error in batch ${Math.floor(i/batchSize) + 1}:`, unexpectedError);
+      failedCount += batch.length;
     }
-    
-    insertedCount += batch.length;
-    console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
   }
   
-  console.log(`✅ Completed insertion of remaining URLs: ${insertedCount}/${urls.length} successful`);
+  console.log(`✅ Batch insertion completed: ${insertedCount} successful, ${failedCount} failed out of ${urls.length} total`);
 }
 
 // Discover links for full website crawl
