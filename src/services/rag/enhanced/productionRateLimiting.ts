@@ -102,7 +102,12 @@ export class ProductionRateLimiting {
           allowed: false,
           reason: `Daily page limit exceeded (${usage.tier.pagesPerDay}). Resets in ${Math.ceil(retryAfter / 3600)} hours.`,
           retryAfter,
-          quotaRemaining: usage.quotas
+          quotaRemaining: {
+            daily: usage.quotas.dailyRemaining,
+            hourly: usage.quotas.hourlyRemaining,
+            concurrent: usage.quotas.concurrentRemaining,
+            storage: usage.quotas.storageRemaining
+          }
         };
       }
 
@@ -116,7 +121,12 @@ export class ProductionRateLimiting {
           allowed: false,
           reason: `Hourly page limit exceeded (${usage.tier.pagesPerHour}). Resets in ${Math.ceil(retryAfter / 60)} minutes.`,
           retryAfter,
-          quotaRemaining: usage.quotas
+          quotaRemaining: {
+            daily: usage.quotas.dailyRemaining,
+            hourly: usage.quotas.hourlyRemaining,
+            concurrent: usage.quotas.concurrentRemaining,
+            storage: usage.quotas.storageRemaining
+          }
         };
       }
 
@@ -125,7 +135,12 @@ export class ProductionRateLimiting {
         return {
           allowed: false,
           reason: `Maximum concurrent jobs reached (${usage.tier.concurrentJobs}). Wait for jobs to complete.`,
-          quotaRemaining: usage.quotas
+          quotaRemaining: {
+            daily: usage.quotas.dailyRemaining,
+            hourly: usage.quotas.hourlyRemaining,
+            concurrent: usage.quotas.concurrentRemaining,
+            storage: usage.quotas.storageRemaining
+          }
         };
       }
 
@@ -134,7 +149,12 @@ export class ProductionRateLimiting {
         return {
           allowed: false,
           reason: `Storage quota exceeded (${usage.tier.storageQuotaGB}GB). Delete old sources or upgrade plan.`,
-          quotaRemaining: usage.quotas
+          quotaRemaining: {
+            daily: usage.quotas.dailyRemaining,
+            hourly: usage.quotas.hourlyRemaining,
+            concurrent: usage.quotas.concurrentRemaining,
+            storage: usage.quotas.storageRemaining
+          }
         };
       }
 
@@ -179,7 +199,7 @@ export class ProductionRateLimiting {
     const hourStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
     const nextHourStart = new Date(hourStart.getTime() + 60 * 60 * 1000);
 
-    // Get daily usage
+    // Get daily usage from source_pages table (completed pages)
     const { count: dailyPages } = await supabase
       .from('source_pages')
       .select('*', { count: 'exact', head: true })
@@ -252,20 +272,8 @@ export class ProductionRateLimiting {
   // Record usage when jobs complete
   static async recordPageProcessed(customerId: string, pageSize: number = 0): Promise<void> {
     try {
-      // Update usage tracking
-      const now = new Date().toISOString();
-      
-      await supabase
-        .from('customer_usage_tracking')
-        .upsert({
-          customer_id: customerId,
-          date: now.split('T')[0],
-          pages_processed: pageSize,
-          last_updated: now
-        }, {
-          onConflict: 'customer_id,date'
-        });
-
+      // For now, just log it since we track usage dynamically
+      console.log(`📊 Page processed for customer ${customerId}: ${pageSize} bytes`);
     } catch (error) {
       console.error('Error recording usage:', error);
     }
@@ -346,14 +354,16 @@ export class ProductionRateLimiting {
   }> {
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     
-    const { data: dailyUsage } = await supabase
-      .from('customer_usage_tracking')
-      .select('*')
+    // Get daily usage from source_pages
+    const { data: dailyJobs } = await supabase
+      .from('source_pages')
+      .select('completed_at, content_size')
       .eq('customer_id', customerId)
-      .gte('date', startDate.toISOString().split('T')[0])
-      .order('date', { ascending: true });
+      .eq('status', 'completed')
+      .gte('completed_at', startDate.toISOString())
+      .order('completed_at');
 
-    if (!dailyUsage) {
+    if (!dailyJobs) {
       return {
         dailyUsage: [],
         trends: {
@@ -365,25 +375,39 @@ export class ProductionRateLimiting {
       };
     }
 
-    const pages = dailyUsage.map(d => d.pages_processed || 0);
-    const averageDailyPages = pages.reduce((sum, p) => sum + p, 0) / pages.length;
-    const peakDailyPages = Math.max(...pages);
+    // Group by date
+    const dailyStats: { [date: string]: { pages: number; storage: number } } = {};
+    
+    dailyJobs.forEach(job => {
+      const date = job.completed_at.split('T')[0];
+      if (!dailyStats[date]) {
+        dailyStats[date] = { pages: 0, storage: 0 };
+      }
+      dailyStats[date].pages += 1;
+      dailyStats[date].storage += job.content_size || 0;
+    });
+
+    const dailyUsage = Object.entries(dailyStats).map(([date, stats]) => ({
+      date,
+      pages: stats.pages,
+      storage: stats.storage
+    }));
+
+    const pages = dailyUsage.map(d => d.pages);
+    const averageDailyPages = pages.length > 0 ? pages.reduce((sum, p) => sum + p, 0) / pages.length : 0;
+    const peakDailyPages = pages.length > 0 ? Math.max(...pages) : 0;
 
     // Calculate storage growth rate (simplified)
     const storageGrowthRate = dailyUsage.length > 1 
-      ? (dailyUsage[dailyUsage.length - 1].storage_used || 0) - (dailyUsage[0].storage_used || 0)
+      ? dailyUsage[dailyUsage.length - 1].storage - dailyUsage[0].storage
       : 0;
 
-    // Efficiency score based on compression and deduplication
+    // Efficiency score based on usage vs limits
     const usage = await this.getCustomerUsage(customerId);
     const efficiencyScore = Math.min(1.0, 1.0 - (usage.usage.storageUsedGB / (usage.usage.dailyPages * 0.001)));
 
     return {
-      dailyUsage: dailyUsage.map(d => ({
-        date: d.date,
-        pages: d.pages_processed || 0,
-        storage: d.storage_used || 0
-      })),
+      dailyUsage,
       trends: {
         averageDailyPages,
         peakDailyPages,

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
   onCrawlStarted
 }) => {
   const { agentId } = useParams();
-  const { submitEnhancedCrawl, isSubmitting } = useEnhancedCrawl();
+  const { initiateCrawl, isLoading } = useEnhancedCrawl();
   
   const [url, setUrl] = useState("");
   const [maxPages, setMaxPages] = useState(100);
@@ -121,7 +122,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
     if (!agentId || !url) return;
 
     try {
-      const result = await submitEnhancedCrawl({
+      const result = await initiateCrawl({
         agentId,
         url,
         maxPages,
@@ -284,7 +285,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com"
               required
-              disabled={isSubmitting}
+              disabled={isLoading}
             />
           </div>
 
@@ -297,7 +298,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
               onChange={(e) => setMaxPages(parseInt(e.target.value) || 100)}
               min={1}
               max={customerUsage?.tier.pagesPerDay || 1000}
-              disabled={isSubmitting}
+              disabled={isLoading}
             />
             {customerUsage && maxPages > customerUsage.quotas.dailyRemaining && (
               <div className="text-sm text-red-600 mt-1">
@@ -318,7 +319,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
                       newPaths[index] = e.target.value;
                       setExcludePaths(newPaths);
                     }}
-                    disabled={isSubmitting}
+                    disabled={isLoading}
                   />
                   <Button
                     type="button"
@@ -327,7 +328,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
                     onClick={() => {
                       setExcludePaths(excludePaths.filter((_, i) => i !== index));
                     }}
-                    disabled={isSubmitting}
+                    disabled={isLoading}
                   >
                     Remove
                   </Button>
@@ -338,7 +339,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
                 variant="outline"
                 size="sm"
                 onClick={() => setExcludePaths([...excludePaths, ""])}
-                disabled={isSubmitting}
+                disabled={isLoading}
               >
                 Add Exclude Path
               </Button>
@@ -351,7 +352,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
               id="respectRobots"
               checked={respectRobots}
               onChange={(e) => setRespectRobots(e.target.checked)}
-              disabled={isSubmitting}
+              disabled={isLoading}
             />
             <Label htmlFor="respectRobots">Respect robots.txt</Label>
             <Badge variant="outline" className="text-xs">Recommended</Badge>
@@ -359,10 +360,10 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
 
           <Button 
             type="submit" 
-            disabled={isSubmitting || !rateLimitStatus?.allowed || (!robotsStatus?.allowed && respectRobots)}
+            disabled={isLoading || !rateLimitStatus?.allowed || (!robotsStatus?.allowed && respectRobots)}
             className="w-full"
           >
-            {isSubmitting ? (
+            {isLoading ? (
               <>
                 <Clock className="w-4 h-4 mr-2 animate-spin" />
                 Starting Enhanced Crawl...
