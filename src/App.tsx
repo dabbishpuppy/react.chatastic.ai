@@ -13,7 +13,6 @@ import SignIn from '@/pages/SignIn';
 import Register from '@/pages/Register';
 import AcceptInvitation from '@/pages/AcceptInvitation';
 import NotFound from '@/pages/NotFound';
-import AgentPageLayout from '@/pages/AgentPageLayout';
 import UsagePage from '@/pages/Usage';
 
 // Settings page components
@@ -68,6 +67,7 @@ function App() {
               
               {/* Settings routes */}
               <Route path="/settings" element={<Settings />}>
+                <Route index element={<GeneralSettings />} />
                 <Route path="general" element={<GeneralSettings />} />
                 <Route path="members" element={<MembersSettings />} />
                 <Route path="plans" element={<PlansSettings />} />
@@ -79,18 +79,16 @@ function App() {
               {/* Usage page */}
               <Route path="/usage" element={<UsagePage />} />
               
-              {/* Agent routes */}
-              <Route path="/agent/:agentId" element={<AgentPageLayout />}>
-                <Route index element={<AgentEnvironment />} />
-                <Route path="sources" element={<SourcesPage />} />
-                <Route path="sources/:sourceId" element={<SourceDetailPage />} />
-                <Route path="integrations" element={<IntegrationsPage />} />
-                <Route path="settings/*" element={<AgentSettingsPage />} />
-                <Route path="analytics" element={<AnalyticsPage />} />
-                <Route path="actions" element={<ActionsPage />} />
-                <Route path="activity" element={<ActivityPage />} />
-                <Route path="activity/leads" element={<LeadsPage />} />
-              </Route>
+              {/* Agent routes - each page handles its own layout */}
+              <Route path="/agent/:agentId" element={<AgentEnvironment />} />
+              <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
+              <Route path="/agent/:agentId/sources/:sourceId" element={<SourceDetailPage />} />
+              <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
+              <Route path="/agent/:agentId/settings/*" element={<AgentSettingsPage />} />
+              <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
+              <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
+              <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
+              <Route path="/agent/:agentId/activity/leads" element={<LeadsPage />} />
               
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />
