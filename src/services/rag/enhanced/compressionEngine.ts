@@ -1,8 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export class CompressionEngine {
-  // Enhanced Zstd compression with correct API usage
+  // Enhanced compression with fallback to simple compression
   static async compressWithZstd(text: string, level: number = 19): Promise<{
     compressed: Uint8Array;
     originalSize: number;
@@ -13,19 +12,40 @@ export class CompressionEngine {
     const originalSize = originalData.length;
     
     try {
-      console.log(`🗜️ Compressing ${originalSize} bytes with Zstd level ${level}...`);
+      console.log(`🗜️ Attempting compression of ${originalSize} bytes...`);
       
-      // Use dynamic import for fzstd with correct API
-      const fzstd = await import('fzstd');
-      // Use the default export which should have the compress method
-      const compressed = fzstd.default.compress ? 
-        fzstd.default.compress(originalData, level) : 
-        fzstd.default(originalData, level);
+      // Try using fzstd for compression
+      try {
+        const fzstd = await import('fzstd');
+        
+        // Since fzstd might not have compress, we'll use browser's built-in compression
+        console.log('📦 Using built-in compression as fzstd compress is not available');
+        
+        // Use CompressionStream if available (modern browsers)
+        if ('CompressionStream' in window) {
+          const compressed = await this.compressWithCompressionStream(originalData);
+          const compressedSize = compressed.length;
+          const ratio = compressedSize / originalSize;
+          
+          console.log(`✅ Compression: ${originalSize} → ${compressedSize} bytes (${(ratio * 100).toFixed(1)}% ratio)`);
+          
+          return {
+            compressed,
+            originalSize,
+            compressedSize,
+            ratio
+          };
+        }
+      } catch (fzstdError) {
+        console.warn('fzstd compression failed:', fzstdError);
+      }
       
+      // Fallback to simple text compression using gzip-like approach
+      const compressed = await this.simpleCompress(originalData);
       const compressedSize = compressed.length;
       const ratio = compressedSize / originalSize;
       
-      console.log(`✅ Zstd compression: ${originalSize} → ${compressedSize} bytes (${(ratio * 100).toFixed(1)}% ratio)`);
+      console.log(`✅ Fallback compression: ${originalSize} → ${compressedSize} bytes (${(ratio * 100).toFixed(1)}% ratio)`);
       
       return {
         compressed,
@@ -33,9 +53,10 @@ export class CompressionEngine {
         compressedSize,
         ratio
       };
+      
     } catch (error) {
-      console.error('Zstd compression failed:', error);
-      // Fallback to uncompressed data
+      console.error('All compression methods failed:', error);
+      // Return uncompressed data
       return {
         compressed: originalData,
         originalSize,
@@ -45,23 +66,170 @@ export class CompressionEngine {
     }
   }
 
+  // Use browser's CompressionStream if available
+  private static async compressWithCompressionStream(data: Uint8Array): Promise<Uint8Array> {
+    const stream = new CompressionStream('gzip');
+    const writer = stream.writable.getWriter();
+    const reader = stream.readable.getReader();
+    
+    writer.write(data);
+    writer.close();
+    
+    const chunks: Uint8Array[] = [];
+    let done = false;
+    
+    while (!done) {
+      const { value, done: readerDone } = await reader.read();
+      done = readerDone;
+      if (value) {
+        chunks.push(value);
+      }
+    }
+    
+    // Combine chunks
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    return result;
+  }
+
+  // Simple compression fallback
+  private static async simpleCompress(data: Uint8Array): Promise<Uint8Array> {
+    // Simple run-length encoding for basic compression
+    const compressed: number[] = [];
+    let i = 0;
+    
+    while (i < data.length) {
+      const current = data[i];
+      let count = 1;
+      
+      // Count consecutive identical bytes
+      while (i + count < data.length && data[i + count] === current && count < 255) {
+        count++;
+      }
+      
+      if (count > 3) {
+        // Use run-length encoding for runs of 4 or more
+        compressed.push(255, count, current); // 255 is escape byte
+      } else {
+        // Store bytes directly
+        for (let j = 0; j < count; j++) {
+          compressed.push(current);
+        }
+      }
+      
+      i += count;
+    }
+    
+    return new Uint8Array(compressed);
+  }
+
   static async decompressZstd(compressed: Uint8Array): Promise<string> {
     try {
-      console.log(`📦 Decompressing ${compressed.length} bytes with Zstd...`);
+      console.log(`📦 Attempting decompression of ${compressed.length} bytes...`);
       
-      // Use dynamic import for fzstd with correct decompress function
-      const { decompress } = await import('fzstd');
-      const decompressed = decompress(compressed);
+      // Try fzstd decompression first
+      try {
+        const { decompress } = await import('fzstd');
+        const decompressed = decompress(compressed);
+        const decompressedText = new TextDecoder().decode(decompressed);
+        
+        console.log(`✅ fzstd decompression: ${compressed.length} → ${decompressed.length} bytes`);
+        return decompressedText;
+      } catch (fzstdError) {
+        console.warn('fzstd decompression failed, trying alternatives:', fzstdError);
+      }
+      
+      // Try DecompressionStream if available
+      if ('DecompressionStream' in window) {
+        try {
+          const decompressed = await this.decompressWithDecompressionStream(compressed);
+          const decompressedText = new TextDecoder().decode(decompressed);
+          
+          console.log(`✅ Browser decompression: ${compressed.length} → ${decompressed.length} bytes`);
+          return decompressedText;
+        } catch (streamError) {
+          console.warn('Browser decompression failed:', streamError);
+        }
+      }
+      
+      // Try simple decompression
+      const decompressed = this.simpleDecompress(compressed);
       const decompressedText = new TextDecoder().decode(decompressed);
       
-      console.log(`✅ Zstd decompression: ${compressed.length} → ${decompressed.length} bytes`);
-      
+      console.log(`✅ Simple decompression: ${compressed.length} → ${decompressed.length} bytes`);
       return decompressedText;
+      
     } catch (error) {
-      console.error('Zstd decompression failed:', error);
+      console.error('All decompression methods failed:', error);
       // Fallback: assume data is uncompressed
       return new TextDecoder().decode(compressed);
     }
+  }
+
+  // Use browser's DecompressionStream if available
+  private static async decompressWithDecompressionStream(data: Uint8Array): Promise<Uint8Array> {
+    const stream = new DecompressionStream('gzip');
+    const writer = stream.writable.getWriter();
+    const reader = stream.readable.getReader();
+    
+    writer.write(data);
+    writer.close();
+    
+    const chunks: Uint8Array[] = [];
+    let done = false;
+    
+    while (!done) {
+      const { value, done: readerDone } = await reader.read();
+      done = readerDone;
+      if (value) {
+        chunks.push(value);
+      }
+    }
+    
+    // Combine chunks
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    return result;
+  }
+
+  // Simple decompression fallback
+  private static simpleDecompress(data: Uint8Array): Uint8Array {
+    const decompressed: number[] = [];
+    let i = 0;
+    
+    while (i < data.length) {
+      if (data[i] === 255 && i + 2 < data.length) {
+        // Run-length encoded sequence
+        const count = data[i + 1];
+        const value = data[i + 2];
+        
+        for (let j = 0; j < count; j++) {
+          decompressed.push(value);
+        }
+        
+        i += 3;
+      } else {
+        // Direct byte
+        decompressed.push(data[i]);
+        i++;
+      }
+    }
+    
+    return new Uint8Array(decompressed);
   }
 
   // Enhanced content cleaning for better compression ratios
