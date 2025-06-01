@@ -83,7 +83,7 @@ serve(async (req) => {
 
     console.log(`📊 Discovery completed: ${discoveredUrls.length} URLs found`);
 
-    // Create parent source with explicit type casting
+    // Create parent source with proper data types
     const parentSourceData = {
       agent_id: agentId,
       team_id: agent.team_id,
@@ -122,11 +122,11 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with enhanced error handling
+    // Create source_pages with corrected data types
     if (discoveredUrls.length > 0) {
       console.log('🔍 Starting source pages insertion...');
       
-      // Insert source pages in batches with better error handling
+      // Insert source pages in batches with corrected data types
       await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, priority);
 
       // Update parent source
@@ -174,10 +174,10 @@ serve(async (req) => {
   }
 });
 
-// Simplified function to insert source pages in batches
+// Fixed function to insert source pages with correct data types
 async function insertSourcePagesInBatches(
   parentSourceId: string,
-  customerId: string,
+  teamId: string,
   urls: string[],
   priority: string
 ): Promise<void> {
@@ -189,15 +189,21 @@ async function insertSourcePagesInBatches(
 
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
+    
+    // Create batch records with correct data types and column names
     const batchRecords = batch.map((url) => ({
       parent_source_id: parentSourceId,
-      customer_id: customerId,
+      customer_id: teamId, // Using team_id as customer_id
       url: url,
-      status: 'pending',
+      status: 'pending', // Ensure this is a string, not boolean
       priority: priority,
       retry_count: 0,
-      max_retries: 3
+      max_retries: 3,
+      created_at: new Date().toISOString()
     }));
+
+    console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
+    console.log(`🔍 Sample record:`, JSON.stringify(batchRecords[0], null, 2));
 
     try {
       const { data: batchResult, error: batchError } = await supabase
@@ -207,12 +213,15 @@ async function insertSourcePagesInBatches(
       
       if (batchError) {
         console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
-        console.error(`❌ Error details:`, JSON.stringify(batchError, null, 2));
-        console.error(`❌ Failed records sample:`, JSON.stringify(batchRecords[0], null, 2));
+        console.error(`❌ Error code:`, batchError.code);
+        console.error(`❌ Error message:`, batchError.message);
+        console.error(`❌ Error details:`, batchError.details);
+        console.error(`❌ Error hint:`, batchError.hint);
         failedCount += batch.length;
       } else {
         insertedCount += batch.length;
         console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
+        console.log(`✅ Batch result count:`, batchResult?.length || 0);
       }
     } catch (unexpectedError) {
       console.error(`❌ Unexpected error in batch ${Math.floor(i/batchSize) + 1}:`, unexpectedError);
@@ -221,6 +230,10 @@ async function insertSourcePagesInBatches(
   }
   
   console.log(`✅ Batch insertion completed: ${insertedCount} successful, ${failedCount} failed out of ${urls.length} total`);
+  
+  if (failedCount > 0) {
+    console.warn(`⚠️ ${failedCount} insertions failed - check RLS policies and table schema`);
+  }
 }
 
 // Discover links for full website crawl
