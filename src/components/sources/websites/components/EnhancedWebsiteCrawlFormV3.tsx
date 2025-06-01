@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
@@ -92,6 +92,17 @@ const EnhancedWebsiteCrawlFormV3: React.FC<Props> = ({ onCrawlStarted }) => {
     }
   };
 
+  const getPlaceholder = () => {
+    switch (crawlMode) {
+      case 'full-website':
+        return 'https://example.com';
+      case 'single-page':
+        return 'https://example.com/specific-page';
+      case 'sitemap-only':
+        return 'https://example.com/sitemap.xml';
+    }
+  };
+
   const getCrawlModeDescription = () => {
     switch (crawlMode) {
       case 'full-website':
@@ -103,71 +114,50 @@ const EnhancedWebsiteCrawlFormV3: React.FC<Props> = ({ onCrawlStarted }) => {
     }
   };
 
-  const getCrawlModeIcon = () => {
-    switch (crawlMode) {
-      case 'full-website':
-        return <Globe className="w-4 h-4" />;
-      case 'single-page':
-        return <FileText className="w-4 h-4" />;
-      case 'sitemap-only':
-        return <Map className="w-4 h-4" />;
-    }
-  };
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          {getCrawlModeIcon()}
           Enhanced Website Crawling
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Crawl Mode Selection with Tabs */}
+          <div className="space-y-2">
+            <Label>Crawl Mode</Label>
+            <Tabs value={crawlMode} onValueChange={(value: any) => setCrawlMode(value)}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="full-website" className="flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Full Website
+                </TabsTrigger>
+                <TabsTrigger value="single-page" className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Single Page
+                </TabsTrigger>
+                <TabsTrigger value="sitemap-only" className="flex items-center gap-2">
+                  <Map className="w-4 h-4" />
+                  Sitemap Only
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <p className="text-sm text-muted-foreground">
+              {getCrawlModeDescription()}
+            </p>
+          </div>
+
           {/* URL Input */}
           <div className="space-y-2">
             <Label htmlFor="url">Website URL</Label>
             <Input
               id="url"
               type="url"
-              placeholder="https://example.com"
+              placeholder={getPlaceholder()}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
             />
-          </div>
-
-          {/* Crawl Mode Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="crawlMode">Crawl Mode</Label>
-            <Select value={crawlMode} onValueChange={(value: any) => setCrawlMode(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select crawl mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="full-website">
-                  <div className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Full Website
-                  </div>
-                </SelectItem>
-                <SelectItem value="single-page">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4" />
-                    Single Page Only
-                  </div>
-                </SelectItem>
-                <SelectItem value="sitemap-only">
-                  <div className="flex items-center gap-2">
-                    <Map className="w-4 h-4" />
-                    Sitemap Only
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              {getCrawlModeDescription()}
-            </p>
           </div>
 
           {/* Advanced Settings Accordion */}
