@@ -1,61 +1,41 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { compress as zstdCompress, decompress as zstdDecompress } from 'fzstd';
 
 export class CompressionEngine {
-  // Simulate Zstd compression (in production, use actual Zstd library)
+  // Actual Zstd compression with configurable levels
   static async compressWithZstd(text: string, level: number = 19): Promise<{
     compressed: Uint8Array;
     originalSize: number;
     compressedSize: number;
     ratio: number;
   }> {
-    const originalSize = new TextEncoder().encode(text).length;
+    const originalData = new TextEncoder().encode(text);
+    const originalSize = originalData.length;
     
     try {
-      // For now, use gzip as Zstd substitute (in production, use actual Zstd)
-      const stream = new CompressionStream('gzip');
-      const writer = stream.writable.getWriter();
-      const reader = stream.readable.getReader();
+      console.log(`🗜️ Compressing ${originalSize} bytes with Zstd level ${level}...`);
       
-      writer.write(new TextEncoder().encode(text));
-      writer.close();
+      // Use actual Zstd compression
+      const compressed = zstdCompress(originalData, level);
+      const compressedSize = compressed.length;
+      const ratio = compressedSize / originalSize;
       
-      const chunks: Uint8Array[] = [];
-      let done = false;
-      
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) chunks.push(value);
-      }
-      
-      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const compressed = new Uint8Array(totalLength);
-      let offset = 0;
-      
-      for (const chunk of chunks) {
-        compressed.set(chunk, offset);
-        offset += chunk.length;
-      }
-      
-      // Simulate additional Zstd compression ratio improvement
-      const zstdRatio = 0.7; // Zstd typically achieves better ratios
-      const adjustedSize = Math.floor(compressed.length * zstdRatio);
-      const finalCompressed = compressed.slice(0, adjustedSize);
+      console.log(`✅ Zstd compression: ${originalSize} → ${compressedSize} bytes (${(ratio * 100).toFixed(1)}% ratio)`);
       
       return {
-        compressed: finalCompressed,
+        compressed,
         originalSize,
-        compressedSize: finalCompressed.length,
-        ratio: finalCompressed.length / originalSize
+        compressedSize,
+        ratio
       };
     } catch (error) {
-      console.error('Compression failed:', error);
-      const encoded = new TextEncoder().encode(text);
+      console.error('Zstd compression failed:', error);
+      // Fallback to uncompressed data
       return {
-        compressed: encoded,
+        compressed: originalData,
         originalSize,
-        compressedSize: encoded.length,
+        compressedSize: originalData.length,
         ratio: 1.0
       };
     }
@@ -63,40 +43,23 @@ export class CompressionEngine {
 
   static async decompressZstd(compressed: Uint8Array): Promise<string> {
     try {
-      // For now, use gzip decompression (in production, use actual Zstd)
-      const stream = new DecompressionStream('gzip');
-      const writer = stream.writable.getWriter();
-      const reader = stream.readable.getReader();
+      console.log(`📦 Decompressing ${compressed.length} bytes with Zstd...`);
       
-      writer.write(compressed);
-      writer.close();
+      // Use actual Zstd decompression
+      const decompressed = zstdDecompress(compressed);
+      const decompressedText = new TextDecoder().decode(decompressed);
       
-      const chunks: Uint8Array[] = [];
-      let done = false;
+      console.log(`✅ Zstd decompression: ${compressed.length} → ${decompressed.length} bytes`);
       
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) chunks.push(value);
-      }
-      
-      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      const decompressed = new Uint8Array(totalLength);
-      let offset = 0;
-      
-      for (const chunk of chunks) {
-        decompressed.set(chunk, offset);
-        offset += chunk.length;
-      }
-      
-      return new TextDecoder().decode(decompressed);
+      return decompressedText;
     } catch (error) {
-      console.error('Decompression failed:', error);
+      console.error('Zstd decompression failed:', error);
+      // Fallback: assume data is uncompressed
       return new TextDecoder().decode(compressed);
     }
   }
 
-  // Enhanced content cleaning for better compression
+  // Enhanced content cleaning for better compression ratios
   static cleanContentForCompression(htmlContent: string): string {
     return htmlContent
       // Remove all scripts and styles
@@ -118,7 +81,7 @@ export class CompressionEngine {
       .replace(/<!--[\s\S]*?-->/g, '')
       // Convert to plain text
       .replace(/<[^>]+>/g, ' ')
-      // Normalize whitespace
+      // Normalize whitespace for better compression
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -130,5 +93,41 @@ export class CompressionEngine {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Compress text for storage with optimal settings
+  static async compressForStorage(text: string): Promise<{
+    compressedData: string;
+    originalSize: number;
+    compressedSize: number;
+    compressionRatio: number;
+  }> {
+    const result = await this.compressWithZstd(text, 19); // Maximum compression
+    
+    // Convert to base64 for database storage
+    const compressedData = btoa(String.fromCharCode(...result.compressed));
+    
+    return {
+      compressedData,
+      originalSize: result.originalSize,
+      compressedSize: result.compressedSize,
+      compressionRatio: result.ratio
+    };
+  }
+
+  // Decompress text from storage
+  static async decompressFromStorage(compressedData: string): Promise<string> {
+    try {
+      // Convert from base64
+      const compressedBytes = new Uint8Array(
+        atob(compressedData).split('').map(char => char.charCodeAt(0))
+      );
+      
+      return await this.decompressZstd(compressedBytes);
+    } catch (error) {
+      console.error('Failed to decompress from storage:', error);
+      // Return as-is if decompression fails
+      return compressedData;
+    }
   }
 }

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { CompressionEngine } from "./compressionEngine";
 
@@ -11,7 +10,7 @@ export interface ChunkProcessingResult {
 }
 
 export class GlobalDeduplicationService {
-  // Process chunks with global deduplication across all customers
+  // Process chunks with global deduplication using Zstd compression
   static async processChunksGlobally(
     chunks: string[],
     sourceId: string,
@@ -21,6 +20,8 @@ export class GlobalDeduplicationService {
     let duplicateChunks = 0;
     let totalCompressedSize = 0;
     let totalOriginalSize = 0;
+
+    console.log(`🔍 Processing ${chunks.length} chunks with Zstd compression and global deduplication`);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -44,13 +45,10 @@ export class GlobalDeduplicationService {
           });
 
         duplicateChunks++;
-        console.log(`🔄 Reused existing chunk ${existingChunk.id}`);
+        console.log(`🔄 Reused existing chunk ${existingChunk.id} (global dedup)`);
       } else {
-        // New chunk - compress and store
-        const compressionResult = await CompressionEngine.compressWithZstd(chunk, 19);
-        
-        // Convert compressed data to base64 string for storage
-        const compressedDataString = btoa(String.fromCharCode(...compressionResult.compressed));
+        // New chunk - compress with Zstd and store
+        const compressionResult = await CompressionEngine.compressForStorage(chunk);
         
         const { data: newChunk, error } = await supabase
           .from('source_chunks')
@@ -61,10 +59,11 @@ export class GlobalDeduplicationService {
             content_hash: contentHash,
             token_count: this.estimateTokens(chunk),
             metadata: {
-              compressed_blob: compressedDataString,
+              compressed_blob: compressionResult.compressedData,
               original_size: compressionResult.originalSize,
               compressed_size: compressionResult.compressedSize,
-              compression_ratio: compressionResult.ratio
+              compression_ratio: compressionResult.compressionRatio,
+              compression_algorithm: 'zstd-level-19'
             }
           })
           .select('id')
@@ -81,7 +80,7 @@ export class GlobalDeduplicationService {
 
           uniqueChunks++;
           totalCompressedSize += compressionResult.compressedSize;
-          console.log(`✨ Created new compressed chunk ${newChunk.id} (${compressionResult.ratio.toFixed(2)}x compression)`);
+          console.log(`✨ Created new Zstd compressed chunk ${newChunk.id} (${(compressionResult.compressionRatio * 100).toFixed(1)}% ratio)`);
         }
       }
       
@@ -90,6 +89,9 @@ export class GlobalDeduplicationService {
 
     const spaceSaved = totalOriginalSize - totalCompressedSize;
     const deduplicationRatio = duplicateChunks / chunks.length;
+
+    console.log(`📊 Zstd compression results: ${totalOriginalSize} → ${totalCompressedSize} bytes (${(totalCompressedSize/totalOriginalSize * 100).toFixed(1)}% ratio)`);
+    console.log(`♻️ Deduplication: ${duplicateChunks}/${chunks.length} chunks (${(deduplicationRatio * 100).toFixed(1)}%) were duplicates`);
 
     // Update source with compression stats
     await supabase
@@ -100,6 +102,7 @@ export class GlobalDeduplicationService {
         total_content_size: totalOriginalSize,
         compressed_content_size: totalCompressedSize,
         global_compression_ratio: totalCompressedSize / totalOriginalSize,
+        compression_algorithm: 'zstd-level-19',
         updated_at: new Date().toISOString()
       })
       .eq('id', sourceId);
@@ -153,13 +156,14 @@ export class GlobalDeduplicationService {
     return chunkIds.length;
   }
 
-  // Get global deduplication statistics
+  // Get global deduplication statistics with Zstd compression metrics
   static async getGlobalStats(): Promise<{
     totalChunks: number;
     uniqueChunks: number;
     duplicateReferences: number;
     compressionRatio: number;
     spaceSavedGB: number;
+    compressionAlgorithm: string;
   }> {
     // Get total unique chunks
     const { count: uniqueChunks } = await supabase
@@ -173,19 +177,25 @@ export class GlobalDeduplicationService {
 
     const duplicateReferences = (totalReferences || 0) - (uniqueChunks || 0);
 
-    // Get compression stats from metadata
+    // Get Zstd compression stats from metadata
     const { data: compressionData } = await supabase
       .from('source_chunks')
       .select('metadata, token_count');
 
     let totalCompressedBytes = 0;
     let estimatedOriginalBytes = 0;
+    let compressionAlgorithm = 'zstd-level-19';
 
     compressionData?.forEach(chunk => {
       const metadata = chunk.metadata as any;
       if (metadata?.compressed_size) {
         totalCompressedBytes += metadata.compressed_size;
         estimatedOriginalBytes += metadata.original_size || (chunk.token_count * 4);
+        
+        // Track the compression algorithm used
+        if (metadata.compression_algorithm) {
+          compressionAlgorithm = metadata.compression_algorithm;
+        }
       }
     });
 
@@ -193,12 +203,15 @@ export class GlobalDeduplicationService {
     const spaceSavedBytes = estimatedOriginalBytes - totalCompressedBytes;
     const spaceSavedGB = spaceSavedBytes / (1024 * 1024 * 1024);
 
+    console.log(`📈 Global Zstd compression stats: ${(compressionRatio * 100).toFixed(1)}% ratio, ${spaceSavedGB.toFixed(2)}GB saved`);
+
     return {
       totalChunks: totalReferences || 0,
       uniqueChunks: uniqueChunks || 0,
       duplicateReferences,
       compressionRatio,
-      spaceSavedGB
+      spaceSavedGB,
+      compressionAlgorithm
     };
   }
 
