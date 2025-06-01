@@ -1,5 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { RealRateLimitingService } from './realRateLimitingService';
 
 export interface RateLimitConfig {
   maxRequestsPerMinute: number;
@@ -61,79 +61,22 @@ export class RateLimitingService {
     }
   };
 
-  // Check if a customer can start a new crawl
+  // Updated to use real rate limiting service
   static async canStartCrawl(customerId: string, requestedPages: number = 1): Promise<RateLimitCheck> {
     try {
-      const usage = await this.getCustomerUsage(customerId);
-      const limits = usage.tier.limits;
-
-      // Check concurrent requests
-      if (usage.currentUsage.concurrentRequests >= limits.maxConcurrentRequests) {
-        return {
-          allowed: false,
-          reason: `Concurrent request limit exceeded (${limits.maxConcurrentRequests})`,
-          quota: { concurrentJobs: limits.maxConcurrentRequests }
-        };
-      }
-
-      // Check daily limit
-      if (usage.currentUsage.requestsLastDay + requestedPages > limits.maxRequestsPerDay) {
-        const resetTime = new Date();
-        resetTime.setHours(24, 0, 0, 0); // Reset at midnight
-        
-        return {
-          allowed: false,
-          reason: `Daily limit exceeded (${limits.maxRequestsPerDay})`,
-          resetTime,
-          quota: { concurrentJobs: limits.maxConcurrentRequests }
-        };
-      }
-
-      // Check hourly limit
-      if (usage.currentUsage.requestsLastHour + requestedPages > limits.maxRequestsPerHour) {
-        const resetTime = new Date();
-        resetTime.setMinutes(60, 0, 0); // Reset at next hour
-        
-        return {
-          allowed: false,
-          reason: `Hourly limit exceeded (${limits.maxRequestsPerHour})`,
-          resetTime,
-          quota: { concurrentJobs: limits.maxConcurrentRequests }
-        };
-      }
-
-      // Check minute limit (with burst allowance)
-      const effectiveMinuteLimit = Math.min(
-        limits.maxRequestsPerMinute + limits.burstLimit,
-        limits.maxRequestsPerHour
-      );
+      const realCheck = await RealRateLimitingService.checkRateLimit(customerId, requestedPages);
       
-      if (usage.currentUsage.requestsLastMinute + requestedPages > effectiveMinuteLimit) {
-        const resetTime = new Date();
-        resetTime.setSeconds(60, 0); // Reset at next minute
-        
-        return {
-          allowed: false,
-          reason: `Rate limit exceeded (${effectiveMinuteLimit}/min)`,
-          resetTime,
-          quota: { concurrentJobs: limits.maxConcurrentRequests }
-        };
-      }
-
-      // All checks passed
       return {
-        allowed: true,
-        remainingRequests: Math.min(
-          limits.maxRequestsPerDay - usage.currentUsage.requestsLastDay,
-          limits.maxRequestsPerHour - usage.currentUsage.requestsLastHour,
-          effectiveMinuteLimit - usage.currentUsage.requestsLastMinute
-        ),
-        quota: { concurrentJobs: limits.maxConcurrentRequests }
+        allowed: realCheck.allowed,
+        reason: realCheck.reason,
+        resetTime: realCheck.retryAfter ? new Date(Date.now() + realCheck.retryAfter * 1000) : undefined,
+        remainingRequests: Math.max(0, realCheck.limits.perDay - realCheck.currentUsage.perDay),
+        quota: {
+          concurrentJobs: realCheck.limits.concurrent
+        }
       };
-
     } catch (error) {
       console.error('Rate limit check failed:', error);
-      // Fail open - allow request but log error
       return { 
         allowed: true,
         quota: { concurrentJobs: 5 }
@@ -141,14 +84,11 @@ export class RateLimitingService {
     }
   }
 
-  // Record usage for a customer (simplified version using existing tables)
+  // Updated to use real tracking
   static async recordUsage(customerId: string, pages: number = 1): Promise<void> {
     try {
-      // For now, just log usage since we don't have the customer_usage_tracking table
       console.log(`📊 Recording usage for customer ${customerId}: ${pages} pages`);
-      
-      // Could store in agent_sources metadata or create a simple tracking mechanism
-      // This is a simplified implementation that doesn't require new DB tables
+      // The real rate limiting service handles usage tracking automatically
     } catch (error) {
       console.error('Usage recording failed:', error);
     }
@@ -219,23 +159,19 @@ export class RateLimitingService {
     }
   }
 
-  // Simplified concurrent request tracking (without DB functions)
+  // Updated to use real concurrent request tracking
   static async incrementConcurrentRequests(customerId: string): Promise<void> {
     try {
-      console.log(`📈 Incrementing concurrent requests for customer ${customerId}`);
-      // In a real implementation, this would use atomic operations
-      // For now, we'll just log it
+      await RealRateLimitingService.incrementConcurrentRequests(customerId);
     } catch (error) {
       console.error('Concurrent request increment failed:', error);
     }
   }
 
-  // Simplified concurrent request tracking (without DB functions)
+  // Updated to use real concurrent request tracking
   static async decrementConcurrentRequests(customerId: string): Promise<void> {
     try {
-      console.log(`📉 Decrementing concurrent requests for customer ${customerId}`);
-      // In a real implementation, this would use atomic operations
-      // For now, we'll just log it
+      await RealRateLimitingService.decrementConcurrentRequests(customerId);
     } catch (error) {
       console.error('Concurrent request decrement failed:', error);
     }

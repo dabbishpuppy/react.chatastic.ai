@@ -1243,6 +1243,51 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_usage_tracking: {
+        Row: {
+          concurrent_requests: number | null
+          created_at: string | null
+          customer_id: string
+          day_reset_at: string | null
+          hour_reset_at: string | null
+          id: string
+          last_request_at: string | null
+          minute_reset_at: string | null
+          requests_last_day: number | null
+          requests_last_hour: number | null
+          requests_last_minute: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          concurrent_requests?: number | null
+          created_at?: string | null
+          customer_id: string
+          day_reset_at?: string | null
+          hour_reset_at?: string | null
+          id?: string
+          last_request_at?: string | null
+          minute_reset_at?: string | null
+          requests_last_day?: number | null
+          requests_last_hour?: number | null
+          requests_last_minute?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          concurrent_requests?: number | null
+          created_at?: string | null
+          customer_id?: string
+          day_reset_at?: string | null
+          hour_reset_at?: string | null
+          id?: string
+          last_request_at?: string | null
+          minute_reset_at?: string | null
+          requests_last_day?: number | null
+          requests_last_hour?: number | null
+          requests_last_minute?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       data_retention_policies: {
         Row: {
           auto_delete: boolean
@@ -1280,6 +1325,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      database_partitions: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          partition_count: number
+          partition_key: string
+          partition_type: string
+          table_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          partition_count?: number
+          partition_key: string
+          partition_type: string
+          table_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          partition_count?: number
+          partition_key?: string
+          partition_type?: string
+          table_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       lead_settings: {
         Row: {
@@ -1460,6 +1538,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      read_replica_config: {
+        Row: {
+          created_at: string | null
+          endpoint_url: string
+          id: string
+          is_active: boolean | null
+          latency_ms: number | null
+          load_percentage: number | null
+          max_connections: number | null
+          region: string
+          replica_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint_url: string
+          id?: string
+          is_active?: boolean | null
+          latency_ms?: number | null
+          load_percentage?: number | null
+          max_connections?: number | null
+          region: string
+          replica_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          endpoint_url?: string
+          id?: string
+          is_active?: boolean | null
+          latency_ms?: number | null
+          load_percentage?: number | null
+          max_connections?: number | null
+          region?: string
+          replica_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       semantic_chunks: {
         Row: {
@@ -1908,6 +2025,10 @@ export type Database = {
         Args: { source_id_param: string }
         Returns: number
       }
+      decrement_concurrent_requests: {
+        Args: { target_customer_id: string }
+        Returns: number
+      }
       decrypt_sensitive_data: {
         Args:
           | { encrypted_data: string }
@@ -1959,6 +2080,15 @@ export type Database = {
         Args: { invitation_id_param: string }
         Returns: Json
       }
+      get_partition_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          table_name: string
+          partition_name: string
+          row_count: number
+          size_bytes: number
+        }[]
+      }
       get_team_role: {
         Args: { team_id: string }
         Returns: Database["public"]["Enums"]["team_role"]
@@ -2009,6 +2139,10 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      increment_concurrent_requests: {
+        Args: { target_customer_id: string }
+        Returns: number
       }
       is_team_member: {
         Args: { team_id: string }

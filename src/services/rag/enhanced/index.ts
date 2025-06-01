@@ -8,6 +8,12 @@ export { PerformanceMonitoringService } from './performanceMonitoringService';
 export { ConnectionPoolManager } from './connectionPoolManager';
 export { DatabaseOptimizationService } from './databaseOptimizationService';
 
+// Phase 1 Production Infrastructure (NEW)
+export { RealRateLimitingService } from './realRateLimitingService';
+export { RealConnectionPoolManager } from './realConnectionPoolManager';
+export { RealDatabasePartitioningService } from './realDatabasePartitioningService';
+export { ProductionInfrastructureService } from './productionInfrastructureService';
+
 // Phase 2: Worker Queue & Rate Limiting
 export { RateLimitingService } from './rateLimiting';
 export { WorkerQueueService } from './workerQueue';
