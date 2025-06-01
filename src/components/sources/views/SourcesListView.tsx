@@ -83,7 +83,8 @@ const SourcesListView: React.FC<SourcesListViewProps> = ({
         {selectedItems.length > 0 && onBulkDelete && (
           <BulkActionBar
             selectedCount={selectedItems.length}
-            onBulkDelete={() => onBulkDelete(selectedItems)}
+            onDelete={() => onBulkDelete(selectedItems)}
+            onRestore={() => {}} // Not implemented in this context
             isDeleting={isDeleting}
           />
         )}
@@ -112,7 +113,6 @@ const SourcesListView: React.FC<SourcesListViewProps> = ({
               <SourceTableRow
                 key={source.id}
                 source={source}
-                isSelected={selectedItems.includes(source.id)}
                 onToggleSelection={() => onToggleSelection(source.id)}
                 onRowClick={() => {}}
                 onDeleteClick={onDelete ? () => onDelete(source) : undefined}

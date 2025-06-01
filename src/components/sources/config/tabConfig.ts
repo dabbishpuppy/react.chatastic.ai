@@ -1,4 +1,6 @@
 
+import React from 'react';
+
 export interface TabConfig {
   id: string;
   label: string;
@@ -6,30 +8,36 @@ export interface TabConfig {
   component: React.ComponentType;
 }
 
+// Import components directly for proper typing
+import TextTab from '../TextTab';
+import FilesTab from '../FilesTab';
+import WebsiteTab from '../WebsiteTab';
+import QATab from '../QATab';
+
 export const sourceTabsConfig: TabConfig[] = [
   {
     id: 'text',
     label: 'Text',
     description: 'Add text content directly',
-    component: () => import('../TextTab').then(m => m.default)
+    component: TextTab
   },
   {
     id: 'files',
     label: 'Files',
     description: 'Upload documents and files',
-    component: () => import('../FilesTab').then(m => m.default)
+    component: FilesTab
   },
   {
     id: 'website',
     label: 'Website',
     description: 'Crawl websites and URLs',
-    component: () => import('../WebsiteTab').then(m => m.default)
+    component: WebsiteTab
   },
   {
     id: 'qa',
     label: 'Q&A',
     description: 'Add question and answer pairs',
-    component: () => import('../QATab').then(m => m.default)
+    component: QATab
   }
 ];
 

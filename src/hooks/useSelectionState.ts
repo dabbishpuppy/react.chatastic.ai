@@ -5,7 +5,7 @@ export interface UseSelectionStateOptions {
   onSelectionChange?: (selectedIds: Set<string>) => void;
 }
 
-export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
+export const useSelectionState = (availableIds?: string[], options: UseSelectionStateOptions = {}) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const selectItem = useCallback((id: string) => {
@@ -15,7 +15,7 @@ export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
       options.onSelectionChange?.(newSet);
       return newSet;
     });
-  }, [options.onSelectionChange]);
+  }, [options]);
 
   const deselectItem = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -24,7 +24,7 @@ export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
       options.onSelectionChange?.(newSet);
       return newSet;
     });
-  }, [options.onSelectionChange]);
+  }, [options]);
 
   const toggleItem = useCallback((id: string) => {
     setSelectedIds(prev => {
@@ -37,7 +37,7 @@ export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
       options.onSelectionChange?.(newSet);
       return newSet;
     });
-  }, [options.onSelectionChange]);
+  }, [options]);
 
   const selectAll = useCallback((ids: string[]) => {
     setSelectedIds(prev => {
@@ -46,7 +46,7 @@ export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
       options.onSelectionChange?.(newSet);
       return newSet;
     });
-  }, [options.onSelectionChange]);
+  }, [options]);
 
   const deselectAll = useCallback((ids?: string[]) => {
     setSelectedIds(prev => {
@@ -59,18 +59,35 @@ export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
       options.onSelectionChange?.(newSet);
       return newSet;
     });
-  }, [options.onSelectionChange]);
+  }, [options]);
 
   const clearSelection = useCallback(() => {
     setSelectedIds(new Set());
     options.onSelectionChange?.(new Set());
-  }, [options.onSelectionChange]);
+  }, [options]);
 
   const isSelected = useCallback((id: string) => selectedIds.has(id), [selectedIds]);
 
   const selectedCount = useMemo(() => selectedIds.size, [selectedIds]);
 
   const selectedArray = useMemo(() => Array.from(selectedIds), [selectedIds]);
+
+  // Legacy interface support
+  const selectedItems = selectedArray;
+  const isAllSelected = useMemo(() => {
+    if (!availableIds || availableIds.length === 0) return false;
+    return selectedCount > 0 && selectedCount === availableIds.length;
+  }, [selectedCount, availableIds]);
+
+  const toggleSelection = toggleItem;
+  const toggleSelectAll = useCallback(() => {
+    if (!availableIds) return;
+    if (isAllSelected) {
+      deselectAll();
+    } else {
+      selectAll(availableIds);
+    }
+  }, [isAllSelected, availableIds, selectAll, deselectAll]);
 
   return {
     selectedIds,
@@ -82,6 +99,11 @@ export const useSelectionState = (options: UseSelectionStateOptions = {}) => {
     selectAll,
     deselectAll,
     clearSelection,
-    isSelected
+    isSelected,
+    // Legacy interface
+    selectedItems,
+    isAllSelected,
+    toggleSelection,
+    toggleSelectAll
   };
 };

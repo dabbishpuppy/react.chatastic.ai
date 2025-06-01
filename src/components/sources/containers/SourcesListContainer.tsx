@@ -4,9 +4,10 @@ import { useSourcesPaginated } from '@/hooks/useSourcesPaginated';
 import { useSelectionState } from '@/hooks/useSelectionState';
 import SourcesListView from '../views/SourcesListView';
 import { useSourcesActions } from '../hooks/useSourcesActions';
+import { SourceType } from '@/types/rag';
 
 interface SourcesListContainerProps {
-  sourceType?: string;
+  sourceType?: SourceType;
   pageSize?: number;
 }
 
@@ -15,12 +16,9 @@ const SourcesListContainer: React.FC<SourcesListContainerProps> = ({
   pageSize = 25
 }) => {
   const { 
-    sources, 
-    loading, 
-    error, 
-    hasMore, 
-    isLoadingMore, 
-    loadMore, 
+    data,
+    isLoading,
+    error,
     refetch 
   } = useSourcesPaginated({
     sourceType,
@@ -28,13 +26,27 @@ const SourcesListContainer: React.FC<SourcesListContainerProps> = ({
     pageSize
   });
 
+  const sources = data?.sources || [];
+  const hasMore = data ? data.currentPage < data.totalPages : false;
+  
   const {
-    selectedItems,
-    isAllSelected,
-    toggleSelection,
-    toggleSelectAll,
+    selectedArray: selectedItems,
+    selectedCount,
+    toggleItem: toggleSelection,
+    selectAll,
+    deselectAll,
     clearSelection
-  } = useSelectionState(sources.map(s => s.id));
+  } = useSelectionState();
+
+  const isAllSelected = selectedCount > 0 && selectedCount === sources.length;
+  
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      deselectAll();
+    } else {
+      selectAll(sources.map(s => s.id));
+    }
+  };
 
   const {
     handleEdit,
@@ -48,13 +60,18 @@ const SourcesListContainer: React.FC<SourcesListContainerProps> = ({
     refetch();
   };
 
+  const loadMore = () => {
+    // Implementation for loading more sources if needed
+    console.log('Load more not implemented in this container');
+  };
+
   return (
     <SourcesListView
       sources={sources}
-      loading={loading}
-      error={error}
+      loading={isLoading}
+      error={error?.message || null}
       hasMore={hasMore}
-      isLoadingMore={isLoadingMore}
+      isLoadingMore={false}
       selectedItems={selectedItems}
       isAllSelected={isAllSelected}
       onLoadMore={loadMore}
