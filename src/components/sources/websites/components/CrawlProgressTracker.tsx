@@ -1,230 +1,227 @@
 
-import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { RefreshCw, CheckCircle, XCircle, Clock, Zap, Database } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RefreshCw, AlertTriangle, CheckCircle, Clock, BarChart3 } from 'lucide-react';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
-import { CrawlStatus } from '@/services/rag/enhancedCrawlService';
 
 interface CrawlProgressTrackerProps {
   parentSourceId: string;
   onComplete?: () => void;
 }
 
-const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({ 
-  parentSourceId, 
-  onComplete 
+const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
+  parentSourceId,
+  onComplete
 }) => {
-  const { getActiveCrawlStatus, retryFailedJobs, getCrawlJobs } = useEnhancedCrawl();
-  const [crawlJobs, setCrawlJobs] = useState<any[]>([]);
-  const [showJobs, setShowJobs] = useState(false);
-  
-  const status = getActiveCrawlStatus(parentSourceId);
+  const { retryFailedJobs, getCrawlJobs, getActiveCrawlStatus } = useEnhancedCrawl();
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const crawlStatus = getActiveCrawlStatus(parentSourceId);
 
   useEffect(() => {
-    if (status?.status === 'completed') {
-      onComplete?.();
+    if (crawlStatus?.status === 'completed' && onComplete) {
+      onComplete();
     }
-  }, [status?.status, onComplete]);
+  }, [crawlStatus?.status, onComplete]);
 
-  const loadCrawlJobs = async () => {
+  const loadJobs = async () => {
+    setLoading(true);
     try {
-      const jobs = await getCrawlJobs(parentSourceId);
-      setCrawlJobs(jobs);
-      setShowJobs(true);
+      const jobsData = await getCrawlJobs(parentSourceId);
+      setJobs(jobsData || []);
     } catch (error) {
-      console.error('Error loading crawl jobs:', error);
+      console.error('Failed to load jobs:', error);
+      setJobs([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleRetryFailed = async () => {
     try {
-      await retryFailedJobs(parentSourceId);
+      const retriedCount = await retryFailedJobs(parentSourceId);
+      if (retriedCount > 0) {
+        await loadJobs();
+      }
     } catch (error) {
-      console.error('Error retrying failed jobs:', error);
+      console.error('Failed to retry jobs:', error);
     }
   };
 
-  if (!status) return null;
-
-  const getStatusColor = (jobStatus: string) => {
-    switch (jobStatus) {
-      case 'completed': return 'text-green-600';
-      case 'failed': return 'text-red-600';
-      case 'in_progress': return 'text-blue-600';
-      default: return 'text-gray-500';
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'failed':
+        return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'in_progress':
+        return <RefreshCw className="h-4 w-4 text-blue-500 animate-spin" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
 
-  const getStatusIcon = (jobStatus: string) => {
-    switch (jobStatus) {
-      case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'failed': return <XCircle className="h-4 w-4 text-red-600" />;
-      case 'in_progress': return <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />;
-      default: return <Clock className="h-4 w-4 text-gray-500" />;
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-  };
+  if (!crawlStatus) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">
+            <BarChart3 className="h-8 w-8 mx-auto mb-2" />
+            <p>Crawl status not found</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const failedJobsCount = jobs.filter(job => job.status === 'failed').length;
 
   return (
-    <Card className="w-full">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-blue-500" />
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            {getStatusIcon(crawlStatus.status)}
             Crawl Progress
-          </div>
-          <Badge variant={
-            status.status === 'completed' ? 'default' : 
-            status.status === 'failed' ? 'destructive' : 
-            'secondary'
-          }>
-            {status.status.toUpperCase()}
+          </CardTitle>
+          <Badge className={getStatusColor(crawlStatus.status)}>
+            {crawlStatus.status}
           </Badge>
-        </CardTitle>
-        <CardDescription>
-          Real-time progress tracking for enhanced website crawl
-        </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Progress Overview */}
+      <CardContent>
         <div className="space-y-4">
-          <div className="flex justify-between text-sm">
-            <span>Progress</span>
-            <span>{status.progress}%</span>
-          </div>
-          <Progress value={status.progress} className="w-full" />
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-blue-600">{status.totalJobs}</div>
-              <div className="text-xs text-muted-foreground">Total Pages</div>
+          <div>
+            <div className="flex justify-between text-sm text-muted-foreground mb-2">
+              <span>Progress</span>
+              <span>{crawlStatus.completedJobs + crawlStatus.failedJobs} / {crawlStatus.totalJobs}</span>
             </div>
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-green-600">{status.completedJobs}</div>
+            <Progress value={crawlStatus.progress} className="h-2" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-green-600">{crawlStatus.completedJobs}</div>
               <div className="text-xs text-muted-foreground">Completed</div>
             </div>
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-red-600">{status.failedJobs}</div>
+            <div>
+              <div className="text-2xl font-bold text-red-600">{crawlStatus.failedJobs}</div>
               <div className="text-xs text-muted-foreground">Failed</div>
             </div>
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-gray-600">
-                {status.totalJobs - status.completedJobs - status.failedJobs}
-              </div>
-              <div className="text-xs text-muted-foreground">Remaining</div>
+            <div>
+              <div className="text-2xl font-bold text-gray-600">{crawlStatus.totalJobs - crawlStatus.completedJobs - crawlStatus.failedJobs}</div>
+              <div className="text-xs text-muted-foreground">Pending</div>
             </div>
           </div>
-        </div>
 
-        {/* Compression Stats */}
-        {status.compressionStats && (
-          <div className="border rounded-lg p-4 bg-green-50">
-            <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Compression & Deduplication
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div className="space-y-1">
-                <div className="text-lg font-bold text-green-700">
-                  {formatBytes(status.compressionStats.totalContentSize)}
+          {crawlStatus.compressionStats && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <h4 className="font-semibold text-blue-900 mb-2">Compression Stats</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-blue-700">Avg Compression:</span>
+                  <span className="ml-1 font-medium">{(crawlStatus.compressionStats.avgCompressionRatio || 0).toFixed(2)}x</span>
                 </div>
-                <div className="text-xs text-green-600">Original Size</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-lg font-bold text-green-700">
-                  {status.compressionStats.avgCompressionRatio.toFixed(2)}x
+                <div>
+                  <span className="text-blue-700">Unique Chunks:</span>
+                  <span className="ml-1 font-medium">{crawlStatus.compressionStats.totalUniqueChunks}</span>
                 </div>
-                <div className="text-xs text-green-600">Compression</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-lg font-bold text-green-700">
-                  {status.compressionStats.totalUniqueChunks}
+                <div>
+                  <span className="text-blue-700">Duplicates Found:</span>
+                  <span className="ml-1 font-medium">{crawlStatus.compressionStats.totalDuplicateChunks}</span>
                 </div>
-                <div className="text-xs text-green-600">Unique Chunks</div>
-              </div>
-              <div className="space-y-1">
-                <div className="text-lg font-bold text-green-700">
-                  {status.compressionStats.totalDuplicateChunks}
+                <div>
+                  <span className="text-blue-700">Total Size:</span>
+                  <span className="ml-1 font-medium">{Math.round(crawlStatus.compressionStats.totalContentSize / 1024)}KB</span>
                 </div>
-                <div className="text-xs text-green-600">Deduplicated</div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={loadCrawlJobs}
-            disabled={!status.totalJobs}
-          >
-            {showJobs ? 'Refresh Jobs' : 'View Individual Jobs'}
-          </Button>
-          
-          {status.failedJobs > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleRetryFailed}
-              className="text-orange-600 border-orange-200 hover:bg-orange-50"
-            >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Retry Failed ({status.failedJobs})
-            </Button>
           )}
-        </div>
 
-        {/* Individual Jobs List */}
-        {showJobs && crawlJobs.length > 0 && (
-          <div className="border rounded-lg">
-            <div className="p-4 border-b bg-gray-50">
-              <h4 className="font-semibold">Individual Page Jobs</h4>
-            </div>
-            <ScrollArea className="h-64">
-              <div className="p-4 space-y-2">
-                {crawlJobs.map((job) => (
-                  <div 
-                    key={job.id} 
-                    className="flex items-center justify-between p-2 rounded-lg bg-gray-50 hover:bg-gray-100"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {getStatusIcon(job.status)}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{job.url}</div>
-                        {job.error_message && (
-                          <div className="text-xs text-red-600 truncate">{job.error_message}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {job.chunks_created > 0 && (
-                        <Badge variant="secondary" className="text-xs">
-                          {job.chunks_created} chunks
-                        </Badge>
-                      )}
-                      {job.processing_time_ms > 0 && (
-                        <span>{(job.processing_time_ms / 1000).toFixed(1)}s</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+          {failedJobsCount > 0 && (
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg p-3">
+              <div>
+                <span className="text-red-700 font-medium">{failedJobsCount} jobs failed</span>
+                <p className="text-xs text-red-600">You can retry failed jobs or review individual failures</p>
               </div>
-            </ScrollArea>
-          </div>
-        )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetryFailed}
+                className="border-red-200 text-red-700 hover:bg-red-100"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Retry Failed
+              </Button>
+            </div>
+          )}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="jobs">
+                Jobs ({jobs.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                Source ID: <code className="bg-gray-100 px-1 rounded text-xs">{parentSourceId}</code>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="jobs" className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Job Details</span>
+                <Button variant="ghost" size="sm" onClick={loadJobs} disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+              
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {jobs.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-4">
+                    <p className="text-sm">No job details available</p>
+                    <Button variant="ghost" size="sm" onClick={loadJobs} className="mt-2">
+                      Load Jobs
+                    </Button>
+                  </div>
+                ) : (
+                  jobs.map((job) => (
+                    <div key={job.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {getStatusIcon(job.status)}
+                        <span className="truncate">{job.url}</span>
+                      </div>
+                      <Badge variant="outline" className={`ml-2 ${getStatusColor(job.status)}`}>
+                        {job.status}
+                      </Badge>
+                    </div>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
       </CardContent>
     </Card>
   );

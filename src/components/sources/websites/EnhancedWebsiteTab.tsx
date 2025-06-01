@@ -93,44 +93,49 @@ const EnhancedWebsiteTab: React.FC = () => {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {websiteSources.map((source) => (
-                <Card key={source.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold">{source.title}</h3>
-                        <p className="text-sm text-muted-foreground">{source.url}</p>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant={
-                            source.crawl_status === 'completed' ? 'default' :
-                            source.crawl_status === 'failed' ? 'destructive' :
-                            'secondary'
-                          }>
-                            {source.crawl_status}
-                          </Badge>
-                          {source.progress !== null && (
-                            <span className="text-sm text-muted-foreground">
-                              {source.progress}% complete
-                            </span>
+              {websiteSources.map((source) => {
+                // Type assertion for new fields until Supabase types are regenerated
+                const enhancedSource = source as any;
+                
+                return (
+                  <Card key={source.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold">{source.title}</h3>
+                          <p className="text-sm text-muted-foreground">{source.url}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant={
+                              source.crawl_status === 'completed' ? 'default' :
+                              source.crawl_status === 'failed' ? 'destructive' :
+                              'secondary'
+                            }>
+                              {source.crawl_status}
+                            </Badge>
+                            {source.progress !== null && (
+                              <span className="text-sm text-muted-foreground">
+                                {source.progress}% complete
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {source.links_count && (
+                            <div className="text-sm">
+                              <span className="font-medium">{source.links_count}</span> pages
+                            </div>
+                          )}
+                          {enhancedSource.compressed_content_size && enhancedSource.total_content_size && (
+                            <div className="text-xs text-muted-foreground">
+                              {((enhancedSource.total_content_size - enhancedSource.compressed_content_size) / enhancedSource.total_content_size * 100).toFixed(1)}% saved
+                            </div>
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        {source.links_count && (
-                          <div className="text-sm">
-                            <span className="font-medium">{source.links_count}</span> pages
-                          </div>
-                        )}
-                        {source.compressed_content_size && source.total_content_size && (
-                          <div className="text-xs text-muted-foreground">
-                            {((source.total_content_size - source.compressed_content_size) / source.total_content_size * 100).toFixed(1)}% saved
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
