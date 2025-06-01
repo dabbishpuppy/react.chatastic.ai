@@ -23,6 +23,8 @@ interface InvitationResponse {
   success: boolean;
   error?: string;
   invitation_id?: string;
+  team_name?: string;
+  inviter_email?: string;
   message?: string;
 }
 
@@ -90,7 +92,8 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('send_team_invitation', {
+      // Use the new function that handles email sending
+      const { data, error } = await supabase.rpc('send_team_invitation_with_email', {
         team_id_param: selectedTeamId,
         email_param: inviteEmail,
         role_param: selectedRole
@@ -101,10 +104,40 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
       const response = data as unknown as InvitationResponse;
 
       if (response.success) {
-        toast({
-          title: "Invitation sent",
-          description: `Invitation sent to ${inviteEmail} with ${selectedRole} role`
-        });
+        // Send the invitation email
+        try {
+          const emailResponse = await supabase.functions.invoke('send-invitation-email', {
+            body: {
+              invitationId: response.invitation_id,
+              email: inviteEmail,
+              teamName: response.team_name,
+              inviterEmail: response.inviter_email,
+              role: selectedRole
+            }
+          });
+
+          if (emailResponse.error) {
+            console.error('Email sending failed:', emailResponse.error);
+            // Still show success for invitation creation, but warn about email
+            toast({
+              title: "Invitation created",
+              description: `Invitation sent to ${inviteEmail}, but email delivery may have failed. Please contact them directly.`,
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Invitation sent",
+              description: `Invitation email sent to ${inviteEmail} with ${selectedRole} role`
+            });
+          }
+        } catch (emailError) {
+          console.error('Email sending failed:', emailError);
+          toast({
+            title: "Invitation created",
+            description: `Invitation created for ${inviteEmail}, but email delivery failed. Please contact them directly.`,
+            variant: "destructive"
+          });
+        }
         
         setInviteEmail("");
         setSelectedTeamId("");

@@ -10,6 +10,8 @@ export interface TeamMember {
   memberSince: string;
   role: "owner" | "admin" | "member";
   teams: string[];
+  status?: "active" | "pending";
+  invitation_id?: string;
 }
 
 export const useTeamMembers = () => {
@@ -24,7 +26,7 @@ export const useTeamMembers = () => {
     setLoading(true);
     try {
       // Get all team members and their teams
-      const { data: teamMembersData, error } = await supabase
+      const { data: teamMembersData, error: membersError } = await supabase
         .from('team_members')
         .select(`
           user_id,
@@ -36,9 +38,27 @@ export const useTeamMembers = () => {
         `)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (membersError) throw membersError;
 
-      // Group by user_id and aggregate team information
+      // Get pending invitations
+      const { data: invitationsData, error: invitationsError } = await supabase
+        .from('team_invitations')
+        .select(`
+          id,
+          email,
+          role,
+          created_at,
+          teams (
+            name
+          )
+        `)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: true });
+
+      if (invitationsError) throw invitationsError;
+
+      // Group active members by user_id and aggregate team information
       const membersMap = new Map<string, TeamMember>();
 
       teamMembersData?.forEach((member) => {
@@ -63,9 +83,30 @@ export const useTeamMembers = () => {
               day: 'numeric'
             }),
             role: member.role as "owner" | "admin" | "member",
-            teams: [teamName]
+            teams: [teamName],
+            status: "active"
           });
         }
+      });
+
+      // Add pending invitations
+      invitationsData?.forEach((invitation) => {
+        const teamName = (invitation.teams as any)?.name || 'Unknown Team';
+        const invitationId = `invitation-${invitation.id}`;
+
+        membersMap.set(invitationId, {
+          user_id: invitationId,
+          email: invitation.email,
+          memberSince: new Date(invitation.created_at).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          }),
+          role: invitation.role as "owner" | "admin" | "member",
+          teams: [teamName],
+          status: "pending",
+          invitation_id: invitation.id
+        });
       });
 
       setMembers(Array.from(membersMap.values()));

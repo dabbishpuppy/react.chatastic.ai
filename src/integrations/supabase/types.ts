@@ -943,6 +943,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invitation_with_signup: {
+        Args: { invitation_id_param: string; password_param: string }
+        Returns: Json
+      }
       accept_team_invitation: {
         Args: { invitation_id: string }
         Returns: Json
@@ -1017,6 +1021,10 @@ export type Database = {
       get_default_team_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_invitation_details: {
+        Args: { invitation_id_param: string }
+        Returns: Json
       }
       get_team_role: {
         Args: { team_id: string }
@@ -1102,6 +1110,14 @@ export type Database = {
         Returns: Json
       }
       send_team_invitation: {
+        Args: {
+          team_id_param: string
+          email_param: string
+          role_param?: Database["public"]["Enums"]["team_role"]
+        }
+        Returns: Json
+      }
+      send_team_invitation_with_email: {
         Args: {
           team_id_param: string
           email_param: string
