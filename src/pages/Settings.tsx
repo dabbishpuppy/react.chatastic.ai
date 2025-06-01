@@ -1,7 +1,6 @@
 
 import React from "react";
 import { Outlet, useLocation, Navigate } from "react-router-dom";
-import TopNavBar from "@/components/layout/TopNavBar";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { 
   LayoutDashboard, 
@@ -65,41 +64,37 @@ const Settings = () => {
 
   return (
     <ProtectedRoute>
-      <div className="flex flex-col min-h-screen bg-gray-50">
-        <TopNavBar />
-        
-        <div className="flex flex-1">
-          {/* Sidebar */}
-          <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
-            </div>
-            
-            <nav className="flex-1 px-4 pb-4 space-y-1">
-              {settingsNavItems.map((item) => (
-                <a
-                  key={item.path}
-                  href={item.path}
-                  className={`
-                    flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
-                    ${isActiveRoute(item.path)
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }
-                  `}
-                >
-                  {item.icon}
-                  <span className="ml-3">{item.label}</span>
-                </a>
-              ))}
-            </nav>
+      <div className="flex min-h-screen bg-gray-50">
+        {/* Sidebar */}
+        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
           </div>
+          
+          <nav className="flex-1 px-4 pb-4 space-y-1">
+            {settingsNavItems.map((item) => (
+              <a
+                key={item.path}
+                href={item.path}
+                className={`
+                  flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
+                  ${isActiveRoute(item.path)
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }
+                `}
+              >
+                {item.icon}
+                <span className="ml-3">{item.label}</span>
+              </a>
+            ))}
+          </nav>
+        </div>
 
-          {/* Main content */}
-          <div className="flex-1 overflow-auto">
-            <div className="max-w-4xl mx-auto p-6">
-              <Outlet />
-            </div>
+        {/* Main content */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-4xl mx-auto p-6">
+            <Outlet />
           </div>
         </div>
       </div>
