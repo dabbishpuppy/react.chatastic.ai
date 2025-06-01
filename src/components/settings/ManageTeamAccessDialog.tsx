@@ -232,8 +232,8 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="flex gap-2">
+          <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
           {selectedTeamId && (
