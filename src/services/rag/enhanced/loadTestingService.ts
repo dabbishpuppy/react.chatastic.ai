@@ -1,4 +1,3 @@
-
 import { EnhancedCrawlService, EnhancedCrawlRequest } from './enhancedCrawlService';
 import { AutoscalingService } from './autoscalingService';
 import { MonitoringAndAlertingService } from './monitoringAndAlerting';
@@ -179,15 +178,14 @@ export class LoadTestingService {
         const url = config.targetSiteUrls[i % config.targetSiteUrls.length];
         
         const crawlRequest: EnhancedCrawlRequest = {
-          customerId: customer.id,
+          agentId: customer.id, // Changed from customerId to agentId
           url,
-          options: {
-            maxPages: Math.min(10, config.pagesPerCustomer),
-            maxDepth: 2,
-            concurrency: 2,
-            excludePaths: ['/wp-json/*', '/wp-admin/*'],
-            priority: 'normal'
-          }
+          maxPages: Math.min(10, config.pagesPerCustomer),
+          excludePaths: ['/wp-json/*', '/wp-admin/*'],
+          respectRobots: true,
+          enableCompression: true,
+          enableDeduplication: true,
+          maxConcurrentJobs: 2
         };
         
         const crawlStart = Date.now();

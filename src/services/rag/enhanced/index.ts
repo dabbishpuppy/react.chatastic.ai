@@ -1,8 +1,9 @@
+
 // Enhanced RAG Services Phase 5: Production Completion
-export { SummaryEmbeddingModeService } from './summaryEmbeddingModeService';
 export { SecurityService } from './securityService';
 export { LoadTestingService } from './loadTestingService';
 export { InfrastructureMonitoringService } from './infrastructureMonitoringService';
+export { SummaryEmbeddingModeService } from './summaryEmbeddingModeService';
 
 // Phase 4: Monitoring & Alerting
 export { MetricsCollectionService } from './metricsCollectionService';
@@ -35,7 +36,6 @@ export { AdvancedChunkPruningService } from './advancedChunkPruning';
 export { GlobalDeduplicationService } from './globalDeduplication';
 export { ContentProcessingPipeline } from './contentProcessingPipeline';
 export { EnhancedContentProcessor } from './enhancedContentProcessor';
-export { SummaryEmbeddingModeService } from './summaryEmbeddingMode';
 
 // API and Subscriptions
 export { CrawlApiService } from './crawlApi';
