@@ -24,6 +24,7 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
 }) => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [selectedRole, setSelectedRole] = useState<"owner" | "admin" | "member">("member");
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const { toast } = useToast();
 
@@ -73,18 +74,31 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
     // Here you would normally send an invitation
     toast({
       title: "Invitation sent",
-      description: `Invitation sent to ${inviteEmail} for the selected team`
+      description: `Invitation sent to ${inviteEmail} for the selected team with ${selectedRole} role`
     });
     
     setInviteEmail("");
     setSelectedTeamId("");
+    setSelectedRole("member");
     onClose();
   };
 
   const handleClose = () => {
     setInviteEmail("");
     setSelectedTeamId("");
+    setSelectedRole("member");
     onClose();
+  };
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return 'bg-purple-100 text-purple-800';
+      case 'admin':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   return (
@@ -116,6 +130,40 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
                     {team.name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="role">Role</Label>
+            <Select value={selectedRole} onValueChange={(value: "owner" | "admin" | "member") => setSelectedRole(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="member">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getRoleColor('member')}`}>
+                      Member
+                    </span>
+                    <span className="text-sm text-gray-600">Can access team resources</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="admin">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getRoleColor('admin')}`}>
+                      Admin
+                    </span>
+                    <span className="text-sm text-gray-600">Can manage team members</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="owner">
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getRoleColor('owner')}`}>
+                      Owner
+                    </span>
+                    <span className="text-sm text-gray-600">Full team control</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
