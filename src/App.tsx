@@ -12,6 +12,13 @@ import SignIn from '@/pages/SignIn';
 import Register from '@/pages/Register';
 import Dashboard from '@/pages/Dashboard';
 import AgentEnvironment from '@/pages/AgentEnvironment';
+import AnalyticsPage from '@/pages/AnalyticsPage';
+import SourcesPage from '@/pages/SourcesPage';
+import ActionsPage from '@/pages/ActionsPage';
+import ActivityPage from '@/pages/ActivityPage';
+import LeadsPage from '@/pages/LeadsPage';
+import IntegrationsPage from '@/pages/IntegrationsPage';
+import AgentSettingsPage from '@/pages/AgentSettingsPage';
 import Settings from '@/pages/Settings';
 import EmbeddedChat from '@/pages/EmbeddedChat';
 import NotFound from '@/pages/NotFound';
@@ -37,9 +44,52 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              <Route path="/agent/:agentId/*" element={
+              {/* Agent routes - each specific route */}
+              <Route path="/agent/:agentId" element={
                 <ProtectedRoute>
                   <AgentEnvironment />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/analytics" element={
+                <ProtectedRoute>
+                  <AnalyticsPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/sources" element={
+                <ProtectedRoute>
+                  <SourcesPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/actions" element={
+                <ProtectedRoute>
+                  <ActionsPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/activity" element={
+                <ProtectedRoute>
+                  <ActivityPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/activity/leads" element={
+                <ProtectedRoute>
+                  <LeadsPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/integrations" element={
+                <ProtectedRoute>
+                  <IntegrationsPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/settings/*" element={
+                <ProtectedRoute>
+                  <AgentSettingsPage />
                 </ProtectedRoute>
               } />
               
