@@ -52,11 +52,11 @@ export class DatabasePartitioningService {
   static async getPartitionInfo(): Promise<PartitionInfo[]> {
     const partitionInfo: PartitionInfo[] = [];
     
-    // Check existing partitioned tables
+    // Check existing partitioned tables with proper typing
     const partitionedTables = [
       'crawl_jobs_part_0', 'crawl_jobs_part_1', 'crawl_jobs_part_2', 'crawl_jobs_part_3',
       'crawl_jobs_part_4', 'crawl_jobs_part_5', 'crawl_jobs_part_6', 'crawl_jobs_part_7'
-    ];
+    ] as const;
 
     for (const tableName of partitionedTables) {
       try {

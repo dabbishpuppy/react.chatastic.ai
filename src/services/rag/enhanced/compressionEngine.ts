@@ -15,9 +15,9 @@ export class CompressionEngine {
     try {
       console.log(`🗜️ Compressing ${originalSize} bytes with Zstd level ${level}...`);
       
-      // Use dynamic import for fzstd to handle module loading
-      const { compress } = await import('fzstd');
-      const compressed = compress(originalData, level);
+      // Use dynamic import for fzstd with correct API
+      const fzstd = await import('fzstd');
+      const compressed = fzstd.default.compress(originalData, level);
       const compressedSize = compressed.length;
       const ratio = compressedSize / originalSize;
       
@@ -45,9 +45,9 @@ export class CompressionEngine {
     try {
       console.log(`📦 Decompressing ${compressed.length} bytes with Zstd...`);
       
-      // Use dynamic import for fzstd to handle module loading
-      const { decompress } = await import('fzstd');
-      const decompressed = decompress(compressed);
+      // Use dynamic import for fzstd with correct API
+      const fzstd = await import('fzstd');
+      const decompressed = fzstd.default.decompress(compressed);
       const decompressedText = new TextDecoder().decode(decompressed);
       
       console.log(`✅ Zstd decompression: ${compressed.length} → ${decompressed.length} bytes`);
