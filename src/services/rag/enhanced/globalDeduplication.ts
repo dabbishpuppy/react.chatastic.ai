@@ -1,221 +1,342 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { CompressionEngine } from "./compressionEngine";
 
-export interface ChunkProcessingResult {
+export interface DeduplicationResult {
+  isDuplicate: boolean;
+  existingChunkId?: string;
+  newChunkId?: string;
+  refCount: number;
+}
+
+export interface DeduplicationStats {
+  totalChunks: number;
   uniqueChunks: number;
   duplicateChunks: number;
-  totalCompressedSize: number;
-  spaceSaved: number;
-  deduplicationRatio: number;
+  spaceSavedBytes: number;
+  compressionRatio: number;
 }
 
 export class GlobalDeduplicationService {
-  // Process chunks with global deduplication using Zstd compression
-  static async processChunksGlobally(
-    chunks: string[],
+  // Check if content already exists and handle deduplication
+  static async deduplicateContent(
+    content: string,
     sourceId: string,
-    customerId: string
-  ): Promise<ChunkProcessingResult> {
-    let uniqueChunks = 0;
-    let duplicateChunks = 0;
-    let totalCompressedSize = 0;
-    let totalOriginalSize = 0;
-
-    console.log(`🔍 Processing ${chunks.length} chunks with Zstd compression and global deduplication`);
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const contentHash = await CompressionEngine.generateContentHash(chunk);
+    chunkIndex: number = 0
+  ): Promise<DeduplicationResult> {
+    try {
+      // Generate content hash
+      const contentHash = await CompressionEngine.generateContentHash(content);
       
-      // Check if chunk exists in source_chunks table by content_hash
-      const { data: existingChunk } = await supabase
-        .from('source_chunks')
-        .select('id, content')
+      // Check if chunk already exists
+      const { data: existingChunk, error } = await supabase
+        .from('semantic_chunks')
+        .select('id, ref_count, compressed_blob')
         .eq('content_hash', contentHash)
         .single();
 
-      if (existingChunk) {
-        // Chunk exists - create mapping to existing chunk
+      if (existingChunk && !error) {
+        // Chunk exists - increment reference count
+        const newRefCount = existingChunk.ref_count + 1;
+        
+        await supabase
+          .from('semantic_chunks')
+          .update({ 
+            ref_count: newRefCount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingChunk.id);
+
+        // Create mapping to existing chunk
         await supabase
           .from('source_to_chunk_map')
           .insert({
             source_id: sourceId,
             chunk_id: existingChunk.id,
-            chunk_index: i
+            chunk_index: chunkIndex
           });
 
-        duplicateChunks++;
-        console.log(`🔄 Reused existing chunk ${existingChunk.id} (global dedup)`);
+        console.log(`♻️ Reused existing chunk ${existingChunk.id} (global dedup, ref_count: ${newRefCount})`);
+
+        return {
+          isDuplicate: true,
+          existingChunkId: existingChunk.id,
+          refCount: newRefCount
+        };
       } else {
-        // New chunk - compress with Zstd and store
-        const compressionResult = await CompressionEngine.compressForStorage(chunk);
+        // New content - compress and store
+        const compressionResult = await CompressionEngine.compressForStorage(content);
+        const tokenCount = Math.ceil(content.length / 3.5); // Rough token estimation
         
-        const { data: newChunk, error } = await supabase
-          .from('source_chunks')
+        const { data: newChunk, error: insertError } = await supabase
+          .from('semantic_chunks')
           .insert({
-            source_id: sourceId,
-            chunk_index: i,
-            content: chunk,
             content_hash: contentHash,
-            token_count: this.estimateTokens(chunk),
-            metadata: {
-              compressed_blob: compressionResult.compressedData,
-              original_size: compressionResult.originalSize,
-              compressed_size: compressionResult.compressedSize,
-              compression_ratio: compressionResult.compressionRatio,
-              compression_algorithm: 'zstd-level-19'
-            }
+            compressed_blob: compressionResult.compressedData,
+            token_count: tokenCount,
+            ref_count: 1
           })
           .select('id')
           .single();
 
-        if (!error && newChunk) {
+        if (newChunk && !insertError) {
+          // Create mapping to new chunk
           await supabase
             .from('source_to_chunk_map')
             .insert({
               source_id: sourceId,
               chunk_id: newChunk.id,
-              chunk_index: i
+              chunk_index: chunkIndex
             });
 
-          uniqueChunks++;
-          totalCompressedSize += compressionResult.compressedSize;
-          console.log(`✨ Created new Zstd compressed chunk ${newChunk.id} (${(compressionResult.compressionRatio * 100).toFixed(1)}% ratio)`);
+          console.log(`✨ Created new compressed chunk ${newChunk.id} (${(compressionResult.compressionRatio * 100).toFixed(1)}% ratio)`);
+
+          return {
+            isDuplicate: false,
+            newChunkId: newChunk.id,
+            refCount: 1
+          };
+        } else {
+          throw new Error(`Failed to create chunk: ${insertError?.message}`);
         }
       }
-      
-      totalOriginalSize += new TextEncoder().encode(chunk).length;
+    } catch (error) {
+      console.error('Deduplication failed:', error);
+      throw error;
     }
-
-    const spaceSaved = totalOriginalSize - totalCompressedSize;
-    const deduplicationRatio = duplicateChunks / chunks.length;
-
-    console.log(`📊 Zstd compression results: ${totalOriginalSize} → ${totalCompressedSize} bytes (${(totalCompressedSize/totalOriginalSize * 100).toFixed(1)}% ratio)`);
-    console.log(`♻️ Deduplication: ${duplicateChunks}/${chunks.length} chunks (${(deduplicationRatio * 100).toFixed(1)}%) were duplicates`);
-
-    // Update source with compression stats
-    await supabase
-      .from('agent_sources')
-      .update({
-        unique_chunks: uniqueChunks,
-        duplicate_chunks: duplicateChunks,
-        total_content_size: totalOriginalSize,
-        compressed_content_size: totalCompressedSize,
-        global_compression_ratio: totalCompressedSize / totalOriginalSize,
-        compression_algorithm: 'zstd-level-19',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', sourceId);
-
-    return {
-      uniqueChunks,
-      duplicateChunks,
-      totalCompressedSize,
-      spaceSaved,
-      deduplicationRatio
-    };
   }
 
-  // Cleanup orphaned chunks when sources are deleted
-  static async cleanupOrphanedChunks(sourceId: string): Promise<number> {
-    // Get all chunk IDs referenced by this source
-    const { data: chunkMappings } = await supabase
-      .from('source_to_chunk_map')
-      .select('chunk_id')
-      .eq('source_id', sourceId);
+  // Get deduplication statistics for a customer
+  static async getDeduplicationStats(customerId: string): Promise<DeduplicationStats> {
+    try {
+      // Get all chunks referenced by this customer's sources
+      const { data: customerChunks } = await supabase
+        .from('source_to_chunk_map')
+        .select(`
+          chunk_id,
+          semantic_chunks (
+            ref_count,
+            compressed_blob,
+            token_count
+          )
+        `)
+        .in('source_id', 
+          // Subquery to get customer's source IDs
+          supabase
+            .from('agent_sources')
+            .select('id')
+            .eq('team_id', customerId)
+        );
 
-    if (!chunkMappings || chunkMappings.length === 0) {
+      if (!customerChunks || customerChunks.length === 0) {
+        return {
+          totalChunks: 0,
+          uniqueChunks: 0,
+          duplicateChunks: 0,
+          spaceSavedBytes: 0,
+          compressionRatio: 1.0
+        };
+      }
+
+      // Calculate statistics
+      const uniqueChunkIds = new Set(customerChunks.map(c => c.chunk_id));
+      const totalChunks = customerChunks.length;
+      const uniqueChunks = uniqueChunkIds.size;
+      const duplicateChunks = totalChunks - uniqueChunks;
+
+      // Calculate space savings from deduplication
+      let totalOriginalSize = 0;
+      let totalCompressedSize = 0;
+
+      for (const mapping of customerChunks) {
+        const chunk = mapping.semantic_chunks;
+        if (chunk) {
+          // Estimate original size from token count
+          const estimatedOriginalSize = (chunk.token_count || 0) * 3.5;
+          totalOriginalSize += estimatedOriginalSize;
+          
+          // Compressed size from blob
+          const compressedSize = chunk.compressed_blob ? 
+            (chunk.compressed_blob.length * 0.75) : // Base64 overhead estimation
+            estimatedOriginalSize;
+          totalCompressedSize += compressedSize;
+        }
+      }
+
+      const compressionRatio = totalOriginalSize > 0 ? totalCompressedSize / totalOriginalSize : 1.0;
+      const spaceSavedBytes = totalOriginalSize - totalCompressedSize;
+
+      return {
+        totalChunks,
+        uniqueChunks,
+        duplicateChunks,
+        spaceSavedBytes: Math.max(0, spaceSavedBytes),
+        compressionRatio
+      };
+    } catch (error) {
+      console.error('Failed to get deduplication stats:', error);
+      return {
+        totalChunks: 0,
+        uniqueChunks: 0,
+        duplicateChunks: 0,
+        spaceSavedBytes: 0,
+        compressionRatio: 1.0
+      };
+    }
+  }
+
+  // Clean up orphaned chunks (chunks with ref_count = 0)
+  static async cleanupOrphanedChunks(): Promise<number> {
+    try {
+      const { data: orphanedChunks } = await supabase
+        .from('semantic_chunks')
+        .select('id')
+        .eq('ref_count', 0);
+
+      if (!orphanedChunks || orphanedChunks.length === 0) {
+        return 0;
+      }
+
+      const chunkIds = orphanedChunks.map(c => c.id);
+      
+      const { error } = await supabase
+        .from('semantic_chunks')
+        .delete()
+        .in('id', chunkIds);
+
+      if (error) {
+        throw new Error(`Failed to delete orphaned chunks: ${error.message}`);
+      }
+
+      console.log(`🧹 Cleaned up ${chunkIds.length} orphaned chunks`);
+      return chunkIds.length;
+    } catch (error) {
+      console.error('Cleanup of orphaned chunks failed:', error);
       return 0;
     }
-
-    const chunkIds = chunkMappings.map(m => m.chunk_id);
-    
-    // For each chunk, check if it's referenced by other sources
-    for (const chunkId of chunkIds) {
-      const { count } = await supabase
-        .from('source_to_chunk_map')
-        .select('*', { count: 'exact', head: true })
-        .eq('chunk_id', chunkId)
-        .neq('source_id', sourceId);
-
-      if (count === 0) {
-        // No other sources reference this chunk, safe to delete
-        await supabase
-          .from('source_chunks')
-          .delete()
-          .eq('id', chunkId);
-      }
-    }
-
-    // Delete all mappings for this source
-    await supabase
-      .from('source_to_chunk_map')
-      .delete()
-      .eq('source_id', sourceId);
-
-    return chunkIds.length;
   }
 
-  // Get global deduplication statistics with Zstd compression metrics
-  static async getGlobalStats(): Promise<{
-    totalChunks: number;
-    uniqueChunks: number;
-    duplicateReferences: number;
-    compressionRatio: number;
-    spaceSavedGB: number;
-    compressionAlgorithm: string;
-  }> {
-    // Get total unique chunks
-    const { count: uniqueChunks } = await supabase
-      .from('source_chunks')
-      .select('*', { count: 'exact', head: true });
+  // Decrement reference count for chunks when a source is deleted
+  static async decrementChunkReferences(sourceId: string): Promise<number> {
+    try {
+      // Get all chunk mappings for this source
+      const { data: mappings } = await supabase
+        .from('source_to_chunk_map')
+        .select('chunk_id')
+        .eq('source_id', sourceId);
 
-    // Get total references (including duplicates via mappings)
-    const { count: totalReferences } = await supabase
-      .from('source_to_chunk_map')
-      .select('*', { count: 'exact', head: true });
+      if (!mappings || mappings.length === 0) {
+        return 0;
+      }
 
-    const duplicateReferences = (totalReferences || 0) - (uniqueChunks || 0);
+      let decrementedCount = 0;
 
-    // Get Zstd compression stats from metadata
-    const { data: compressionData } = await supabase
-      .from('source_chunks')
-      .select('metadata, token_count');
+      // Decrement ref_count for each chunk
+      for (const mapping of mappings) {
+        const { data: chunk } = await supabase
+          .from('semantic_chunks')
+          .select('ref_count')
+          .eq('id', mapping.chunk_id)
+          .single();
 
-    let totalCompressedBytes = 0;
-    let estimatedOriginalBytes = 0;
-    let compressionAlgorithm = 'zstd-level-19';
+        if (chunk) {
+          const newRefCount = Math.max(0, chunk.ref_count - 1);
+          
+          await supabase
+            .from('semantic_chunks')
+            .update({ 
+              ref_count: newRefCount,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', mapping.chunk_id);
 
-    compressionData?.forEach(chunk => {
-      const metadata = chunk.metadata as any;
-      if (metadata?.compressed_size) {
-        totalCompressedBytes += metadata.compressed_size;
-        estimatedOriginalBytes += metadata.original_size || (chunk.token_count * 4);
-        
-        // Track the compression algorithm used
-        if (metadata.compression_algorithm) {
-          compressionAlgorithm = metadata.compression_algorithm;
+          decrementedCount++;
         }
       }
-    });
 
-    const compressionRatio = estimatedOriginalBytes > 0 ? totalCompressedBytes / estimatedOriginalBytes : 0;
-    const spaceSavedBytes = estimatedOriginalBytes - totalCompressedBytes;
-    const spaceSavedGB = spaceSavedBytes / (1024 * 1024 * 1024);
+      // Delete all mappings for this source
+      await supabase
+        .from('source_to_chunk_map')
+        .delete()
+        .eq('source_id', sourceId);
 
-    console.log(`📈 Global Zstd compression stats: ${(compressionRatio * 100).toFixed(1)}% ratio, ${spaceSavedGB.toFixed(2)}GB saved`);
+      // Clean up any orphaned chunks
+      const cleanedCount = await this.cleanupOrphanedChunks();
 
-    return {
-      totalChunks: totalReferences || 0,
-      uniqueChunks: uniqueChunks || 0,
-      duplicateReferences,
-      compressionRatio,
-      spaceSavedGB,
-      compressionAlgorithm
-    };
+      console.log(`📉 Decremented refs for ${decrementedCount} chunks, cleaned ${cleanedCount} orphaned chunks`);
+      
+      return decrementedCount;
+    } catch (error) {
+      console.error('Failed to decrement chunk references:', error);
+      return 0;
+    }
   }
 
-  private static estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4); // Rough estimation: 1 token ≈ 4 characters
+  // Get global deduplication metrics across all customers
+  static async getGlobalDeduplicationMetrics(): Promise<{
+    totalChunks: number;
+    uniqueChunks: number;
+    avgRefCount: number;
+    totalSpaceSaved: number;
+    topDuplicatedChunks: Array<{ id: string; refCount: number; estimatedSize: number }>;
+  }> {
+    try {
+      const { data: allChunks } = await supabase
+        .from('semantic_chunks')
+        .select('id, ref_count, token_count, compressed_blob')
+        .order('ref_count', { ascending: false })
+        .limit(1000); // Limit for performance
+
+      if (!allChunks || allChunks.length === 0) {
+        return {
+          totalChunks: 0,
+          uniqueChunks: 0,
+          avgRefCount: 0,
+          totalSpaceSaved: 0,
+          topDuplicatedChunks: []
+        };
+      }
+
+      const totalReferences = allChunks.reduce((sum, chunk) => sum + chunk.ref_count, 0);
+      const uniqueChunks = allChunks.length;
+      const avgRefCount = totalReferences / uniqueChunks;
+
+      // Calculate space saved from deduplication
+      let totalSpaceSaved = 0;
+      for (const chunk of allChunks) {
+        if (chunk.ref_count > 1) {
+          const estimatedSize = (chunk.token_count || 0) * 3.5;
+          const spaceSavedForChunk = estimatedSize * (chunk.ref_count - 1);
+          totalSpaceSaved += spaceSavedForChunk;
+        }
+      }
+
+      // Get top duplicated chunks
+      const topDuplicatedChunks = allChunks
+        .filter(chunk => chunk.ref_count > 1)
+        .slice(0, 10)
+        .map(chunk => ({
+          id: chunk.id,
+          refCount: chunk.ref_count,
+          estimatedSize: (chunk.token_count || 0) * 3.5
+        }));
+
+      return {
+        totalChunks: totalReferences,
+        uniqueChunks,
+        avgRefCount,
+        totalSpaceSaved,
+        topDuplicatedChunks
+      };
+    } catch (error) {
+      console.error('Failed to get global deduplication metrics:', error);
+      return {
+        totalChunks: 0,
+        uniqueChunks: 0,
+        avgRefCount: 0,
+        totalSpaceSaved: 0,
+        topDuplicatedChunks: []
+      };
+    }
   }
 }

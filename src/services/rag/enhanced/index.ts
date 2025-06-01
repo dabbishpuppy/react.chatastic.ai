@@ -17,7 +17,11 @@ export { CrawlWorkerService } from './crawlWorker';
 export { EnhancedCrawlService } from './enhancedCrawlService';
 export { CompressionEngine } from './compressionEngine';
 export { ChunkPruningService } from './chunkPruning';
+export { AdvancedChunkPruningService } from './advancedChunkPruning';
 export { GlobalDeduplicationService } from './globalDeduplication';
+export { ContentProcessingPipeline } from './contentProcessingPipeline';
+export { EnhancedContentProcessor } from './enhancedContentProcessor';
+export { SummaryEmbeddingModeService } from './summaryEmbeddingMode';
 
 // API and Subscriptions
 export { CrawlApiService } from './crawlApi';

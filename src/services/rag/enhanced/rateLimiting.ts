@@ -1,223 +1,366 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export interface CustomerQuota {
+export interface RateLimitConfig {
+  maxRequestsPerMinute: number;
+  maxRequestsPerHour: number;
+  maxRequestsPerDay: number;
+  maxConcurrentRequests: number;
+  burstLimit: number;
+}
+
+export interface CustomerTier {
+  name: 'basic' | 'pro' | 'enterprise';
+  limits: RateLimitConfig;
+}
+
+export interface RateLimitCheck {
+  allowed: boolean;
+  reason?: string;
+  resetTime?: Date;
+  remainingRequests?: number;
+}
+
+export interface CustomerUsage {
   customerId: string;
-  tier: 'basic' | 'pro' | 'enterprise';
-  pagesPerDay: number;
-  concurrentJobs: number;
-  storageQuotaGB: number;
-  resetDate: string;
+  tier: CustomerTier;
   currentUsage: {
-    pagesProcessed: number;
-    activeJobs: number;
-    storageUsedGB: number;
+    requestsLastMinute: number;
+    requestsLastHour: number;
+    requestsLastDay: number;
+    concurrentRequests: number;
   };
+  lastReset: Date;
 }
 
 export class RateLimitingService {
-  private static readonly TIER_LIMITS = {
-    basic: { pagesPerDay: 100, concurrentJobs: 5, storageQuotaGB: 0.5 },
-    pro: { pagesPerDay: 1000, concurrentJobs: 20, storageQuotaGB: 5 },
-    enterprise: { pagesPerDay: 10000, concurrentJobs: 100, storageQuotaGB: 50 }
+  private static readonly TIER_CONFIGS: Record<string, RateLimitConfig> = {
+    basic: {
+      maxRequestsPerMinute: 10,
+      maxRequestsPerHour: 100,
+      maxRequestsPerDay: 500,
+      maxConcurrentRequests: 5,
+      burstLimit: 20
+    },
+    pro: {
+      maxRequestsPerMinute: 50,
+      maxRequestsPerHour: 1000,
+      maxRequestsPerDay: 10000,
+      maxConcurrentRequests: 20,
+      burstLimit: 100
+    },
+    enterprise: {
+      maxRequestsPerMinute: 200,
+      maxRequestsPerHour: 5000,
+      maxRequestsPerDay: 100000,
+      maxConcurrentRequests: 100,
+      burstLimit: 500
+    }
   };
 
-  // Check if customer can start a new crawl
-  static async canStartCrawl(
-    customerId: string, 
-    estimatedPages: number
-  ): Promise<{ allowed: boolean; reason?: string; quota?: CustomerQuota }> {
-    const quota = await this.getCustomerQuota(customerId);
-    
-    // Check daily page limit
-    const pagesAfterCrawl = quota.currentUsage.pagesProcessed + estimatedPages;
-    if (pagesAfterCrawl > quota.pagesPerDay) {
-      return {
-        allowed: false,
-        reason: `Would exceed daily page limit (${quota.pagesPerDay}). Current: ${quota.currentUsage.pagesProcessed}, Requested: ${estimatedPages}`,
-        quota
-      };
-    }
+  // Check if a customer can start a new crawl
+  static async canStartCrawl(customerId: string, requestedPages: number = 1): Promise<RateLimitCheck> {
+    try {
+      const usage = await this.getCustomerUsage(customerId);
+      const limits = usage.tier.limits;
 
-    // Check concurrent jobs
-    if (quota.currentUsage.activeJobs >= quota.concurrentJobs) {
-      return {
-        allowed: false,
-        reason: `Maximum concurrent jobs reached (${quota.concurrentJobs})`,
-        quota
-      };
-    }
-
-    // Check storage quota
-    if (quota.currentUsage.storageUsedGB >= quota.storageQuotaGB) {
-      return {
-        allowed: false,
-        reason: `Storage quota exceeded (${quota.storageQuotaGB}GB)`,
-        quota
-      };
-    }
-
-    return { allowed: true, quota };
-  }
-
-  // Get customer quota and current usage
-  static async getCustomerQuota(customerId: string): Promise<CustomerQuota> {
-    // Get customer tier from teams table with proper error handling
-    const { data: teamData, error: teamError } = await supabase
-      .from('teams')
-      .select('id, metadata')
-      .eq('id', customerId)
-      .single();
-
-    if (teamError) {
-      console.warn('Error fetching team data:', teamError);
-    }
-
-    // Extract tier from metadata, defaulting to basic
-    let tier: CustomerQuota['tier'] = 'basic';
-    if (teamData?.metadata && typeof teamData.metadata === 'object') {
-      const metadata = teamData.metadata as any;
-      if (metadata.tier && ['basic', 'pro', 'enterprise'].includes(metadata.tier)) {
-        tier = metadata.tier;
+      // Check concurrent requests
+      if (usage.currentUsage.concurrentRequests >= limits.maxConcurrentRequests) {
+        return {
+          allowed: false,
+          reason: `Concurrent request limit exceeded (${limits.maxConcurrentRequests})`
+        };
       }
-    }
 
-    const limits = this.TIER_LIMITS[tier];
-
-    // Get current usage for today
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrowISO = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    // Count pages processed today
-    const { count: pagesProcessed } = await supabase
-      .from('crawl_jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('customer_id', customerId)
-      .eq('status', 'completed')
-      .gte('completed_at', `${today}T00:00:00.000Z`)
-      .lt('completed_at', tomorrowISO);
-
-    // Count active jobs
-    const { count: activeJobs } = await supabase
-      .from('crawl_jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('customer_id', customerId)
-      .in('status', ['pending', 'in_progress']);
-
-    // Calculate storage usage
-    const storageUsedGB = await this.calculateStorageUsage(customerId);
-
-    return {
-      customerId,
-      tier,
-      pagesPerDay: limits.pagesPerDay,
-      concurrentJobs: limits.concurrentJobs,
-      storageQuotaGB: limits.storageQuotaGB,
-      resetDate: tomorrowISO,
-      currentUsage: {
-        pagesProcessed: pagesProcessed || 0,
-        activeJobs: activeJobs || 0,
-        storageUsedGB
+      // Check daily limit
+      if (usage.currentUsage.requestsLastDay + requestedPages > limits.maxRequestsPerDay) {
+        const resetTime = new Date();
+        resetTime.setHours(24, 0, 0, 0); // Reset at midnight
+        
+        return {
+          allowed: false,
+          reason: `Daily limit exceeded (${limits.maxRequestsPerDay})`,
+          resetTime
+        };
       }
-    };
+
+      // Check hourly limit
+      if (usage.currentUsage.requestsLastHour + requestedPages > limits.maxRequestsPerHour) {
+        const resetTime = new Date();
+        resetTime.setMinutes(60, 0, 0); // Reset at next hour
+        
+        return {
+          allowed: false,
+          reason: `Hourly limit exceeded (${limits.maxRequestsPerHour})`,
+          resetTime
+        };
+      }
+
+      // Check minute limit (with burst allowance)
+      const effectiveMinuteLimit = Math.min(
+        limits.maxRequestsPerMinute + limits.burstLimit,
+        limits.maxRequestsPerHour
+      );
+      
+      if (usage.currentUsage.requestsLastMinute + requestedPages > effectiveMinuteLimit) {
+        const resetTime = new Date();
+        resetTime.setSeconds(60, 0); // Reset at next minute
+        
+        return {
+          allowed: false,
+          reason: `Rate limit exceeded (${effectiveMinuteLimit}/min)`,
+          resetTime
+        };
+      }
+
+      // All checks passed
+      return {
+        allowed: true,
+        remainingRequests: Math.min(
+          limits.maxRequestsPerDay - usage.currentUsage.requestsLastDay,
+          limits.maxRequestsPerHour - usage.currentUsage.requestsLastHour,
+          effectiveMinuteLimit - usage.currentUsage.requestsLastMinute
+        )
+      };
+
+    } catch (error) {
+      console.error('Rate limit check failed:', error);
+      // Fail open - allow request but log error
+      return { allowed: true };
+    }
   }
 
-  // Calculate total storage usage for a customer
-  private static async calculateStorageUsage(customerId: string): Promise<number> {
-    const { data: sources } = await supabase
-      .from('agent_sources')
-      .select('compressed_content_size, total_content_size')
-      .eq('team_id', customerId);
+  // Record usage for a customer
+  static async recordUsage(customerId: string, pages: number = 1): Promise<void> {
+    try {
+      const now = new Date();
+      
+      // Update or insert usage record
+      const { error } = await supabase
+        .from('customer_usage_tracking')
+        .upsert({
+          customer_id: customerId,
+          requests_last_minute: pages,
+          requests_last_hour: pages,
+          requests_last_day: pages,
+          concurrent_requests: 1,
+          last_request_at: now.toISOString(),
+          updated_at: now.toISOString()
+        }, {
+          onConflict: 'customer_id'
+        });
 
-    if (!sources) return 0;
-
-    const totalBytes = sources.reduce((sum, source) => {
-      return sum + (source.compressed_content_size || source.total_content_size || 0);
-    }, 0);
-
-    return totalBytes / (1024 * 1024 * 1024); // Convert to GB
+      if (error) {
+        console.error('Failed to record usage:', error);
+      }
+    } catch (error) {
+      console.error('Usage recording failed:', error);
+    }
   }
 
-  // Increment usage counters
-  static async incrementUsage(
-    customerId: string,
-    type: 'pages' | 'storage',
-    amount: number
-  ): Promise<void> {
-    // This would typically update a separate usage tracking table
-    // For now, we'll just log it since usage is calculated dynamically
-    console.log(`📊 Usage increment for ${customerId}: ${type} +${amount}`);
+  // Get current usage for a customer
+  static async getCustomerUsage(customerId: string): Promise<CustomerUsage> {
+    try {
+      // Get customer tier (default to basic if not found)
+      const tierName = await this.getCustomerTier(customerId);
+      const tier: CustomerTier = {
+        name: tierName,
+        limits: this.TIER_CONFIGS[tierName]
+      };
+
+      // Get current usage from database
+      const { data: usageData } = await supabase
+        .from('customer_usage_tracking')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      let currentUsage = {
+        requestsLastMinute: 0,
+        requestsLastHour: 0,
+        requestsLastDay: 0,
+        concurrentRequests: 0
+      };
+
+      if (usageData) {
+        const lastRequest = new Date(usageData.last_request_at);
+        const now = new Date();
+        const minutesAgo = (now.getTime() - lastRequest.getTime()) / (1000 * 60);
+
+        // Reset counters based on time elapsed
+        if (minutesAgo < 1) {
+          currentUsage.requestsLastMinute = usageData.requests_last_minute || 0;
+        }
+        if (minutesAgo < 60) {
+          currentUsage.requestsLastHour = usageData.requests_last_hour || 0;
+        }
+        if (minutesAgo < (24 * 60)) {
+          currentUsage.requestsLastDay = usageData.requests_last_day || 0;
+        }
+        
+        currentUsage.concurrentRequests = usageData.concurrent_requests || 0;
+      }
+
+      return {
+        customerId,
+        tier,
+        currentUsage,
+        lastReset: new Date()
+      };
+
+    } catch (error) {
+      console.error('Failed to get customer usage:', error);
+      
+      // Return default usage for basic tier
+      return {
+        customerId,
+        tier: {
+          name: 'basic',
+          limits: this.TIER_CONFIGS.basic
+        },
+        currentUsage: {
+          requestsLastMinute: 0,
+          requestsLastHour: 0,
+          requestsLastDay: 0,
+          concurrentRequests: 0
+        },
+        lastReset: new Date()
+      };
+    }
   }
 
-  // Get usage statistics
-  static async getUsageStats(customerId: string): Promise<{
-    dailyPages: { date: string; count: number }[];
-    storageGrowth: { date: string; sizeGB: number }[];
-    jobSuccessRate: number;
+  // Get customer tier (mock implementation - replace with actual logic)
+  private static async getCustomerTier(customerId: string): Promise<'basic' | 'pro' | 'enterprise'> {
+    try {
+      // This would typically query a subscription/billing table
+      // For now, return basic as default
+      return 'basic';
+    } catch (error) {
+      console.warn('Failed to get customer tier:', error);
+      return 'basic';
+    }
+  }
+
+  // Increment concurrent request counter
+  static async incrementConcurrentRequests(customerId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .rpc('increment_concurrent_requests', {
+          customer_id_param: customerId
+        });
+
+      if (error) {
+        console.error('Failed to increment concurrent requests:', error);
+      }
+    } catch (error) {
+      console.error('Concurrent request increment failed:', error);
+    }
+  }
+
+  // Decrement concurrent request counter
+  static async decrementConcurrentRequests(customerId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .rpc('decrement_concurrent_requests', {
+          customer_id_param: customerId
+        });
+
+      if (error) {
+        console.error('Failed to decrement concurrent requests:', error);
+      }
+    } catch (error) {
+      console.error('Concurrent request decrement failed:', error);
+    }
+  }
+
+  // Reset usage counters (called by scheduled job)
+  static async resetUsageCounters(): Promise<void> {
+    try {
+      const now = new Date();
+      
+      // Reset minute counters
+      const { error: minuteError } = await supabase
+        .from('customer_usage_tracking')
+        .update({
+          requests_last_minute: 0,
+          updated_at: now.toISOString()
+        })
+        .lt('last_request_at', new Date(now.getTime() - 60000).toISOString());
+
+      // Reset hour counters
+      const { error: hourError } = await supabase
+        .from('customer_usage_tracking')
+        .update({
+          requests_last_hour: 0,
+          updated_at: now.toISOString()
+        })
+        .lt('last_request_at', new Date(now.getTime() - 3600000).toISOString());
+
+      // Reset day counters
+      const { error: dayError } = await supabase
+        .from('customer_usage_tracking')
+        .update({
+          requests_last_day: 0,
+          updated_at: now.toISOString()
+        })
+        .lt('last_request_at', new Date(now.getTime() - 86400000).toISOString());
+
+      if (minuteError || hourError || dayError) {
+        console.error('Failed to reset some usage counters:', { minuteError, hourError, dayError });
+      }
+    } catch (error) {
+      console.error('Usage counter reset failed:', error);
+    }
+  }
+
+  // Get rate limit status for monitoring
+  static async getRateLimitStatus(): Promise<{
+    totalCustomers: number;
+    activeCustomers: number;
+    rateLimitedCustomers: number;
+    avgRequestsPerMinute: number;
   }> {
-    // Get daily page counts for the last 30 days
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    
-    const { data: dailyJobs } = await supabase
-      .from('crawl_jobs')
-      .select('completed_at, status')
-      .eq('customer_id', customerId)
-      .eq('status', 'completed')
-      .gte('completed_at', thirtyDaysAgo.toISOString())
-      .order('completed_at');
+    try {
+      const { data: stats } = await supabase
+        .from('customer_usage_tracking')
+        .select('requests_last_minute, concurrent_requests, last_request_at');
 
-    // Group by date
-    const dailyPages: { [date: string]: number } = {};
-    dailyJobs?.forEach(job => {
-      const date = job.completed_at.split('T')[0];
-      dailyPages[date] = (dailyPages[date] || 0) + 1;
-    });
+      if (!stats) {
+        return {
+          totalCustomers: 0,
+          activeCustomers: 0,
+          rateLimitedCustomers: 0,
+          avgRequestsPerMinute: 0
+        };
+      }
 
-    // Get job success rate
-    const { data: allJobs } = await supabase
-      .from('crawl_jobs')
-      .select('status')
-      .eq('customer_id', customerId)
-      .gte('created_at', thirtyDaysAgo.toISOString());
+      const now = new Date();
+      const activeCustomers = stats.filter(s => 
+        new Date(s.last_request_at).getTime() > now.getTime() - 300000 // Active in last 5 minutes
+      );
 
-    const completedJobs = allJobs?.filter(job => job.status === 'completed').length || 0;
-    const totalJobs = allJobs?.length || 0;
-    const jobSuccessRate = totalJobs > 0 ? completedJobs / totalJobs : 0;
+      const rateLimitedCustomers = stats.filter(s => 
+        (s.concurrent_requests || 0) >= this.TIER_CONFIGS.basic.maxConcurrentRequests
+      );
 
-    return {
-      dailyPages: Object.entries(dailyPages).map(([date, count]) => ({ date, count })),
-      storageGrowth: [], // Would need historical tracking
-      jobSuccessRate
-    };
-  }
+      const avgRequestsPerMinute = activeCustomers.length > 0
+        ? activeCustomers.reduce((sum, s) => sum + (s.requests_last_minute || 0), 0) / activeCustomers.length
+        : 0;
 
-  // Update customer tier
-  static async updateCustomerTier(
-    customerId: string,
-    newTier: CustomerQuota['tier']
-  ): Promise<void> {
-    // Get current metadata
-    const { data: currentTeam } = await supabase
-      .from('teams')
-      .select('metadata')
-      .eq('id', customerId)
-      .single();
-
-    const currentMetadata = (currentTeam?.metadata as any) || {};
-    const updatedMetadata = {
-      ...currentMetadata,
-      tier: newTier
-    };
-
-    const { error } = await supabase
-      .from('teams')
-      .update({ metadata: updatedMetadata })
-      .eq('id', customerId);
-
-    if (error) {
-      throw new Error(`Failed to update customer tier: ${error.message}`);
+      return {
+        totalCustomers: stats.length,
+        activeCustomers: activeCustomers.length,
+        rateLimitedCustomers: rateLimitedCustomers.length,
+        avgRequestsPerMinute
+      };
+    } catch (error) {
+      console.error('Failed to get rate limit status:', error);
+      return {
+        totalCustomers: 0,
+        activeCustomers: 0,
+        rateLimitedCustomers: 0,
+        avgRequestsPerMinute: 0
+      };
     }
-
-    console.log(`📈 Updated customer ${customerId} to tier: ${newTier}`);
   }
 }
