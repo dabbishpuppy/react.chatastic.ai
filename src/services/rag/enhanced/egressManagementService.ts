@@ -1,4 +1,3 @@
-
 import { IPPoolService } from "./ipPoolService";
 import { AlertingService } from "./alertingService";
 
@@ -12,7 +11,7 @@ export interface EgressRequest {
   retries?: number;
   priority: 'low' | 'normal' | 'high';
   customerId: string;
-  sourceType: 'crawl' | 'api' | 'webhook';
+  sourceType: 'crawl' | 'api' | 'bulk'; // Fixed: changed 'webhook' to 'bulk';
 }
 
 export interface EgressResponse {

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export class CompressionEngine {
@@ -14,9 +15,13 @@ export class CompressionEngine {
     try {
       console.log(`🗜️ Compressing ${originalSize} bytes with Zstd level ${level}...`);
       
-      // Use dynamic import for fzstd with correct compress function
-      const { compress } = await import('fzstd');
-      const compressed = compress(originalData, level);
+      // Use dynamic import for fzstd with correct API
+      const fzstd = await import('fzstd');
+      // Use the default export which should have the compress method
+      const compressed = fzstd.default.compress ? 
+        fzstd.default.compress(originalData, level) : 
+        fzstd.default(originalData, level);
+      
       const compressedSize = compressed.length;
       const ratio = compressedSize / originalSize;
       
