@@ -18,19 +18,6 @@ interface InvitationDetails {
   expires_at: string;
 }
 
-interface InvitationDetailsResponse {
-  success: boolean;
-  error?: string;
-  invitation?: InvitationDetails;
-}
-
-interface AcceptInvitationResponse {
-  success: boolean;
-  error?: string;
-  team_id?: string;
-  role?: string;
-}
-
 const AcceptInvitation: React.FC = () => {
   const { invitationId } = useParams<{ invitationId: string }>();
   const navigate = useNavigate();
@@ -57,12 +44,10 @@ const AcceptInvitation: React.FC = () => {
 
       if (error) throw error;
 
-      const response = data as unknown as InvitationDetailsResponse;
-
-      if (response.success) {
-        setInvitation(response.invitation!);
+      if (data.success) {
+        setInvitation(data.invitation);
       } else {
-        setError(response.error || 'Unknown error');
+        setError(data.error);
       }
     } catch (error: any) {
       console.error('Error fetching invitation:', error);
@@ -135,15 +120,13 @@ const AcceptInvitation: React.FC = () => {
 
         if (acceptError) throw acceptError;
 
-        const acceptResponse = acceptData as unknown as AcceptInvitationResponse;
-
         // Add user to team
         const { error: teamError } = await supabase
           .from('team_members')
           .insert({
-            team_id: acceptResponse.team_id,
+            team_id: acceptData.team_id,
             user_id: signUpData.user.id,
-            role: acceptResponse.role
+            role: acceptData.role
           });
 
         if (teamError && !teamError.message.includes('duplicate')) {
