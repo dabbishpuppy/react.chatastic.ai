@@ -81,7 +81,7 @@ const TeamInvitations: React.FC = () => {
 
       if (error) throw error;
 
-      const response = data as AcceptInvitationResponse;
+      const response = data as unknown as AcceptInvitationResponse;
 
       if (response.success) {
         toast({

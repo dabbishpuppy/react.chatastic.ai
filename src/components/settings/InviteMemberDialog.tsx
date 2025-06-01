@@ -98,7 +98,7 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
 
       if (error) throw error;
 
-      const response = data as InvitationResponse;
+      const response = data as unknown as InvitationResponse;
 
       if (response.success) {
         toast({
