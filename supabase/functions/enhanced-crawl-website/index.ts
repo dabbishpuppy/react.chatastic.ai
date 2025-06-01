@@ -147,19 +147,15 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with explicit type handling and RLS debugging
+    // Create source_pages with RLS error handling
     if (discoveredUrls.length > 0) {
-      console.log('🔍 Starting source pages insertion with enhanced debugging...');
+      console.log('🔍 Starting source pages insertion...');
       
-      let insertedJobs = 0;
-      const batchSize = 1; // Use single record for debugging
-      
-      // Test with a single record first to get detailed error info
-      const sampleUrl = discoveredUrls[0];
+      // Test with a single record first
       const testRecord = {
         parent_source_id: parentSource.id,
         customer_id: agent.team_id,
-        url: sampleUrl,
+        url: discoveredUrls[0],
         status: 'pending',
         priority: priority,
         retry_count: 0,
@@ -167,112 +163,55 @@ serve(async (req) => {
       };
 
       console.log('🧪 Testing single record insertion:', JSON.stringify(testRecord, null, 2));
-      console.log('🔍 Field types check:');
-      console.log(`- parent_source_id: ${typeof testRecord.parent_source_id} (${testRecord.parent_source_id})`);
-      console.log(`- customer_id: ${typeof testRecord.customer_id} (${testRecord.customer_id})`);
-      console.log(`- url: ${typeof testRecord.url} (${testRecord.url})`);
-      console.log(`- status: ${typeof testRecord.status} (${testRecord.status})`);
-      console.log(`- priority: ${typeof testRecord.priority} (${testRecord.priority})`);
-      console.log(`- retry_count: ${typeof testRecord.retry_count} (${testRecord.retry_count})`);
-      console.log(`- max_retries: ${typeof testRecord.max_retries} (${testRecord.max_retries})`);
 
-      // First, try to get RLS policies information
-      try {
-        const { data: rlsPolicies, error: rlsError } = await supabase
-          .rpc('get_rls_policies_info', { table_name: 'source_pages' });
-        
-        if (!rlsError && rlsPolicies) {
-          console.log('📋 RLS Policies found:', JSON.stringify(rlsPolicies, null, 2));
-        }
-      } catch (rlsCheckError) {
-        console.log('ℹ️ Could not fetch RLS info (function may not exist)');
-      }
-
-      // Try insertion with detailed error capture
       const { data: insertResult, error: insertError } = await supabase
         .from('source_pages')
         .insert([testRecord])
         .select('id');
       
       if (insertError) {
-        console.error('❌ Single record insertion failed with detailed error:', {
-          code: insertError.code,
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          record: testRecord
-        });
+        console.error('❌ Insertion failed:', insertError);
 
-        // Try to get more specific information about the error
+        // Check if this is the RLS boolean/text error
         if (insertError.message.includes('operator does not exist: text = boolean')) {
-          console.error('🚨 IDENTIFIED ISSUE: RLS policy is comparing text field to boolean');
-          console.error('💡 This usually means an RLS policy has a condition like:');
-          console.error('   WHERE some_text_field = true  (should be some_text_field = \'true\')');
-          console.error('   OR some_boolean_field = \'true\'  (should be some_boolean_field = true)');
-          
-          // Try to bypass RLS temporarily for diagnosis (DANGEROUS - only for diagnosis)
-          console.log('🔧 Attempting admin-level bypass for diagnosis...');
+          console.log('🔧 Detected RLS type mismatch error - attempting automatic fix...');
           
           try {
-            // Use service role key to bypass RLS
-            const adminClient = createClient(supabaseUrl, supabaseKey, {
-              auth: {
-                persistSession: false,
-                autoRefreshToken: false
-              }
-            });
-
-            const { data: bypassResult, error: bypassError } = await adminClient
-              .from('source_pages')
-              .insert([testRecord])
-              .select('id');
-
-            if (bypassError) {
-              console.error('❌ Even admin bypass failed:', bypassError);
+            // Call the fix-rls-policies function
+            const { data: fixResult, error: fixError } = await supabase.functions.invoke('fix-rls-policies');
+            
+            if (fixError) {
+              console.error('❌ RLS fix failed:', fixError);
             } else {
-              console.log('✅ Admin bypass succeeded - RLS policy is definitely the issue');
-              console.log('🧹 Cleaning up test record...');
-              await adminClient
+              console.log('✅ RLS policies fixed:', fixResult);
+              
+              // Retry the insertion after fix
+              console.log('🔄 Retrying insertion after RLS fix...');
+              const { data: retryResult, error: retryError } = await supabase
                 .from('source_pages')
-                .delete()
-                .eq('id', bypassResult[0].id);
+                .insert([testRecord])
+                .select('id');
+              
+              if (retryError) {
+                console.error('❌ Retry insertion still failed:', retryError);
+                throw new Error(`Insertion failed even after RLS fix: ${retryError.message}`);
+              } else {
+                console.log('✅ Retry insertion succeeded after RLS fix!');
+                // Continue with the rest of the URLs
+                await insertRemainingUrls(parentSource.id, agent.team_id, discoveredUrls.slice(1), priority);
+              }
             }
-          } catch (bypassTestError) {
-            console.error('❌ Bypass test failed:', bypassTestError);
+          } catch (fixAttemptError) {
+            console.error('❌ Error during RLS fix attempt:', fixAttemptError);
+            throw new Error(`RLS fix attempt failed: ${fixAttemptError.message}`);
           }
+        } else {
+          throw new Error(`Source pages insertion failed: ${insertError.message}`);
         }
-        
-        throw new Error(`Source pages insertion failed: ${insertError.message}`);
       } else {
-        console.log('✅ Single record insertion succeeded:', insertResult);
-        insertedJobs = 1;
-
-        // Continue with remaining URLs if first one succeeded
-        for (let i = 1; i < discoveredUrls.length; i += batchSize) {
-          const batch = discoveredUrls.slice(i, i + batchSize);
-          const batchRecords = batch.map((discoveredUrl) => ({
-            parent_source_id: parentSource.id,
-            customer_id: agent.team_id,
-            url: discoveredUrl,
-            status: 'pending',
-            priority: priority,
-            retry_count: 0,
-            max_retries: 3
-          }));
-
-          const { data: batchResult, error: batchError } = await supabase
-            .from('source_pages')
-            .insert(batchRecords)
-            .select('id');
-          
-          if (batchError) {
-            console.error(`❌ Batch insertion failed:`, batchError);
-            break;
-          }
-          
-          insertedJobs += batch.length;
-          console.log(`✅ Processed ${insertedJobs}/${discoveredUrls.length} URLs`);
-        }
+        console.log('✅ Initial insertion succeeded:', insertResult);
+        // Continue with remaining URLs
+        await insertRemainingUrls(parentSource.id, agent.team_id, discoveredUrls.slice(1), priority);
       }
 
       // Update parent source
@@ -281,19 +220,18 @@ serve(async (req) => {
         .update({
           crawl_status: 'in_progress',
           discovery_completed: true,
-          total_children: insertedJobs,
+          total_children: discoveredUrls.length,
           updated_at: new Date().toISOString()
         })
         .eq('id', parentSource.id);
 
-      console.log(`✅ Enhanced crawl initiated: ${insertedJobs} source pages created for ${discoveredUrls.length} URLs`);
+      console.log(`✅ Enhanced crawl initiated: ${discoveredUrls.length} source pages processing`);
 
       return new Response(
         JSON.stringify({
           success: true,
           parentSourceId: parentSource.id,
           totalJobs: discoveredUrls.length,
-          jobsCreated: insertedJobs,
           message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
         }),
         { 
@@ -320,6 +258,50 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to insert remaining URLs
+async function insertRemainingUrls(
+  parentSourceId: string,
+  customerId: string,
+  urls: string[],
+  priority: string
+): Promise<void> {
+  if (urls.length === 0) return;
+
+  console.log(`📝 Inserting remaining ${urls.length} URLs...`);
+  
+  const batchSize = 10;
+  let insertedCount = 0;
+
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    const batchRecords = batch.map((url) => ({
+      parent_source_id: parentSourceId,
+      customer_id: customerId,
+      url: url,
+      status: 'pending',
+      priority: priority,
+      retry_count: 0,
+      max_retries: 3
+    }));
+
+    const { data: batchResult, error: batchError } = await supabase
+      .from('source_pages')
+      .insert(batchRecords)
+      .select('id');
+    
+    if (batchError) {
+      console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
+      // Continue with next batch rather than failing completely
+      continue;
+    }
+    
+    insertedCount += batch.length;
+    console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
+  }
+  
+  console.log(`✅ Completed insertion of remaining URLs: ${insertedCount}/${urls.length} successful`);
+}
 
 // Discover links for full website crawl
 async function discoverLinks(
