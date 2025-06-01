@@ -17,6 +17,18 @@ interface MemberTableRowProps {
   canManageTeamMembers?: boolean;
 }
 
+interface InvitationDetailsResponse {
+  success: boolean;
+  invitation?: {
+    id: string;
+    email: string;
+    role: string;
+    team_name: string;
+    inviter_email: string;
+  };
+  error?: string;
+}
+
 const MemberTableRow: React.FC<MemberTableRowProps> = ({
   member,
   onManageTeams,
@@ -57,8 +69,10 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
 
       if (error) throw error;
 
-      if (data.success) {
-        const invitation = data.invitation;
+      const response = data as InvitationDetailsResponse;
+
+      if (response.success) {
+        const invitation = response.invitation!;
         
         // Send the invitation email
         const emailResponse = await supabase.functions.invoke('send-invitation-email', {
@@ -80,7 +94,7 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
           description: `Invitation email resent to ${member.email}`,
         });
       } else {
-        throw new Error(data.error);
+        throw new Error(response.error);
       }
     } catch (error: any) {
       console.error('Error resending invitation:', error);

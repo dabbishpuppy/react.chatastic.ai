@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,20 @@ interface InvitationDetails {
   team_name: string;
   inviter_email: string;
   expires_at: string;
+}
+
+interface InvitationDetailsResponse {
+  success: boolean;
+  invitation?: InvitationDetails;
+  error?: string;
+}
+
+interface AcceptInvitationResponse {
+  success: boolean;
+  team_id?: string;
+  role?: string;
+  email?: string;
+  error?: string;
 }
 
 const AcceptInvitation: React.FC = () => {
@@ -44,10 +57,12 @@ const AcceptInvitation: React.FC = () => {
 
       if (error) throw error;
 
-      if (data.success) {
-        setInvitation(data.invitation);
+      const response = data as InvitationDetailsResponse;
+
+      if (response.success) {
+        setInvitation(response.invitation!);
       } else {
-        setError(data.error);
+        setError(response.error);
       }
     } catch (error: any) {
       console.error('Error fetching invitation:', error);
@@ -120,13 +135,15 @@ const AcceptInvitation: React.FC = () => {
 
         if (acceptError) throw acceptError;
 
+        const acceptResponse = acceptData as AcceptInvitationResponse;
+
         // Add user to team
         const { error: teamError } = await supabase
           .from('team_members')
           .insert({
-            team_id: acceptData.team_id,
+            team_id: acceptResponse.team_id,
             user_id: signUpData.user.id,
-            role: acceptData.role
+            role: acceptResponse.role
           });
 
         if (teamError && !teamError.message.includes('duplicate')) {
