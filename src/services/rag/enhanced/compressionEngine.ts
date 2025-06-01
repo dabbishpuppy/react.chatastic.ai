@@ -1,6 +1,5 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { compress as zstdCompress, decompress as zstdDecompress } from 'fzstd';
 
 export class CompressionEngine {
   // Actual Zstd compression with configurable levels
@@ -16,8 +15,9 @@ export class CompressionEngine {
     try {
       console.log(`🗜️ Compressing ${originalSize} bytes with Zstd level ${level}...`);
       
-      // Use actual Zstd compression
-      const compressed = zstdCompress(originalData, level);
+      // Use dynamic import for fzstd to handle module loading
+      const { compress } = await import('fzstd');
+      const compressed = compress(originalData, level);
       const compressedSize = compressed.length;
       const ratio = compressedSize / originalSize;
       
@@ -45,8 +45,9 @@ export class CompressionEngine {
     try {
       console.log(`📦 Decompressing ${compressed.length} bytes with Zstd...`);
       
-      // Use actual Zstd decompression
-      const decompressed = zstdDecompress(compressed);
+      // Use dynamic import for fzstd to handle module loading
+      const { decompress } = await import('fzstd');
+      const decompressed = decompress(compressed);
       const decompressedText = new TextDecoder().decode(decompressed);
       
       console.log(`✅ Zstd decompression: ${compressed.length} → ${decompressed.length} bytes`);
