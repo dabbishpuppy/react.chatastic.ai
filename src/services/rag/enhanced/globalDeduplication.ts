@@ -109,6 +109,24 @@ export class GlobalDeduplicationService {
   // Get deduplication statistics for a customer
   static async getDeduplicationStats(customerId: string): Promise<DeduplicationStats> {
     try {
+      // Get all source IDs for this customer
+      const { data: sources } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('team_id', customerId);
+
+      if (!sources || sources.length === 0) {
+        return {
+          totalChunks: 0,
+          uniqueChunks: 0,
+          duplicateChunks: 0,
+          spaceSavedBytes: 0,
+          compressionRatio: 1.0
+        };
+      }
+
+      const sourceIds = sources.map(s => s.id);
+
       // Get all chunks referenced by this customer's sources
       const { data: customerChunks } = await supabase
         .from('source_to_chunk_map')
@@ -120,13 +138,7 @@ export class GlobalDeduplicationService {
             token_count
           )
         `)
-        .in('source_id', 
-          // Subquery to get customer's source IDs
-          supabase
-            .from('agent_sources')
-            .select('id')
-            .eq('team_id', customerId)
-        );
+        .in('source_id', sourceIds);
 
       if (!customerChunks || customerChunks.length === 0) {
         return {
@@ -181,6 +193,60 @@ export class GlobalDeduplicationService {
         duplicateChunks: 0,
         spaceSavedBytes: 0,
         compressionRatio: 1.0
+      };
+    }
+  }
+
+  // Get global deduplication statistics (added missing method)
+  static async getGlobalStats(): Promise<{
+    totalChunks: number;
+    uniqueChunks: number;
+    duplicateReferences: number;
+    compressionRatio: number;
+    spaceSavedGB: number;
+  }> {
+    try {
+      // Get all semantic chunks
+      const { data: chunks } = await supabase
+        .from('semantic_chunks')
+        .select('ref_count, token_count');
+
+      if (!chunks || chunks.length === 0) {
+        return {
+          totalChunks: 0,
+          uniqueChunks: 0,
+          duplicateReferences: 0,
+          compressionRatio: 1.0,
+          spaceSavedGB: 0
+        };
+      }
+
+      const uniqueChunks = chunks.length;
+      const totalReferences = chunks.reduce((sum, chunk) => sum + chunk.ref_count, 0);
+      const duplicateReferences = totalReferences - uniqueChunks;
+
+      // Calculate space savings (rough estimation)
+      const totalOriginalSize = chunks.reduce((sum, chunk) => sum + (chunk.token_count * 3.5), 0);
+      const estimatedCompressionRatio = 0.3; // Assume 30% compression ratio
+      const totalCompressedSize = totalOriginalSize * estimatedCompressionRatio;
+      const spaceSavedBytes = totalOriginalSize - totalCompressedSize;
+      const spaceSavedGB = spaceSavedBytes / (1024 * 1024 * 1024);
+
+      return {
+        totalChunks: totalReferences,
+        uniqueChunks,
+        duplicateReferences,
+        compressionRatio: estimatedCompressionRatio,
+        spaceSavedGB: Math.max(0, spaceSavedGB)
+      };
+    } catch (error) {
+      console.error('Failed to get global deduplication stats:', error);
+      return {
+        totalChunks: 0,
+        uniqueChunks: 0,
+        duplicateReferences: 0,
+        compressionRatio: 1.0,
+        spaceSavedGB: 0
       };
     }
   }
