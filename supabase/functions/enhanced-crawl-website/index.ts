@@ -122,10 +122,7 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // First, let's check the source_pages table schema to understand the exact column requirements
-    console.log('🔍 Checking source_pages table schema...');
-    
-    // Create source_pages with schema-compliant data types
+    // Create source_pages with exact schema compliance
     if (discoveredUrls.length > 0) {
       console.log('🔍 Starting source pages insertion...');
       
@@ -201,82 +198,51 @@ async function insertSourcePagesInBatches(
 ): Promise<void> {
   console.log(`📝 Inserting ${urls.length} URLs in batches...`);
   
-  const batchSize = 5; // Smaller batches for better error isolation
+  const batchSize = 10;
   let insertedCount = 0;
   let failedCount = 0;
 
-  // First, let's try inserting a single record to test the exact schema requirements
-  const testRecord = {
-    parent_source_id: parentSourceId,
-    customer_id: teamId,
-    url: urls[0],
-    status: 'pending',
-    priority: priority,
-    retry_count: 0,
-    max_retries: 3,
-    created_at: new Date().toISOString()
-  };
+  // Process URLs in batches
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    
+    // Create batch records with EXACT schema compliance
+    const batchRecords = batch.map((url) => ({
+      parent_source_id: parentSourceId,
+      customer_id: teamId,
+      url: url,
+      status: 'pending', // TEXT field - ensure it's a string
+      priority: priority, // TEXT field - ensure it's a string  
+      retry_count: 0, // INTEGER field
+      max_retries: 3, // INTEGER field
+      created_at: new Date().toISOString() // TIMESTAMP field
+    }));
 
-  console.log('🧪 Testing single record insertion:', JSON.stringify(testRecord, null, 2));
+    console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
+    console.log('🔍 Sample record:', JSON.stringify(batchRecords[0], null, 2));
 
-  try {
-    const { data: testResult, error: testError } = await supabase
-      .from('source_pages')
-      .insert([testRecord])
-      .select('id, status, url');
-    
-    if (testError) {
-      console.error('❌ Test insertion failed:', testError);
-      console.error('❌ Full error object:', JSON.stringify(testError, null, 2));
-      throw new Error(`Schema validation failed: ${testError.message}`);
-    }
-    
-    console.log('✅ Test insertion successful:', testResult);
-    insertedCount = 1;
-    
-    // If test passed, continue with remaining URLs
-    const remainingUrls = urls.slice(1);
-    
-    for (let i = 0; i < remainingUrls.length; i += batchSize) {
-      const batch = remainingUrls.slice(i, i + batchSize);
+    try {
+      const { data: batchResult, error: batchError } = await supabase
+        .from('source_pages')
+        .insert(batchRecords)
+        .select('id');
       
-      // Create batch records with exact same structure as test record
-      const batchRecords = batch.map((url) => ({
-        parent_source_id: parentSourceId,
-        customer_id: teamId,
-        url: url,
-        status: 'pending',
-        priority: priority,
-        retry_count: 0,
-        max_retries: 3,
-        created_at: new Date().toISOString()
-      }));
-
-      console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
-
-      try {
-        const { data: batchResult, error: batchError } = await supabase
-          .from('source_pages')
-          .insert(batchRecords)
-          .select('id');
-        
-        if (batchError) {
-          console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
-          console.error(`❌ Full batch error:`, JSON.stringify(batchError, null, 2));
-          failedCount += batch.length;
-        } else {
-          insertedCount += batch.length;
-          console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
-        }
-      } catch (unexpectedError) {
-        console.error(`❌ Unexpected error in batch ${Math.floor(i/batchSize) + 1}:`, unexpectedError);
+      if (batchError) {
+        console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
+        console.error(`❌ Error code:`, batchError.code);
+        console.error(`❌ Error message:`, batchError.message);
+        console.error(`❌ Error details:`, batchError.details);
+        console.error(`❌ Error hint:`, batchError.hint);
+        console.error(`❌ Full batch error:`, JSON.stringify(batchError, null, 2));
         failedCount += batch.length;
+      } else {
+        insertedCount += batch.length;
+        console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
       }
+    } catch (unexpectedError) {
+      console.error(`❌ Unexpected error in batch ${Math.floor(i/batchSize) + 1}:`, unexpectedError);
+      failedCount += batch.length;
     }
-    
-  } catch (testFailure) {
-    console.error('❌ Initial test insertion failed completely:', testFailure);
-    throw new Error(`Cannot insert into source_pages table: ${testFailure.message}`);
   }
   
   console.log(`✅ Batch insertion completed: ${insertedCount} successful, ${failedCount} failed out of ${urls.length} total`);
