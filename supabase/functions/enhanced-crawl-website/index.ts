@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 
@@ -123,23 +122,9 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with enhanced error handling and RLS fixes
+    // Create source_pages with enhanced error handling
     if (discoveredUrls.length > 0) {
       console.log('🔍 Starting source pages insertion...');
-      
-      // Test RLS policies first
-      console.log('🧪 Testing RLS policies for source_pages...');
-      const { data: testResult, error: testError } = await supabase.rpc('test_source_pages_insertion');
-      
-      if (testError) {
-        console.error('❌ RLS test failed:', testError);
-        // Continue anyway, but log the issue
-      } else if (testResult && !testResult.success) {
-        console.error('❌ RLS test returned error:', testResult.error);
-        // Continue anyway, but log the issue
-      } else {
-        console.log('✅ RLS policies test passed');
-      }
       
       // Insert source pages in batches with better error handling
       await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, priority);
@@ -189,7 +174,7 @@ serve(async (req) => {
   }
 });
 
-// Enhanced function to insert source pages in batches with better error handling
+// Simplified function to insert source pages in batches
 async function insertSourcePagesInBatches(
   parentSourceId: string,
   customerId: string,
@@ -222,49 +207,9 @@ async function insertSourcePagesInBatches(
       
       if (batchError) {
         console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
-        
-        // If it's an RLS error, try to handle it gracefully
-        if (batchError.message?.includes('row-level security') || 
-            batchError.message?.includes('operator does not exist')) {
-          console.log('🔧 Attempting to fix RLS issues...');
-          
-          // Try to temporarily disable RLS for this operation
-          try {
-            const { error: disableError } = await supabase.rpc('exec_sql', {
-              sql: 'ALTER TABLE public.source_pages DISABLE ROW LEVEL SECURITY;'
-            });
-            
-            if (disableError) {
-              console.error('❌ Could not disable RLS:', disableError);
-            } else {
-              console.log('✅ RLS disabled temporarily');
-              
-              // Retry the batch insertion
-              const { data: retryResult, error: retryError } = await supabase
-                .from('source_pages')
-                .insert(batchRecords)
-                .select('id');
-              
-              if (retryError) {
-                console.error('❌ Retry insertion still failed:', retryError);
-                failedCount += batch.length;
-              } else {
-                console.log(`✅ Retry insertion succeeded for batch ${Math.floor(i/batchSize) + 1}`);
-                insertedCount += batch.length;
-              }
-              
-              // Re-enable RLS
-              await supabase.rpc('exec_sql', {
-                sql: 'ALTER TABLE public.source_pages ENABLE ROW LEVEL SECURITY;'
-              });
-            }
-          } catch (rlsFixError) {
-            console.error('❌ RLS fix failed:', rlsFixError);
-            failedCount += batch.length;
-          }
-        } else {
-          failedCount += batch.length;
-        }
+        console.error(`❌ Error details:`, JSON.stringify(batchError, null, 2));
+        console.error(`❌ Failed records sample:`, JSON.stringify(batchRecords[0], null, 2));
+        failedCount += batch.length;
       } else {
         insertedCount += batch.length;
         console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
