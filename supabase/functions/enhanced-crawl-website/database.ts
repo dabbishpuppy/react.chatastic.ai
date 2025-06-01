@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { validateSourcePageRecord } from './validation.ts';
 import { ValidationError } from './types.ts';
@@ -23,19 +24,39 @@ export async function insertSourcePagesInBatches(
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
     
-    // Create batch records with explicit type safety
+    // Create batch records with explicit type safety and coercion
     const batchRecords = batch.map((url) => {
-      // Ensure all values are explicitly typed correctly
+      // CRITICAL: Ensure ALL values are the correct primitive types
       const record = {
         parent_source_id: String(parentSourceId),     // Ensure string
         customer_id: String(teamId),                  // Ensure string
         url: String(url),                             // Ensure string
-        status: 'pending',                            // Explicit string literal
-        priority: String(priority),                   // Ensure string (convert any boolean/other type)
-        retry_count: Number(0),                       // Ensure number
-        max_retries: Number(3),                       // Ensure number
+        status: String('pending'),                    // Force to string literal
+        priority: String(priority),                   // Force to string
+        retry_count: parseInt('0', 10),               // Force to integer
+        max_retries: parseInt('3', 10),               // Force to integer
         created_at: new Date().toISOString()          // ISO string format
       };
+      
+      // Additional type verification - reject any non-string text fields
+      const textFields = ['parent_source_id', 'customer_id', 'url', 'status', 'priority'];
+      for (const field of textFields) {
+        if (typeof record[field as keyof typeof record] !== 'string') {
+          console.error(`❌ CRITICAL: Field ${field} is not a string:`, typeof record[field as keyof typeof record], record[field as keyof typeof record]);
+          failedUrls.push({ url, errors: [`Field ${field} has wrong type: ${typeof record[field as keyof typeof record]}`] });
+          return null;
+        }
+      }
+      
+      // Additional type verification - reject any non-number numeric fields
+      const numericFields = ['retry_count', 'max_retries'];
+      for (const field of numericFields) {
+        if (typeof record[field as keyof typeof record] !== 'number') {
+          console.error(`❌ CRITICAL: Field ${field} is not a number:`, typeof record[field as keyof typeof record], record[field as keyof typeof record]);
+          failedUrls.push({ url, errors: [`Field ${field} has wrong type: ${typeof record[field as keyof typeof record]}`] });
+          return null;
+        }
+      }
       
       // Validate the record before proceeding
       const validationErrors = validateSourcePageRecord(record);
@@ -56,18 +77,28 @@ export async function insertSourcePagesInBatches(
 
     console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
     
-    // DETAILED PER-FIELD LOGGING - Log every field and its type
+    // FINAL TYPE VERIFICATION - Log every field and its type before insertion
     batchRecords.forEach((row, idx) => {
-      console.log(`🔍 [Batch ${Math.floor(i/batchSize)+1}, Record ${idx+1}]`);
+      console.log(`🔍 [Batch ${Math.floor(i/batchSize)+1}, Record ${idx+1}] PRE-INSERTION VERIFICATION:`);
       Object.entries(row).forEach(([field, value]) => {
-        console.log(`   • ${field}:`, value, `(JS type: ${typeof value})`);
+        console.log(`   • ${field}: ${JSON.stringify(value)} (JS type: ${typeof value})`);
       });
     });
 
     try {
+      // Use explicit type casting in the query to prevent any implicit conversions
       const { data: batchResult, error: batchError } = await supabase
         .from('source_pages')
-        .insert(batchRecords)
+        .insert(batchRecords.map(record => ({
+          parent_source_id: record.parent_source_id,  // Already string
+          customer_id: record.customer_id,            // Already string  
+          url: record.url,                            // Already string
+          status: record.status,                      // Already string
+          priority: record.priority,                  // Already string
+          retry_count: record.retry_count,            // Already number
+          max_retries: record.max_retries,            // Already number
+          created_at: record.created_at               // Already string (ISO)
+        })))
         .select('id');
       
       if (batchError) {
@@ -87,6 +118,11 @@ export async function insertSourcePagesInBatches(
         if (batchError.message?.includes('operator does not exist') || batchError.code === '42883') {
           console.error(`❌ TYPE MISMATCH ERROR: Database schema expects different types than provided`);
           console.error(`❌ This suggests a column type mismatch - check table schema vs. record structure`);
+          
+          // Log all field types for debugging
+          console.error(`❌ Record field types:`, Object.fromEntries(
+            Object.entries(batchRecords[0]).map(([k, v]) => [k, typeof v])
+          ));
         }
         
         failedCount += batch.length;
