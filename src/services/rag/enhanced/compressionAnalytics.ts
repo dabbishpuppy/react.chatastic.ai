@@ -1,64 +1,107 @@
 
+import { supabase } from "@/integrations/supabase/client";
 import { CompressionStats } from "./crawlTypes";
 
 export class CompressionAnalyticsService {
-  private static readonly supabaseUrl = 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
-  private static readonly apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk';
-
   static async getCompressionStats(customerId: string): Promise<CompressionStats> {
     try {
-      const url = `${this.supabaseUrl}/rest/v1/agent_sources?customer_id=eq.${customerId}&source_type=eq.website&select=total_content_size,compressed_content_size,unique_chunks,duplicate_chunks,global_compression_ratio`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'apikey': this.apiKey,
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Get overall compression statistics for the customer
+      const { data: sources, error } = await supabase
+        .from('agent_sources')
+        .select(`
+          total_content_size,
+          compressed_content_size,
+          unique_chunks,
+          duplicate_chunks,
+          global_compression_ratio
+        `)
+        .eq('team_id', customerId)
+        .eq('source_type', 'website')
+        .not('total_content_size', 'is', null);
 
-      if (!response.ok) {
-        console.error('Error fetching compression stats:', response.statusText);
-        return this.getDefaultStats();
+      if (error) throw error;
+
+      if (!sources || sources.length === 0) {
+        return {
+          totalOriginalSize: 0,
+          totalCompressedSize: 0,
+          totalUniqueChunks: 0,
+          totalDuplicateChunks: 0,
+          avgCompressionRatio: 0,
+          spaceSavedBytes: 0,
+          spaceSavedPercentage: 0
+        };
       }
 
-      const sources = await response.json();
-      return this.calculateStats(sources);
+      const totalOriginalSize = sources.reduce((sum, s) => sum + (s.total_content_size || 0), 0);
+      const totalCompressedSize = sources.reduce((sum, s) => sum + (s.compressed_content_size || 0), 0);
+      const totalUniqueChunks = sources.reduce((sum, s) => sum + (s.unique_chunks || 0), 0);
+      const totalDuplicateChunks = sources.reduce((sum, s) => sum + (s.duplicate_chunks || 0), 0);
+      
+      const avgCompressionRatio = sources.length > 0 
+        ? sources.reduce((sum, s) => sum + (s.global_compression_ratio || 0), 0) / sources.length
+        : 0;
+
+      const spaceSavedBytes = totalOriginalSize - totalCompressedSize;
+      const spaceSavedPercentage = totalOriginalSize > 0 
+        ? (spaceSavedBytes / totalOriginalSize) * 100 
+        : 0;
+
+      return {
+        totalOriginalSize,
+        totalCompressedSize,
+        totalUniqueChunks,
+        totalDuplicateChunks,
+        avgCompressionRatio,
+        spaceSavedBytes,
+        spaceSavedPercentage
+      };
     } catch (error) {
-      console.error('Error in getCompressionStats:', error);
-      return this.getDefaultStats();
+      console.error('Error getting compression stats:', error);
+      return {
+        totalOriginalSize: 0,
+        totalCompressedSize: 0,
+        totalUniqueChunks: 0,
+        totalDuplicateChunks: 0,
+        avgCompressionRatio: 0,
+        spaceSavedBytes: 0,
+        spaceSavedPercentage: 0
+      };
     }
   }
 
-  private static getDefaultStats(): CompressionStats {
-    return {
-      totalOriginalSize: 0,
-      totalCompressedSize: 0,
-      totalUniqueChunks: 0,
-      totalDuplicateChunks: 0,
-      avgCompressionRatio: 0,
-      spaceSavedBytes: 0,
-      spaceSavedPercentage: 0
-    };
-  }
+  static async getGlobalDeduplicationStats(): Promise<{
+    totalChunks: number;
+    uniqueChunks: number;
+    duplicateChunks: number;
+    deduplicationRatio: number;
+  }> {
+    try {
+      const { data: chunkStats, error } = await supabase
+        .from('semantic_chunks')
+        .select('ref_count');
 
-  private static calculateStats(sources: any[]): CompressionStats {
-    const totalOriginalSize = sources.reduce((sum: number, source: any) => sum + (source.total_content_size || 0), 0);
-    const totalCompressedSize = sources.reduce((sum: number, source: any) => sum + (source.compressed_content_size || 0), 0);
-    const totalUniqueChunks = sources.reduce((sum: number, source: any) => sum + (source.unique_chunks || 0), 0);
-    const totalDuplicateChunks = sources.reduce((sum: number, source: any) => sum + (source.duplicate_chunks || 0), 0);
-    const avgCompressionRatio = sources.length 
-      ? sources.reduce((sum: number, source: any) => sum + (source.global_compression_ratio || 0), 0) / sources.length 
-      : 0;
+      if (error) throw error;
 
-    return {
-      totalOriginalSize,
-      totalCompressedSize,
-      totalUniqueChunks,
-      totalDuplicateChunks,
-      avgCompressionRatio,
-      spaceSavedBytes: totalOriginalSize - totalCompressedSize,
-      spaceSavedPercentage: totalOriginalSize > 0 ? ((totalOriginalSize - totalCompressedSize) / totalOriginalSize) * 100 : 0
-    };
+      const totalChunks = chunkStats?.reduce((sum, chunk) => sum + chunk.ref_count, 0) || 0;
+      const uniqueChunks = chunkStats?.length || 0;
+      const duplicateChunks = totalChunks - uniqueChunks;
+      const deduplicationRatio = totalChunks > 0 ? (duplicateChunks / totalChunks) * 100 : 0;
+
+      return {
+        totalChunks,
+        uniqueChunks,
+        duplicateChunks,
+        deduplicationRatio
+      };
+    } catch (error) {
+      console.error('Error getting global deduplication stats:', error);
+      return {
+        totalChunks: 0,
+        uniqueChunks: 0,
+        duplicateChunks: 0,
+        deduplicationRatio: 0
+      };
+    }
   }
 }

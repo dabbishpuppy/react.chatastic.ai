@@ -1,143 +1,120 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Zap, Globe, BarChart3 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EnhancedWebsiteCrawlForm from './components/EnhancedWebsiteCrawlForm';
-import CrawlProgressTracker from './components/CrawlProgressTracker';
+import CrawlProgressTracker from './components/crawl-tracker/CrawlProgressTracker';
+import WebsiteSourcesList from './components/WebsiteSourcesList';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
-import { useOptimizedAgentSources } from '@/hooks/useOptimizedAgentSources';
 
 const EnhancedWebsiteTab: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('new-crawl');
+  const [trackingCrawlId, setTrackingCrawlId] = useState<string | null>(null);
   const { activeCrawls } = useEnhancedCrawl();
-  const { sources, refetch } = useOptimizedAgentSources();
-  const [activeTab, setActiveTab] = useState('crawl');
 
-  const websiteSources = sources.filter(source => source.source_type === 'website');
-  const activeCrawlSources = websiteSources.filter(source => 
-    activeCrawls.some(crawl => crawl.parentSourceId === source.id)
-  );
+  const handleCrawlInitiated = () => {
+    // Switch to active crawls tab after initiating a crawl
+    setActiveTab('active-crawls');
+  };
 
-  const handleCrawlSuccess = () => {
-    refetch();
-    setActiveTab('progress');
+  const handleTrackCrawl = (crawlId: string) => {
+    setTrackingCrawlId(crawlId);
+    setActiveTab('active-crawls');
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Zap className="h-6 w-6 text-blue-500" />
-        <h2 className="text-2xl font-bold">Enhanced Website Crawling</h2>
-        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-          v2.0 Beta
-        </Badge>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Enhanced Website Crawler</h2>
+          <p className="text-muted-foreground">
+            Industrial-scale crawling with compression and global deduplication
+          </p>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="crawl" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            New Crawl
-          </TabsTrigger>
-          <TabsTrigger value="progress" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
+          <TabsTrigger value="new-crawl">New Crawl</TabsTrigger>
+          <TabsTrigger value="active-crawls" className="relative">
             Active Crawls
             {activeCrawls.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
                 {activeCrawls.length}
-              </Badge>
+              </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="sources">
-            Sources ({websiteSources.length})
-          </TabsTrigger>
+          <TabsTrigger value="sources">All Sources</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="crawl" className="space-y-4">
-          <EnhancedWebsiteCrawlForm onSuccess={handleCrawlSuccess} />
+        <TabsContent value="new-crawl" className="mt-6">
+          <EnhancedWebsiteCrawlForm onCrawlInitiated={handleCrawlInitiated} />
         </TabsContent>
 
-        <TabsContent value="progress" className="space-y-4">
-          {activeCrawls.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center h-32">
-                <div className="text-center text-muted-foreground">
-                  <BarChart3 className="h-8 w-8 mx-auto mb-2" />
-                  <p>No active crawls</p>
-                  <p className="text-sm">Start a new crawl to see progress here</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            activeCrawls.map((crawl) => (
-              <CrawlProgressTracker
-                key={crawl.parentSourceId}
-                parentSourceId={crawl.parentSourceId}
-                onComplete={refetch}
-              />
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="sources" className="space-y-4">
-          {websiteSources.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center h-32">
-                <div className="text-center text-muted-foreground">
-                  <Globe className="h-8 w-8 mx-auto mb-2" />
-                  <p>No website sources</p>
-                  <p className="text-sm">Crawl your first website to get started</p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {websiteSources.map((source) => {
-                // Type assertion for new fields until Supabase types are regenerated
-                const enhancedSource = source as any;
-                
-                return (
-                  <Card key={source.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold">{source.title}</h3>
-                          <p className="text-sm text-muted-foreground">{source.url}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant={
-                              source.crawl_status === 'completed' ? 'default' :
-                              source.crawl_status === 'failed' ? 'destructive' :
-                              'secondary'
-                            }>
-                              {source.crawl_status}
-                            </Badge>
-                            {source.progress !== null && (
-                              <span className="text-sm text-muted-foreground">
-                                {source.progress}% complete
-                              </span>
-                            )}
+        <TabsContent value="active-crawls" className="mt-6">
+          <div className="space-y-4">
+            {activeCrawls.length === 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>No Active Crawls</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    No crawls are currently running. Start a new crawl to see progress here.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {trackingCrawlId ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setTrackingCrawlId(null)}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        ← Back to all active crawls
+                      </button>
+                    </div>
+                    <CrawlProgressTracker 
+                      parentSourceId={trackingCrawlId}
+                      onClose={() => setTrackingCrawlId(null)}
+                    />
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {activeCrawls.map((crawl) => (
+                      <Card key={crawl.parentSourceId} className="cursor-pointer hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium">Crawl Progress</div>
+                              <div className="text-sm text-muted-foreground">
+                                {crawl.completedJobs + crawl.failedJobs} / {crawl.totalJobs} pages
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Status: {crawl.status} • Progress: {crawl.progress}%
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleTrackCrawl(crawl.parentSourceId)}
+                              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            >
+                              View Details
+                            </button>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          {source.links_count && (
-                            <div className="text-sm">
-                              <span className="font-medium">{source.links_count}</span> pages
-                            </div>
-                          )}
-                          {enhancedSource.compressed_content_size && enhancedSource.total_content_size && (
-                            <div className="text-xs text-muted-foreground">
-                              {((enhancedSource.total_content_size - enhancedSource.compressed_content_size) / enhancedSource.total_content_size * 100).toFixed(1)}% saved
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="sources" className="mt-6">
+          <WebsiteSourcesList />
         </TabsContent>
       </Tabs>
     </div>

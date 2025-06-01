@@ -73,10 +73,66 @@ export class CrawlJobManager {
       });
 
       await Promise.all(updatePromises);
+      
+      // Trigger re-processing for retried jobs
+      await this.triggerJobReprocessing(parentSourceId);
+      
       return failedJobs.length;
     } catch (error) {
       console.error('Error retrying failed jobs:', error);
       return 0;
+    }
+  }
+
+  private static async triggerJobReprocessing(parentSourceId: string): Promise<void> {
+    try {
+      // Call the enhanced crawl function to reprocess pending jobs
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/enhanced-crawl-website`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          mode: 'retry',
+          parentSourceId: parentSourceId
+        })
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to trigger job reprocessing:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error triggering job reprocessing:', error);
+    }
+  }
+
+  static async getJobMetrics(parentSourceId: string) {
+    try {
+      const jobs = await this.getCrawlJobs(parentSourceId);
+      
+      const metrics = {
+        totalJobs: jobs.length,
+        pendingJobs: jobs.filter(j => j.status === 'pending').length,
+        inProgressJobs: jobs.filter(j => j.status === 'in_progress').length,
+        completedJobs: jobs.filter(j => j.status === 'completed').length,
+        failedJobs: jobs.filter(j => j.status === 'failed').length,
+        avgProcessingTime: 0,
+        totalContentSize: 0,
+        avgCompressionRatio: 0
+      };
+
+      const completedJobs = jobs.filter(j => j.status === 'completed');
+      if (completedJobs.length > 0) {
+        metrics.avgProcessingTime = completedJobs.reduce((sum, j) => sum + (j.processing_time_ms || 0), 0) / completedJobs.length;
+        metrics.totalContentSize = completedJobs.reduce((sum, j) => sum + (j.content_size || 0), 0);
+        metrics.avgCompressionRatio = completedJobs.reduce((sum, j) => sum + (j.compression_ratio || 0), 0) / completedJobs.length;
+      }
+
+      return metrics;
+    } catch (error) {
+      console.error('Error getting job metrics:', error);
+      return null;
     }
   }
 }

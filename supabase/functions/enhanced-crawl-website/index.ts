@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -57,7 +56,7 @@ serve(async (req) => {
       .from('agent_sources')
       .insert({
         agent_id: agentId,
-        customer_id: customerId,
+        team_id: customerId,
         source_type: 'website',
         title: url,
         url: url,
@@ -346,6 +345,9 @@ async function processSingleCrawlJob(job: CrawlJob, supabase: any): Promise<void
 
     console.log(`✅ Completed job ${job.id} in ${processingTime}ms`)
 
+    // Trigger status aggregation
+    await supabase.rpc('aggregate_crawl_status', { parent_source_id_param: job.parentSourceId })
+
   } catch (error) {
     console.error(`❌ Failed job ${job.id}:`, error)
     
@@ -361,6 +363,9 @@ async function processSingleCrawlJob(job: CrawlJob, supabase: any): Promise<void
         processing_time_ms: processingTime
       })
       .eq('id', job.id)
+
+    // Trigger status aggregation even on failure
+    await supabase.rpc('aggregate_crawl_status', { parent_source_id_param: job.parentSourceId })
   }
 }
 
@@ -420,7 +425,13 @@ function createSemanticChunks(content: string, maxTokens: number = 150): string[
     chunks.push(currentChunk.trim())
   }
   
-  return chunks.filter(chunk => chunk.length > 20) // Filter out very short chunks
+  // Prune to keep only best 3-5 chunks per page
+  const prunedChunks = chunks
+    .sort((a, b) => b.length - a.length) // Sort by length (simple quality metric)
+    .slice(0, 5) // Keep top 5 chunks
+    .filter(chunk => chunk.length > 20) // Filter out very short chunks
+  
+  return prunedChunks
 }
 
 async function processChunksWithDeduplication(
@@ -507,11 +518,37 @@ async function generateHash(content: string): Promise<string> {
 }
 
 async function compressText(text: string): Promise<Uint8Array> {
-  // Simple compression using gzip (Zstd would be better but not available in Deno)
+  // Simulate high-efficiency compression (in production, use Zstd level -19)
   const encoder = new TextEncoder()
   const data = encoder.encode(text)
   
-  // For now, we'll use a simple compression or store as-is
-  // In production, you'd want to use a proper compression library
-  return data
+  // For demo, we'll use a compression stream (DeflateStream would be closer to Zstd)
+  const compressionStream = new CompressionStream('gzip')
+  const writer = compressionStream.writable.getWriter()
+  const reader = compressionStream.readable.getReader()
+  
+  writer.write(data)
+  writer.close()
+  
+  const chunks: Uint8Array[] = []
+  let done = false
+  
+  while (!done) {
+    const { value, done: readerDone } = await reader.read()
+    done = readerDone
+    if (value) {
+      chunks.push(value)
+    }
+  }
+  
+  // Combine chunks into single array
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const result = new Uint8Array(totalLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+  
+  return result
 }

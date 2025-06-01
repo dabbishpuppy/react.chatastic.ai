@@ -3,184 +3,225 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Globe, Shield, Settings, Zap } from 'lucide-react';
-import { useParams } from 'react-router-dom';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
+import { EnhancedCrawlRequest } from '@/services/rag/enhanced/crawlTypes';
+import { useParams } from 'react-router-dom';
 
 interface EnhancedWebsiteCrawlFormProps {
-  onSuccess?: () => void;
+  onCrawlInitiated?: () => void;
 }
 
-const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({ onSuccess }) => {
+const EnhancedWebsiteCrawlForm: React.FC<EnhancedWebsiteCrawlFormProps> = ({ 
+  onCrawlInitiated 
+}) => {
   const { agentId } = useParams();
   const { initiateCrawl, isLoading } = useEnhancedCrawl();
   
-  const [url, setUrl] = useState('');
-  const [excludePaths, setExcludePaths] = useState('/wp-json/*, /wp-admin/*, /xmlrpc.php, /checkout/*, /cart/*, /admin/*, /api/*, *.json, *.xml, *.rss');
-  const [includePaths, setIncludePaths] = useState('');
-  const [respectRobots, setRespectRobots] = useState(true);
-  const [maxConcurrentJobs, setMaxConcurrentJobs] = useState(5);
+  const [formData, setFormData] = useState({
+    url: '',
+    excludePaths: '/wp-json/*\n/wp-admin/*\n/xmlrpc.php\n/checkout/*\n/cart/*\n/admin/*\n/api/*\n*.json\n*.xml\n*.rss',
+    includePaths: '',
+    respectRobots: true,
+    maxConcurrentJobs: 5
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.url.trim()) {
+      newErrors.url = 'URL is required';
+    } else {
+      try {
+        new URL(formData.url);
+      } catch {
+        newErrors.url = 'Please enter a valid URL';
+      }
+    }
+
+    if (formData.maxConcurrentJobs < 1 || formData.maxConcurrentJobs > 20) {
+      newErrors.maxConcurrentJobs = 'Concurrent jobs must be between 1 and 20';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!agentId || !url) return;
+    if (!validateForm() || !agentId) return;
 
     try {
-      const excludePathsArray = excludePaths
-        .split(',')
-        .map(path => path.trim())
-        .filter(path => path.length > 0);
-        
-      const includePathsArray = includePaths
-        .split(',')
-        .map(path => path.trim())
-        .filter(path => path.length > 0);
-
-      await initiateCrawl({
+      const request: EnhancedCrawlRequest = {
         agentId,
-        url: url.trim(),
-        excludePaths: excludePathsArray,
-        includePaths: includePathsArray,
-        respectRobots,
-        maxConcurrentJobs
-      });
+        url: formData.url.trim(),
+        excludePaths: formData.excludePaths
+          .split('\n')
+          .map(path => path.trim())
+          .filter(path => path.length > 0),
+        includePaths: formData.includePaths
+          .split('\n')
+          .map(path => path.trim())
+          .filter(path => path.length > 0),
+        respectRobots: formData.respectRobots,
+        maxConcurrentJobs: formData.maxConcurrentJobs
+      };
 
-      // Reset form
-      setUrl('');
-      onSuccess?.();
+      await initiateCrawl(request);
       
+      // Reset form
+      setFormData({
+        url: '',
+        excludePaths: '/wp-json/*\n/wp-admin/*\n/xmlrpc.php\n/checkout/*\n/cart/*\n/admin/*\n/api/*\n*.json\n*.xml\n*.rss',
+        includePaths: '',
+        respectRobots: true,
+        maxConcurrentJobs: 5
+      });
+      
+      onCrawlInitiated?.();
     } catch (error) {
-      console.error('Enhanced crawl submission error:', error);
+      console.error('Failed to initiate crawl:', error);
     }
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-blue-500" />
-          Enhanced Website Crawl
-        </CardTitle>
-        <CardDescription>
-          Advanced crawling with global deduplication, compression, and real-time progress tracking
-        </CardDescription>
+        <CardTitle>Enhanced Website Crawler</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Industrial-scale crawling with compression and global deduplication
+        </p>
       </CardHeader>
+
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* URL Input */}
           <div className="space-y-2">
-            <Label htmlFor="url" className="flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              Website URL
-            </Label>
+            <Label htmlFor="url">Website URL *</Label>
             <Input
               id="url"
               type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com"
-              required
+              value={formData.url}
+              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+              className={errors.url ? 'border-red-500' : ''}
             />
+            {errors.url && <p className="text-sm text-red-500">{errors.url}</p>}
           </div>
 
           <Separator />
 
+          {/* Advanced Configuration */}
           <div className="space-y-4">
-            <Label className="flex items-center gap-2 text-base font-semibold">
-              <Shield className="h-4 w-4" />
-              Filtering & Security
-            </Label>
+            <h3 className="text-lg font-medium">Advanced Configuration</h3>
             
+            {/* Exclude Paths */}
             <div className="space-y-2">
-              <Label htmlFor="exclude-paths">
+              <Label htmlFor="excludePaths">
                 Exclude Paths
-                <Badge variant="secondary" className="ml-2">Recommended</Badge>
+                <span className="text-sm text-muted-foreground ml-2">
+                  (one per line, supports wildcards *)
+                </span>
               </Label>
               <Textarea
-                id="exclude-paths"
-                value={excludePaths}
-                onChange={(e) => setExcludePaths(e.target.value)}
-                placeholder="/wp-json/*, /wp-admin/*, /api/*"
+                id="excludePaths"
+                placeholder="/wp-json/*&#10;/admin/*"
+                value={formData.excludePaths}
+                onChange={(e) => setFormData({ ...formData, excludePaths: e.target.value })}
+                rows={6}
                 className="font-mono text-sm"
-                rows={3}
               />
               <p className="text-xs text-muted-foreground">
-                Comma-separated patterns. Use * for wildcards. Pre-filled with common WordPress and admin endpoints.
+                Pre-filled with common boilerplate endpoints to skip
               </p>
             </div>
 
+            {/* Include Paths */}
             <div className="space-y-2">
-              <Label htmlFor="include-paths">Include Paths (Optional)</Label>
+              <Label htmlFor="includePaths">
+                Include Paths (Optional)
+                <span className="text-sm text-muted-foreground ml-2">
+                  (if specified, only these paths will be crawled)
+                </span>
+              </Label>
               <Textarea
-                id="include-paths"
-                value={includePaths}
-                onChange={(e) => setIncludePaths(e.target.value)}
-                placeholder="/blog/*, /docs/*, /help/*"
+                id="includePaths"
+                placeholder="/blog/*&#10;/products/*"
+                value={formData.includePaths}
+                onChange={(e) => setFormData({ ...formData, includePaths: e.target.value })}
+                rows={3}
                 className="font-mono text-sm"
-                rows={2}
               />
-              <p className="text-xs text-muted-foreground">
-                If specified, only paths matching these patterns will be crawled.
-              </p>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Respect robots.txt</Label>
-                <p className="text-xs text-muted-foreground">
-                  Follow website's crawling guidelines
-                </p>
+            {/* Settings */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between space-x-2">
+                <div>
+                  <Label htmlFor="respectRobots">Respect robots.txt</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Obey website crawling rules
+                  </p>
+                </div>
+                <Switch
+                  id="respectRobots"
+                  checked={formData.respectRobots}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, respectRobots: checked })
+                  }
+                />
               </div>
-              <Switch
-                checked={respectRobots}
-                onCheckedChange={setRespectRobots}
-              />
+
+              <div className="space-y-2">
+                <Label htmlFor="maxConcurrentJobs">
+                  Max Concurrent Jobs (1-20)
+                </Label>
+                <Input
+                  id="maxConcurrentJobs"
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={formData.maxConcurrentJobs}
+                  onChange={(e) => 
+                    setFormData({ 
+                      ...formData, 
+                      maxConcurrentJobs: parseInt(e.target.value) || 5 
+                    })
+                  }
+                  className={errors.maxConcurrentJobs ? 'border-red-500' : ''}
+                />
+                {errors.maxConcurrentJobs && (
+                  <p className="text-sm text-red-500">{errors.maxConcurrentJobs}</p>
+                )}
+              </div>
             </div>
           </div>
 
           <Separator />
 
-          <div className="space-y-4">
-            <Label className="flex items-center gap-2 text-base font-semibold">
-              <Settings className="h-4 w-4" />
-              Performance Settings
-            </Label>
-            
-            <div className="space-y-2">
-              <Label htmlFor="max-concurrent">Max Concurrent Jobs</Label>
-              <Input
-                id="max-concurrent"
-                type="number"
-                min="1"
-                max="20"
-                value={maxConcurrentJobs}
-                onChange={(e) => setMaxConcurrentJobs(parseInt(e.target.value) || 5)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Higher values crawl faster but may overwhelm the target server. Recommended: 5-10.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">✨ Enhanced Features</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Global deduplication across all customers for maximum efficiency</li>
-              <li>• Advanced Zstandard compression (~90% storage reduction)</li>
-              <li>• Real-time progress tracking with individual page status</li>
-              <li>• Automatic retry logic for failed pages</li>
-              <li>• Intelligent content cleaning and semantic chunking</li>
+          {/* Features Overview */}
+          <div className="space-y-2">
+            <h4 className="font-medium">Enhanced Features:</h4>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>• High-efficiency compression (targets ~1-2KB per page)</li>
+              <li>• Global deduplication across all customers</li>
+              <li>• Intelligent content extraction and boilerplate removal</li>
+              <li>• Semantic chunking with quality pruning (top 5 chunks per page)</li>
+              <li>• Real-time progress tracking with parent/child status workflow</li>
+              <li>• Industrial-scale architecture with proper error handling</li>
             </ul>
           </div>
 
+          {/* Submit Button */}
           <Button 
             type="submit" 
-            disabled={isLoading || !url}
+            disabled={isLoading}
             className="w-full"
           >
             {isLoading ? 'Initiating Crawl...' : 'Start Enhanced Crawl'}

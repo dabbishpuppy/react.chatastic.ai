@@ -12,6 +12,8 @@ export type Database = {
       agent_sources: {
         Row: {
           agent_id: string
+          completed_jobs: number | null
+          compressed_content_size: number | null
           compressed_size: number | null
           compression_ratio: number | null
           content: string | null
@@ -19,28 +21,40 @@ export type Database = {
           crawl_status: string | null
           created_at: string
           created_by: string | null
+          duplicate_chunks: number | null
+          exclude_paths: string[] | null
           extraction_method: string | null
+          failed_jobs: number | null
           file_path: string | null
+          global_compression_ratio: number | null
           id: string
+          include_paths: string[] | null
           is_active: boolean
           is_excluded: boolean | null
           keywords: string[] | null
           last_crawled_at: string | null
           links_count: number | null
+          max_concurrent_jobs: number | null
           metadata: Json | null
           original_size: number | null
           parent_source_id: string | null
           progress: number | null
           raw_text: string | null
+          respect_robots: boolean | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
           title: string
+          total_content_size: number | null
+          total_jobs: number | null
+          unique_chunks: number | null
           updated_at: string
           updated_by: string | null
           url: string | null
         }
         Insert: {
           agent_id: string
+          completed_jobs?: number | null
+          compressed_content_size?: number | null
           compressed_size?: number | null
           compression_ratio?: number | null
           content?: string | null
@@ -48,28 +62,40 @@ export type Database = {
           crawl_status?: string | null
           created_at?: string
           created_by?: string | null
+          duplicate_chunks?: number | null
+          exclude_paths?: string[] | null
           extraction_method?: string | null
+          failed_jobs?: number | null
           file_path?: string | null
+          global_compression_ratio?: number | null
           id?: string
+          include_paths?: string[] | null
           is_active?: boolean
           is_excluded?: boolean | null
           keywords?: string[] | null
           last_crawled_at?: string | null
           links_count?: number | null
+          max_concurrent_jobs?: number | null
           metadata?: Json | null
           original_size?: number | null
           parent_source_id?: string | null
           progress?: number | null
           raw_text?: string | null
+          respect_robots?: boolean | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
           title: string
+          total_content_size?: number | null
+          total_jobs?: number | null
+          unique_chunks?: number | null
           updated_at?: string
           updated_by?: string | null
           url?: string | null
         }
         Update: {
           agent_id?: string
+          completed_jobs?: number | null
+          compressed_content_size?: number | null
           compressed_size?: number | null
           compression_ratio?: number | null
           content?: string | null
@@ -77,22 +103,32 @@ export type Database = {
           crawl_status?: string | null
           created_at?: string
           created_by?: string | null
+          duplicate_chunks?: number | null
+          exclude_paths?: string[] | null
           extraction_method?: string | null
+          failed_jobs?: number | null
           file_path?: string | null
+          global_compression_ratio?: number | null
           id?: string
+          include_paths?: string[] | null
           is_active?: boolean
           is_excluded?: boolean | null
           keywords?: string[] | null
           last_crawled_at?: string | null
           links_count?: number | null
+          max_concurrent_jobs?: number | null
           metadata?: Json | null
           original_size?: number | null
           parent_source_id?: string | null
           progress?: number | null
           raw_text?: string | null
+          respect_robots?: boolean | null
           source_type?: Database["public"]["Enums"]["source_type"]
           team_id?: string
           title?: string
+          total_content_size?: number | null
+          total_jobs?: number | null
+          unique_chunks?: number | null
           updated_at?: string
           updated_by?: string | null
           url?: string | null
@@ -414,6 +450,71 @@ export type Database = {
           },
         ]
       }
+      crawl_jobs: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          parent_source_id: string
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          parent_source_id: string
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          parent_source_id?: string
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crawl_jobs_parent_source_id_fkey"
+            columns: ["parent_source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crawl_performance_metrics: {
         Row: {
           agent_id: string
@@ -694,6 +795,36 @@ export type Database = {
           },
         ]
       }
+      semantic_chunks: {
+        Row: {
+          compressed_blob: string
+          content_hash: string
+          created_at: string
+          id: string
+          ref_count: number
+          token_count: number
+          updated_at: string
+        }
+        Insert: {
+          compressed_blob: string
+          content_hash: string
+          created_at?: string
+          id?: string
+          ref_count?: number
+          token_count: number
+          updated_at?: string
+        }
+        Update: {
+          compressed_blob?: string
+          content_hash?: string
+          created_at?: string
+          id?: string
+          ref_count?: number
+          token_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       source_chunks: {
         Row: {
           chunk_index: number
@@ -776,6 +907,45 @@ export type Database = {
             columns: ["chunk_id"]
             isOneToOne: false
             referencedRelation: "source_chunks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_to_chunk_map: {
+        Row: {
+          chunk_id: string
+          chunk_index: number
+          created_at: string
+          id: string
+          source_id: string
+        }
+        Insert: {
+          chunk_id: string
+          chunk_index: number
+          created_at?: string
+          id?: string
+          source_id: string
+        }
+        Update: {
+          chunk_id?: string
+          chunk_index?: number
+          created_at?: string
+          id?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_to_chunk_map_chunk_id_fkey"
+            columns: ["chunk_id"]
+            isOneToOne: false
+            referencedRelation: "semantic_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_to_chunk_map_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -951,6 +1121,10 @@ export type Database = {
         Args: { invitation_id: string }
         Returns: Json
       }
+      aggregate_crawl_status: {
+        Args: { parent_source_id_param: string }
+        Returns: Json
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -973,6 +1147,14 @@ export type Database = {
       }
       cleanup_orphaned_chunks: {
         Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      cleanup_unused_chunks: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      decrement_chunk_refs: {
+        Args: { source_id_param: string }
         Returns: number
       }
       decrypt_sensitive_data: {
