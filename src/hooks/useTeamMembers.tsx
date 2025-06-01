@@ -21,34 +21,11 @@ export const useTeamMembers = () => {
   const { toast } = useToast();
 
   const fetchTeamMembers = async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+    if (!user) return;
 
     setLoading(true);
     try {
-      console.log('Fetching team members...');
-      
-      // First, get all teams where the current user is a member
-      const { data: userTeams, error: userTeamsError } = await supabase
-        .from('team_members')
-        .select('team_id')
-        .eq('user_id', user.id);
-
-      if (userTeamsError) throw userTeamsError;
-
-      if (!userTeams || userTeams.length === 0) {
-        console.log('User is not a member of any teams');
-        setMembers([]);
-        setLoading(false);
-        return;
-      }
-
-      const teamIds = userTeams.map(t => t.team_id);
-      console.log('User teams:', teamIds);
-
-      // Get all team members for these teams
+      // Get all team members and their teams
       const { data: teamMembersData, error: membersError } = await supabase
         .from('team_members')
         .select(`
@@ -59,30 +36,11 @@ export const useTeamMembers = () => {
             name
           )
         `)
-        .in('team_id', teamIds)
         .order('created_at', { ascending: true });
 
       if (membersError) throw membersError;
 
-      // Get all user emails for the team members
-      const userIds = [...new Set(teamMembersData?.map(m => m.user_id) || [])];
-      const { data: usersData, error: usersError } = await supabase.rpc('get_users_emails', {
-        user_ids: userIds
-      });
-
-      if (usersError) {
-        console.warn('Could not fetch user emails, using fallback approach');
-      }
-
-      // Create a map of user emails
-      const emailMap = new Map<string, string>();
-      if (usersData) {
-        usersData.forEach((userData: { id: string; email: string }) => {
-          emailMap.set(userData.id, userData.email);
-        });
-      }
-
-      // Get pending invitations for these teams
+      // Get pending invitations
       const { data: invitationsData, error: invitationsError } = await supabase
         .from('team_invitations')
         .select(`
@@ -94,14 +52,11 @@ export const useTeamMembers = () => {
             name
           )
         `)
-        .in('team_id', teamIds)
         .eq('status', 'pending')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: true });
 
-      if (invitationsError) {
-        console.warn('Could not fetch invitations:', invitationsError);
-      }
+      if (invitationsError) throw invitationsError;
 
       // Group active members by user_id and aggregate team information
       const membersMap = new Map<string, TeamMember>();
@@ -109,17 +64,19 @@ export const useTeamMembers = () => {
       teamMembersData?.forEach((member) => {
         const userId = member.user_id;
         const teamName = (member.teams as any)?.name || 'Unknown Team';
-        const userEmail = emailMap.get(userId) || `user-${userId.slice(0, 8)}@example.com`;
 
         if (membersMap.has(userId)) {
           const existingMember = membersMap.get(userId)!;
-          if (!existingMember.teams.includes(teamName)) {
-            existingMember.teams.push(teamName);
-          }
+          existingMember.teams.push(teamName);
         } else {
+          // For the current user, use their actual email, for others use a placeholder
+          const email = userId === user.id 
+            ? user.email || 'unknown@example.com'
+            : `user-${userId.slice(0, 8)}@wonderwave.no`;
+
           membersMap.set(userId, {
             user_id: userId,
-            email: userEmail,
+            email,
             memberSince: new Date(member.created_at).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'short',
@@ -152,9 +109,7 @@ export const useTeamMembers = () => {
         });
       });
 
-      const finalMembers = Array.from(membersMap.values());
-      console.log('Fetched members:', finalMembers);
-      setMembers(finalMembers);
+      setMembers(Array.from(membersMap.values()));
     } catch (error: any) {
       console.error('Error fetching team members:', error);
       toast({
@@ -162,7 +117,6 @@ export const useTeamMembers = () => {
         description: error.message,
         variant: "destructive",
       });
-      setMembers([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
