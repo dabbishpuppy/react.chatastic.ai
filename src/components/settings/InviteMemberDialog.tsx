@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -185,6 +184,9 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Invite team member</DialogTitle>
+          <DialogDescription>
+            Send an invitation to a new team member. They will receive an email with instructions to join your team.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
