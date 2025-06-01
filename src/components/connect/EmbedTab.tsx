@@ -52,7 +52,11 @@ const EmbedTab: React.FC<EmbedTabProps> = ({ embedCode, agentId }) => {
         </TabsList>
         
         <TabsContent value="bubble">
-          <ChatBubbleTab agentId={agentId} onCopy={copyToClipboard} />
+          <ChatBubbleTab 
+            agentId={agentId} 
+            onCopy={copyToClipboard} 
+            embedCode={embedCode}
+          />
         </TabsContent>
         
         <TabsContent value="iframe">
