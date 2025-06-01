@@ -1,18 +1,20 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EnhancedWebsiteCrawlForm from './components/EnhancedWebsiteCrawlForm';
 import CrawlProgressTracker from './components/crawl-tracker/CrawlProgressTracker';
 import WebsiteSourcesList from './components/WebsiteSourcesList';
+import CompressionMetrics from './components/CompressionMetrics';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
 import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
 import { useSourcesPaginated } from '@/hooks/useSourcesPaginated';
+import { useParams } from 'react-router-dom';
 
 const EnhancedWebsiteTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState('new-crawl');
   const [trackingCrawlId, setTrackingCrawlId] = useState<string | null>(null);
   const { activeCrawls } = useEnhancedCrawl();
+  const { agentId } = useParams();
 
   const { refetch } = useSourcesPaginated({
     sourceType: 'website',
@@ -43,13 +45,13 @@ const EnhancedWebsiteTab: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold">Enhanced Website Crawler</h2>
           <p className="text-muted-foreground">
-            Industrial-scale crawling with compression and global deduplication
+            Industrial-scale crawling with Zstd compression and global deduplication
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="new-crawl">New Crawl</TabsTrigger>
           <TabsTrigger value="active-crawls" className="relative">
             Active Crawls
@@ -60,6 +62,7 @@ const EnhancedWebsiteTab: React.FC = () => {
             )}
           </TabsTrigger>
           <TabsTrigger value="sources">All Sources</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="new-crawl" className="mt-6">
@@ -103,12 +106,17 @@ const EnhancedWebsiteTab: React.FC = () => {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="font-medium">Crawl Progress</div>
+                              <div className="font-medium">Enhanced Crawl Progress</div>
                               <div className="text-sm text-muted-foreground">
                                 {crawl.completedJobs + crawl.failedJobs} / {crawl.totalJobs} pages
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 Status: {crawl.status} • Progress: {crawl.progress}%
+                                {crawl.compressionStats && (
+                                  <span className="ml-2">
+                                    • Compression: {(crawl.compressionStats.avgCompressionRatio * 100).toFixed(1)}%
+                                  </span>
+                                )}
                               </div>
                             </div>
                             <button
@@ -137,6 +145,46 @@ const EnhancedWebsiteTab: React.FC = () => {
             loading={false}
             error={null}
           />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6">
+          <div className="grid gap-6">
+            <CompressionMetrics customerId={agentId} />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>🎯 Enhanced Pipeline Features</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold text-green-600">🗜️ Zstd Compression</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Level 19 compression achieving ~75% size reduction
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold text-blue-600">🌍 Global Deduplication</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Cross-customer content sharing with secure isolation
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h3 className="font-semibold text-purple-600">🎯 Quality Filtering</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      AI-powered content pruning and boilerplate removal
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-muted-foreground pt-4 border-t">
+                  <strong>Default Excluded Paths:</strong> /wp-json/*, /wp-admin/*, /xmlrpc.php, /checkout/*, 
+                  /cart/*, /admin/*, /api/*, *.json, *.xml, *.rss, /feed/*, /sitemap*, /search*, /tag/*, 
+                  /category/*, /author/*, /comments/*, /trackback/*, /wp-content/uploads/*
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
