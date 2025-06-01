@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { RealConnectionPoolManager } from './realConnectionPoolManager';
 import { RealDatabasePartitioningService } from './realDatabasePartitioningService';
@@ -100,9 +101,6 @@ export class DatabaseOptimizationService {
   // Initialize optimization service
   static async initialize(): Promise<void> {
     console.log('🗄️ Initializing database optimization service...');
-    
-    // Initialize connection pools
-    await ConnectionPoolManager.initializePools();
     
     // Set up monitoring
     await this.setupPerformanceMonitoring();
@@ -241,19 +239,10 @@ export class DatabaseOptimizationService {
   // Collect performance metrics
   private static async collectPerformanceMetrics(): Promise<void> {
     // Monitor connection pool health
-    const poolHealth = ConnectionPoolManager.getPoolHealth();
+    const poolHealth = await RealConnectionPoolManager.getPoolHealth();
     
     if (poolHealth.critical.length > 0) {
       console.warn(`🚨 Critical pool health issues: ${poolHealth.critical.join(', ')}`);
-      
-      // Auto-scale critical pools
-      for (const poolName of poolHealth.critical) {
-        try {
-          await ConnectionPoolManager.scalePool(poolName, 'up');
-        } catch (error) {
-          console.error(`Failed to scale pool ${poolName}:`, error);
-        }
-      }
     }
 
     // Monitor partition performance
@@ -299,7 +288,7 @@ export class DatabaseOptimizationService {
     }
 
     // Check connection pool health
-    const poolHealth = ConnectionPoolManager.getPoolHealth();
+    const poolHealth = await RealConnectionPoolManager.getPoolHealth();
     if (poolHealth.critical.length > 0) {
       recommendations.push({
         priority: 'high' as const,
@@ -354,22 +343,19 @@ export class DatabaseOptimizationService {
     }
 
     try {
-      // 2. Scale connection pools
-      const poolHealth = ConnectionPoolManager.getPoolHealth();
-      for (const poolName of poolHealth.degraded) {
-        await ConnectionPoolManager.scalePool(poolName, 'up');
-      }
+      // 2. Optimize connection pools
+      const poolOptimization = await RealConnectionPoolManager.optimizeLoadDistribution();
       
       results.push({
         category: 'Connection Pooling',
-        action: `Scaled ${poolHealth.degraded.length} degraded pools`,
+        action: `Optimized ${poolOptimization.rebalancedReplicas.length} connection pools`,
         success: true,
-        improvementPercent: poolHealth.degraded.length * 5
+        improvementPercent: poolOptimization.expectedImprovementPercent
       });
     } catch (error) {
       results.push({
         category: 'Connection Pooling',
-        action: 'Scale connection pools',
+        action: 'Optimize connection pools',
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       });

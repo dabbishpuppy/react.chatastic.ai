@@ -190,15 +190,27 @@ export class RealConnectionPoolManager {
       // Calculate new load percentage based on response time
       const loadAdjustment = metrics.responseTime ? Math.min(metrics.responseTime / 100, 10) : 0;
       const errorAdjustment = metrics.errorOccurred ? 5 : 0;
+      const totalAdjustment = loadAdjustment + errorAdjustment;
 
-      await supabase
+      // Get current load percentage first
+      const { data: currentReplica } = await supabase
         .from('read_replica_config')
-        .update({
-          load_percentage: supabase.raw(`LEAST(100, load_percentage + ${loadAdjustment + errorAdjustment})`),
-          latency_ms: metrics.responseTime || supabase.raw('latency_ms'),
-          updated_at: new Date().toISOString()
-        })
-        .eq('replica_name', replicaName);
+        .select('load_percentage')
+        .eq('replica_name', replicaName)
+        .single();
+
+      if (currentReplica) {
+        const newLoadPercentage = Math.min(100, Number(currentReplica.load_percentage) + totalAdjustment);
+        
+        await supabase
+          .from('read_replica_config')
+          .update({
+            load_percentage: newLoadPercentage,
+            latency_ms: metrics.responseTime || undefined,
+            updated_at: new Date().toISOString()
+          })
+          .eq('replica_name', replicaName);
+      }
 
     } catch (error) {
       console.error('Failed to update replica metrics:', error);
@@ -266,15 +278,16 @@ export class RealConnectionPoolManager {
         return { rebalancedReplicas: [], expectedImprovementPercent: 0 };
       }
 
-      const avgLoad = replicas.reduce((sum, r) => sum + r.load_percentage, 0) / replicas.length;
-      const overloadedReplicas = replicas.filter(r => r.load_percentage > avgLoad * 1.3);
+      const avgLoad = replicas.reduce((sum, r) => sum + Number(r.load_percentage), 0) / replicas.length;
+      const overloadedReplicas = replicas.filter(r => Number(r.load_percentage) > avgLoad * 1.3);
       
       const rebalancedReplicas: string[] = [];
       let expectedImprovementPercent = 0;
 
       for (const replica of overloadedReplicas) {
-        const excessLoad = replica.load_percentage - avgLoad;
-        const newLoad = Math.max(avgLoad, replica.load_percentage * 0.8);
+        const currentLoad = Number(replica.load_percentage);
+        const excessLoad = currentLoad - avgLoad;
+        const newLoad = Math.max(avgLoad, currentLoad * 0.8);
         
         await supabase
           .from('read_replica_config')
@@ -285,7 +298,7 @@ export class RealConnectionPoolManager {
           .eq('replica_name', replica.replica_name);
 
         rebalancedReplicas.push(replica.replica_name);
-        expectedImprovementPercent += (excessLoad / replica.load_percentage) * 100;
+        expectedImprovementPercent += (excessLoad / currentLoad) * 100;
       }
 
       expectedImprovementPercent = Math.min(expectedImprovementPercent / overloadedReplicas.length, 40);
