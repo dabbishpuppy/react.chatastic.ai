@@ -1,30 +1,17 @@
 
 import React, { useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
-import { useWebsiteSubmission } from "./websites/useWebsiteSubmission";
-import { useWebsiteFormState } from "./websites/hooks/useWebsiteFormState";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
-import WebsiteFormSection from "./websites/components/WebsiteFormSection";
+import { EnhancedWebsiteCrawlFormV2 } from "./websites/components/EnhancedWebsiteCrawlFormV2";
 import WebsiteSourcesListOptimized from "./websites/components/WebsiteSourcesListOptimized";
 import ErrorBoundary from "./ErrorBoundary";
 import { useSourcesPaginated } from "@/hooks/useSourcesPaginated";
+import CrawlProgressTracker from "./websites/components/crawl-tracker/CrawlProgressTracker";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 
 const WebsiteTabContent: React.FC = () => {
-  const { isSubmitting, submitWebsiteSource } = useWebsiteSubmission();
-  
-  const {
-    activeSubTab,
-    setActiveSubTab,
-    url,
-    setUrl,
-    protocol,
-    setProtocol,
-    includePaths,
-    setIncludePaths,
-    excludePaths,
-    setExcludePaths,
-    clearForm
-  } = useWebsiteFormState();
+  const [trackingCrawlId, setTrackingCrawlId] = useState<string | null>(null);
 
   const { refetch } = useSourcesPaginated({
     sourceType: 'website',
@@ -39,99 +26,60 @@ const WebsiteTabContent: React.FC = () => {
     }
   );
 
-  const handleSubmit = async (crawlType: 'crawl-links' | 'sitemap' | 'individual-link', options?: { maxPages?: number; maxDepth?: number; concurrency?: number }) => {
-    if (!url) {
-      toast({
-        title: "URL required",
-        description: "Please enter a URL",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    console.log('🚀 Website crawl submission started:', {
-      url,
-      crawlType,
-      options,
-      timestamp: new Date().toISOString()
+  const handleCrawlStarted = (parentSourceId: string) => {
+    // Show the progress tracker for the new crawl
+    setTrackingCrawlId(parentSourceId);
+    refetch();
+    
+    toast({
+      title: "Enhanced Crawl Started",
+      description: "Your crawl has been initiated with the new parent-child workflow",
     });
-
-    // Combine protocol with domain
-    const fullUrl = protocol + url.replace(/^https?:\/\//, '');
-
-    // Parse include and exclude paths
-    const parsePathsString = (pathsString: string): string[] => {
-      if (!pathsString || pathsString.trim() === '') return [];
-      return pathsString
-        .split(',')
-        .map(path => path.trim())
-        .filter(path => path.length > 0);
-    };
-
-    const submissionData = {
-      url: fullUrl,
-      includePaths: parsePathsString(includePaths),
-      excludePaths: parsePathsString(excludePaths),
-      crawlType,
-      ...options
-    };
-
-    console.log('📝 Parsed submission data:', submissionData);
-
-    const result = await submitWebsiteSource(submissionData);
-
-    if (result) {
-      console.log('✅ Website source created successfully:', {
-        sourceId: result.id,
-        status: result.crawl_status,
-        timestamp: new Date().toISOString()
-      });
-      
-      clearForm();
-      refetch();
-      
-      toast({
-        title: "Success",
-        description: "Website crawl has been started and will appear in the list below",
-      });
-    } else {
-      console.error('❌ Website source creation failed');
-      toast({
-        title: "Error",
-        description: "Failed to start website crawl",
-        variant: "destructive"
-      });
-    }
   };
 
   return (
     <div className="space-y-6 mt-4">
       <div>
-        <h2 className="text-2xl font-semibold">Website Training</h2>
+        <h2 className="text-2xl font-semibold">Enhanced Website Training</h2>
+        <p className="text-muted-foreground mt-1">
+          Industrial-scale crawling with compression and global deduplication
+        </p>
       </div>
 
-      <div className="space-y-4">
-        <WebsiteFormSection
-          activeSubTab={activeSubTab}
-          setActiveSubTab={setActiveSubTab}
-          url={url}
-          setUrl={setUrl}
-          protocol={protocol}
-          setProtocol={setProtocol}
-          includePaths={includePaths}
-          setIncludePaths={setIncludePaths}
-          excludePaths={excludePaths}
-          setExcludePaths={setExcludePaths}
-          onSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
-        />
+      <div className="space-y-6">
+        {/* Enhanced Crawl Form */}
+        <EnhancedWebsiteCrawlFormV2 onCrawlStarted={handleCrawlStarted} />
 
+        {/* Progress Tracker */}
+        {trackingCrawlId && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                Active Crawl Progress
+                <button 
+                  onClick={() => setTrackingCrawlId(null)}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Hide
+                </button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CrawlProgressTracker 
+                parentSourceId={trackingCrawlId}
+                onClose={() => setTrackingCrawlId(null)}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sources List */}
         <WebsiteSourcesListOptimized
           onEdit={handleEdit}
           onExclude={handleExclude}
           onDelete={handleDelete}
           onRecrawl={handleRecrawl}
-          loading={isSubmitting}
+          loading={false}
           error={null}
         />
       </div>

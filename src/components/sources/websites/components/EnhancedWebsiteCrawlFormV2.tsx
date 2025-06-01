@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,7 +71,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
 
       const customerId = agent.team_id;
 
-      // Create parent source first
+      // Create parent source with enhanced metadata
       const parentSourceData = {
         agent_id: agentId,
         team_id: customerId,
@@ -86,7 +85,12 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
         max_concurrent_jobs: priority === 'high' ? 10 : priority === 'slow' ? 2 : 5,
         progress: 0,
         total_children: 0,
+        children_completed: 0,
+        children_failed: 0,
+        children_pending: 0,
         discovery_completed: false,
+        avg_compression_ratio: 0,
+        total_processing_time_ms: 0,
         metadata: {
           enhanced_pipeline: true,
           parent_child_workflow: true,
@@ -94,35 +98,75 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
           deduplication_enabled: enableDeduplication,
           priority,
           max_pages: maxPages,
-          crawl_initiated_at: new Date().toISOString()
+          crawl_initiated_at: new Date().toISOString(),
+          exclude_paths: excludePaths.split('\n').filter(p => p.trim()),
+          include_paths: includePaths.split('\n').filter(p => p.trim())
         }
       };
 
-      console.log('🚀 Creating parent source:', parentSourceData);
+      console.log('🚀 Creating enhanced parent source:', parentSourceData);
 
       const parentSource = await sources.createSource(parentSourceData);
 
-      console.log('✅ Parent source created:', parentSource.id);
+      console.log('✅ Enhanced parent source created:', parentSource.id);
 
-      // Start link discovery workflow
-      const discoveryParams = {
-        customerId,
-        url,
-        excludePaths: excludePaths.split('\n').filter(p => p.trim()),
-        includePaths: includePaths.split('\n').filter(p => p.trim()),
-        maxPages,
-        priority
-      };
+      // Start enhanced link discovery workflow
+      try {
+        const { data: discoveryResult, error: discoveryError } = await sources.supabase.functions.invoke('link-discovery', {
+          body: {
+            parentSourceId: parentSource.id,
+            customerId,
+            url,
+            excludePaths: excludePaths.split('\n').filter(p => p.trim()),
+            includePaths: includePaths.split('\n').filter(p => p.trim()),
+            maxPages,
+            priority,
+            enableEnhancedProcessing: true
+          }
+        });
 
-      console.log('🔍 Starting link discovery with params:', discoveryParams);
+        if (discoveryError) {
+          console.error('❌ Link discovery failed:', discoveryError);
+          
+          // Update parent status to failed
+          await sources.updateSource(parentSource.id, { 
+            crawl_status: 'failed',
+            metadata: {
+              ...parentSource.metadata,
+              error_message: discoveryError.message || 'Link discovery failed',
+              last_error_at: new Date().toISOString()
+            }
+          });
+          
+          throw new Error(`Link discovery failed: ${discoveryError.message}`);
+        }
 
-      // Note: We don't wait for discovery to complete here since it's async
-      // The ParentChildWorkflow will handle the discovery and status updates
-      
-      toast({
-        title: "Crawl Initiated",
-        description: "Link discovery started. You'll see progress updates in real-time.",
-      });
+        console.log('✅ Enhanced link discovery completed:', discoveryResult);
+        
+        toast({
+          title: "Enhanced Crawl Initiated",
+          description: `Link discovery started. Found ${discoveryResult?.discoveredCount || 'unknown'} pages to process.`,
+        });
+
+      } catch (discoveryError) {
+        console.error('❌ Error in enhanced link discovery:', discoveryError);
+        
+        // Update parent status but don't prevent UI from showing it
+        await sources.updateSource(parentSource.id, { 
+          crawl_status: 'failed',
+          metadata: {
+            ...parentSource.metadata,
+            error_message: discoveryError instanceof Error ? discoveryError.message : 'Enhanced discovery failed',
+            last_error_at: new Date().toISOString()
+          }
+        });
+        
+        toast({
+          title: "Enhanced Crawl Warning", 
+          description: "Source created but enhanced discovery failed. You can try to recrawl it later.",
+          variant: "destructive"
+        });
+      }
 
       // Reset form
       setUrl('');
@@ -139,7 +183,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
     } catch (error) {
       console.error('❌ Error starting enhanced crawl:', error);
       toast({
-        title: "Crawl Failed",
+        title: "Enhanced Crawl Failed",
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive"
       });
@@ -316,7 +360,7 @@ export const EnhancedWebsiteCrawlFormV2: React.FC<EnhancedWebsiteCrawlFormV2Prop
             {isSubmitting ? (
               <>
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Starting Crawl...
+                Starting Enhanced Crawl...
               </>
             ) : (
               <>

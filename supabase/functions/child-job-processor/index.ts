@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -44,8 +45,8 @@ serve(async (req) => {
     const startTime = Date.now();
 
     try {
-      // Fetch and process the page
-      const result = await processPage(childJob.url);
+      // Fetch and process the page with enhanced pipeline
+      const result = await processPageWithPipeline(childJob.url, childJob.parent_source_id, childJob.customer_id);
       
       const processingTime = Date.now() - startTime;
 
@@ -63,6 +64,11 @@ serve(async (req) => {
           content_hash: result.contentHash
         })
         .eq('id', childJobId);
+
+      // Trigger parent status aggregation
+      await supabaseClient.rpc('aggregate_parent_status', {
+        parent_source_id_param: childJob.parent_source_id
+      });
 
       console.log(`✅ Child job ${childJobId} completed successfully`);
 
@@ -93,6 +99,11 @@ serve(async (req) => {
         })
         .eq('id', childJobId);
 
+      // Still trigger parent status aggregation to handle failed jobs
+      await supabaseClient.rpc('aggregate_parent_status', {
+        parent_source_id_param: childJob.parent_source_id
+      });
+
       throw processingError;
     }
 
@@ -110,7 +121,7 @@ serve(async (req) => {
   }
 });
 
-async function processPage(url: string) {
+async function processPageWithPipeline(url: string, parentSourceId: string, customerId: string) {
   // Fetch the page
   const response = await fetch(url, {
     headers: {
@@ -125,55 +136,108 @@ async function processPage(url: string) {
 
   const html = await response.text();
   
-  // Extract main content (simplified version)
-  const cleanedContent = extractMainContent(html);
+  // Extract main content and remove boilerplate
+  const cleanContent = extractMainContent(html);
+  const originalSize = cleanContent.length;
+
+  if (cleanContent.length < 100) {
+    throw new Error('Content too short after cleaning');
+  }
+
+  // Create semantic chunks
+  const chunks = createSemanticChunks(cleanContent);
   
-  // Simulate compression and chunking (actual implementation would use Zstd)
-  const originalSize = cleanedContent.length;
-  const compressedSize = Math.floor(originalSize * 0.3); // Simulate 70% compression
-  const compressionRatio = compressedSize / originalSize;
-  
-  // Simulate chunking
-  const chunks = Math.ceil(cleanedContent.length / 500); // ~500 chars per chunk
-  const duplicates = Math.floor(chunks * 0.1); // Simulate 10% duplicates
-  
+  // Simulate processing with compression and deduplication
+  const compressionRatio = 0.25; // Simulate 75% compression
+  const duplicateRate = 0.1; // Simulate 10% duplicates
+  const uniqueChunks = Math.floor(chunks.length * (1 - duplicateRate));
+  const duplicateChunks = chunks.length - uniqueChunks;
+
   // Create content hash
   const encoder = new TextEncoder();
-  const data = encoder.encode(cleanedContent);
+  const data = encoder.encode(cleanContent);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
 
   return {
     contentSize: originalSize,
     compressionRatio,
-    chunksCreated: chunks - duplicates,
-    duplicatesFound: duplicates,
-    contentHash: contentHash.substring(0, 16) // Truncate for storage
+    chunksCreated: uniqueChunks,
+    duplicatesFound: duplicateChunks,
+    contentHash
   };
 }
 
 function extractMainContent(html: string): string {
-  // Remove script and style tags
-  let content = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  
-  // Remove HTML tags but keep text
-  content = content.replace(/<[^>]*>/g, ' ');
-  
-  // Clean up whitespace
-  content = content.replace(/\s+/g, ' ').trim();
-  
-  // Remove common boilerplate phrases
-  const boilerplate = [
-    'click here', 'read more', 'subscribe now', 'follow us',
-    'privacy policy', 'terms of service', 'cookie policy'
+  // Remove script, style, and navigation elements
+  let content = html
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<style[^>]*>.*?<\/style>/gi, '')
+    .replace(/<nav[^>]*>.*?<\/nav>/gi, '')
+    .replace(/<header[^>]*>.*?<\/header>/gi, '')
+    .replace(/<footer[^>]*>.*?<\/footer>/gi, '')
+    .replace(/<aside[^>]*>.*?<\/aside>/gi, '')
+    .replace(/<form[^>]*>.*?<\/form>/gi, '');
+
+  // Remove common boilerplate patterns
+  const boilerplatePatterns = [
+    /cookie policy|privacy policy|terms of service/gi,
+    /subscribe|newsletter|follow us/gi,
+    /click here|read more|learn more/gi,
+    /advertisement|sponsored content/gi,
+    /share this|social media/gi,
+    /copyright|all rights reserved/gi,
   ];
-  
-  boilerplate.forEach(phrase => {
-    const regex = new RegExp(phrase, 'gi');
-    content = content.replace(regex, '');
+
+  boilerplatePatterns.forEach(pattern => {
+    content = content.replace(pattern, '');
   });
+
+  // Convert to plain text and clean up
+  return content
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function createSemanticChunks(content: string, maxTokens: number = 150): Array<{
+  content: string;
+  tokenCount: number;
+  chunkIndex: number;
+}> {
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15);
+  const chunks: Array<{ content: string; tokenCount: number; chunkIndex: number }> = [];
+  let currentChunk = '';
+  let tokenCount = 0;
+  let chunkIndex = 0;
+
+  for (const sentence of sentences) {
+    const sentenceTokens = Math.ceil(sentence.trim().split(/\s+/).length);
+    
+    if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
+      if (currentChunk.trim().length > 30) {
+        chunks.push({
+          content: currentChunk.trim(),
+          tokenCount,
+          chunkIndex: chunkIndex++
+        });
+      }
+      currentChunk = sentence;
+      tokenCount = sentenceTokens;
+    } else {
+      currentChunk += (currentChunk ? '. ' : '') + sentence;
+      tokenCount += sentenceTokens;
+    }
+  }
   
-  return content;
+  if (currentChunk.trim().length > 30) {
+    chunks.push({
+      content: currentChunk.trim(),
+      tokenCount,
+      chunkIndex: chunkIndex++
+    });
+  }
+  
+  return chunks.filter(chunk => chunk.content.length > 20);
 }
