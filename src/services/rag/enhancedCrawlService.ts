@@ -62,18 +62,21 @@ export class EnhancedCrawlService {
     try {
       // Use direct query since RPC function isn't available in types yet
       // This is a temporary workaround until Supabase types are regenerated
-      const { data, error } = await (supabase as any)
-        .from('crawl_jobs')
-        .select('*')
-        .eq('parent_source_id', parentSourceId)
-        .order('created_at', { ascending: true });
+      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/rest/v1/crawl_jobs?parent_source_id=eq.${parentSourceId}&order=created_at.asc`, {
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      if (error) {
-        console.warn('Error fetching crawl jobs:', error);
+      if (!response.ok) {
+        console.warn('Error fetching crawl jobs:', response.statusText);
         return [];
       }
 
-      return data || [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching crawl jobs:', error);
       return [];
@@ -82,34 +85,42 @@ export class EnhancedCrawlService {
 
   static async retryFailedJobs(parentSourceId: string): Promise<number> {
     try {
-      // Get failed jobs that haven't exceeded retry limit
-      const { data: failedJobs, error: fetchError } = await (supabase as any)
-        .from('crawl_jobs')
-        .select('id, retry_count')
-        .eq('parent_source_id', parentSourceId)
-        .eq('status', 'failed')
-        .lt('retry_count', 3);
+      // Get failed jobs that haven't exceeded retry limit using REST API
+      const response = await fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/rest/v1/crawl_jobs?parent_source_id=eq.${parentSourceId}&status=eq.failed&retry_count=lt.3&select=id,retry_count`, {
+        headers: {
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      if (!failedJobs || failedJobs.length === 0) {
+      if (!response.ok) {
         return 0;
       }
 
-      // Update each job individually to increment retry count
+      const failedJobs = await response.json();
+
+      if (!Array.isArray(failedJobs) || failedJobs.length === 0) {
+        return 0;
+      }
+
+      // Update each job individually
       const updatePromises = failedJobs.map(async (job: any) => {
-        return (supabase as any)
-          .from('crawl_jobs')
-          .update({
+        return fetch(`https://lndfjlkzvxbnoxfuboxz.supabase.co/rest/v1/crawl_jobs?id=eq.${job.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk',
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKXfZXVuF90azFk',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
             status: 'pending',
             retry_count: (job.retry_count || 0) + 1,
             error_message: null,
             started_at: null,
             completed_at: null
           })
-          .eq('id', job.id);
+        });
       });
 
       await Promise.all(updatePromises);
