@@ -3,18 +3,23 @@ import React from "react";
 import { Table, TableHeader, TableRow, TableHead, TableBody } from "@/components/ui/table";
 import { TeamMember } from "@/hooks/useTeamMembers";
 import MemberTableRow from "./MemberTableRow";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 interface MembersTableProps {
   members: TeamMember[];
   onManageTeams: (member: TeamMember) => void;
   onRemoveMember: (member: TeamMember) => void;
+  selectedTeamId?: string;
 }
 
 const MembersTable: React.FC<MembersTableProps> = ({
   members,
   onManageTeams,
-  onRemoveMember
+  onRemoveMember,
+  selectedTeamId
 }) => {
+  const { permissions, canManageUser } = useRolePermissions(selectedTeamId || null);
+
   return (
     <Table>
       <TableHeader>
@@ -33,6 +38,8 @@ const MembersTable: React.FC<MembersTableProps> = ({
             member={member}
             onManageTeams={onManageTeams}
             onRemoveMember={onRemoveMember}
+            canManage={canManageUser(member.role)}
+            canManageTeamMembers={permissions.canManageTeamMembers}
           />
         ))}
       </TableBody>

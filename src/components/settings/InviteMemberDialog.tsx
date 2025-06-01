@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Team {
   id: string;
@@ -26,7 +27,9 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [selectedRole, setSelectedRole] = useState<"owner" | "admin" | "member">("member");
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (isOpen) {
@@ -36,9 +39,16 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
 
   const fetchAvailableTeams = async () => {
     try {
+      // Get teams where user can manage members (admin or owner)
       const { data: teams, error } = await supabase
         .from('teams')
-        .select('id, name');
+        .select(`
+          id, 
+          name,
+          team_members!inner(role)
+        `)
+        .eq('team_members.user_id', user?.id)
+        .in('team_members.role', ['admin', 'owner']);
 
       if (error) throw error;
       setAvailableTeams(teams || []);
@@ -52,7 +62,7 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
     }
   };
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (!inviteEmail) {
       toast({
         title: "Error",
@@ -71,16 +81,43 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
       return;
     }
 
-    // Here you would normally send an invitation
-    toast({
-      title: "Invitation sent",
-      description: `Invitation sent to ${inviteEmail} for the selected team with ${selectedRole} role`
-    });
-    
-    setInviteEmail("");
-    setSelectedTeamId("");
-    setSelectedRole("member");
-    onClose();
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('send_team_invitation', {
+        team_id_param: selectedTeamId,
+        email_param: inviteEmail,
+        role_param: selectedRole
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        toast({
+          title: "Invitation sent",
+          description: `Invitation sent to ${inviteEmail} with ${selectedRole} role`
+        });
+        
+        setInviteEmail("");
+        setSelectedTeamId("");
+        setSelectedRole("member");
+        onClose();
+      } else {
+        toast({
+          title: "Error sending invitation",
+          description: data.error,
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error('Error sending invitation:', error);
+      toast({
+        title: "Error sending invitation",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -169,10 +206,12 @@ const InviteMemberDialog: React.FC<InviteMemberDialogProps> = ({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" onClick={handleClose} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleInvite}>Send invitation</Button>
+          <Button onClick={handleInvite} disabled={loading}>
+            {loading ? "Sending..." : "Send invitation"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

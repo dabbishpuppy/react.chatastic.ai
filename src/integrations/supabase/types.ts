@@ -780,6 +780,50 @@ export type Database = {
           },
         ]
       }
+      team_invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: Database["public"]["Enums"]["team_role"]
+          status: Database["public"]["Enums"]["invitation_status"]
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          role?: Database["public"]["Enums"]["team_role"]
+          status?: Database["public"]["Enums"]["invitation_status"]
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          status?: Database["public"]["Enums"]["invitation_status"]
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invitations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string | null
@@ -899,6 +943,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_team_invitation: {
+        Args: { invitation_id: string }
+        Returns: Json
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -910,6 +958,10 @@ export type Database = {
       calculate_content_hash: {
         Args: { content: string }
         Returns: string
+      }
+      can_manage_team_members: {
+        Args: { team_id_param: string }
+        Returns: boolean
       }
       cleanup_expired_data: {
         Args: Record<PropertyKey, never>
@@ -973,6 +1025,10 @@ export type Database = {
       get_user_email: {
         Args: { user_id_param: string }
         Returns: string
+      }
+      get_user_team_role: {
+        Args: { team_id_param: string; user_id_param?: string }
+        Returns: Database["public"]["Enums"]["team_role"]
       }
       get_users_emails: {
         Args: { user_ids: string[] }
@@ -1045,6 +1101,14 @@ export type Database = {
         Args: { batch_size?: number }
         Returns: Json
       }
+      send_team_invitation: {
+        Args: {
+          team_id_param: string
+          email_param: string
+          role_param?: Database["public"]["Enums"]["team_role"]
+        }
+        Returns: Json
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown
@@ -1091,6 +1155,7 @@ export type Database = {
         | "export"
         | "train"
         | "query"
+      invitation_status: "pending" | "accepted" | "expired" | "cancelled"
       source_type: "text" | "file" | "website" | "qa"
       team_role: "owner" | "admin" | "member"
       training_status: "pending" | "in_progress" | "completed" | "failed"
@@ -1218,6 +1283,7 @@ export const Constants = {
         "train",
         "query",
       ],
+      invitation_status: ["pending", "accepted", "expired", "cancelled"],
       source_type: ["text", "file", "website", "qa"],
       team_role: ["owner", "admin", "member"],
       training_status: ["pending", "in_progress", "completed", "failed"],

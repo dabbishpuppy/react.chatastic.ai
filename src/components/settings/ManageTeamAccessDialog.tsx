@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { X, UserPlus, Settings } from "lucide-react";
+import { X, UserPlus } from "lucide-react";
+import { useRolePermissions } from "@/hooks/useRolePermissions";
 
 interface TeamWithAccess {
   id: string;
@@ -39,6 +40,10 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // We'll use the first team for permission checking - in a real app you'd want to check per team
+  const firstTeamId = allTeams.find(t => t.hasAccess)?.id || null;
+  const { canManageUser, userRole } = useRolePermissions(firstTeamId);
 
   useEffect(() => {
     if (isOpen) {
@@ -141,6 +146,29 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
   };
 
   const handleRoleChange = async (teamId: string, newRole: "owner" | "admin" | "member") => {
+    const team = allTeams.find(t => t.id === teamId);
+    if (!team || !team.userRole) return;
+
+    // Check if current user can manage this user's role
+    if (!canManageUser(team.userRole)) {
+      toast({
+        title: "Insufficient permissions",
+        description: "You don't have permission to change this user's role.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Admins cannot promote users to admin or owner roles
+    if (userRole === 'admin' && (newRole === 'admin' || newRole === 'owner')) {
+      toast({
+        title: "Insufficient permissions",
+        description: "Admins cannot assign admin or owner roles.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setRoleUpdating(teamId);
     try {
       const { error } = await supabase
@@ -179,6 +207,19 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
       toast({
         title: "Cannot remove access",
         description: "User must belong to at least one team.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const team = allTeams.find(t => t.id === teamId);
+    if (!team || !team.userRole) return;
+
+    // Check if current user can manage this user
+    if (!canManageUser(team.userRole)) {
+      toast({
+        title: "Insufficient permissions",
+        description: "You don't have permission to remove this user.",
         variant: "destructive",
       });
       return;
@@ -226,6 +267,20 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
     }
   };
 
+  const canChangeRole = (team: TeamWithAccess): boolean => {
+    if (!team.userRole) return false;
+    return canManageUser(team.userRole);
+  };
+
+  const getAvailableRoles = (): ("owner" | "admin" | "member")[] => {
+    if (userRole === 'owner') {
+      return ['member', 'admin', 'owner'];
+    } else if (userRole === 'admin') {
+      return ['member']; // Admins can only assign member role
+    }
+    return ['member'];
+  };
+
   const currentTeams = allTeams.filter(team => team.hasAccess);
   const availableTeams = allTeams.filter(team => !team.hasAccess);
 
@@ -262,22 +317,30 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Select
-                        value={team.userRole}
-                        onValueChange={(value: "owner" | "admin" | "member") => handleRoleChange(team.id, value)}
-                        disabled={roleUpdating === team.id}
-                      >
-                        <SelectTrigger className="w-24 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="owner">Owner</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {canChangeRole(team) ? (
+                        <Select
+                          value={team.userRole}
+                          onValueChange={(value: "owner" | "admin" | "member") => handleRoleChange(team.id, value)}
+                          disabled={roleUpdating === team.id}
+                        >
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAvailableRoles().map(role => (
+                              <SelectItem key={role} value={role}>
+                                {role.charAt(0).toUpperCase() + role.slice(1)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="w-24 h-8 flex items-center text-sm text-gray-500">
+                          {team.userRole?.charAt(0).toUpperCase() + team.userRole?.slice(1)}
+                        </div>
+                      )}
                       
-                      {currentTeams.length > 1 && (
+                      {currentTeams.length > 1 && canChangeRole(team) && (
                         <button
                           onClick={() => handleRemoveTeamAccess(team.id)}
                           disabled={loading || roleUpdating === team.id}
@@ -320,9 +383,11 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="owner">Owner</SelectItem>
+                    {getAvailableRoles().map(role => (
+                      <SelectItem key={role} value={role}>
+                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

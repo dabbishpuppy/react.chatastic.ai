@@ -11,12 +11,16 @@ interface MemberTableRowProps {
   member: TeamMember;
   onManageTeams: (member: TeamMember) => void;
   onRemoveMember: (member: TeamMember) => void;
+  canManage?: boolean;
+  canManageTeamMembers?: boolean;
 }
 
 const MemberTableRow: React.FC<MemberTableRowProps> = ({
   member,
   onManageTeams,
-  onRemoveMember
+  onRemoveMember,
+  canManage = false,
+  canManageTeamMembers = false
 }) => {
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -28,6 +32,8 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const showActions = canManageTeamMembers && canManage;
 
   return (
     <TableRow key={member.user_id}>
@@ -48,31 +54,33 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
         </div>
       </TableCell>
       <TableCell>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem 
-              onClick={() => onManageTeams(member)}
-              className="text-sm"
-              style={{ fontSize: '0.875rem' }}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Manage Teams
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => onRemoveMember(member)}
-              className="text-sm text-red-600 hover:text-red-700"
-              style={{ fontSize: '0.875rem' }}
-            >
-              <UserMinus className="mr-2 h-4 w-4" />
-              Remove member
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {showActions && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => onManageTeams(member)}
+                className="text-sm"
+                style={{ fontSize: '0.875rem' }}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                Manage Teams
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => onRemoveMember(member)}
+                className="text-sm text-red-600 hover:text-red-700"
+                style={{ fontSize: '0.875rem' }}
+              >
+                <UserMinus className="mr-2 h-4 w-4" />
+                Remove member
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </TableCell>
     </TableRow>
   );
