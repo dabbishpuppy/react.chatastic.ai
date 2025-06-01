@@ -122,38 +122,56 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with corrected data types
+    // First, let's check the source_pages table schema to understand the exact column requirements
+    console.log('🔍 Checking source_pages table schema...');
+    
+    // Create source_pages with schema-compliant data types
     if (discoveredUrls.length > 0) {
       console.log('🔍 Starting source pages insertion...');
       
-      // Insert source pages in batches with corrected data types
-      await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, priority);
+      try {
+        // Insert source pages in batches with exact schema compliance
+        await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, priority);
 
-      // Update parent source
-      await supabase
-        .from('agent_sources')
-        .update({
-          crawl_status: 'in_progress',
-          discovery_completed: true,
-          total_children: discoveredUrls.length,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', parentSource.id);
+        // Update parent source
+        await supabase
+          .from('agent_sources')
+          .update({
+            crawl_status: 'in_progress',
+            discovery_completed: true,
+            total_children: discoveredUrls.length,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', parentSource.id);
 
-      console.log(`✅ Enhanced crawl initiated: ${discoveredUrls.length} source pages processing`);
+        console.log(`✅ Enhanced crawl initiated: ${discoveredUrls.length} source pages processing`);
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          parentSourceId: parentSource.id,
-          totalJobs: discoveredUrls.length,
-          message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
-        }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200
-        }
-      );
+        return new Response(
+          JSON.stringify({
+            success: true,
+            parentSourceId: parentSource.id,
+            totalJobs: discoveredUrls.length,
+            message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
+          }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200
+          }
+        );
+      } catch (insertError) {
+        console.error('❌ Source pages insertion failed:', insertError);
+        
+        // Update parent source to failed status
+        await supabase
+          .from('agent_sources')
+          .update({
+            crawl_status: 'failed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', parentSource.id);
+
+        throw new Error(`Source pages insertion failed: ${insertError.message}`);
+      }
     } else {
       throw new Error('No URLs discovered for crawling');
     }
@@ -174,7 +192,7 @@ serve(async (req) => {
   }
 });
 
-// Fixed function to insert source pages with correct data types
+// Fixed function to insert source pages with exact schema compliance
 async function insertSourcePagesInBatches(
   parentSourceId: string,
   teamId: string,
@@ -183,56 +201,88 @@ async function insertSourcePagesInBatches(
 ): Promise<void> {
   console.log(`📝 Inserting ${urls.length} URLs in batches...`);
   
-  const batchSize = 10;
+  const batchSize = 5; // Smaller batches for better error isolation
   let insertedCount = 0;
   let failedCount = 0;
 
-  for (let i = 0; i < urls.length; i += batchSize) {
-    const batch = urls.slice(i, i + batchSize);
+  // First, let's try inserting a single record to test the exact schema requirements
+  const testRecord = {
+    parent_source_id: parentSourceId,
+    customer_id: teamId,
+    url: urls[0],
+    status: 'pending',
+    priority: priority,
+    retry_count: 0,
+    max_retries: 3,
+    created_at: new Date().toISOString()
+  };
+
+  console.log('🧪 Testing single record insertion:', JSON.stringify(testRecord, null, 2));
+
+  try {
+    const { data: testResult, error: testError } = await supabase
+      .from('source_pages')
+      .insert([testRecord])
+      .select('id, status, url');
     
-    // Create batch records with correct data types and column names
-    const batchRecords = batch.map((url) => ({
-      parent_source_id: parentSourceId,
-      customer_id: teamId, // Using team_id as customer_id
-      url: url,
-      status: 'pending', // Ensure this is a string, not boolean
-      priority: priority,
-      retry_count: 0,
-      max_retries: 3,
-      created_at: new Date().toISOString()
-    }));
-
-    console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
-    console.log(`🔍 Sample record:`, JSON.stringify(batchRecords[0], null, 2));
-
-    try {
-      const { data: batchResult, error: batchError } = await supabase
-        .from('source_pages')
-        .insert(batchRecords)
-        .select('id');
-      
-      if (batchError) {
-        console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
-        console.error(`❌ Error code:`, batchError.code);
-        console.error(`❌ Error message:`, batchError.message);
-        console.error(`❌ Error details:`, batchError.details);
-        console.error(`❌ Error hint:`, batchError.hint);
-        failedCount += batch.length;
-      } else {
-        insertedCount += batch.length;
-        console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
-        console.log(`✅ Batch result count:`, batchResult?.length || 0);
-      }
-    } catch (unexpectedError) {
-      console.error(`❌ Unexpected error in batch ${Math.floor(i/batchSize) + 1}:`, unexpectedError);
-      failedCount += batch.length;
+    if (testError) {
+      console.error('❌ Test insertion failed:', testError);
+      console.error('❌ Full error object:', JSON.stringify(testError, null, 2));
+      throw new Error(`Schema validation failed: ${testError.message}`);
     }
+    
+    console.log('✅ Test insertion successful:', testResult);
+    insertedCount = 1;
+    
+    // If test passed, continue with remaining URLs
+    const remainingUrls = urls.slice(1);
+    
+    for (let i = 0; i < remainingUrls.length; i += batchSize) {
+      const batch = remainingUrls.slice(i, i + batchSize);
+      
+      // Create batch records with exact same structure as test record
+      const batchRecords = batch.map((url) => ({
+        parent_source_id: parentSourceId,
+        customer_id: teamId,
+        url: url,
+        status: 'pending',
+        priority: priority,
+        retry_count: 0,
+        max_retries: 3,
+        created_at: new Date().toISOString()
+      }));
+
+      console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
+
+      try {
+        const { data: batchResult, error: batchError } = await supabase
+          .from('source_pages')
+          .insert(batchRecords)
+          .select('id');
+        
+        if (batchError) {
+          console.error(`❌ Batch insertion failed for URLs ${i+1}-${i+batch.length}:`, batchError);
+          console.error(`❌ Full batch error:`, JSON.stringify(batchError, null, 2));
+          failedCount += batch.length;
+        } else {
+          insertedCount += batch.length;
+          console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}: ${insertedCount}/${urls.length} URLs processed`);
+        }
+      } catch (unexpectedError) {
+        console.error(`❌ Unexpected error in batch ${Math.floor(i/batchSize) + 1}:`, unexpectedError);
+        failedCount += batch.length;
+      }
+    }
+    
+  } catch (testFailure) {
+    console.error('❌ Initial test insertion failed completely:', testFailure);
+    throw new Error(`Cannot insert into source_pages table: ${testFailure.message}`);
   }
   
   console.log(`✅ Batch insertion completed: ${insertedCount} successful, ${failedCount} failed out of ${urls.length} total`);
   
   if (failedCount > 0) {
-    console.warn(`⚠️ ${failedCount} insertions failed - check RLS policies and table schema`);
+    console.warn(`⚠️ ${failedCount} insertions failed - check table schema and constraints`);
   }
 }
 
