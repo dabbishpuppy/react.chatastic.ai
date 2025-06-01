@@ -106,28 +106,46 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
     }
   };
 
-  const showActions = canManageTeamMembers && (canManage || member.status === 'pending');
+  const formatExpiryDate = (expiresAt?: string) => {
+    if (!expiresAt) return '';
+    return new Date(expiresAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const showActions = canManageTeamMembers && (canManage || member.type === 'invitation');
 
   return (
     <TableRow key={member.user_id}>
       <TableCell>
         <div className="flex items-center gap-2">
           {member.email}
-          {member.status === 'pending' && (
+          {member.type === 'invitation' && (
             <Clock className="h-4 w-4 text-yellow-600" />
           )}
         </div>
       </TableCell>
-      <TableCell>{member.memberSince}</TableCell>
+      <TableCell>
+        {member.type === 'invitation' ? 'Invited' : 'Member since'} {member.memberSince}
+      </TableCell>
       <TableCell>
         <Badge className={getRoleColor(member.role)}>
           {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
         </Badge>
       </TableCell>
       <TableCell>
-        <Badge className={getStatusColor(member.status)}>
-          {member.status === 'pending' ? 'Pending' : 'Active'}
-        </Badge>
+        <div className="flex flex-col gap-1">
+          <Badge className={getStatusColor(member.status)}>
+            {member.type === 'invitation' ? 'Pending' : 'Active'}
+          </Badge>
+          {member.type === 'invitation' && member.expires_at && (
+            <span className="text-xs text-gray-500">
+              Expires {formatExpiryDate(member.expires_at)}
+            </span>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1">
@@ -147,7 +165,7 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {member.status === 'pending' ? (
+              {member.type === 'invitation' ? (
                 <DropdownMenuItem 
                   onClick={handleResendInvitation}
                   className="text-sm"
@@ -172,7 +190,7 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
                 style={{ fontSize: '0.875rem' }}
               >
                 <UserMinus className="mr-2 h-4 w-4" />
-                {member.status === 'pending' ? 'Cancel invitation' : 'Remove member'}
+                {member.type === 'invitation' ? 'Cancel invitation' : 'Remove member'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -25,7 +25,7 @@ const MembersTable: React.FC<MembersTableProps> = ({
       <TableHeader>
         <TableRow>
           <TableHead>User</TableHead>
-          <TableHead>Member since</TableHead>
+          <TableHead>Date</TableHead>
           <TableHead>Role</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Teams</TableHead>
@@ -39,7 +39,7 @@ const MembersTable: React.FC<MembersTableProps> = ({
             member={member}
             onManageTeams={onManageTeams}
             onRemoveMember={onRemoveMember}
-            canManage={canManageUser(member.role)}
+            canManage={member.type === 'member' ? canManageUser(member.role) : true}
             canManageTeamMembers={permissions.canManageTeamMembers}
           />
         ))}

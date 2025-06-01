@@ -12,6 +12,8 @@ export interface TeamMember {
   teams: string[];
   status?: "active" | "pending";
   invitation_id?: string;
+  type: "member" | "invitation";
+  expires_at?: string;
 }
 
 export const useTeamMembers = () => {
@@ -48,6 +50,7 @@ export const useTeamMembers = () => {
           email,
           role,
           created_at,
+          expires_at,
           teams (
             name
           )
@@ -84,7 +87,8 @@ export const useTeamMembers = () => {
             }),
             role: member.role as "owner" | "admin" | "member",
             teams: [teamName],
-            status: "active"
+            status: "active",
+            type: "member"
           });
         }
       });
@@ -105,11 +109,20 @@ export const useTeamMembers = () => {
           role: invitation.role as "owner" | "admin" | "member",
           teams: [teamName],
           status: "pending",
-          invitation_id: invitation.id
+          invitation_id: invitation.id,
+          type: "invitation",
+          expires_at: invitation.expires_at
         });
       });
 
-      setMembers(Array.from(membersMap.values()));
+      // Sort members: active members first, then pending invitations
+      const sortedMembers = Array.from(membersMap.values()).sort((a, b) => {
+        if (a.type === "member" && b.type === "invitation") return -1;
+        if (a.type === "invitation" && b.type === "member") return 1;
+        return new Date(a.memberSince).getTime() - new Date(b.memberSince).getTime();
+      });
+
+      setMembers(sortedMembers);
     } catch (error: any) {
       console.error('Error fetching team members:', error);
       toast({

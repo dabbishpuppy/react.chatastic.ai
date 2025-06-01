@@ -8,7 +8,6 @@ import MembersTable from "@/components/settings/MembersTable";
 import MembersTableSkeleton from "@/components/settings/MembersTableSkeleton";
 import InviteMemberDialog from "@/components/settings/InviteMemberDialog";
 import RemoveMemberDialog from "@/components/settings/RemoveMemberDialog";
-import TeamInvitations from "@/components/settings/TeamInvitations";
 import { useRolePermissions } from "@/hooks/useRolePermissions";
 import { useTeamsData } from "@/hooks/useTeamsData";
 
@@ -42,12 +41,17 @@ const MembersSettings: React.FC = () => {
     setSelectedMember(null);
   };
 
+  // Calculate member and invitation counts
+  const memberCount = members.filter(m => m.type === 'member').length;
+  const invitationCount = members.filter(m => m.type === 'invitation').length;
+  const totalCount = memberCount + invitationCount;
+
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg border p-6">
           <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold">Members</h2>
+            <h2 className="text-2xl font-bold">Members & Invitations</h2>
             {permissions.canInviteMembers && (
               <Button disabled>
                 <UserPlus className="mr-2 h-4 w-4" />
@@ -63,13 +67,15 @@ const MembersSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <TeamInvitations disableLoadingWhenMainLoading={false} />
-      
       <div className="bg-white rounded-lg border p-6">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-bold">
-              Members <span className="text-sm text-muted-foreground font-normal">{members.length}/{members.length}</span>
+              Members & Invitations{" "}
+              <span className="text-sm text-muted-foreground font-normal">
+                {memberCount} member{memberCount !== 1 ? 's' : ''}
+                {invitationCount > 0 && `, ${invitationCount} pending`}
+              </span>
             </h2>
           </div>
           {permissions.canInviteMembers && (
@@ -101,7 +107,7 @@ const MembersSettings: React.FC = () => {
           onSuccess={refetch}
         />
 
-        {selectedMember && (
+        {selectedMember && selectedMember.type === 'member' && (
           <ManageTeamAccessDialog
             isOpen={isManageTeamDialogOpen}
             onClose={handleCloseManageTeam}
