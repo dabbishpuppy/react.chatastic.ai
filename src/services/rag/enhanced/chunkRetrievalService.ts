@@ -50,8 +50,8 @@ export class ChunkRetrievalService {
         const chunk = mapping.semantic_chunks as any;
         if (chunk && chunk.compressed_blob) {
           try {
-            // Convert bytea to base64 string for decompression
-            const compressedData = btoa(String.fromCharCode(...new Uint8Array(chunk.compressed_blob)));
+            // The compressed_blob should already be a base64 string in the database
+            const compressedData = chunk.compressed_blob;
             
             // Decompress the content
             const decompressedContent = await CompressionEngine.decompressFromStorage(compressedData);
@@ -196,9 +196,8 @@ export class ChunkRetrievalService {
       if (chunks) {
         for (const chunk of chunks) {
           try {
-            // Decompress content for analysis
-            const compressedData = btoa(String.fromCharCode(...new Uint8Array(chunk.compressed_blob)));
-            const decompressedContent = await CompressionEngine.decompressFromStorage(compressedData);
+            // Decompress content for analysis - compressed_blob is already base64
+            const decompressedContent = await CompressionEngine.decompressFromStorage(chunk.compressed_blob);
 
             retrievedChunks.push({
               id: chunk.id,

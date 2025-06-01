@@ -147,16 +147,12 @@ export class ContentProcessingPipeline {
         // New chunk - compress with real Zstd and store
         const compressionResult = await CompressionEngine.compressForStorage(chunk.content);
         
-        // Convert compressed data to bytea format for Postgres
-        const compressedBytes = new Uint8Array(
-          atob(compressionResult.compressedData).split('').map(char => char.charCodeAt(0))
-        );
-        
+        // The compressed data is already a base64 string from compressForStorage
         const { data: newChunk, error: insertError } = await supabase
           .from('semantic_chunks')
           .insert({
             content_hash: contentHash,
-            compressed_blob: compressedBytes,
+            compressed_blob: compressionResult.compressedData, // This is already base64
             token_count: chunk.tokenCount,
             ref_count: 1
           })

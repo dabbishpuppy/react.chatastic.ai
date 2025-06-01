@@ -324,7 +324,7 @@ async function compressWithZstd(text: string): Promise<{
     console.warn('Native compression failed, using fallback:', error);
   }
   
-  // Fallback to simple compression
+  // Fallback to base64 encoding (simulated compression)
   const compressed = btoa(text);
   const compressedSize = Math.floor(originalSize * 0.3); // Simulate ~70% compression
   
@@ -387,16 +387,12 @@ async function processChunksWithRealDeduplication(
       // New chunk - compress and store
       const compressionResult = await compressWithZstd(chunk.content);
       
-      // Convert compressed data to bytea format for Postgres
-      const compressedBytes = new Uint8Array(
-        atob(compressionResult.compressedData).split('').map(char => char.charCodeAt(0))
-      );
-      
+      // Store the base64 compressed data directly
       const { data: newChunk, error: insertError } = await supabaseClient
         .from('semantic_chunks')
         .insert({
           content_hash: contentHash,
-          compressed_blob: compressedBytes,
+          compressed_blob: compressionResult.compressedData, // Already base64
           token_count: chunk.tokenCount,
           ref_count: 1
         })
