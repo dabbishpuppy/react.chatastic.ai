@@ -1,104 +1,66 @@
 
-import React from "react";
-import { Outlet, useLocation, Navigate } from "react-router-dom";
-import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { 
-  LayoutDashboard, 
-  Settings as SettingsIcon, 
-  Users, 
-  CreditCard, 
-  Package, 
-  Key, 
-  BarChart3 
-} from "lucide-react";
+import React, { useEffect } from "react";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard, BarChart3 } from "lucide-react";
+import Logo from "@/components/layout/Logo";
 
 const Settings = () => {
+  const navigate = useNavigate();
   const location = useLocation();
   
-  // If we're at the base /settings route, redirect to /settings/general
-  if (location.pathname === '/settings') {
-    return <Navigate to="/settings/general" replace />;
-  }
-
-  const settingsNavItems = [
-    {
-      icon: <LayoutDashboard size={20} />,
-      label: "Dashboard",
-      path: "/dashboard"
-    },
-    {
-      icon: <SettingsIcon size={20} />,
-      label: "General",
-      path: "/settings/general"
-    },
-    {
-      icon: <Users size={20} />,
-      label: "Members",
-      path: "/settings/members"
-    },
-    {
-      icon: <Package size={20} />,
-      label: "Plans",
-      path: "/settings/plans"
-    },
-    {
-      icon: <CreditCard size={20} />,
-      label: "Billing",
-      path: "/settings/billing"
-    },
-    {
-      icon: <Key size={20} />,
-      label: "API Keys",
-      path: "/settings/api-keys"
-    },
-    {
-      icon: <BarChart3 size={20} />,
-      label: "Usage",
-      path: "/settings/usage"
+  // Redirect to general settings if on root settings path
+  useEffect(() => {
+    if (location.pathname === '/settings' || location.pathname === '/settings/') {
+      navigate('/settings/general', { replace: true });
     }
+  }, [location.pathname, navigate]);
+  
+  const menuItems = [
+    { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
+    { to: "/settings/general", label: "General", icon: <SettingsIcon size={18} /> },
+    { to: "/settings/members", label: "Members", icon: <Users size={18} /> },
+    { to: "/settings/plans", label: "Plans", icon: <Package size={18} /> },
+    { to: "/settings/billing", label: "Billing", icon: <CreditCard size={18} /> },
+    { to: "/settings/api-keys", label: "API Keys", icon: <Key size={18} /> },
+    { to: "/settings/usage", label: "Usage", icon: <BarChart3 size={18} /> },
   ];
 
-  const isActiveRoute = (path: string) => {
-    return location.pathname === path;
-  };
-
   return (
-    <ProtectedRoute>
-      <div className="flex min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen">
+      <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900">Settings</h2>
+        <div className="w-64 border-r border-gray-200 bg-white">
+          <div className="p-4 border-b border-gray-200">
+            <Logo size="md" />
           </div>
-          
-          <nav className="flex-1 px-4 pb-4 space-y-1">
-            {settingsNavItems.map((item) => (
-              <a
-                key={item.path}
-                href={item.path}
-                className={`
-                  flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors
-                  ${isActiveRoute(item.path)
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }
-                `}
+          <nav className="p-4">
+            {menuItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `flex items-center px-4 py-2.5 my-1 text-sm rounded-md ${
+                    isActive
+                      ? "bg-gray-100 font-medium"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`
+                }
               >
-                {item.icon}
-                <span className="ml-3">{item.label}</span>
-              </a>
+                <span className="mr-3 text-gray-500">{item.icon}</span>
+                {item.label}
+              </NavLink>
             ))}
           </nav>
         </div>
-
+        
         {/* Main content */}
-        <div className="flex-1 overflow-auto">
-          <div className="max-w-4xl mx-auto p-6">
+        <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
+          <div className="max-w-6xl mx-auto">
             <Outlet />
           </div>
         </div>
       </div>
-    </ProtectedRoute>
+    </div>
   );
 };
 

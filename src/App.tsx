@@ -1,50 +1,23 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthProvider } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
 
-// Page imports
+// Pages
 import Index from '@/pages/Index';
-import Dashboard from '@/pages/Dashboard';
-import Settings from '@/pages/Settings';
 import SignIn from '@/pages/SignIn';
 import Register from '@/pages/Register';
-import AcceptInvitation from '@/pages/AcceptInvitation';
-import NotFound from '@/pages/NotFound';
-import UsagePage from '@/pages/Usage';
-
-// Settings page components
-import GeneralSettings from '@/pages/settings/General';
-import MembersSettings from '@/pages/settings/Members';
-import PlansSettings from '@/pages/settings/Plans';
-import BillingSettings from '@/pages/settings/Billing';
-import ApiKeysSettings from '@/pages/settings/ApiKeys';
-import UsageSettings from '@/pages/settings/Usage';
-
-// Agent page components
+import Dashboard from '@/pages/Dashboard';
 import AgentEnvironment from '@/pages/AgentEnvironment';
-import SourcesPage from '@/pages/SourcesPage';
-import SourceDetailPage from '@/pages/SourceDetailPage';
-import IntegrationsPage from '@/pages/IntegrationsPage';
-import AgentSettingsPage from '@/pages/AgentSettingsPage';
-import AnalyticsPage from '@/pages/AnalyticsPage';
-import ActionsPage from '@/pages/ActionsPage';
-import ActivityPage from '@/pages/ActivityPage';
-import LeadsPage from '@/pages/LeadsPage';
+import Settings from '@/pages/Settings';
 import EmbeddedChat from '@/pages/EmbeddedChat';
+import NotFound from '@/pages/NotFound';
+import AcceptInvitation from '@/pages/AcceptInvitation';
 
-import './App.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 function App() {
   return (
@@ -53,48 +26,35 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
-              {/* Public routes */}
               <Route path="/" element={<Index />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/register" element={<Register />} />
               <Route path="/accept-invitation/:invitationId" element={<AcceptInvitation />} />
               
-              {/* Embedded chat route */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/*" element={
+                <ProtectedRoute>
+                  <AgentEnvironment />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/settings/*" element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+              
               <Route path="/chat/:agentId" element={<EmbeddedChat />} />
               
-              {/* Main dashboard */}
-              <Route path="/dashboard" element={<Dashboard />} />
-              
-              {/* Settings routes */}
-              <Route path="/settings" element={<Settings />}>
-                <Route index element={<GeneralSettings />} />
-                <Route path="general" element={<GeneralSettings />} />
-                <Route path="members" element={<MembersSettings />} />
-                <Route path="plans" element={<PlansSettings />} />
-                <Route path="billing" element={<BillingSettings />} />
-                <Route path="api-keys" element={<ApiKeysSettings />} />
-                <Route path="usage" element={<UsageSettings />} />
-              </Route>
-              
-              {/* Usage page */}
-              <Route path="/usage" element={<UsagePage />} />
-              
-              {/* Agent routes - each page handles its own layout */}
-              <Route path="/agent/:agentId" element={<AgentEnvironment />} />
-              <Route path="/agent/:agentId/sources" element={<SourcesPage />} />
-              <Route path="/agent/:agentId/sources/:sourceId" element={<SourceDetailPage />} />
-              <Route path="/agent/:agentId/integrations" element={<IntegrationsPage />} />
-              <Route path="/agent/:agentId/settings/*" element={<AgentSettingsPage />} />
-              <Route path="/agent/:agentId/analytics" element={<AnalyticsPage />} />
-              <Route path="/agent/:agentId/actions" element={<ActionsPage />} />
-              <Route path="/agent/:agentId/activity" element={<ActivityPage />} />
-              <Route path="/agent/:agentId/activity/leads" element={<LeadsPage />} />
-              
-              {/* 404 route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <Toaster />
           </div>
+          <Toaster />
         </Router>
       </AuthProvider>
     </QueryClientProvider>
