@@ -45,7 +45,6 @@ const MembersSettings: React.FC = () => {
   if (loading) {
     return (
       <div className="space-y-6">
-        <TeamInvitations />
         <div className="bg-white rounded-lg border p-6">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-bold">Members</h2>
@@ -64,7 +63,7 @@ const MembersSettings: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <TeamInvitations />
+      <TeamInvitations disableLoadingWhenMainLoading={false} />
       
       <div className="bg-white rounded-lg border p-6">
         <div className="flex justify-between items-center mb-8">

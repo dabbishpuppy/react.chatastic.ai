@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,13 @@ interface AcceptInvitationResponse {
   message?: string;
 }
 
-const TeamInvitations: React.FC = () => {
+interface TeamInvitationsProps {
+  disableLoadingWhenMainLoading?: boolean;
+}
+
+const TeamInvitations: React.FC<TeamInvitationsProps> = ({ 
+  disableLoadingWhenMainLoading = false 
+}) => {
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -128,6 +135,11 @@ const TeamInvitations: React.FC = () => {
       day: 'numeric',
     });
   };
+
+  // Don't show loading skeleton when main loading is disabled
+  if (loading && disableLoadingWhenMainLoading) {
+    return null;
+  }
 
   if (loading) {
     return <TeamInvitationsSkeleton />;
