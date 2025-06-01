@@ -69,7 +69,7 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
 
       if (error) throw error;
 
-      const response = data as InvitationDetailsResponse;
+      const response = data as unknown as InvitationDetailsResponse;
 
       if (response.success) {
         const invitation = response.invitation!;

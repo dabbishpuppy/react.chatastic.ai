@@ -57,7 +57,7 @@ const AcceptInvitation: React.FC = () => {
 
       if (error) throw error;
 
-      const response = data as InvitationDetailsResponse;
+      const response = data as unknown as InvitationDetailsResponse;
 
       if (response.success) {
         setInvitation(response.invitation!);
@@ -135,15 +135,18 @@ const AcceptInvitation: React.FC = () => {
 
         if (acceptError) throw acceptError;
 
-        const acceptResponse = acceptData as AcceptInvitationResponse;
+        const acceptResponse = acceptData as unknown as AcceptInvitationResponse;
+
+        // Ensure role is properly typed
+        const userRole = acceptResponse.role as "owner" | "admin" | "member";
 
         // Add user to team
         const { error: teamError } = await supabase
           .from('team_members')
           .insert({
-            team_id: acceptResponse.team_id,
+            team_id: acceptResponse.team_id!,
             user_id: signUpData.user.id,
-            role: acceptResponse.role
+            role: userRole
           });
 
         if (teamError && !teamError.message.includes('duplicate')) {
