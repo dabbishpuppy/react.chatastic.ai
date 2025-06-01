@@ -1,388 +1,336 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { MetricsCollectionService } from "./metricsCollectionService";
-import { AlertingService } from "./alertingService";
+import { ProductionWorkerQueue } from './productionWorkerQueue';
+import { MonitoringAndAlertingService } from './monitoringAndAlerting';
 
-export interface WorkerPool {
-  name: string;
-  type: 'high_performance' | 'standard' | 'batch_processing';
-  minInstances: number;
-  maxInstances: number;
-  currentInstances: number;
-  targetCPU: number;
-  targetMemory: number;
-  scaleUpThreshold: number;
-  scaleDownThreshold: number;
-  isActive: boolean;
-}
-
-export interface ScalingMetrics {
-  timestamp: string;
-  poolName: string;
+export interface AutoscalingMetrics {
+  currentWorkers: number;
+  targetWorkers: number;
+  queueDepth: number;
+  avgProcessingTime: number;
   cpuUtilization: number;
   memoryUtilization: number;
-  queueDepth: number;
-  activeJobs: number;
-  pendingJobs: number;
-  avgProcessingTime: number;
-  errorRate: number;
+  lastScaleAction: string;
+  lastScaleTime: string;
 }
 
-export interface AutoscalingDecision {
-  poolName: string;
-  action: 'scale_up' | 'scale_down' | 'no_change';
-  currentInstances: number;
-  targetInstances: number;
-  reason: string;
-  confidence: number;
-  estimatedSavings?: number;
+export interface ScalingRule {
+  id: string;
+  metric: 'queue_depth' | 'cpu_utilization' | 'memory_utilization' | 'error_rate';
+  threshold: number;
+  action: 'scale_up' | 'scale_down';
+  cooldownMinutes: number;
+  minWorkers: number;
+  maxWorkers: number;
 }
 
 export class AutoscalingService {
-  private static workerPools: WorkerPool[] = [
+  private static isAutoscalingActive = false;
+  private static currentWorkerCount = 2; // Start with 2 workers
+  private static lastScaleAction: string = 'initial';
+  private static lastScaleTime = new Date().toISOString();
+  
+  private static readonly DEFAULT_SCALING_RULES: ScalingRule[] = [
     {
-      name: 'high_performance',
-      type: 'high_performance',
-      minInstances: 2,
-      maxInstances: 50,
-      currentInstances: 5,
-      targetCPU: 70,
-      targetMemory: 80,
-      scaleUpThreshold: 85,
-      scaleDownThreshold: 40,
-      isActive: true
+      id: 'queue-depth-scale-up',
+      metric: 'queue_depth',
+      threshold: 100, // Scale up if more than 100 jobs queued
+      action: 'scale_up',
+      cooldownMinutes: 5,
+      minWorkers: 2,
+      maxWorkers: 50
     },
     {
-      name: 'standard',
-      type: 'standard',
-      minInstances: 5,
-      maxInstances: 100,
-      currentInstances: 10,
-      targetCPU: 75,
-      targetMemory: 85,
-      scaleUpThreshold: 80,
-      scaleDownThreshold: 50,
-      isActive: true
+      id: 'queue-depth-scale-down',
+      metric: 'queue_depth',
+      threshold: 10, // Scale down if less than 10 jobs queued
+      action: 'scale_down',
+      cooldownMinutes: 10,
+      minWorkers: 2,
+      maxWorkers: 50
     },
     {
-      name: 'batch_processing',
-      type: 'batch_processing',
-      minInstances: 1,
-      maxInstances: 200,
-      currentInstances: 15,
-      targetCPU: 90,
-      targetMemory: 95,
-      scaleUpThreshold: 95,
-      scaleDownThreshold: 60,
-      isActive: true
+      id: 'cpu-scale-up',
+      metric: 'cpu_utilization',
+      threshold: 70, // Scale up if CPU > 70%
+      action: 'scale_up',
+      cooldownMinutes: 3,
+      minWorkers: 2,
+      maxWorkers: 50
+    },
+    {
+      id: 'cpu-scale-down',
+      metric: 'cpu_utilization',
+      threshold: 20, // Scale down if CPU < 20%
+      action: 'scale_down',
+      cooldownMinutes: 15,
+      minWorkers: 2,
+      maxWorkers: 50
     }
   ];
 
-  private static scalingHistory: AutoscalingDecision[] = [];
-  private static isAutoscalingEnabled = true;
-
-  // Start autoscaling monitoring
-  static startAutoscaling(): void {
-    if (!this.isAutoscalingEnabled) {
-      console.log('🔧 Autoscaling is disabled');
+  // Start autoscaling system
+  static async startAutoscaling(): Promise<void> {
+    if (this.isAutoscalingActive) {
+      console.log('Autoscaling already active');
       return;
     }
 
-    console.log('🚀 Starting autoscaling service...');
+    this.isAutoscalingActive = true;
+    console.log('🔄 Starting production autoscaling service');
 
-    // Run scaling decisions every 2 minutes
+    // Run autoscaling decisions every 2 minutes
     setInterval(async () => {
       try {
         await this.evaluateScalingDecisions();
       } catch (error) {
         console.error('Error in autoscaling evaluation:', error);
       }
-    }, 120000);
+    }, 120000); // 2 minutes
 
-    // Collect scaling metrics every 30 seconds
+    // Monitor queue depth more frequently for burst scaling
     setInterval(async () => {
       try {
-        await this.collectScalingMetrics();
+        await this.evaluateBurstScaling();
       } catch (error) {
-        console.error('Error collecting scaling metrics:', error);
+        console.error('Error in burst scaling evaluation:', error);
       }
-    }, 30000);
+    }, 30000); // 30 seconds
 
-    console.log('✅ Autoscaling service started');
+    console.log('✅ Autoscaling service initialized');
+  }
+
+  // Evaluate scaling decisions based on metrics
+  private static async evaluateScalingDecisions(): Promise<void> {
+    try {
+      const metrics = await this.collectAutoscalingMetrics();
+      const scalingDecision = this.calculateScalingDecision(metrics);
+
+      if (scalingDecision.shouldScale) {
+        await this.executeScalingAction(scalingDecision.action, scalingDecision.targetWorkers, scalingDecision.reason);
+      }
+
+      // Log current status
+      console.log(`📊 Autoscaling status: ${this.currentWorkerCount} workers, queue: ${metrics.queueDepth}, CPU: ${metrics.cpuUtilization}%`);
+
+    } catch (error) {
+      console.error('Failed to evaluate scaling decisions:', error);
+    }
+  }
+
+  // Fast burst scaling for sudden queue growth
+  private static async evaluateBurstScaling(): Promise<void> {
+    try {
+      const queueMetrics = await ProductionWorkerQueue.getQueueMetrics();
+      
+      // If queue depth suddenly spikes above 500, immediately add workers
+      if (queueMetrics.queueDepth > 500 && this.currentWorkerCount < 20) {
+        const targetWorkers = Math.min(20, this.currentWorkerCount + 5);
+        await this.executeScalingAction('scale_up', targetWorkers, 'Burst scaling for queue spike');
+      }
+
+    } catch (error) {
+      console.error('Failed to evaluate burst scaling:', error);
+    }
+  }
+
+  // Collect metrics for autoscaling decisions
+  private static async collectAutoscalingMetrics(): Promise<AutoscalingMetrics> {
+    try {
+      const queueMetrics = await ProductionWorkerQueue.getQueueMetrics();
+      
+      // Simulate CPU and memory metrics (in production, these would come from actual monitoring)
+      const cpuUtilization = Math.min(100, (queueMetrics.workerUtilization * 100) + Math.random() * 20);
+      const memoryUtilization = Math.min(100, cpuUtilization * 0.8 + Math.random() * 15);
+
+      return {
+        currentWorkers: this.currentWorkerCount,
+        targetWorkers: this.currentWorkerCount,
+        queueDepth: queueMetrics.queueDepth,
+        avgProcessingTime: queueMetrics.averageProcessingTime,
+        cpuUtilization,
+        memoryUtilization,
+        lastScaleAction: this.lastScaleAction,
+        lastScaleTime: this.lastScaleTime
+      };
+    } catch (error) {
+      console.error('Failed to collect autoscaling metrics:', error);
+      return {
+        currentWorkers: this.currentWorkerCount,
+        targetWorkers: this.currentWorkerCount,
+        queueDepth: 0,
+        avgProcessingTime: 0,
+        cpuUtilization: 0,
+        memoryUtilization: 0,
+        lastScaleAction: this.lastScaleAction,
+        lastScaleTime: this.lastScaleTime
+      };
+    }
+  }
+
+  // Calculate if scaling is needed
+  private static calculateScalingDecision(metrics: AutoscalingMetrics): {
+    shouldScale: boolean;
+    action: 'scale_up' | 'scale_down';
+    targetWorkers: number;
+    reason: string;
+  } {
+    const now = new Date();
+    const lastScaleTime = new Date(this.lastScaleTime);
+    const timeSinceLastScale = (now.getTime() - lastScaleTime.getTime()) / (1000 * 60); // minutes
+
+    // Check each scaling rule
+    for (const rule of this.DEFAULT_SCALING_RULES) {
+      if (timeSinceLastScale < rule.cooldownMinutes) {
+        continue; // Still in cooldown period
+      }
+
+      let currentValue = 0;
+      switch (rule.metric) {
+        case 'queue_depth':
+          currentValue = metrics.queueDepth;
+          break;
+        case 'cpu_utilization':
+          currentValue = metrics.cpuUtilization;
+          break;
+        case 'memory_utilization':
+          currentValue = metrics.memoryUtilization;
+          break;
+      }
+
+      const shouldTrigger = rule.action === 'scale_up' 
+        ? currentValue > rule.threshold
+        : currentValue < rule.threshold;
+
+      if (shouldTrigger) {
+        let targetWorkers = this.currentWorkerCount;
+        
+        if (rule.action === 'scale_up') {
+          // Scale up by 25% or at least 2 workers
+          const scaleAmount = Math.max(2, Math.ceil(this.currentWorkerCount * 0.25));
+          targetWorkers = Math.min(rule.maxWorkers, this.currentWorkerCount + scaleAmount);
+        } else {
+          // Scale down by 20% or at least 1 worker
+          const scaleAmount = Math.max(1, Math.ceil(this.currentWorkerCount * 0.2));
+          targetWorkers = Math.max(rule.minWorkers, this.currentWorkerCount - scaleAmount);
+        }
+
+        if (targetWorkers !== this.currentWorkerCount) {
+          return {
+            shouldScale: true,
+            action: rule.action,
+            targetWorkers,
+            reason: `${rule.metric} ${rule.action === 'scale_up' ? 'above' : 'below'} threshold (${currentValue} vs ${rule.threshold})`
+          };
+        }
+      }
+    }
+
+    return { shouldScale: false, action: 'scale_up', targetWorkers: this.currentWorkerCount, reason: '' };
+  }
+
+  // Execute scaling action
+  private static async executeScalingAction(action: 'scale_up' | 'scale_down', targetWorkers: number, reason: string): Promise<void> {
+    try {
+      console.log(`🔄 Autoscaling: ${action} from ${this.currentWorkerCount} to ${targetWorkers} workers. Reason: ${reason}`);
+
+      // In production, this would actually scale the worker deployment
+      // For now, we simulate the scaling action
+      this.currentWorkerCount = targetWorkers;
+      this.lastScaleAction = `${action} to ${targetWorkers} workers`;
+      this.lastScaleTime = new Date().toISOString();
+
+      // Store scaling event for analysis
+      await this.recordScalingEvent(action, this.currentWorkerCount, targetWorkers, reason);
+
+      // In real production environment, execute actual scaling:
+      // - Kubernetes: kubectl scale deployment worker-deployment --replicas=${targetWorkers}
+      // - AWS ECS: update service desired count
+      // - Cloud Functions: adjust concurrency limits
+      // - Docker Swarm: docker service scale worker=${targetWorkers}
+
+      console.log(`✅ Scaling completed: now running ${this.currentWorkerCount} workers`);
+
+    } catch (error) {
+      console.error('Failed to execute scaling action:', error);
+    }
+  }
+
+  // Record scaling events for analysis
+  private static async recordScalingEvent(action: string, fromWorkers: number, toWorkers: number, reason: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('autoscaling_events')
+        .insert({
+          action,
+          from_workers: fromWorkers,
+          to_workers: toWorkers,
+          reason,
+          timestamp: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error('Failed to record scaling event:', error);
+      }
+    } catch (error) {
+      console.error('Error recording scaling event:', error);
+    }
+  }
+
+  // Get current autoscaling status
+  static async getAutoscalingStatus(): Promise<{
+    active: boolean;
+    currentWorkers: number;
+    metrics: AutoscalingMetrics;
+    recentEvents: any[];
+  }> {
+    try {
+      const metrics = await this.collectAutoscalingMetrics();
+      
+      // Get recent scaling events
+      const { data: recentEvents } = await supabase
+        .from('autoscaling_events')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(10);
+
+      return {
+        active: this.isAutoscalingActive,
+        currentWorkers: this.currentWorkerCount,
+        metrics,
+        recentEvents: recentEvents || []
+      };
+    } catch (error) {
+      console.error('Failed to get autoscaling status:', error);
+      return {
+        active: this.isAutoscalingActive,
+        currentWorkers: this.currentWorkerCount,
+        metrics: await this.collectAutoscalingMetrics(),
+        recentEvents: []
+      };
+    }
+  }
+
+  // Manual scaling override
+  static async manualScale(targetWorkers: number, reason: string = 'Manual override'): Promise<boolean> {
+    try {
+      if (targetWorkers < 1 || targetWorkers > 100) {
+        console.error('Invalid worker count for manual scaling:', targetWorkers);
+        return false;
+      }
+
+      const action = targetWorkers > this.currentWorkerCount ? 'scale_up' : 'scale_down';
+      await this.executeScalingAction(action, targetWorkers, reason);
+      return true;
+    } catch (error) {
+      console.error('Manual scaling failed:', error);
+      return false;
+    }
   }
 
   // Stop autoscaling
   static stopAutoscaling(): void {
-    this.isAutoscalingEnabled = false;
+    this.isAutoscalingActive = false;
     console.log('🛑 Autoscaling service stopped');
-  }
-
-  // Evaluate scaling decisions for all pools
-  static async evaluateScalingDecisions(): Promise<AutoscalingDecision[]> {
-    const decisions: AutoscalingDecision[] = [];
-
-    for (const pool of this.workerPools) {
-      if (!pool.isActive) continue;
-
-      const metrics = await this.getPoolMetrics(pool.name);
-      const decision = this.calculateScalingDecision(pool, metrics);
-      
-      decisions.push(decision);
-
-      // Execute scaling action if needed
-      if (decision.action !== 'no_change') {
-        await this.executeScalingAction(decision);
-      }
-    }
-
-    // Store decisions in history
-    this.scalingHistory.push(...decisions);
-    
-    // Keep only last 1000 decisions
-    if (this.scalingHistory.length > 1000) {
-      this.scalingHistory = this.scalingHistory.slice(-1000);
-    }
-
-    return decisions;
-  }
-
-  // Calculate scaling decision for a pool
-  private static calculateScalingDecision(pool: WorkerPool, metrics: ScalingMetrics): AutoscalingDecision {
-    const { cpuUtilization, memoryUtilization, queueDepth, pendingJobs, errorRate } = metrics;
-    
-    // Calculate utilization score
-    const avgUtilization = (cpuUtilization + memoryUtilization) / 2;
-    
-    // Scale up conditions
-    if (
-      avgUtilization > pool.scaleUpThreshold ||
-      queueDepth > 100 ||
-      pendingJobs > pool.currentInstances * 10 ||
-      errorRate > 10
-    ) {
-      const targetInstances = Math.min(
-        pool.maxInstances,
-        Math.ceil(pool.currentInstances * 1.5)
-      );
-
-      return {
-        poolName: pool.name,
-        action: 'scale_up',
-        currentInstances: pool.currentInstances,
-        targetInstances,
-        reason: `High utilization: ${avgUtilization.toFixed(1)}%, Queue: ${queueDepth}, Pending: ${pendingJobs}`,
-        confidence: this.calculateConfidence(metrics, 'scale_up')
-      };
-    }
-
-    // Scale down conditions
-    if (
-      avgUtilization < pool.scaleDownThreshold &&
-      queueDepth < 10 &&
-      pendingJobs < pool.currentInstances * 2 &&
-      errorRate < 2
-    ) {
-      const targetInstances = Math.max(
-        pool.minInstances,
-        Math.floor(pool.currentInstances * 0.8)
-      );
-
-      if (targetInstances < pool.currentInstances) {
-        const estimatedSavings = (pool.currentInstances - targetInstances) * 50; // $50 per instance per hour
-
-        return {
-          poolName: pool.name,
-          action: 'scale_down',
-          currentInstances: pool.currentInstances,
-          targetInstances,
-          reason: `Low utilization: ${avgUtilization.toFixed(1)}%, Queue: ${queueDepth}`,
-          confidence: this.calculateConfidence(metrics, 'scale_down'),
-          estimatedSavings
-        };
-      }
-    }
-
-    return {
-      poolName: pool.name,
-      action: 'no_change',
-      currentInstances: pool.currentInstances,
-      targetInstances: pool.currentInstances,
-      reason: `Stable utilization: ${avgUtilization.toFixed(1)}%`,
-      confidence: 100
-    };
-  }
-
-  // Calculate confidence score for scaling decision
-  private static calculateConfidence(metrics: ScalingMetrics, action: 'scale_up' | 'scale_down'): number {
-    const { cpuUtilization, memoryUtilization, queueDepth, errorRate } = metrics;
-    
-    let confidence = 80; // Base confidence
-    
-    // Higher confidence for clear resource pressure
-    if (action === 'scale_up') {
-      if (cpuUtilization > 90) confidence += 10;
-      if (memoryUtilization > 90) confidence += 10;
-      if (queueDepth > 200) confidence += 10;
-      if (errorRate > 15) confidence += 10;
-    }
-    
-    // Higher confidence for sustained low utilization
-    if (action === 'scale_down') {
-      if (cpuUtilization < 30 && memoryUtilization < 30) confidence += 15;
-      if (queueDepth === 0) confidence += 5;
-      if (errorRate === 0) confidence += 5;
-    }
-    
-    return Math.min(confidence, 100);
-  }
-
-  // Execute scaling action
-  private static async executeScalingAction(decision: AutoscalingDecision): Promise<void> {
-    console.log(`🎯 Executing scaling action for ${decision.poolName}: ${decision.action} (${decision.currentInstances} → ${decision.targetInstances})`);
-    
-    const pool = this.workerPools.find(p => p.name === decision.poolName);
-    if (!pool) return;
-
-    // Update current instances
-    pool.currentInstances = decision.targetInstances;
-
-    // In a real implementation, this would:
-    // 1. Update Kubernetes deployment replicas
-    // 2. Trigger serverless function scaling
-    // 3. Adjust container orchestration settings
-    // 4. Update load balancer configuration
-
-    // Simulate scaling action
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Create alert for significant scaling events
-    if (Math.abs(decision.currentInstances - decision.targetInstances) > 5) {
-      await AlertingService.createAlert({
-        type: 'capacity',
-        severity: decision.action === 'scale_up' ? 'medium' : 'low',
-        title: `Autoscaling: ${decision.action.replace('_', ' ')} ${decision.poolName}`,
-        message: `Scaled ${decision.poolName} from ${decision.currentInstances} to ${decision.targetInstances} instances. Reason: ${decision.reason}`,
-        source: 'autoscaling-service',
-        metadata: decision
-      });
-    }
-
-    console.log(`✅ Scaling completed for ${decision.poolName}`);
-  }
-
-  // Collect scaling metrics for a pool
-  private static async collectScalingMetrics(): Promise<void> {
-    for (const pool of this.workerPools) {
-      if (!pool.isActive) continue;
-
-      const metrics = await this.getPoolMetrics(pool.name);
-      
-      // Store metrics for analysis (in real implementation, this would go to a time-series database)
-      console.log(`📊 Pool ${pool.name} metrics:`, {
-        instances: pool.currentInstances,
-        cpu: metrics.cpuUtilization.toFixed(1) + '%',
-        memory: metrics.memoryUtilization.toFixed(1) + '%',
-        queue: metrics.queueDepth,
-        pending: metrics.pendingJobs
-      });
-    }
-  }
-
-  // Get metrics for a specific pool
-  private static async getPoolMetrics(poolName: string): Promise<ScalingMetrics> {
-    // Get current system metrics
-    const currentMetrics = MetricsCollectionService.getCurrentMetrics();
-    
-    // Get job queue metrics
-    const { count: pendingJobs } = await supabase
-      .from('crawl_jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending');
-
-    const { count: activeJobs } = await supabase
-      .from('crawl_jobs')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'in_progress');
-
-    // Calculate pool-specific metrics based on workload distribution
-    const poolMultiplier = this.getPoolLoadMultiplier(poolName);
-    
-    return {
-      timestamp: new Date().toISOString(),
-      poolName,
-      cpuUtilization: (currentMetrics.system?.cpuUsage || 0) * poolMultiplier,
-      memoryUtilization: (currentMetrics.system?.memoryUsage || 0) * poolMultiplier,
-      queueDepth: (currentMetrics.system?.queueLength || 0) * poolMultiplier,
-      activeJobs: (activeJobs || 0) * poolMultiplier,
-      pendingJobs: (pendingJobs || 0) * poolMultiplier,
-      avgProcessingTime: currentMetrics.system?.responseTime || 0,
-      errorRate: currentMetrics.system?.errorRate || 0
-    };
-  }
-
-  // Get load multiplier for different pool types
-  private static getPoolLoadMultiplier(poolName: string): number {
-    switch (poolName) {
-      case 'high_performance':
-        return 0.3; // Handles 30% of total load
-      case 'standard':
-        return 0.5; // Handles 50% of total load
-      case 'batch_processing':
-        return 0.2; // Handles 20% of total load
-      default:
-        return 1.0;
-    }
-  }
-
-  // Get autoscaling status and metrics
-  static getAutoscalingStatus(): {
-    enabled: boolean;
-    pools: WorkerPool[];
-    recentDecisions: AutoscalingDecision[];
-    totalInstances: number;
-    estimatedMonthlyCost: number;
-  } {
-    const totalInstances = this.workerPools.reduce((sum, pool) => sum + pool.currentInstances, 0);
-    const estimatedMonthlyCost = totalInstances * 50 * 24 * 30; // $50 per instance per hour
-
-    return {
-      enabled: this.isAutoscalingEnabled,
-      pools: [...this.workerPools],
-      recentDecisions: this.scalingHistory.slice(-20),
-      totalInstances,
-      estimatedMonthlyCost
-    };
-  }
-
-  // Update pool configuration
-  static updatePoolConfig(poolName: string, updates: Partial<WorkerPool>): boolean {
-    const pool = this.workerPools.find(p => p.name === poolName);
-    if (!pool) return false;
-
-    Object.assign(pool, updates);
-    console.log(`🔧 Updated pool ${poolName} configuration`);
-    return true;
-  }
-
-  // Force scaling action (for manual intervention)
-  static async forceScaling(poolName: string, targetInstances: number): Promise<boolean> {
-    const pool = this.workerPools.find(p => p.name === poolName);
-    if (!pool) return false;
-
-    if (targetInstances < pool.minInstances || targetInstances > pool.maxInstances) {
-      console.error(`Target instances ${targetInstances} outside allowed range [${pool.minInstances}, ${pool.maxInstances}]`);
-      return false;
-    }
-
-    const decision: AutoscalingDecision = {
-      poolName,
-      action: targetInstances > pool.currentInstances ? 'scale_up' : 'scale_down',
-      currentInstances: pool.currentInstances,
-      targetInstances,
-      reason: 'Manual scaling intervention',
-      confidence: 100
-    };
-
-    await this.executeScalingAction(decision);
-    return true;
   }
 }

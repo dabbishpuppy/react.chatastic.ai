@@ -3,6 +3,8 @@
 export { MetricsCollectionService } from './metricsCollectionService';
 export { AlertingService } from './alertingService';
 export { PerformanceMonitoringService } from './performanceMonitoringService';
+export { MonitoringAndAlertingService } from './monitoringAndAlerting';
+export { AutoscalingService } from './autoscalingService';
 
 // Phase 3: Database Optimization & Connection Pooling
 export { ConnectionPoolManager } from './connectionPoolManager';
@@ -13,6 +15,7 @@ export { RealRateLimitingService } from './realRateLimitingService';
 export { RealConnectionPoolManager } from './realConnectionPoolManager';
 export { RealDatabasePartitioningService } from './realDatabasePartitioningService';
 export { ProductionInfrastructureService } from './productionInfrastructureService';
+export { ProductionWorkerQueue } from './productionWorkerQueue';
 
 // Phase 2: Worker Queue & Rate Limiting
 export { RateLimitingService } from './rateLimiting';
