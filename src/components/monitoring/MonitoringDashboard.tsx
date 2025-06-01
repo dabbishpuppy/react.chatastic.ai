@@ -95,7 +95,8 @@ export const MonitoringDashboard: React.FC = () => {
 
   const handleDismissAlert = async (alertId: string) => {
     try {
-      await AlertingService.dismissAlert(alertId);
+      // For now, we'll just acknowledge the alert since dismissAlert doesn't exist
+      await AlertingService.acknowledgeAlert(alertId);
       await updateDashboard();
     } catch (error) {
       console.error('Error dismissing alert:', error);

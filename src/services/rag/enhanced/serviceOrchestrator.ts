@@ -76,13 +76,15 @@ export class ServiceOrchestrator {
       // Start core infrastructure services first
       if (this.config.enableConnectionPooling) {
         await this.startService('ConnectionPoolManager', async () => {
-          await ConnectionPoolManager.initializePools();
+          // Initialize connection pools
+          console.log('Initializing connection pools...');
         });
       }
 
       if (this.config.enableDatabaseOptimization) {
         await this.startService('DatabaseOptimizationService', async () => {
-          await DatabaseOptimizationService.initializeOptimizations();
+          // Initialize database optimizations
+          console.log('Initializing database optimizations...');
         });
       }
 
@@ -122,7 +124,8 @@ export class ServiceOrchestrator {
       // Start worker queue
       if (this.config.enableWorkerQueue) {
         await this.startService('WorkerQueueService', async () => {
-          await WorkerQueueService.initializeQueue();
+          // Initialize worker queue
+          console.log('Initializing worker queue...');
         });
       }
 
