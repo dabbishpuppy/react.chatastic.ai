@@ -27,6 +27,7 @@ const MembersTable: React.FC<MembersTableProps> = ({
           <TableHead>User</TableHead>
           <TableHead>Member since</TableHead>
           <TableHead>Role</TableHead>
+          <TableHead>Status</TableHead>
           <TableHead>Teams</TableHead>
           <TableHead className="w-10"></TableHead>
         </TableRow>

@@ -120,14 +120,14 @@ const MemberTableRow: React.FC<MemberTableRowProps> = ({
       </TableCell>
       <TableCell>{member.memberSince}</TableCell>
       <TableCell>
-        <div className="flex items-center gap-2">
-          <Badge className={getRoleColor(member.role)}>
-            {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-          </Badge>
-          <Badge className={getStatusColor(member.status)}>
-            {member.status === 'pending' ? 'Pending' : 'Active'}
-          </Badge>
-        </div>
+        <Badge className={getRoleColor(member.role)}>
+          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <Badge className={getStatusColor(member.status)}>
+          {member.status === 'pending' ? 'Pending' : 'Active'}
+        </Badge>
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap gap-1">
