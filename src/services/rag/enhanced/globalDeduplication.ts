@@ -26,24 +26,15 @@ export class GlobalDeduplicationService {
       const chunk = chunks[i];
       const contentHash = await CompressionEngine.generateContentHash(chunk);
       
-      // Check if chunk exists globally
+      // Check if chunk exists in source_chunks table by content_hash
       const { data: existingChunk } = await supabase
-        .from('semantic_chunks')
-        .select('id, ref_count, compressed_blob')
+        .from('source_chunks')
+        .select('id, content')
         .eq('content_hash', contentHash)
         .single();
 
       if (existingChunk) {
-        // Chunk exists globally - increment reference
-        await supabase
-          .from('semantic_chunks')
-          .update({ 
-            ref_count: existingChunk.ref_count + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingChunk.id);
-
-        // Create mapping without storing duplicate content
+        // Chunk exists - create mapping to existing chunk
         await supabase
           .from('source_to_chunk_map')
           .insert({
@@ -53,18 +44,28 @@ export class GlobalDeduplicationService {
           });
 
         duplicateChunks++;
-        console.log(`🔄 Reused global chunk ${existingChunk.id}`);
+        console.log(`🔄 Reused existing chunk ${existingChunk.id}`);
       } else {
         // New chunk - compress and store
         const compressionResult = await CompressionEngine.compressWithZstd(chunk, 19);
         
+        // Convert compressed data to base64 string for storage
+        const compressedDataString = btoa(String.fromCharCode(...compressionResult.compressed));
+        
         const { data: newChunk, error } = await supabase
-          .from('semantic_chunks')
+          .from('source_chunks')
           .insert({
+            source_id: sourceId,
+            chunk_index: i,
+            content: chunk,
             content_hash: contentHash,
-            compressed_blob: compressionResult.compressed,
             token_count: this.estimateTokens(chunk),
-            ref_count: 1
+            metadata: {
+              compressed_blob: compressedDataString,
+              original_size: compressionResult.originalSize,
+              compressed_size: compressionResult.compressedSize,
+              compression_ratio: compressionResult.ratio
+            }
           })
           .select('id')
           .single();
@@ -80,7 +81,7 @@ export class GlobalDeduplicationService {
 
           uniqueChunks++;
           totalCompressedSize += compressionResult.compressedSize;
-          console.log(`✨ Created new global chunk ${newChunk.id} (${compressionResult.ratio.toFixed(2)}x compression)`);
+          console.log(`✨ Created new compressed chunk ${newChunk.id} (${compressionResult.ratio.toFixed(2)}x compression)`);
         }
       }
       
@@ -126,30 +127,20 @@ export class GlobalDeduplicationService {
 
     const chunkIds = chunkMappings.map(m => m.chunk_id);
     
-    // Decrement ref_count for each chunk
+    // For each chunk, check if it's referenced by other sources
     for (const chunkId of chunkIds) {
-      const { data: chunk } = await supabase
-        .from('semantic_chunks')
-        .select('ref_count')
-        .eq('id', chunkId)
-        .single();
+      const { count } = await supabase
+        .from('source_to_chunk_map')
+        .select('*', { count: 'exact', head: true })
+        .eq('chunk_id', chunkId)
+        .neq('source_id', sourceId);
 
-      if (chunk) {
-        const newRefCount = chunk.ref_count - 1;
-        
-        if (newRefCount <= 0) {
-          // Delete chunk if no more references
-          await supabase
-            .from('semantic_chunks')
-            .delete()
-            .eq('id', chunkId);
-        } else {
-          // Decrement reference count
-          await supabase
-            .from('semantic_chunks')
-            .update({ ref_count: newRefCount })
-            .eq('id', chunkId);
-        }
+      if (count === 0) {
+        // No other sources reference this chunk, safe to delete
+        await supabase
+          .from('source_chunks')
+          .delete()
+          .eq('id', chunkId);
       }
     }
 
@@ -172,28 +163,30 @@ export class GlobalDeduplicationService {
   }> {
     // Get total unique chunks
     const { count: uniqueChunks } = await supabase
-      .from('semantic_chunks')
+      .from('source_chunks')
       .select('*', { count: 'exact', head: true });
 
-    // Get total references (including duplicates)
-    const { data: refCounts } = await supabase
-      .from('semantic_chunks')
-      .select('ref_count');
+    // Get total references (including duplicates via mappings)
+    const { count: totalReferences } = await supabase
+      .from('source_to_chunk_map')
+      .select('*', { count: 'exact', head: true });
 
-    const totalChunks = refCounts?.reduce((sum, chunk) => sum + chunk.ref_count, 0) || 0;
-    const duplicateReferences = totalChunks - (uniqueChunks || 0);
+    const duplicateReferences = (totalReferences || 0) - (uniqueChunks || 0);
 
-    // Get compression stats
+    // Get compression stats from metadata
     const { data: compressionData } = await supabase
-      .from('semantic_chunks')
-      .select('compressed_blob, token_count');
+      .from('source_chunks')
+      .select('metadata, token_count');
 
     let totalCompressedBytes = 0;
     let estimatedOriginalBytes = 0;
 
     compressionData?.forEach(chunk => {
-      totalCompressedBytes += chunk.compressed_blob?.length || 0;
-      estimatedOriginalBytes += (chunk.token_count || 0) * 4; // ~4 chars per token
+      const metadata = chunk.metadata as any;
+      if (metadata?.compressed_size) {
+        totalCompressedBytes += metadata.compressed_size;
+        estimatedOriginalBytes += metadata.original_size || (chunk.token_count * 4);
+      }
     });
 
     const compressionRatio = estimatedOriginalBytes > 0 ? totalCompressedBytes / estimatedOriginalBytes : 0;
@@ -201,7 +194,7 @@ export class GlobalDeduplicationService {
     const spaceSavedGB = spaceSavedBytes / (1024 * 1024 * 1024);
 
     return {
-      totalChunks,
+      totalChunks: totalReferences || 0,
       uniqueChunks: uniqueChunks || 0,
       duplicateReferences,
       compressionRatio,
