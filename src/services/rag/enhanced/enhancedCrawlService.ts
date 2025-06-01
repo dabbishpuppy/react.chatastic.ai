@@ -70,28 +70,30 @@ export class EnhancedCrawlService {
     }
 
     // Create parent source
+    const parentSourceData = {
+      agent_id: request.agentId,
+      team_id: customerId,
+      source_type: 'website' as const,
+      title: request.url,
+      url: request.url,
+      crawl_status: 'pending' as const,
+      exclude_paths: request.excludePaths || [],
+      include_paths: request.includePaths || [],
+      respect_robots: request.respectRobots ?? true,
+      max_concurrent_jobs: rateLimitCheck.quota?.concurrentJobs || 5,
+      progress: 0,
+      total_jobs: discoveredUrls.length,
+      metadata: {
+        crawl_initiated_at: new Date().toISOString(),
+        enhanced_pipeline: true,
+        worker_queue_enabled: true,
+        priority: request.priority || 'normal'
+      }
+    };
+
     const { data: parentSource, error: sourceError } = await supabase
       .from('agent_sources')
-      .insert({
-        agent_id: request.agentId,
-        team_id: customerId,
-        source_type: 'website',
-        title: request.url,
-        url: request.url,
-        crawl_status: 'pending',
-        exclude_paths: request.excludePaths || [],
-        include_paths: request.includePaths || [],
-        respect_robots: request.respectRobots ?? true,
-        max_concurrent_jobs: rateLimitCheck.quota?.concurrentJobs || 5,
-        progress: 0,
-        total_jobs: discoveredUrls.length,
-        metadata: {
-          crawl_initiated_at: new Date().toISOString(),
-          enhanced_pipeline: true,
-          worker_queue_enabled: true,
-          priority: request.priority || 'normal'
-        }
-      })
+      .insert(parentSourceData)
       .select()
       .single();
 
@@ -108,15 +110,22 @@ export class EnhancedCrawlService {
     );
 
     // Update parent source to in_progress
+    const updateMetadata = parentSource.metadata ? 
+      { 
+        ...parentSource.metadata, 
+        jobs_enqueued_at: new Date().toISOString(),
+        job_ids: jobIds
+      } : 
+      {
+        jobs_enqueued_at: new Date().toISOString(),
+        job_ids: jobIds
+      };
+
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'in_progress',
-        metadata: {
-          ...parentSource.metadata,
-          jobs_enqueued_at: new Date().toISOString(),
-          job_ids: jobIds
-        }
+        metadata: updateMetadata
       })
       .eq('id', parentSource.id);
 

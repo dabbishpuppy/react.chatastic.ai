@@ -62,15 +62,27 @@ export class RateLimitingService {
 
   // Get customer quota and current usage
   static async getCustomerQuota(customerId: string): Promise<CustomerQuota> {
-    // Get customer tier (default to basic if not found)
-    const { data: customerData } = await supabase
+    // Get customer tier from teams table with proper error handling
+    const { data: teamData, error: teamError } = await supabase
       .from('teams')
       .select('id, metadata')
       .eq('id', customerId)
       .single();
 
-    const tier = (customerData?.metadata as any)?.tier || 'basic';
-    const limits = this.TIER_LIMITS[tier as keyof typeof this.TIER_LIMITS];
+    if (teamError) {
+      console.warn('Error fetching team data:', teamError);
+    }
+
+    // Extract tier from metadata, defaulting to basic
+    let tier: CustomerQuota['tier'] = 'basic';
+    if (teamData?.metadata && typeof teamData.metadata === 'object') {
+      const metadata = teamData.metadata as any;
+      if (metadata.tier && ['basic', 'pro', 'enterprise'].includes(metadata.tier)) {
+        tier = metadata.tier;
+      }
+    }
+
+    const limits = this.TIER_LIMITS[tier];
 
     // Get current usage for today
     const today = new Date().toISOString().split('T')[0];
@@ -97,7 +109,7 @@ export class RateLimitingService {
 
     return {
       customerId,
-      tier: tier as CustomerQuota['tier'],
+      tier,
       pagesPerDay: limits.pagesPerDay,
       concurrentJobs: limits.concurrentJobs,
       storageQuotaGB: limits.storageQuotaGB,
@@ -184,13 +196,22 @@ export class RateLimitingService {
     customerId: string,
     newTier: CustomerQuota['tier']
   ): Promise<void> {
+    // Get current metadata
+    const { data: currentTeam } = await supabase
+      .from('teams')
+      .select('metadata')
+      .eq('id', customerId)
+      .single();
+
+    const currentMetadata = (currentTeam?.metadata as any) || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      tier: newTier
+    };
+
     const { error } = await supabase
       .from('teams')
-      .update({
-        metadata: supabase.sql(`
-          COALESCE(metadata, '{}'::jsonb) || '{"tier": "${newTier}"}'::jsonb
-        `)
-      })
+      .update({ metadata: updatedMetadata })
       .eq('id', customerId);
 
     if (error) {

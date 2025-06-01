@@ -406,6 +406,42 @@ export type Database = {
           },
         ]
       }
+      connection_pool_config: {
+        Row: {
+          connection_timeout_ms: number | null
+          created_at: string | null
+          id: string
+          idle_timeout_ms: number | null
+          max_connections: number | null
+          max_lifetime_ms: number | null
+          min_connections: number | null
+          pool_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          connection_timeout_ms?: number | null
+          created_at?: string | null
+          id?: string
+          idle_timeout_ms?: number | null
+          max_connections?: number | null
+          max_lifetime_ms?: number | null
+          min_connections?: number | null
+          pool_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          connection_timeout_ms?: number | null
+          created_at?: string | null
+          id?: string
+          idle_timeout_ms?: number | null
+          max_connections?: number | null
+          max_lifetime_ms?: number | null
+          min_connections?: number | null
+          pool_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           agent_id: string
@@ -515,6 +551,573 @@ export type Database = {
           },
         ]
       }
+      crawl_jobs_part_0: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_1: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_2: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_3: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_4: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_5: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_6: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_part_7: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      crawl_jobs_partitioned: {
+        Row: {
+          chunks_created: number | null
+          completed_at: string | null
+          compression_ratio: number | null
+          content_size: number | null
+          created_at: string
+          customer_id: string
+          duplicates_found: number | null
+          error_message: string | null
+          id: string
+          max_retries: number | null
+          parent_source_id: string
+          priority: string | null
+          processing_time_ms: number | null
+          retry_count: number
+          started_at: string | null
+          status: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id: string
+          max_retries?: number | null
+          parent_source_id: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          chunks_created?: number | null
+          completed_at?: string | null
+          compression_ratio?: number | null
+          content_size?: number | null
+          created_at?: string
+          customer_id?: string
+          duplicates_found?: number | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number | null
+          parent_source_id?: string
+          priority?: string | null
+          processing_time_ms?: number | null
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       crawl_performance_metrics: {
         Row: {
           agent_id: string
@@ -576,6 +1179,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      customer_load_distribution: {
+        Row: {
+          created_at: string | null
+          current_load: number | null
+          customer_id: string
+          id: string
+          last_assigned_at: string | null
+          max_concurrent_jobs: number | null
+          partition_id: number
+          updated_at: string | null
+          worker_pool: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_load?: number | null
+          customer_id: string
+          id?: string
+          last_assigned_at?: string | null
+          max_concurrent_jobs?: number | null
+          partition_id: number
+          updated_at?: string | null
+          worker_pool: string
+        }
+        Update: {
+          created_at?: string | null
+          current_load?: number | null
+          customer_id?: string
+          id?: string
+          last_assigned_at?: string | null
+          max_concurrent_jobs?: number | null
+          partition_id?: number
+          updated_at?: string | null
+          worker_pool?: string
+        }
+        Relationships: []
       }
       data_retention_policies: {
         Row: {
@@ -1125,6 +1764,10 @@ export type Database = {
         Args: { parent_source_id_param: string }
         Returns: Json
       }
+      assign_customer_to_pool: {
+        Args: { target_customer_id: string }
+        Returns: Json
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -1286,6 +1929,10 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
+      }
+      process_batch_jobs: {
+        Args: { batch_size?: number; target_customer_id?: string }
+        Returns: Json
       }
       safe_migration_backfill: {
         Args: { batch_size?: number }

@@ -67,18 +67,50 @@ export class WorkerQueueService {
     return jobIds;
   }
 
-  // Get next available job for a worker
+  // Get next available job for a worker (simplified version)
   static async getNextJob(workerId: string): Promise<CrawlJob | null> {
-    // Use a transaction to atomically claim a job
-    const { data, error } = await supabase.rpc('claim_next_crawl_job', {
-      worker_id: workerId
-    });
+    // Get the next pending job with priority ordering
+    const { data: jobs, error } = await supabase
+      .from('crawl_jobs')
+      .select('*')
+      .eq('status', 'pending')
+      .order('priority', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(1);
 
-    if (error || !data) {
+    if (error || !jobs || jobs.length === 0) {
       return null;
     }
 
-    return data as CrawlJob;
+    const job = jobs[0];
+
+    // Update job to in_progress
+    const { error: updateError } = await supabase
+      .from('crawl_jobs')
+      .update({
+        status: 'in_progress',
+        started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', job.id);
+
+    if (updateError) {
+      console.error('Failed to update job status:', updateError);
+      return null;
+    }
+
+    return {
+      id: job.id,
+      parentSourceId: job.parent_source_id,
+      customerId: job.customer_id,
+      url: job.url,
+      status: 'in_progress',
+      priority: job.priority as CrawlJob['priority'],
+      retryCount: job.retry_count,
+      maxRetries: job.max_retries || this.DEFAULT_MAX_RETRIES,
+      createdAt: job.created_at,
+      startedAt: new Date().toISOString()
+    };
   }
 
   // Update job status
@@ -143,7 +175,6 @@ export class WorkerQueueService {
       .from('crawl_jobs')
       .update({
         status: 'pending',
-        retry_count: supabase.sql('retry_count + 1'),
         error_message: null,
         started_at: null,
         completed_at: null,
@@ -153,6 +184,14 @@ export class WorkerQueueService {
 
     if (error) {
       throw new Error(`Failed to retry jobs: ${error.message}`);
+    }
+
+    // Increment retry count for each job
+    for (const job of failedJobs) {
+      await supabase
+        .from('crawl_jobs')
+        .update({ retry_count: job.retry_count + 1 })
+        .eq('id', job.id);
     }
 
     // Publish retry events
