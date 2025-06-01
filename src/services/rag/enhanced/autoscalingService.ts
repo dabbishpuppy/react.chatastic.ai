@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionWorkerQueue } from './productionWorkerQueue';
 import { MonitoringAndAlertingService } from './monitoringAndAlerting';
@@ -29,6 +28,13 @@ export class AutoscalingService {
   private static currentWorkerCount = 2; // Start with 2 workers
   private static lastScaleAction: string = 'initial';
   private static lastScaleTime = new Date().toISOString();
+  private static scalingEvents: Array<{
+    action: string;
+    fromWorkers: number;
+    toWorkers: number;
+    reason: string;
+    timestamp: string;
+  }> = [];
   
   private static readonly DEFAULT_SCALING_RULES: ScalingRule[] = [
     {
@@ -236,12 +242,13 @@ export class AutoscalingService {
 
       // In production, this would actually scale the worker deployment
       // For now, we simulate the scaling action
+      const fromWorkers = this.currentWorkerCount;
       this.currentWorkerCount = targetWorkers;
       this.lastScaleAction = `${action} to ${targetWorkers} workers`;
       this.lastScaleTime = new Date().toISOString();
 
-      // Store scaling event for analysis
-      await this.recordScalingEvent(action, this.currentWorkerCount, targetWorkers, reason);
+      // Store scaling event in memory for analysis
+      await this.recordScalingEvent(action, fromWorkers, targetWorkers, reason);
 
       // In real production environment, execute actual scaling:
       // - Kubernetes: kubectl scale deployment worker-deployment --replicas=${targetWorkers}
@@ -256,22 +263,25 @@ export class AutoscalingService {
     }
   }
 
-  // Record scaling events for analysis
+  // Record scaling events for analysis (in memory since table doesn't exist)
   private static async recordScalingEvent(action: string, fromWorkers: number, toWorkers: number, reason: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('autoscaling_events')
-        .insert({
-          action,
-          from_workers: fromWorkers,
-          to_workers: toWorkers,
-          reason,
-          timestamp: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Failed to record scaling event:', error);
+      const event = {
+        action,
+        fromWorkers,
+        toWorkers,
+        reason,
+        timestamp: new Date().toISOString()
+      };
+      
+      this.scalingEvents.push(event);
+      
+      // Keep only last 100 events
+      if (this.scalingEvents.length > 100) {
+        this.scalingEvents = this.scalingEvents.slice(-100);
       }
+
+      console.log(`📝 Recorded scaling event: ${action} from ${fromWorkers} to ${toWorkers} workers`);
     } catch (error) {
       console.error('Error recording scaling event:', error);
     }
@@ -287,18 +297,11 @@ export class AutoscalingService {
     try {
       const metrics = await this.collectAutoscalingMetrics();
       
-      // Get recent scaling events
-      const { data: recentEvents } = await supabase
-        .from('autoscaling_events')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(10);
-
       return {
         active: this.isAutoscalingActive,
         currentWorkers: this.currentWorkerCount,
         metrics,
-        recentEvents: recentEvents || []
+        recentEvents: this.scalingEvents.slice(-10)
       };
     } catch (error) {
       console.error('Failed to get autoscaling status:', error);

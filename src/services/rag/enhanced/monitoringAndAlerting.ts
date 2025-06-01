@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionWorkerQueue } from './productionWorkerQueue';
 import { ProductionInfrastructureService } from './productionInfrastructureService';
@@ -28,6 +27,7 @@ export interface Alert {
 export class MonitoringAndAlertingService {
   private static alerts: Alert[] = [];
   private static isMonitoringActive = false;
+  private static metricsHistory: SystemMetrics[] = [];
   private static readonly THRESHOLDS = {
     queueDepthCritical: 5000,
     queueDepthHigh: 1000,
@@ -248,43 +248,32 @@ export class MonitoringAndAlertingService {
     }
   }
 
-  // Persist metrics for historical analysis
+  // Persist metrics for historical analysis (in memory since table doesn't exist)
   private static async persistMetrics(metrics: SystemMetrics): Promise<void> {
     try {
-      // Store metrics in database for historical analysis
-      // In production, this might go to a time-series database like InfluxDB
-      const { error } = await supabase
-        .from('system_metrics')
-        .insert({
-          timestamp: metrics.timestamp,
-          queue_depth: metrics.queueDepth,
-          worker_utilization: metrics.workerUtilization,
-          error_rate: metrics.errorRate,
-          avg_processing_time: metrics.avgProcessingTime,
-          compression_ratio: metrics.compressionRatio,
-          storage_usage_gb: metrics.storageUsageGB,
-          active_customers: metrics.activeCustomers,
-          crawls_completed_24h: metrics.crawlsCompletedLast24h
-        });
-
-      if (error) {
-        console.error('Failed to persist metrics:', error);
+      // Store metrics in memory for historical analysis
+      this.metricsHistory.push(metrics);
+      
+      // Keep only last 1000 entries
+      if (this.metricsHistory.length > 1000) {
+        this.metricsHistory = this.metricsHistory.slice(-1000);
       }
+
+      console.log(`📈 Collected metrics: Queue ${metrics.queueDepth}, Error rate ${(metrics.errorRate * 100).toFixed(1)}%, Storage ${metrics.storageUsageGB.toFixed(2)}GB`);
     } catch (error) {
       console.error('Error persisting metrics:', error);
     }
   }
 
-  // Clean up old data to prevent storage bloat
+  // Clean up old data to prevent memory bloat
   private static async cleanupOldData(): Promise<void> {
     try {
       const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
       
       // Clean up old metrics
-      await supabase
-        .from('system_metrics')
-        .delete()
-        .lt('timestamp', cutoffDate.toISOString());
+      this.metricsHistory = this.metricsHistory.filter(m => 
+        new Date(m.timestamp) > cutoffDate
+      );
 
       // Clean up resolved alerts older than 24 hours
       const alertCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);

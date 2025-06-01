@@ -79,7 +79,7 @@ export class InfrastructureMonitoringService {
     // Initialize dependent services
     await AlertingService.initialize();
     await PerformanceMonitoringService.startMonitoring();
-    AutoscalingService.startAutoscaling();
+    await AutoscalingService.startAutoscaling();
 
     // Monitor infrastructure health every 5 minutes
     setInterval(async () => {
@@ -218,34 +218,40 @@ export class InfrastructureMonitoringService {
 
   // Check workers health
   private static async checkWorkersHealth(): Promise<ComponentHealth> {
-    const autoscalingStatus = AutoscalingService.getAutoscalingStatus();
     const details: string[] = [];
     let score = 100;
     let status: ComponentHealth['status'] = 'healthy';
 
-    const totalInstances = autoscalingStatus.totalInstances;
-    const recentFailures = autoscalingStatus.recentDecisions.filter(d => d.action === 'scale_up').length;
+    try {
+      const autoscalingStatus = await AutoscalingService.getAutoscalingStatus();
+      const totalInstances = autoscalingStatus.currentWorkers;
+      const recentFailures = autoscalingStatus.recentEvents.filter(e => e.action === 'scale_up').length;
 
-    if (totalInstances === 0) {
-      score = 0;
-      status = 'critical';
-      details.push('No active worker instances');
-    } else if (recentFailures > 5) {
-      score -= 40;
+      if (totalInstances === 0) {
+        score = 0;
+        status = 'critical';
+        details.push('No active worker instances');
+      } else if (recentFailures > 5) {
+        score -= 40;
+        status = 'degraded';
+        details.push(`Multiple scaling events: ${recentFailures} scale-ups recently`);
+      }
+
+      // Check queue health
+      const systemStatus = await PerformanceMonitoringService.getSystemStatus();
+      if (systemStatus.criticalAlerts > 0) {
+        score -= 30;
+        status = 'critical';
+        details.push(`${systemStatus.criticalAlerts} critical alerts active`);
+      }
+
+      details.push(`Active instances: ${totalInstances}`);
+      details.push(`Health score: ${systemStatus.healthScore}%`);
+    } catch (error) {
+      score = 50;
       status = 'degraded';
-      details.push(`Multiple scaling events: ${recentFailures} scale-ups recently`);
+      details.push(`Failed to check workers: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    // Check queue health
-    const systemStatus = PerformanceMonitoringService.getSystemStatus();
-    if (systemStatus.criticalAlerts > 0) {
-      score -= 30;
-      status = 'critical';
-      details.push(`${systemStatus.criticalAlerts} critical alerts active`);
-    }
-
-    details.push(`Active instances: ${totalInstances}`);
-    details.push(`Health score: ${systemStatus.healthScore}%`);
 
     return { status, score: Math.max(0, score), details };
   }
@@ -347,37 +353,44 @@ export class InfrastructureMonitoringService {
 
   // Check autoscaling health
   private static async checkAutoscalingHealth(): Promise<ComponentHealth> {
-    const autoscalingStatus = AutoscalingService.getAutoscalingStatus();
     const details: string[] = [];
     let score = 100;
     let status: ComponentHealth['status'] = 'healthy';
 
-    if (!autoscalingStatus.enabled) {
-      score -= 30;
+    try {
+      const autoscalingStatus = await AutoscalingService.getAutoscalingStatus();
+
+      if (!autoscalingStatus.active) {
+        score -= 30;
+        status = 'degraded';
+        details.push('Autoscaling is disabled');
+      }
+
+      const recentDecisions = autoscalingStatus.recentEvents.slice(-10);
+      const failedScaling = recentDecisions.filter(d => d.action.includes('failed')).length;
+
+      if (failedScaling > 3) {
+        score -= 25;
+        status = 'degraded';
+        details.push(`${failedScaling} failed scaling decisions recently`);
+      }
+
+      const totalInstances = autoscalingStatus.currentWorkers;
+      const maxPossibleInstances = 100; // Simulated max capacity
+
+      if (totalInstances / maxPossibleInstances > 0.8) {
+        score -= 20;
+        details.push('Approaching maximum scaling capacity');
+      }
+
+      details.push(`Autoscaling: ${autoscalingStatus.active ? 'Enabled' : 'Disabled'}`);
+      details.push(`Total instances: ${totalInstances}`);
+      details.push(`Recent decisions: ${recentDecisions.length}`);
+    } catch (error) {
+      score = 50;
       status = 'degraded';
-      details.push('Autoscaling is disabled');
+      details.push(`Failed to check autoscaling: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    const recentDecisions = autoscalingStatus.recentDecisions.slice(-10);
-    const failedScaling = recentDecisions.filter(d => d.confidence < 50).length;
-
-    if (failedScaling > 3) {
-      score -= 25;
-      status = 'degraded';
-      details.push(`${failedScaling} low-confidence scaling decisions recently`);
-    }
-
-    const totalInstances = autoscalingStatus.totalInstances;
-    const maxPossibleInstances = autoscalingStatus.pools.reduce((sum, p) => sum + p.maxInstances, 0);
-
-    if (totalInstances / maxPossibleInstances > 0.8) {
-      score -= 20;
-      details.push('Approaching maximum scaling capacity');
-    }
-
-    details.push(`Autoscaling: ${autoscalingStatus.enabled ? 'Enabled' : 'Disabled'}`);
-    details.push(`Total instances: ${totalInstances}`);
-    details.push(`Recent decisions: ${recentDecisions.length}`);
 
     return { status, score: Math.max(0, score), details };
   }
@@ -455,8 +468,8 @@ export class InfrastructureMonitoringService {
 
   // Generate cost optimization report
   private static async generateCostOptimizationReport(): Promise<CostOptimization> {
-    const autoscalingStatus = AutoscalingService.getAutoscalingStatus();
-    const currentMonthlyCost = autoscalingStatus.estimatedMonthlyCost;
+    const autoscalingStatus = await AutoscalingService.getAutoscalingStatus();
+    const currentMonthlyCost = autoscalingStatus.currentWorkers * 100; // $100 per worker
 
     const optimizations = [
       {
@@ -520,7 +533,7 @@ export class InfrastructureMonitoringService {
   }> {
     const health = await this.calculateInfrastructureHealth();
     const resourceUsage = this.resourceHistory[this.resourceHistory.length - 1] || null;
-    const autoscaling = AutoscalingService.getAutoscalingStatus();
+    const autoscaling = await AutoscalingService.getAutoscalingStatus();
     const costOptimization = await this.generateCostOptimizationReport();
 
     return {
