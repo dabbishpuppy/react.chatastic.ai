@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, XCircle, Clock } from "lucide-react";
+import TeamInvitationsSkeleton from "./TeamInvitationsSkeleton";
 
 interface TeamInvitation {
   id: string;
@@ -130,21 +130,7 @@ const TeamInvitations: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock size={20} />
-            Pending Invitations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">
-            <div className="text-gray-500">Loading invitations...</div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return <TeamInvitationsSkeleton />;
   }
 
   if (invitations.length === 0) {

@@ -5,6 +5,7 @@ import { UserPlus } from "lucide-react";
 import { useTeamMembers, TeamMember } from "@/hooks/useTeamMembers";
 import ManageTeamAccessDialog from "@/components/settings/ManageTeamAccessDialog";
 import MembersTable from "@/components/settings/MembersTable";
+import MembersTableSkeleton from "@/components/settings/MembersTableSkeleton";
 import InviteMemberDialog from "@/components/settings/InviteMemberDialog";
 import RemoveMemberDialog from "@/components/settings/RemoveMemberDialog";
 import TeamInvitations from "@/components/settings/TeamInvitations";
@@ -48,10 +49,14 @@ const MembersSettings: React.FC = () => {
         <div className="bg-white rounded-lg border p-6">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-2xl font-bold">Members</h2>
+            {permissions.canInviteMembers && (
+              <Button disabled>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite members
+              </Button>
+            )}
           </div>
-          <div className="flex items-center justify-center py-8">
-            <div className="text-gray-500">Loading members...</div>
-          </div>
+          <MembersTableSkeleton />
         </div>
       </div>
     );
