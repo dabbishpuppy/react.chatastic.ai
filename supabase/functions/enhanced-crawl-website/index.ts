@@ -46,7 +46,7 @@ serve(async (req) => {
       priority = 'normal'
     } = requestBody;
 
-    console.log('🚀 Starting enhanced crawl with compression for agent', agentId, ', URL:', url);
+    console.log('🚀 Starting simplified crawl for agent', agentId, ', URL:', url);
 
     if (!agentId || !url) {
       throw new Error('Missing required fields: agentId and url');
@@ -81,41 +81,23 @@ serve(async (req) => {
 
     console.log(`📊 Discovery completed: ${discoveredUrls.length} URLs found`);
 
-    // Create parent source
-    const parentSourceData = {
-      agent_id: agentId,
-      team_id: agent.team_id,
-      source_type: 'website' as const,
-      title: url,
-      url: url,
-      crawl_status: 'pending' as const,
-      exclude_paths: excludePaths,
-      include_paths: includePaths,
-      respect_robots: respectRobots,
-      max_concurrent_jobs: 5,
-      progress: 0,
-      total_jobs: discoveredUrls.length,
-      completed_jobs: 0,
-      failed_jobs: 0,
-      links_count: discoveredUrls.length,
-      discovery_completed: false,
-      metadata: {
-        crawl_initiated_at: new Date().toISOString(),
-        enhanced_pipeline: true,
-        priority: priority,
-        crawlMode: crawlMode,
-        maxPages: maxPages,
-        enableCompression: enableCompression,
-        enableDeduplication: enableDeduplication,
-        compression_enabled: enableCompression,
-        global_deduplication: enableDeduplication,
-        compression_algorithm: 'zstd-level-19'
-      }
-    };
-
+    // Create parent source with minimal data
     const { data: parentSource, error: sourceError } = await supabase
       .from('agent_sources')
-      .insert(parentSourceData)
+      .insert({
+        agent_id: agentId,
+        team_id: agent.team_id,
+        source_type: 'website',
+        title: url,
+        url: url,
+        crawl_status: 'pending',
+        progress: 0,
+        total_jobs: discoveredUrls.length,
+        completed_jobs: 0,
+        failed_jobs: 0,
+        links_count: discoveredUrls.length,
+        discovery_completed: false
+      })
       .select()
       .single();
 
@@ -125,129 +107,103 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with simplified structure and explicit type validation
-    const sourcePages = discoveredUrls.map((discoveredUrl, index) => {
-      // Only include the essential fields that match the source_pages table schema
-      const sourcePage = {
-        parent_source_id: parentSource.id, // uuid
-        customer_id: agent.team_id, // uuid  
-        url: String(discoveredUrl), // text - explicitly ensure it's a string
-        status: 'pending', // text - use string literal, not String() constructor
-        priority: priority || 'normal', // text - ensure it's a string
-        retry_count: 0, // integer
-        max_retries: 3 // integer
-        // Removed created_at - let database handle the default
+    // Test single record insertion first
+    if (discoveredUrls.length > 0) {
+      console.log('🔍 Testing single record insertion...');
+      
+      const testRecord = {
+        parent_source_id: parentSource.id,
+        customer_id: agent.team_id,
+        url: discoveredUrls[0],
+        status: 'pending',
+        priority: priority,
+        retry_count: 0,
+        max_retries: 3
       };
-      
-      // Log the first few entries for debugging
-      if (index < 3) {
-        console.log(`🔍 Source page ${index + 1} simplified data:`, {
-          parent_source_id: `${typeof sourcePage.parent_source_id} (${sourcePage.parent_source_id})`,
-          customer_id: `${typeof sourcePage.customer_id} (${sourcePage.customer_id})`,
-          url: `${typeof sourcePage.url} (${sourcePage.url.substring(0, 50)}...)`,
-          status: `${typeof sourcePage.status} (${sourcePage.status})`,
-          priority: `${typeof sourcePage.priority} (${sourcePage.priority})`,
-          retry_count: `${typeof sourcePage.retry_count} (${sourcePage.retry_count})`,
-          max_retries: `${typeof sourcePage.max_retries} (${sourcePage.max_retries})`
+
+      console.log('📝 Test record data:', JSON.stringify(testRecord, null, 2));
+
+      const { data: testResult, error: testError } = await supabase
+        .from('source_pages')
+        .insert([testRecord])
+        .select('id');
+
+      if (testError) {
+        console.error('❌ Single record test failed:', {
+          error: testError,
+          code: testError.code,
+          message: testError.message,
+          details: testError.details,
+          hint: testError.hint
         });
+        throw new Error(`Single record insertion failed: ${testError.message}`);
       }
-      
-      return sourcePage;
-    });
 
-    console.log(`📝 Preparing to insert ${sourcePages.length} source pages with simplified structure`);
+      console.log('✅ Single record test succeeded:', testResult);
 
-    // Insert source pages in smaller batches with better error handling
-    const batchSize = 10; // Even smaller batches for better debugging
-    let insertedJobs = 0;
-    
-    for (let i = 0; i < sourcePages.length; i += batchSize) {
-      const batch = sourcePages.slice(i, i + batchSize);
-      console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1}: ${batch.length} pages (${i + 1}-${Math.min(i + batchSize, sourcePages.length)})`);
+      // If single record works, try the rest in small batches
+      let insertedJobs = 1; // Already inserted the test record
       
-      try {
-        const { data: insertedPages, error: pagesError } = await supabase
-          .from('source_pages')
-          .insert(batch)
-          .select('id');
+      if (discoveredUrls.length > 1) {
+        const remainingUrls = discoveredUrls.slice(1);
+        const batchSize = 5;
         
-        if (pagesError) {
-          console.error(`❌ Error inserting source pages batch ${Math.floor(i/batchSize) + 1}:`, {
-            error: pagesError,
-            errorCode: pagesError.code,
-            errorMessage: pagesError.message,
-            errorDetails: pagesError.details,
-            batchSize: batch.length,
-            firstUrl: batch[0]?.url,
-            sampleData: batch[0]
-          });
+        for (let i = 0; i < remainingUrls.length; i += batchSize) {
+          const batch = remainingUrls.slice(i, i + batchSize);
+          console.log(`📦 Inserting batch: ${batch.length} pages`);
           
-          // Try inserting the first row individually to isolate the exact problem
-          console.log('🔧 Attempting individual row insertion for debugging...');
-          try {
-            const singleRow = batch[0];
-            console.log(`🔍 Attempting to insert single row:`, JSON.stringify(singleRow, null, 2));
-            
-            const { data: singleResult, error: singleError } = await supabase
-              .from('source_pages')
-              .insert([singleRow])
-              .select('id');
-              
-            if (singleError) {
-              console.error(`❌ Single row failed with detailed error:`, {
-                code: singleError.code,
-                message: singleError.message,
-                details: singleError.details,
-                hint: singleError.hint
-              });
-            } else {
-              console.log(`✅ Single row succeeded, this suggests a batch-specific issue`);
-            }
-          } catch (individualError) {
-            console.error(`❌ Individual insertion exception:`, individualError);
+          const batchRecords = batch.map(discoveredUrl => ({
+            parent_source_id: parentSource.id,
+            customer_id: agent.team_id,
+            url: discoveredUrl,
+            status: 'pending',
+            priority: priority,
+            retry_count: 0,
+            max_retries: 3
+          }));
+
+          const { error: batchError } = await supabase
+            .from('source_pages')
+            .insert(batchRecords);
+          
+          if (batchError) {
+            console.error(`❌ Batch insertion failed:`, batchError);
+            throw new Error(`Batch insertion failed: ${batchError.message}`);
           }
           
-          throw new Error(`Batch insertion failed: ${pagesError.message} (Code: ${pagesError.code})`);
-        } else {
           insertedJobs += batch.length;
-          console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} inserted successfully: ${batch.length} pages`);
+          console.log(`✅ Batch inserted successfully: ${batch.length} pages`);
         }
-      } catch (batchError) {
-        console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} exception:`, batchError);
-        throw batchError;
       }
+
+      // Mark discovery as completed and update parent source
+      await supabase
+        .from('agent_sources')
+        .update({
+          crawl_status: 'in_progress',
+          discovery_completed: true,
+          total_children: insertedJobs
+        })
+        .eq('id', parentSource.id);
+
+      console.log(`✅ Crawl initiated: ${insertedJobs} jobs created for ${discoveredUrls.length} URLs`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          parentSourceId: parentSource.id,
+          totalJobs: discoveredUrls.length,
+          jobsCreated: insertedJobs,
+          message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
+    } else {
+      throw new Error('No URLs discovered for crawling');
     }
-
-    // Mark discovery as completed and update parent source
-    await supabase
-      .from('agent_sources')
-      .update({
-        crawl_status: 'in_progress',
-        discovery_completed: true,
-        total_children: insertedJobs,
-        metadata: {
-          ...parentSourceData.metadata,
-          jobs_created_at: new Date().toISOString(),
-          jobs_inserted: insertedJobs
-        }
-      })
-      .eq('id', parentSource.id);
-
-    console.log(`✅ Enhanced crawl initiated: ${insertedJobs} jobs created for ${discoveredUrls.length} URLs`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        parentSourceId: parentSource.id,
-        totalJobs: discoveredUrls.length,
-        jobsCreated: insertedJobs,
-        message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
-      }),
-      { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200
-      }
-    );
 
   } catch (error) {
     console.error('❌ Error in enhanced crawl:', error);
