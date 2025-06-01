@@ -16,7 +16,7 @@ export const useEnhancedCrawl = () => {
       const result = await EnhancedCrawlService.initiateCrawl(request);
       
       // Set up real-time subscription for this crawl
-      const unsubscribe = EnhancedCrawlService.subscribeToCrawlUpdates(
+      const unsubscribe = await EnhancedCrawlService.subscribeToCrawlUpdates(
         result.parentSourceId,
         (status) => {
           console.log('📡 Received crawl status update:', status);
