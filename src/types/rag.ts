@@ -17,6 +17,19 @@ export type AuditAction = Database['public']['Enums']['audit_action'];
 
 export interface AgentSource extends Omit<DbAgentSource, 'metadata'> {
   metadata?: Record<string, any>;
+  // Ensure all new industrial-scale crawling fields are included
+  total_jobs?: number | null;
+  completed_jobs?: number | null;
+  failed_jobs?: number | null;
+  exclude_paths?: string[] | null;
+  include_paths?: string[] | null;
+  respect_robots?: boolean | null;
+  max_concurrent_jobs?: number | null;
+  total_content_size?: number | null;
+  compressed_content_size?: number | null;
+  unique_chunks?: number | null;
+  duplicate_chunks?: number | null;
+  global_compression_ratio?: number | null;
 }
 
 export interface SourceChunk extends Omit<DbSourceChunk, 'metadata'> {

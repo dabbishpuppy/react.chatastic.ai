@@ -6,11 +6,26 @@ import EnhancedWebsiteCrawlForm from './components/EnhancedWebsiteCrawlForm';
 import CrawlProgressTracker from './components/crawl-tracker/CrawlProgressTracker';
 import WebsiteSourcesList from './components/WebsiteSourcesList';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
+import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
+import { useSourcesPaginated } from '@/hooks/useSourcesPaginated';
 
 const EnhancedWebsiteTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState('new-crawl');
   const [trackingCrawlId, setTrackingCrawlId] = useState<string | null>(null);
   const { activeCrawls } = useEnhancedCrawl();
+
+  const { refetch } = useSourcesPaginated({
+    sourceType: 'website',
+    page: 1,
+    pageSize: 25
+  });
+
+  const { handleEdit, handleExclude, handleDelete, handleRecrawl } = useWebsiteSourceOperations(
+    refetch, 
+    (sourceId: string) => {
+      refetch();
+    }
+  );
 
   const handleCrawlInitiated = () => {
     // Switch to active crawls tab after initiating a crawl
@@ -114,7 +129,14 @@ const EnhancedWebsiteTab: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="sources" className="mt-6">
-          <WebsiteSourcesList />
+          <WebsiteSourcesList
+            onEdit={handleEdit}
+            onExclude={handleExclude}
+            onDelete={handleDelete}
+            onRecrawl={handleRecrawl}
+            loading={false}
+            error={null}
+          />
         </TabsContent>
       </Tabs>
     </div>

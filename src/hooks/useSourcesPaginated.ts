@@ -19,7 +19,7 @@ interface SourcesPageResult {
   pageSize: number;
 }
 
-// Type for optimized source data (without heavy fields)
+// Type for optimized source data (including all new fields)
 interface OptimizedSourceData {
   id: string;
   title: string;
@@ -46,6 +46,19 @@ interface OptimizedSourceData {
   compression_ratio: number | null;
   original_size: number | null;
   compressed_size: number | null;
+  // New industrial-scale crawling fields
+  total_jobs: number | null;
+  completed_jobs: number | null;
+  failed_jobs: number | null;
+  exclude_paths: string[] | null;
+  include_paths: string[] | null;
+  respect_robots: boolean | null;
+  max_concurrent_jobs: number | null;
+  total_content_size: number | null;
+  compressed_content_size: number | null;
+  unique_chunks: number | null;
+  duplicate_chunks: number | null;
+  global_compression_ratio: number | null;
 }
 
 // Optimized source query - excludes heavy content fields for performance
@@ -56,6 +69,20 @@ const fetchSourcesPage = async (
   pageSize = 25
 ): Promise<SourcesPageResult> => {
   console.log(`🔍 Fetching sources page: agentId=${agentId}, type=${sourceType}, page=${page}, size=${pageSize}`);
+  
+  // Build the select query with all necessary fields
+  const selectFields = `
+    id, title, source_type, url, created_at, updated_at, 
+    metadata, is_active, parent_source_id, crawl_status, 
+    progress, links_count, last_crawled_at, is_excluded,
+    agent_id, team_id, created_by, updated_by, file_path,
+    extraction_method, content_summary, keywords, 
+    compression_ratio, original_size, compressed_size,
+    total_jobs, completed_jobs, failed_jobs, exclude_paths,
+    include_paths, respect_robots, max_concurrent_jobs,
+    total_content_size, compressed_content_size, unique_chunks,
+    duplicate_chunks, global_compression_ratio
+  `;
   
   // For website sources, implement proper pagination for parent sources only
   if (sourceType === 'website') {
@@ -80,14 +107,7 @@ const fetchSourcesPage = async (
     // Fetch only parent sources for this page (no heavy content fields)
     const { data: parentSources, error: parentError } = await supabase
       .from('agent_sources')
-      .select(`
-        id, title, source_type, url, created_at, updated_at, 
-        metadata, is_active, parent_source_id, crawl_status, 
-        progress, links_count, last_crawled_at, is_excluded,
-        agent_id, team_id, created_by, updated_by, file_path,
-        extraction_method, content_summary, keywords, 
-        compression_ratio, original_size, compressed_size
-      `)
+      .select(selectFields)
       .eq('agent_id', agentId)
       .eq('source_type', 'website')
       .eq('is_active', true)
@@ -108,14 +128,7 @@ const fetchSourcesPage = async (
       
       const { data: childSources, error: childError } = await supabase
         .from('agent_sources')
-        .select(`
-          id, title, source_type, url, created_at, updated_at, 
-          metadata, is_active, parent_source_id, crawl_status, 
-          progress, links_count, last_crawled_at, is_excluded,
-          agent_id, team_id, created_by, updated_by, file_path,
-          extraction_method, content_summary, keywords, 
-          compression_ratio, original_size, compressed_size
-        `)
+        .select(selectFields)
         .in('parent_source_id', parentIds)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
@@ -168,14 +181,7 @@ const fetchSourcesPage = async (
   // Then get the actual data (excluding heavy content fields)
   let dataQuery = supabase
     .from('agent_sources')
-    .select(`
-      id, title, source_type, url, created_at, updated_at, 
-      metadata, is_active, parent_source_id, crawl_status, 
-      progress, links_count, last_crawled_at, is_excluded,
-      agent_id, team_id, created_by, updated_by, file_path,
-      extraction_method, content_summary, keywords, 
-      compression_ratio, original_size, compressed_size
-    `)
+    .select(selectFields)
     .eq('agent_id', agentId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
@@ -199,31 +205,8 @@ const fetchSourcesPage = async (
   
   // Convert optimized data to AgentSource format with required fields
   const typedSources: AgentSource[] = (data || []).map(source => ({
-    id: source.id,
-    title: source.title,
-    source_type: source.source_type,
-    url: source.url,
-    created_at: source.created_at,
-    updated_at: source.updated_at,
+    ...source,
     metadata: source.metadata as Record<string, any>,
-    is_active: source.is_active,
-    parent_source_id: source.parent_source_id,
-    crawl_status: source.crawl_status,
-    progress: source.progress,
-    links_count: source.links_count,
-    last_crawled_at: source.last_crawled_at,
-    is_excluded: source.is_excluded,
-    agent_id: source.agent_id,
-    team_id: source.team_id,
-    created_by: source.created_by,
-    updated_by: source.updated_by,
-    file_path: source.file_path,
-    extraction_method: source.extraction_method,
-    content_summary: source.content_summary,
-    keywords: source.keywords,
-    compression_ratio: source.compression_ratio,
-    original_size: source.original_size,
-    compressed_size: source.compressed_size,
     content: null, // Not fetched for performance
     raw_text: null // Not fetched for performance
   }));
