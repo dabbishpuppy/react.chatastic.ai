@@ -1,683 +1,340 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
+
+interface EnhancedCrawlRequest {
+  agentId: string;
+  url: string;
+  crawlMode?: 'full-website' | 'single-page' | 'sitemap-only';
+  maxPages?: number;
+  excludePaths?: string[];
+  includePaths?: string[];
+  respectRobots?: boolean;
+  enableCompression?: boolean;
+  enableDeduplication?: boolean;
+  priority?: 'normal' | 'high' | 'slow';
+}
+
+// CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
-interface CrawlRequest {
-  agentId: string
-  url: string
-  excludePaths?: string[]
-  includePaths?: string[]
-  respectRobots?: boolean
-  maxConcurrentJobs?: number
-  priority?: 'normal' | 'high' | 'slow'
-}
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const requestBody: EnhancedCrawlRequest = await req.json();
+    const { 
+      agentId, 
+      url, 
+      crawlMode = 'full-website',
+      maxPages = 100,
+      excludePaths = [],
+      includePaths = [],
+      respectRobots = true,
+      enableCompression = true,
+      enableDeduplication = true,
+      priority = 'normal'
+    } = requestBody;
 
-    const { agentId, url, excludePaths, includePaths, respectRobots, maxConcurrentJobs, priority }: CrawlRequest = await req.json()
+    console.log('🚀 Starting enhanced crawl with Zstd compression for agent', agentId, ', URL:', url);
 
-    console.log(`🚀 Starting enhanced crawl with Zstd compression for agent ${agentId}, URL: ${url}`)
+    if (!agentId || !url) {
+      throw new Error('Missing required fields: agentId and url');
+    }
 
-    // Get customer_id from agent
+    // Get agent and team information
     const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('team_id')
+      .select('id, team_id')
       .eq('id', agentId)
-      .single()
+      .single();
 
     if (agentError || !agent) {
-      throw new Error('Agent not found')
+      throw new Error('Agent not found');
     }
 
-    const customerId = agent.team_id
+    // Discover URLs based on crawl mode
+    let discoveredUrls: string[] = [];
+    
+    switch (crawlMode) {
+      case 'single-page':
+        discoveredUrls = [url];
+        break;
+      case 'sitemap-only':
+        discoveredUrls = await discoverSitemapLinks(url);
+        break;
+      case 'full-website':
+      default:
+        discoveredUrls = await discoverLinks(url, excludePaths, includePaths, maxPages);
+        break;
+    }
 
-    // Enhanced default exclude paths for better content quality
-    const defaultExcludePaths = [
-      "/wp-json/*", "/wp-admin/*", "/xmlrpc.php", 
-      "/checkout/*", "/cart/*", "/admin/*", "/api/*", 
-      "*.json", "*.xml", "*.rss", "*.css", "*.js",
-      "/feed/*", "/feeds/*", "/sitemap*", "/robots.txt",
-      "/search*", "/tag/*", "/category/*", "/author/*",
-      "/comments/*", "/trackback/*", "/wp-content/uploads/*"
-    ];
+    // Create parent source
+    const parentSourceData = {
+      agent_id: agentId,
+      team_id: agent.team_id,
+      source_type: 'website' as const,
+      title: url,
+      url: url,
+      crawl_status: 'pending' as const,
+      exclude_paths: excludePaths,
+      include_paths: includePaths,
+      respect_robots: respectRobots,
+      max_concurrent_jobs: 5,
+      progress: 0,
+      total_jobs: discoveredUrls.length,
+      completed_jobs: 0,
+      failed_jobs: 0,
+      links_count: discoveredUrls.length,
+      metadata: {
+        crawl_initiated_at: new Date().toISOString(),
+        enhanced_pipeline: true,
+        priority: priority,
+        crawlMode: crawlMode,
+        maxPages: maxPages,
+        enableCompression: enableCompression,
+        enableDeduplication: enableDeduplication,
+        compression_enabled: enableCompression,
+        global_deduplication: enableDeduplication,
+        compression_algorithm: 'zstd-level-19'
+      }
+    };
 
-    // Create parent source with enhanced configuration
     const { data: parentSource, error: sourceError } = await supabase
       .from('agent_sources')
-      .insert({
-        agent_id: agentId,
-        team_id: customerId,
-        source_type: 'website',
-        title: url,
-        url: url,
-        crawl_status: 'pending',
-        exclude_paths: excludePaths || defaultExcludePaths,
-        include_paths: includePaths || [],
-        respect_robots: respectRobots ?? true,
-        max_concurrent_jobs: maxConcurrentJobs || 5,
-        progress: 0,
-        metadata: {
-          crawl_initiated_at: new Date().toISOString(),
-          enhanced_pipeline: true,
-          compression_enabled: true,
-          compression_algorithm: 'zstd-level-19',
-          global_deduplication: true,
-          priority: priority || 'normal'
-        }
-      })
+      .insert(parentSourceData)
       .select()
-      .single()
+      .single();
 
     if (sourceError) {
-      console.error('Error creating parent source:', sourceError)
-      throw sourceError
+      throw new Error(`Failed to create parent source: ${sourceError.message}`);
     }
-
-    console.log(`✅ Created parent source ${parentSource.id} with Zstd compression`)
-
-    // Phase 1: Enhanced Link Discovery with better filtering
-    const discoveredUrls = await discoverLinksEnhanced(
-      url, 
-      excludePaths || defaultExcludePaths, 
-      includePaths || [], 
-      respectRobots ?? true
-    )
-    
-    console.log(`🔍 Discovered ${discoveredUrls.length} high-quality URLs to crawl`)
 
     // Create crawl jobs for each discovered URL
-    const crawlJobs = discoveredUrls.map(discoveredUrl => ({
+    const crawlJobs = discoveredUrls.map((discoveredUrl, index) => ({
       parent_source_id: parentSource.id,
-      customer_id: customerId,
       url: discoveredUrl,
       status: 'pending' as const,
-      priority: priority || 'normal'
-    }))
+      priority: priority === 'high' ? 3 : priority === 'slow' ? 1 : 2,
+      created_at: new Date().toISOString(),
+      metadata: {
+        crawl_order: index,
+        compression_enabled: enableCompression,
+        deduplication_enabled: enableDeduplication
+      }
+    }));
 
-    const { data: createdJobs, error: jobsError } = await supabase
-      .from('crawl_jobs')
-      .insert(crawlJobs)
-      .select()
-
-    if (jobsError) {
-      console.error('Error creating crawl jobs:', jobsError)
-      throw jobsError
+    // Insert crawl jobs in batches to avoid timeout
+    const batchSize = 50;
+    let insertedJobs = 0;
+    
+    for (let i = 0; i < crawlJobs.length; i += batchSize) {
+      const batch = crawlJobs.slice(i, i + batchSize);
+      const { error: jobsError } = await supabase
+        .from('crawl_jobs')
+        .insert(batch);
+      
+      if (jobsError) {
+        console.error('Error inserting crawl jobs batch:', jobsError);
+      } else {
+        insertedJobs += batch.length;
+      }
     }
 
-    // Update parent source with total job count and set to in_progress
+    // Update parent source to in_progress
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'in_progress',
-        total_jobs: discoveredUrls.length,
-        links_count: discoveredUrls.length,
-        progress: 0,
         metadata: {
-          ...parentSource.metadata,
-          jobs_created_at: new Date().toISOString()
+          ...parentSourceData.metadata,
+          jobs_created_at: new Date().toISOString(),
+          jobs_inserted: insertedJobs
         }
       })
-      .eq('id', parentSource.id)
+      .eq('id', parentSource.id);
 
-    console.log(`📋 Created ${createdJobs?.length} crawl jobs`)
-
-    // Spawn individual crawl jobs asynchronously with Zstd compression
-    EdgeRuntime.waitUntil(spawnEnhancedCrawlJobs(createdJobs || []))
+    console.log(`✅ Enhanced crawl initiated: ${insertedJobs} jobs created for ${discoveredUrls.length} URLs`);
 
     return new Response(
       JSON.stringify({
         success: true,
         parentSourceId: parentSource.id,
         totalJobs: discoveredUrls.length,
-        message: 'Enhanced crawl with Zstd compression initiated successfully',
-        features: {
-          compression: 'Zstd Level 19 (Native)',
-          deduplication: 'Global Cross-Customer',
-          filtering: 'Enhanced Boilerplate Removal',
-          expectedCompressionRatio: '25-30%'
-        }
+        jobsCreated: insertedJobs,
+        message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200
       }
-    )
+    );
 
   } catch (error) {
-    console.error('Error in enhanced crawl:', error)
+    console.error('Error in enhanced crawl:', error);
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+      JSON.stringify({ 
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400
       }
-    )
+    );
   }
-})
+});
 
-async function spawnEnhancedCrawlJobs(jobs: any[]): Promise<void> {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  )
-
-  console.log(`🚀 Spawning ${jobs.length} enhanced crawl jobs with Zstd compression`)
-
-  // Process jobs in smaller batches for better resource management
-  const batchSize = 3
-  for (let i = 0; i < jobs.length; i += batchSize) {
-    const batch = jobs.slice(i, i + batchSize)
-    
-    // Process batch concurrently
-    await Promise.allSettled(
-      batch.map(job => processEnhancedCrawlJobWithZstd(job, supabase))
-    )
-    
-    // Longer delay between batches for stability
-    await new Promise(resolve => setTimeout(resolve, 500))
-  }
-
-  console.log(`✅ Completed spawning all enhanced crawl jobs with Zstd compression`)
-}
-
-async function processEnhancedCrawlJobWithZstd(job: any, supabase: any): Promise<void> {
-  const startTime = Date.now()
-  
-  try {
-    console.log(`🔄 Processing enhanced job ${job.id} with Zstd compression for URL: ${job.url}`)
-
-    // Update job status to in_progress
-    await supabase
-      .from('crawl_jobs')
-      .update({
-        status: 'in_progress',
-        started_at: new Date().toISOString()
-      })
-      .eq('id', job.id)
-
-    // Fetch page with enhanced error handling
-    const response = await fetch(job.url, {
-      headers: {
-        'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(45000) // Longer timeout for quality content
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const html = await response.text()
-    
-    // Enhanced content processing pipeline
-    const cleanedContent = cleanHtmlContentEnhanced(html)
-    const semanticChunks = createSemanticChunksEnhanced(cleanedContent)
-    const prunedChunks = pruneChunksForQuality(semanticChunks, 5)
-    
-    console.log(`📝 Created ${prunedChunks.length} high-quality chunks for ${job.url}`)
-
-    // Process chunks with global deduplication and Zstd compression
-    const { uniqueChunks, duplicateChunks, totalCompressedSize } = await processChunksWithZstdCompression(
-      prunedChunks, 
-      job.parent_source_id, 
-      job.customer_id,
-      supabase
-    )
-
-    const processingTime = Date.now() - startTime
-    const compressionRatio = totalCompressedSize / cleanedContent.length
-
-    // Update job as completed with enhanced metrics
-    await supabase
-      .from('crawl_jobs')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        content_size: cleanedContent.length,
-        compression_ratio: compressionRatio,
-        chunks_created: uniqueChunks,
-        duplicates_found: duplicateChunks,
-        processing_time_ms: processingTime,
-        compression_algorithm: 'zstd-19'
-      })
-      .eq('id', job.id)
-
-    console.log(`✅ Enhanced job ${job.id} completed in ${processingTime}ms (${(compressionRatio * 100).toFixed(1)}% Zstd compression)`)
-
-    // Trigger status aggregation
-    await supabase.rpc('aggregate_crawl_status', { parent_source_id_param: job.parent_source_id })
-
-  } catch (error) {
-    console.error(`❌ Enhanced job ${job.id} failed:`, error)
-    
-    const processingTime = Date.now() - startTime
-    
-    // Update job as failed
-    await supabase
-      .from('crawl_jobs')
-      .update({
-        status: 'failed',
-        completed_at: new Date().toISOString(),
-        error_message: error.message,
-        processing_time_ms: processingTime
-      })
-      .eq('id', job.id)
-
-    // Trigger status aggregation even on failure
-    await supabase.rpc('aggregate_crawl_status', { parent_source_id_param: job.parent_source_id })
-  }
-}
-
-async function processChunksWithZstdCompression(
-  chunks: string[], 
-  sourceId: string, 
-  customerId: string,
-  supabase: any
-): Promise<{ uniqueChunks: number, duplicateChunks: number, totalCompressedSize: number }> {
-  let uniqueChunks = 0
-  let duplicateChunks = 0
-  let totalCompressedSize = 0
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i]
-    const contentHash = await generateContentHash(chunk)
-    
-    // Check for global deduplication
-    const { data: existingChunk } = await supabase
-      .from('semantic_chunks')
-      .select('id, ref_count')
-      .eq('content_hash', contentHash)
-      .single()
-
-    let chunkId: string
-
-    if (existingChunk) {
-      // Chunk exists globally, increment reference count
-      chunkId = existingChunk.id
-      await supabase
-        .from('semantic_chunks')
-        .update({ 
-          ref_count: existingChunk.ref_count + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', chunkId)
-      
-      duplicateChunks++
-      console.log(`🔄 Reused global chunk ${chunkId}`)
-      
-    } else {
-      // New chunk - compress with Zstd and store
-      const compressedBlob = await compressTextWithZstd(chunk)
-      totalCompressedSize += compressedBlob.length
-      
-      const { data: newChunk, error } = await supabase
-        .from('semantic_chunks')
-        .insert({
-          content_hash: contentHash,
-          compressed_blob: compressedBlob,
-          token_count: chunk.split(/\s+/).length,
-          ref_count: 1
-        })
-        .select('id')
-        .single()
-
-      if (error) {
-        console.error('Error creating chunk:', error)
-        continue
-      }
-
-      chunkId = newChunk.id
-      uniqueChunks++
-      console.log(`✨ Created new Zstd compressed chunk ${chunkId}`)
-    }
-
-    // Create mapping
-    await supabase
-      .from('source_to_chunk_map')
-      .insert({
-        source_id: sourceId,
-        chunk_id: chunkId,
-        chunk_index: i
-      })
-  }
-
-  return { uniqueChunks, duplicateChunks, totalCompressedSize }
-}
-
-async function generateContentHash(content: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(content.toLowerCase().trim())
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-async function compressTextWithZstd(text: string): Promise<Uint8Array> {
-  // Import Zstd compression (this would need to be available in Deno)
-  // For now, we'll use a more aggressive gzip as a placeholder until Zstd is available
-  const encoder = new TextEncoder()
-  const data = encoder.encode(text)
-  
-  const compressionStream = new CompressionStream('gzip')
-  const writer = compressionStream.writable.getWriter()
-  const reader = compressionStream.readable.getReader()
-  
-  writer.write(data)
-  writer.close()
-  
-  const chunks: Uint8Array[] = []
-  let done = false
-  
-  while (!done) {
-    const { value, done: readerDone } = await reader.read()
-    done = readerDone
-    if (value) {
-      chunks.push(value)
-    }
-  }
-  
-  // Combine chunks and simulate Zstd-level compression (typically 25-30% better than gzip)
-  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
-  const result = new Uint8Array(totalLength)
-  let offset = 0
-  for (const chunk of chunks) {
-    result.set(chunk, offset)
-    offset += chunk.length
-  }
-  
-  // Simulate Zstd level 19 compression improvement (typically 70-75% of gzip size)
-  const zstdImprovement = 0.72
-  const improvedSize = Math.floor(result.length * zstdImprovement)
-  console.log(`🗜️ Simulated Zstd compression: ${data.length} → ${improvedSize} bytes (${(improvedSize/data.length * 100).toFixed(1)}%)`)
-  
-  return result.slice(0, improvedSize)
-}
-
-async function discoverLinksEnhanced(
-  url: string, 
-  excludePaths: string[], 
-  includePaths: string[], 
-  respectRobots: boolean
+// Discover links for full website crawl
+async function discoverLinks(
+  url: string,
+  excludePaths: string[] = [],
+  includePaths: string[] = [],
+  maxPages: number = 100
 ): Promise<string[]> {
   try {
-    const baseUrl = new URL(url)
-    const discovered = new Set<string>()
-    
-    // Check robots.txt if required
-    let robotsRules: string[] = []
-    if (respectRobots) {
-      robotsRules = await fetchRobotsRules(baseUrl.origin)
-    }
-
-    // Fetch the main page with better error handling
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
-      signal: AbortSignal.timeout(30000)
-    })
+      signal: AbortSignal.timeout(10000)
+    });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.status}`)
+      return [url]; // Fallback to just the main URL
     }
 
-    const html = await response.text()
-    
-    // Enhanced link extraction with better patterns
-    const linkPatterns = [
-      /href\s*=\s*["']([^"']+)["']/gi,
-      /src\s*=\s*["']([^"']+\.(?:html|htm|php|asp|aspx))["']/gi
-    ]
+    const html = await response.text();
+    const linkPattern = /href\s*=\s*["']([^"']+)["']/gi;
+    const discovered = new Set<string>([url]); // Always include the main URL
 
-    for (const pattern of linkPatterns) {
-      let match
-      while ((match = pattern.exec(html)) !== null) {
-        try {
-          const linkUrl = new URL(match[1], baseUrl)
+    let match;
+    while ((match = linkPattern.exec(html)) !== null) {
+      try {
+        const linkUrl = new URL(match[1], url);
+        
+        // Only include same-domain links
+        if (linkUrl.hostname === new URL(url).hostname) {
+          const fullUrl = linkUrl.href;
+          const path = linkUrl.pathname;
           
-          // Only include same-domain links
-          if (linkUrl.hostname !== baseUrl.hostname) continue
+          // Apply filters
+          if (shouldExcludePath(path, excludePaths)) continue;
+          if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) continue;
           
-          const fullUrl = linkUrl.href
-          const path = linkUrl.pathname
-          
-          // Enhanced filtering
-          if (shouldExcludePathEnhanced(path, fullUrl, excludePaths)) continue
-          if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) continue
-          if (respectRobots && robotsRules.some(rule => path.startsWith(rule))) continue
-          
-          // Additional quality filters
-          if (isLowQualityUrl(fullUrl)) continue
-          
-          discovered.add(fullUrl)
+          discovered.add(fullUrl);
           
           // Limit discovery to prevent runaway crawls
-          if (discovered.size >= 500) break
-          
-        } catch (e) {
-          // Invalid URL, skip
-          continue
+          if (discovered.size >= maxPages) break;
         }
+      } catch (e) {
+        continue; // Invalid URL, skip
       }
     }
 
-    return Array.from(discovered).slice(0, 200) // Reduced limit for better quality
-    
+    return Array.from(discovered);
   } catch (error) {
-    console.error('Error discovering links:', error)
-    return [url] // Fallback to just the main URL
+    console.error('Error discovering links:', error);
+    return [url]; // Fallback to just the main URL
   }
 }
 
-function shouldExcludePathEnhanced(path: string, fullUrl: string, excludePaths: string[]): boolean {
-  // Standard exclude patterns
-  const isExcluded = excludePaths.some(pattern => {
+// Discover sitemap links
+async function discoverSitemapLinks(sitemapUrl: string): Promise<string[]> {
+  try {
+    console.log('🗺️ Discovering links from sitemap:', sitemapUrl);
+    
+    const response = await fetch(sitemapUrl, {
+      headers: {
+        'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
+      },
+      signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sitemap: ${response.status}`);
+    }
+
+    const xmlText = await response.text();
+    const urls = parseSitemapXml(xmlText);
+    
+    console.log(`✅ Discovered ${urls.length} URLs from sitemap`);
+    return urls;
+    
+  } catch (error) {
+    console.error('Error discovering sitemap links:', error);
+    // Fallback to just the sitemap URL itself
+    return [sitemapUrl];
+  }
+}
+
+// Parse sitemap XML to extract URLs
+function parseSitemapXml(xmlText: string): string[] {
+  const urls: string[] = [];
+  
+  try {
+    // Simple regex-based XML parsing
+    const locRegex = /<loc>(.*?)<\/loc>/g;
+    let match;
+    
+    while ((match = locRegex.exec(xmlText)) !== null) {
+      const url = match[1].trim();
+      if (url && url.startsWith('http')) {
+        urls.push(url);
+      }
+    }
+    
+    // If no URLs found, try sitemapindex format
+    if (urls.length === 0) {
+      const sitemapRegex = /<sitemap>[\s\S]*?<loc>(.*?)<\/loc>[\s\S]*?<\/sitemap>/g;
+      while ((match = sitemapRegex.exec(xmlText)) !== null) {
+        const sitemapUrl = match[1].trim();
+        if (sitemapUrl && sitemapUrl.startsWith('http')) {
+          urls.push(sitemapUrl);
+        }
+      }
+    }
+    
+  } catch (error) {
+    console.error('Error parsing sitemap XML:', error);
+  }
+  
+  return urls;
+}
+
+function shouldExcludePath(path: string, excludePaths: string[]): boolean {
+  const defaultExcludes = [
+    '/wp-json/*', '/wp-admin/*', '/xmlrpc.php', '/checkout/*', 
+    '/cart/*', '/admin/*', '/api/*', '*.json', '*.xml', '*.rss'
+  ];
+  
+  const allExcludes = [...defaultExcludes, ...excludePaths];
+  
+  return allExcludes.some(pattern => {
     if (pattern.endsWith('*')) {
-      return path.startsWith(pattern.slice(0, -1))
+      return path.startsWith(pattern.slice(0, -1));
     }
-    if (pattern.startsWith('*')) {
-      return path.endsWith(pattern.slice(1))
-    }
-    return path === pattern
-  })
-  
-  if (isExcluded) return true
-  
-  // Additional quality filters
-  const lowQualityPatterns = [
-    /\/(wp-|wordpress)/i,
-    /\/(admin|login|register|logout)/i,
-    /\/(search|tag|category|archive)/i,
-    /\/(feed|rss|atom)/i,
-    /\?p=\d+$/,  // WordPress post IDs
-    /[&?]utm_/,   // UTM parameters
-    /[&?]ref=/,   // Referral parameters
-    /#/,          // Fragment identifiers
-  ]
-  
-  return lowQualityPatterns.some(pattern => pattern.test(fullUrl))
+    return path === pattern;
+  });
 }
 
 function shouldIncludePath(path: string, includePaths: string[]): boolean {
   return includePaths.some(pattern => {
     if (pattern.endsWith('*')) {
-      return path.startsWith(pattern.slice(0, -1))
+      return path.startsWith(pattern.slice(0, -1));
     }
-    if (pattern.startsWith('*')) {
-      return path.endsWith(pattern.slice(1))
-    }
-    return path === pattern
-  })
-}
-
-function isLowQualityUrl(url: string): boolean {
-  const lowQualityIndicators = [
-    /\/page\/\d+/,     // Pagination
-    /\/\d{4}\/\d{2}/,  // Date-based URLs
-    /\/comment-/,      // Comment pages
-    /\?replytocom=/,   // Comment replies
-    /\/amp\//,         // AMP pages
-    /\?print=/,        // Print versions
-    /\/printable/,     // Printable versions
-  ]
-  
-  return lowQualityIndicators.some(pattern => pattern.test(url))
-}
-
-async function fetchRobotsRules(origin: string): Promise<string[]> {
-  try {
-    const robotsResponse = await fetch(`${origin}/robots.txt`, {
-      signal: AbortSignal.timeout(10000)
-    })
-    if (!robotsResponse.ok) return []
-    
-    const robotsText = await robotsResponse.text()
-    const rules: string[] = []
-    
-    const lines = robotsText.split('\n')
-    let isRelevantSection = false
-    
-    for (const line of lines) {
-      const trimmed = line.trim().toLowerCase()
-      if (trimmed.startsWith('user-agent:')) {
-        isRelevantSection = trimmed.includes('*') || trimmed.includes('wonderwave')
-      } else if (isRelevantSection && trimmed.startsWith('disallow:')) {
-        const path = trimmed.replace('disallow:', '').trim()
-        if (path) rules.push(path)
-      }
-    }
-    
-    return rules
-  } catch {
-    return []
-  }
-}
-
-function cleanHtmlContentEnhanced(html: string): string {
-  // More aggressive cleaning for better compression
-  let cleaned = html
-    // Remove all scripts, styles, and metadata
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<link[^>]*>/gi, '')
-    .replace(/<meta[^>]*>/gi, '')
-    // Remove navigation and boilerplate
-    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
-    // Remove ads and widgets
-    .replace(/<div[^>]*class="[^"]*ad[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-    .replace(/<div[^>]*id="[^"]*ad[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-    .replace(/<div[^>]*class="[^"]*widget[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-    // Remove forms and inputs
-    .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
-    .replace(/<input[^>]*>/gi, '')
-    .replace(/<button[^>]*>[\s\S]*?<\/button>/gi, '')
-    // Remove comments and hidden content
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<div[^>]*style="[^"]*display:\s*none[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-    // Convert to plain text
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  // Enhanced boilerplate removal
-  const boilerplatePatterns = [
-    /click here|read more|continue reading|learn more|find out more/gi,
-    /subscribe|newsletter|follow us|share this|like us on/gi,
-    /copyright|all rights reserved|terms of service|privacy policy/gi,
-    /cookie policy|gdpr|accept cookies/gi,
-    /advertisement|sponsored|affiliate/gi,
-    /home\s*\|\s*about\s*\|\s*contact/gi,
-  ]
-  
-  boilerplatePatterns.forEach(pattern => {
-    cleaned = cleaned.replace(pattern, '')
-  })
-  
-  return cleaned
-}
-
-function createSemanticChunksEnhanced(content: string, maxTokens: number = 150): string[] {
-  // Enhanced semantic chunking
-  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15)
-  const chunks: string[] = []
-  let currentChunk = ''
-  let tokenCount = 0
-
-  for (const sentence of sentences) {
-    const sentenceTokens = sentence.trim().split(/\s+/).length
-    
-    if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
-      if (currentChunk.trim().length > 30) { // Minimum chunk size
-        chunks.push(currentChunk.trim())
-      }
-      currentChunk = sentence
-      tokenCount = sentenceTokens
-    } else {
-      currentChunk += (currentChunk ? '. ' : '') + sentence
-      tokenCount += sentenceTokens
-    }
-  }
-  
-  if (currentChunk.trim().length > 30) {
-    chunks.push(currentChunk.trim())
-  }
-  
-  return chunks.filter(chunk => chunk.length > 20) // Filter very short chunks
-}
-
-function pruneChunksForQuality(chunks: string[], maxChunks: number): string[] {
-  // Score and rank chunks by quality
-  const scoredChunks = chunks.map(chunk => ({
-    content: chunk,
-    score: calculateChunkQuality(chunk)
-  }))
-  
-  return scoredChunks
-    .sort((a, b) => b.score - a.score)
-    .slice(0, maxChunks)
-    .filter(chunk => chunk.score > 0)
-    .map(chunk => chunk.content)
-}
-
-function calculateChunkQuality(chunk: string): number {
-  let score = 0
-  const length = chunk.length
-  
-  // Length scoring
-  if (length >= 100 && length <= 800) score += 10
-  else if (length >= 50 && length <= 1200) score += 5
-  else if (length < 30) score -= 10
-  
-  // Content quality indicators
-  const lowerChunk = chunk.toLowerCase()
-  
-  // Positive indicators
-  if (/\d+/.test(chunk)) score += 3 // Has numbers
-  if (/[A-Z][a-z]+/.test(chunk)) score += 2 // Has proper nouns
-  if (chunk.split('.').length > 1) score += 5 // Multiple sentences
-  
-  // Negative indicators
-  if (/click|subscribe|follow|share/i.test(lowerChunk)) score -= 8
-  if (/home|menu|navigation|footer/i.test(lowerChunk)) score -= 6
-  if (/cookie|privacy|terms/i.test(lowerChunk)) score -= 10
-  
-  return score
+    return path === pattern;
+  });
 }
