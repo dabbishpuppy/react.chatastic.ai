@@ -26,19 +26,19 @@ export async function insertSourcePagesInBatches(
     
     // Create batch records with strict type validation
     const batchRecords = batch.map((url) => {
-      // Create record with correct types
+      // Create record with EXPLICIT type conversion
       const record = {
-        parent_source_id: parentSourceId,
-        customer_id: teamId,
-        url: url,
-        status: 'pending',  // Ensure this is a string
-        priority: priority, // Ensure this is a string
-        retry_count: 0,     // Ensure this is a number
-        max_retries: 3,     // Ensure this is a number
-        created_at: new Date().toISOString() // Ensure this is an ISO string
+        parent_source_id: String(parentSourceId), // Ensure string
+        customer_id: String(teamId), // Ensure string
+        url: String(url), // Ensure string
+        status: String('pending'), // Ensure string, not boolean
+        priority: String(priority), // Ensure string, not boolean
+        retry_count: Number(0), // Ensure number
+        max_retries: Number(3), // Ensure number
+        created_at: new Date().toISOString() // Ensure ISO string
       };
       
-      // Validate the record
+      // Validate the record before proceeding
       const validationErrors = validateSourcePageRecord(record);
       if (validationErrors.length > 0) {
         console.error(`❌ Record validation failed for URL ${url}:`, validationErrors);
@@ -55,7 +55,16 @@ export async function insertSourcePagesInBatches(
     }
 
     console.log(`📦 Inserting batch ${Math.floor(i/batchSize) + 1} with ${batchRecords.length} records`);
-    console.log('🔍 Sample record:', JSON.stringify(batchRecords[0], null, 2));
+    console.log('🔍 Sample record types:', {
+      parent_source_id: typeof batchRecords[0].parent_source_id,
+      customer_id: typeof batchRecords[0].customer_id,
+      url: typeof batchRecords[0].url,
+      status: typeof batchRecords[0].status,
+      priority: typeof batchRecords[0].priority,
+      retry_count: typeof batchRecords[0].retry_count,
+      max_retries: typeof batchRecords[0].max_retries,
+      created_at: typeof batchRecords[0].created_at
+    });
 
     try {
       const { data: batchResult, error: batchError } = await supabase
@@ -70,9 +79,10 @@ export async function insertSourcePagesInBatches(
         console.error(`❌ Error details:`, batchError.details);
         console.error(`❌ Error hint:`, batchError.hint);
         
-        // Check for common RLS policy issues
-        if (batchError.message?.includes('new row violates row-level security policy')) {
-          console.error(`❌ RLS policy violation detected. Ensure the service role has proper permissions`);
+        // Check for specific type error
+        if (batchError.message?.includes('operator does not exist: text = boolean')) {
+          console.error(`❌ TYPE ERROR DETECTED: One of the fields is being passed as wrong type`);
+          console.error(`❌ Problematic record:`, JSON.stringify(batchRecords[0], null, 2));
         }
         
         failedCount += batch.length;
