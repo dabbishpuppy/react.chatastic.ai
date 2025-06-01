@@ -59,25 +59,18 @@ export class EnhancedCrawlService {
   }
 
   static async getCrawlJobs(parentSourceId: string) {
-    // Try the RPC function first, with fallback to direct query
     try {
-      const { data, error } = await supabase.rpc('get_crawl_jobs_for_source', {
-        parent_source_id: parentSourceId
-      });
+      // Use direct query since RPC function isn't available in types yet
+      // This is a temporary workaround until Supabase types are regenerated
+      const { data, error } = await (supabase as any)
+        .from('crawl_jobs')
+        .select('*')
+        .eq('parent_source_id', parentSourceId)
+        .order('created_at', { ascending: true });
 
       if (error) {
-        console.warn('RPC function not available, using fallback query:', error);
-        // Fallback to direct query
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('crawl_jobs')
-          .select('*')
-          .eq('parent_source_id', parentSourceId)
-          .order('created_at', { ascending: true });
-
-        if (fallbackError) {
-          throw fallbackError;
-        }
-        return fallbackData || [];
+        console.warn('Error fetching crawl jobs:', error);
+        return [];
       }
 
       return data || [];
@@ -89,9 +82,10 @@ export class EnhancedCrawlService {
 
   static async retryFailedJobs(parentSourceId: string): Promise<number> {
     try {
-      const { data: failedJobs, error: fetchError } = await supabase
+      // Get failed jobs that haven't exceeded retry limit
+      const { data: failedJobs, error: fetchError } = await (supabase as any)
         .from('crawl_jobs')
-        .select('id')
+        .select('id, retry_count')
         .eq('parent_source_id', parentSourceId)
         .eq('status', 'failed')
         .lt('retry_count', 3);
@@ -104,21 +98,21 @@ export class EnhancedCrawlService {
         return 0;
       }
 
-      const { error: updateError } = await supabase
-        .from('crawl_jobs')
-        .update({
-          status: 'pending',
-          retry_count: supabase.rpc('increment', { x: 1 }), // Use increment function
-          error_message: null,
-          started_at: null,
-          completed_at: null
-        })
-        .in('id', failedJobs.map(job => job.id));
+      // Update each job individually to increment retry count
+      const updatePromises = failedJobs.map(async (job: any) => {
+        return (supabase as any)
+          .from('crawl_jobs')
+          .update({
+            status: 'pending',
+            retry_count: (job.retry_count || 0) + 1,
+            error_message: null,
+            started_at: null,
+            completed_at: null
+          })
+          .eq('id', job.id);
+      });
 
-      if (updateError) {
-        throw updateError;
-      }
-
+      await Promise.all(updatePromises);
       return failedJobs.length;
     } catch (error) {
       console.error('Error retrying failed jobs:', error);

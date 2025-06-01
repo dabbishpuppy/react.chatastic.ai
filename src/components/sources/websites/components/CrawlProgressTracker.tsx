@@ -13,12 +13,19 @@ interface CrawlProgressTrackerProps {
   onComplete?: () => void;
 }
 
+interface CrawlJob {
+  id: string;
+  url: string;
+  status: string;
+  error_message?: string;
+}
+
 const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
   parentSourceId,
   onComplete
 }) => {
   const { retryFailedJobs, getCrawlJobs, getActiveCrawlStatus } = useEnhancedCrawl();
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<CrawlJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -34,7 +41,7 @@ const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
     setLoading(true);
     try {
       const jobsData = await getCrawlJobs(parentSourceId);
-      setJobs(jobsData || []);
+      setJobs(Array.isArray(jobsData) ? jobsData : []);
     } catch (error) {
       console.error('Failed to load jobs:', error);
       setJobs([]);
