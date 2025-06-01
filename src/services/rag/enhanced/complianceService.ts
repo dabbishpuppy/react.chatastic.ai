@@ -306,7 +306,8 @@ export class ComplianceService {
     const auditLogs = await AuditService.getTeamLogs(teamId);
     const userAuditLogs = auditLogs.filter(log => 
       log.user_id === subjectId || 
-      (log.metadata as any)?.subject_id === subjectId
+      (log.old_values as any)?.subject_id === subjectId ||
+      (log.new_values as any)?.subject_id === subjectId
     );
     personalData.push(...userAuditLogs);
 
