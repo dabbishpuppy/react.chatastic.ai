@@ -275,9 +275,7 @@ const WebsiteSourcesListOptimized: React.FC<WebsiteSourcesListOptimizedProps> = 
       <Card className="border border-gray-200">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              Website Sources (Page {page} of {totalPages})
-            </CardTitle>
+            <CardTitle className="text-lg">Website Sources</CardTitle>
             {parentSources.length > 0 && (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
