@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { CompressionEngine } from "./compressionEngine";
 
 export interface ProcessingResult {
   success: boolean;
@@ -15,13 +16,6 @@ interface SemanticChunk {
   content: string;
   tokenCount: number;
   chunkIndex: number;
-}
-
-interface CompressionResult {
-  compressed: string;
-  originalSize: number;
-  compressedSize: number;
-  ratio: number;
 }
 
 export class ContentProcessingPipeline {
@@ -67,7 +61,8 @@ export class ContentProcessingPipeline {
     let chunkIndex = 0;
 
     for (const sentence of sentences) {
-      const sentenceTokens = Math.ceil(sentence.trim().split(/\s+/).length);
+      // Use more accurate token estimation (roughly 1 token per 3.5 characters for English)
+      const sentenceTokens = Math.ceil(sentence.trim().length / 3.5);
       
       if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
         if (currentChunk.trim().length > 30) {
@@ -96,42 +91,12 @@ export class ContentProcessingPipeline {
     return chunks.filter(chunk => chunk.content.length > 20);
   }
 
-  // Simulate Zstd compression (in production, this would use actual Zstd)
-  static compressContent(content: string): CompressionResult {
-    const originalSize = new TextEncoder().encode(content).length;
-    
-    // Simulate high compression ratio (~75% reduction)
-    const compressed = btoa(content); // Base64 encoding as compression simulation
-    const compressedSize = Math.floor(originalSize * 0.25); // Simulate 75% compression
-    
-    return {
-      compressed,
-      originalSize,
-      compressedSize,
-      ratio: compressedSize / originalSize
-    };
-  }
-
   // Calculate content hash for deduplication
   static async calculateContentHash(content: string): Promise<string> {
-    try {
-      const { data: hash, error } = await supabase
-        .rpc('calculate_content_hash', { content });
-
-      if (error) {
-        console.error('Error calculating hash:', error);
-        // Fallback to simple hash
-        return btoa(content).substring(0, 16);
-      }
-
-      return hash.substring(0, 16); // Truncate for storage
-    } catch (error) {
-      console.error('Hash calculation failed:', error);
-      return btoa(content).substring(0, 16);
-    }
+    return await CompressionEngine.generateContentHash(content);
   }
 
-  // Process chunks for global deduplication
+  // Process chunks for global deduplication with real Zstd compression
   static async processChunksWithDeduplication(
     chunks: SemanticChunk[],
     sourceId: string,
@@ -145,10 +110,12 @@ export class ContentProcessingPipeline {
     let duplicateChunks = 0;
     let totalCompressedSize = 0;
 
+    console.log(`🔍 Processing ${chunks.length} chunks with real Zstd compression and global deduplication`);
+
     for (const chunk of chunks) {
       const contentHash = await this.calculateContentHash(chunk.content);
       
-      // Check if chunk already exists globally
+      // Check if chunk already exists globally in semantic_chunks table
       const { data: existingChunk, error } = await supabase
         .from('semantic_chunks')
         .select('id, ref_count')
@@ -156,13 +123,16 @@ export class ContentProcessingPipeline {
         .single();
 
       if (existingChunk && !error) {
-        // Chunk exists, increment reference count
+        // Chunk exists globally - increment reference count
         await supabase
           .from('semantic_chunks')
-          .update({ ref_count: existingChunk.ref_count + 1 })
+          .update({ 
+            ref_count: existingChunk.ref_count + 1,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', existingChunk.id);
 
-        // Create mapping
+        // Create mapping to existing chunk
         await supabase
           .from('source_to_chunk_map')
           .insert({
@@ -172,15 +142,21 @@ export class ContentProcessingPipeline {
           });
 
         duplicateChunks++;
+        console.log(`♻️ Reused existing chunk ${existingChunk.id} (global dedup)`);
       } else {
-        // New chunk, compress and store
-        const compressed = this.compressContent(chunk.content);
+        // New chunk - compress with real Zstd and store
+        const compressionResult = await CompressionEngine.compressForStorage(chunk.content);
+        
+        // Convert compressed data to bytea format for Postgres
+        const compressedBytes = new Uint8Array(
+          atob(compressionResult.compressedData).split('').map(char => char.charCodeAt(0))
+        );
         
         const { data: newChunk, error: insertError } = await supabase
           .from('semantic_chunks')
           .insert({
             content_hash: contentHash,
-            compressed_blob: compressed.compressed,
+            compressed_blob: compressedBytes,
             token_count: chunk.tokenCount,
             ref_count: 1
           })
@@ -188,7 +164,7 @@ export class ContentProcessingPipeline {
           .single();
 
         if (newChunk && !insertError) {
-          // Create mapping
+          // Create mapping to new chunk
           await supabase
             .from('source_to_chunk_map')
             .insert({
@@ -198,10 +174,16 @@ export class ContentProcessingPipeline {
             });
 
           uniqueChunks++;
-          totalCompressedSize += compressed.compressedSize;
+          totalCompressedSize += compressionResult.compressedSize;
+          
+          console.log(`✨ Created new Zstd compressed chunk ${newChunk.id} (${(compressionResult.compressionRatio * 100).toFixed(1)}% ratio)`);
+        } else {
+          console.error('Failed to create chunk:', insertError);
         }
       }
     }
+
+    console.log(`📊 Global deduplication results: ${uniqueChunks} unique, ${duplicateChunks} duplicates`);
 
     return {
       uniqueChunks,
@@ -210,7 +192,7 @@ export class ContentProcessingPipeline {
     };
   }
 
-  // Complete processing pipeline for a single page
+  // Complete processing pipeline for a single page with real compression
   static async processPage(
     sourceId: string,
     customerId: string,
@@ -218,6 +200,8 @@ export class ContentProcessingPipeline {
     htmlContent: string
   ): Promise<ProcessingResult> {
     try {
+      console.log(`🚀 Processing page with real Zstd compression: ${url}`);
+      
       // Step 1: Extract main content and remove boilerplate
       const cleanContent = this.extractMainContent(htmlContent);
       const originalSize = cleanContent.length;
@@ -234,10 +218,11 @@ export class ContentProcessingPipeline {
         };
       }
 
-      // Step 2: Create semantic chunks
+      // Step 2: Create semantic chunks with proper token counting
       const chunks = this.createSemanticChunks(cleanContent);
+      console.log(`📝 Created ${chunks.length} semantic chunks`);
       
-      // Step 3: Process with global deduplication
+      // Step 3: Process with real Zstd compression and global deduplication
       const dedupeResult = await this.processChunksWithDeduplication(
         chunks,
         sourceId,
@@ -248,7 +233,11 @@ export class ContentProcessingPipeline {
       const contentHash = await this.calculateContentHash(cleanContent);
 
       // Step 5: Calculate compression ratio
-      const compressionRatio = dedupeResult.totalCompressedSize / originalSize;
+      const compressionRatio = dedupeResult.totalCompressedSize > 0 
+        ? dedupeResult.totalCompressedSize / originalSize 
+        : 0;
+
+      console.log(`✅ Page processing complete: ${dedupeResult.uniqueChunks + dedupeResult.duplicateChunks} total chunks, ${(compressionRatio * 100).toFixed(1)}% compression ratio`);
 
       return {
         success: true,
@@ -270,6 +259,67 @@ export class ContentProcessingPipeline {
         duplicatesFound: 0,
         contentHash: ''
       };
+    }
+  }
+
+  // Cleanup chunks when sources are deleted (decrement ref_count)
+  static async cleanupSourceChunks(sourceId: string): Promise<number> {
+    try {
+      // Get all chunk mappings for this source
+      const { data: mappings } = await supabase
+        .from('source_to_chunk_map')
+        .select('chunk_id')
+        .eq('source_id', sourceId);
+
+      if (!mappings || mappings.length === 0) {
+        return 0;
+      }
+
+      let cleanedCount = 0;
+
+      // Decrement ref_count for each chunk
+      for (const mapping of mappings) {
+        const { data: chunk } = await supabase
+          .from('semantic_chunks')
+          .select('ref_count')
+          .eq('id', mapping.chunk_id)
+          .single();
+
+        if (chunk) {
+          const newRefCount = Math.max(0, chunk.ref_count - 1);
+          
+          if (newRefCount === 0) {
+            // Delete chunk if no more references
+            await supabase
+              .from('semantic_chunks')
+              .delete()
+              .eq('id', mapping.chunk_id);
+            cleanedCount++;
+          } else {
+            // Update ref_count
+            await supabase
+              .from('semantic_chunks')
+              .update({ 
+                ref_count: newRefCount,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', mapping.chunk_id);
+          }
+        }
+      }
+
+      // Delete all mappings for this source
+      await supabase
+        .from('source_to_chunk_map')
+        .delete()
+        .eq('source_id', sourceId);
+
+      console.log(`🧹 Cleaned up ${cleanedCount} orphaned chunks for source ${sourceId}`);
+      return cleanedCount;
+
+    } catch (error) {
+      console.error('Cleanup failed:', error);
+      return 0;
     }
   }
 }
