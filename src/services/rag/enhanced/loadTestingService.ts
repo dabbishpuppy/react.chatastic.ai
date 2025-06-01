@@ -178,14 +178,13 @@ export class LoadTestingService {
         const url = config.targetSiteUrls[i % config.targetSiteUrls.length];
         
         const crawlRequest: EnhancedCrawlRequest = {
-          agentId: customer.id, // Changed from customerId to agentId
+          agentId: customer.id,
           url,
           maxPages: Math.min(10, config.pagesPerCustomer),
           excludePaths: ['/wp-json/*', '/wp-admin/*'],
           respectRobots: true,
           enableCompression: true,
-          enableDeduplication: true,
-          maxConcurrentJobs: 2
+          enableDeduplication: true
         };
         
         const crawlStart = Date.now();
