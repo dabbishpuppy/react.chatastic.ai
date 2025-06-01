@@ -215,20 +215,22 @@ export class EnhancedCrawlService {
 
   static async getCompressionStats(customerId: string) {
     try {
-      const { data, error } = await supabase
-        .from('agent_sources')
-        .select(`
-          total_content_size,
-          compressed_content_size,
-          unique_chunks,
-          duplicate_chunks,
-          global_compression_ratio
-        `)
-        .eq('customer_id', customerId)
-        .eq('source_type', 'website');
+      // Use direct REST API call to avoid type issues
+      const supabaseUrl = 'https://lndfjlkzvxbnoxfuboxz.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk';
+      
+      const url = `${supabaseUrl}/rest/v1/agent_sources?customer_id=eq.${customerId}&source_type=eq.website&select=total_content_size,compressed_content_size,unique_chunks,duplicate_chunks,global_compression_ratio`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'apikey': apiKey,
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      if (error) {
-        console.error('Error fetching compression stats:', error);
+      if (!response.ok) {
+        console.error('Error fetching compression stats:', response.statusText);
         // Return default stats if there's an error
         return {
           totalOriginalSize: 0,
@@ -241,13 +243,13 @@ export class EnhancedCrawlService {
         };
       }
 
-      const sources = data || [];
-      const totalOriginalSize = sources.reduce((sum, source: any) => sum + (source.total_content_size || 0), 0);
-      const totalCompressedSize = sources.reduce((sum, source: any) => sum + (source.compressed_content_size || 0), 0);
-      const totalUniqueChunks = sources.reduce((sum, source: any) => sum + (source.unique_chunks || 0), 0);
-      const totalDuplicateChunks = sources.reduce((sum, source: any) => sum + (source.duplicate_chunks || 0), 0);
+      const sources = await response.json();
+      const totalOriginalSize = sources.reduce((sum: number, source: any) => sum + (source.total_content_size || 0), 0);
+      const totalCompressedSize = sources.reduce((sum: number, source: any) => sum + (source.compressed_content_size || 0), 0);
+      const totalUniqueChunks = sources.reduce((sum: number, source: any) => sum + (source.unique_chunks || 0), 0);
+      const totalDuplicateChunks = sources.reduce((sum: number, source: any) => sum + (source.duplicate_chunks || 0), 0);
       const avgCompressionRatio = sources.length 
-        ? sources.reduce((sum, source: any) => sum + (source.global_compression_ratio || 0), 0) / sources.length 
+        ? sources.reduce((sum: number, source: any) => sum + (source.global_compression_ratio || 0), 0) / sources.length 
         : 0;
 
       return {
