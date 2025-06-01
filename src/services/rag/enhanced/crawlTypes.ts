@@ -2,9 +2,12 @@
 export interface EnhancedCrawlRequest {
   agentId: string;
   url: string;
+  maxPages?: number;
   excludePaths?: string[];
   includePaths?: string[];
   respectRobots?: boolean;
+  enableCompression?: boolean;
+  enableDeduplication?: boolean;
   maxConcurrentJobs?: number;
 }
 

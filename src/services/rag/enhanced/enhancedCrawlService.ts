@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkerQueueService } from "./workerQueue";
 import { RateLimitingService } from "./rateLimiting";
@@ -6,10 +7,12 @@ import { CrawlWorkerService } from "./crawlWorker";
 export interface EnhancedCrawlRequest {
   agentId: string;
   url: string;
+  maxPages?: number;
   excludePaths?: string[];
   includePaths?: string[];
   respectRobots?: boolean;
-  maxPages?: number;
+  enableCompression?: boolean;
+  enableDeduplication?: boolean;
   priority?: 'normal' | 'high' | 'slow';
 }
 
@@ -58,9 +61,15 @@ export class EnhancedCrawlService {
     }
 
     const customerId = agent.team_id;
+    const maxPages = request.maxPages || 100;
 
     // Discover links first to estimate page count
-    const discoveredUrls = await this.discoverLinks(request.url, request.excludePaths, request.includePaths);
+    const discoveredUrls = await this.discoverLinks(
+      request.url, 
+      request.excludePaths, 
+      request.includePaths,
+      maxPages
+    );
     
     // Check rate limits and quotas
     const rateLimitCheck = await RateLimitingService.canStartCrawl(customerId, discoveredUrls.length);
@@ -86,7 +95,10 @@ export class EnhancedCrawlService {
         crawl_initiated_at: new Date().toISOString(),
         enhanced_pipeline: true,
         worker_queue_enabled: true,
-        priority: request.priority || 'normal'
+        priority: request.priority || 'normal',
+        maxPages: maxPages,
+        enableCompression: request.enableCompression ?? true,
+        enableDeduplication: request.enableDeduplication ?? true
       }
     };
 
@@ -234,7 +246,8 @@ export class EnhancedCrawlService {
   private static async discoverLinks(
     url: string,
     excludePaths: string[] = [],
-    includePaths: string[] = []
+    includePaths: string[] = [],
+    maxPages: number = 100
   ): Promise<string[]> {
     try {
       const response = await fetch(url, {
@@ -269,7 +282,7 @@ export class EnhancedCrawlService {
             discovered.add(fullUrl);
             
             // Limit discovery to prevent runaway crawls
-            if (discovered.size >= 200) break;
+            if (discovered.size >= maxPages) break;
           }
         } catch (e) {
           continue; // Invalid URL, skip
