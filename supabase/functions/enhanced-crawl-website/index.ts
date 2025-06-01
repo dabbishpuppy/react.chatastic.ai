@@ -125,41 +125,40 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Create source_pages with explicit type validation and detailed logging
+    // Create source_pages with simplified structure and explicit type validation
     const sourcePages = discoveredUrls.map((discoveredUrl, index) => {
-      // Ensure all values are exactly the right type
+      // Only include the essential fields that match the source_pages table schema
       const sourcePage = {
         parent_source_id: parentSource.id, // uuid
         customer_id: agent.team_id, // uuid  
-        url: String(discoveredUrl), // text
-        status: String('pending'), // text - explicitly cast to string
-        priority: String(priority), // text - explicitly cast to string  
-        created_at: new Date().toISOString(), // timestamp
-        retry_count: Number(0), // integer
-        max_retries: Number(3) // integer
+        url: String(discoveredUrl), // text - explicitly ensure it's a string
+        status: 'pending', // text - use string literal, not String() constructor
+        priority: priority || 'normal', // text - ensure it's a string
+        retry_count: 0, // integer
+        max_retries: 3 // integer
+        // Removed created_at - let database handle the default
       };
       
       // Log the first few entries for debugging
       if (index < 3) {
-        console.log(`🔍 Source page ${index + 1} data types:`, {
-          parent_source_id: typeof sourcePage.parent_source_id,
-          customer_id: typeof sourcePage.customer_id,
-          url: typeof sourcePage.url,
-          status: typeof sourcePage.status,
-          priority: typeof sourcePage.priority,
-          retry_count: typeof sourcePage.retry_count,
-          max_retries: typeof sourcePage.max_retries
+        console.log(`🔍 Source page ${index + 1} simplified data:`, {
+          parent_source_id: `${typeof sourcePage.parent_source_id} (${sourcePage.parent_source_id})`,
+          customer_id: `${typeof sourcePage.customer_id} (${sourcePage.customer_id})`,
+          url: `${typeof sourcePage.url} (${sourcePage.url.substring(0, 50)}...)`,
+          status: `${typeof sourcePage.status} (${sourcePage.status})`,
+          priority: `${typeof sourcePage.priority} (${sourcePage.priority})`,
+          retry_count: `${typeof sourcePage.retry_count} (${sourcePage.retry_count})`,
+          max_retries: `${typeof sourcePage.max_retries} (${sourcePage.max_retries})`
         });
-        console.log(`🔍 Source page ${index + 1} values:`, sourcePage);
       }
       
       return sourcePage;
     });
 
-    console.log(`📝 Preparing to insert ${sourcePages.length} source pages`);
+    console.log(`📝 Preparing to insert ${sourcePages.length} source pages with simplified structure`);
 
     // Insert source pages in smaller batches with better error handling
-    const batchSize = 25; // Smaller batches for better debugging
+    const batchSize = 10; // Even smaller batches for better debugging
     let insertedJobs = 0;
     
     for (let i = 0; i < sourcePages.length; i += batchSize) {
@@ -175,34 +174,40 @@ serve(async (req) => {
         if (pagesError) {
           console.error(`❌ Error inserting source pages batch ${Math.floor(i/batchSize) + 1}:`, {
             error: pagesError,
+            errorCode: pagesError.code,
+            errorMessage: pagesError.message,
+            errorDetails: pagesError.details,
             batchSize: batch.length,
             firstUrl: batch[0]?.url,
             sampleData: batch[0]
           });
           
-          // Try inserting individual rows to isolate the problem
+          // Try inserting the first row individually to isolate the exact problem
           console.log('🔧 Attempting individual row insertion for debugging...');
-          for (let j = 0; j < Math.min(batch.length, 3); j++) {
-            try {
-              const singleRow = batch[j];
-              console.log(`🔍 Attempting to insert single row ${j + 1}:`, singleRow);
+          try {
+            const singleRow = batch[0];
+            console.log(`🔍 Attempting to insert single row:`, JSON.stringify(singleRow, null, 2));
+            
+            const { data: singleResult, error: singleError } = await supabase
+              .from('source_pages')
+              .insert([singleRow])
+              .select('id');
               
-              const { data: singleResult, error: singleError } = await supabase
-                .from('source_pages')
-                .insert([singleRow])
-                .select('id');
-                
-              if (singleError) {
-                console.error(`❌ Single row ${j + 1} failed:`, singleError);
-              } else {
-                console.log(`✅ Single row ${j + 1} succeeded:`, singleResult);
-              }
-            } catch (individualError) {
-              console.error(`❌ Individual insertion ${j + 1} exception:`, individualError);
+            if (singleError) {
+              console.error(`❌ Single row failed with detailed error:`, {
+                code: singleError.code,
+                message: singleError.message,
+                details: singleError.details,
+                hint: singleError.hint
+              });
+            } else {
+              console.log(`✅ Single row succeeded, this suggests a batch-specific issue`);
             }
+          } catch (individualError) {
+            console.error(`❌ Individual insertion exception:`, individualError);
           }
           
-          throw new Error(`Batch insertion failed: ${pagesError.message}`);
+          throw new Error(`Batch insertion failed: ${pagesError.message} (Code: ${pagesError.code})`);
         } else {
           insertedJobs += batch.length;
           console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} inserted successfully: ${batch.length} pages`);
