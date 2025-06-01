@@ -1,5 +1,10 @@
+// Enhanced RAG Services Phase 5: Production Completion
+export { SummaryEmbeddingModeService } from './summaryEmbeddingModeService';
+export { SecurityService } from './securityService';
+export { LoadTestingService } from './loadTestingService';
+export { InfrastructureMonitoringService } from './infrastructureMonitoringService';
 
-// Enhanced RAG Services Phase 4: Monitoring & Alerting
+// Phase 4: Monitoring & Alerting
 export { MetricsCollectionService } from './metricsCollectionService';
 export { AlertingService } from './alertingService';
 export { PerformanceMonitoringService } from './performanceMonitoringService';

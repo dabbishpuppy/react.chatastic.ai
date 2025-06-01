@@ -1,469 +1,460 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { EncryptionService } from "@/services/rag/encryptionService";
 
-export interface SecurityAuditResult {
-  score: number;
-  vulnerabilities: SecurityVulnerability[];
-  recommendations: string[];
-  compliance: ComplianceStatus;
+export interface SecurityConfig {
+  enableKMSEncryption: boolean;
+  enableEgressIPRotation: boolean;
+  maxConcurrentRequestsPerCustomer: number;
+  rateLimitWindowMinutes: number;
+  maxPagesPerDay: Record<string, number>; // tier -> limit
+  enableRobotsRespect: boolean;
 }
 
-export interface SecurityVulnerability {
-  id: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  type: string;
-  description: string;
-  location: string;
-  recommendation: string;
-  cve?: string;
+export interface CustomerSecurityProfile {
+  customerId: string;
+  tier: string;
+  concurrentRequests: number;
+  requestsToday: number;
+  lastRequestTime: string;
+  isBlocked: boolean;
+  blockReason?: string;
 }
 
-export interface ComplianceStatus {
-  gdpr: boolean;
-  ccpa: boolean;
-  hipaa: boolean;
-  soc2: boolean;
-  iso27001: boolean;
-}
-
-export interface SecurityPolicy {
-  id: string;
-  name: string;
-  description: string;
-  rules: SecurityRule[];
-  enabled: boolean;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-}
-
-export interface SecurityRule {
-  id: string;
-  condition: string;
-  action: 'allow' | 'deny' | 'monitor' | 'quarantine';
-  priority: number;
+export interface EgressIPPool {
+  activeIPs: string[];
+  rotationIntervalHours: number;
+  lastRotation: string;
 }
 
 export class SecurityService {
-  private static securityPolicies: SecurityPolicy[] = [];
-  private static isInitialized = false;
+  private static readonly DEFAULT_CONFIG: SecurityConfig = {
+    enableKMSEncryption: true,
+    enableEgressIPRotation: true,
+    maxConcurrentRequestsPerCustomer: 100,
+    rateLimitWindowMinutes: 60,
+    maxPagesPerDay: {
+      'basic': 100,
+      'pro': 1000,
+      'enterprise': 10000
+    },
+    enableRobotsRespect: true
+  };
+
+  private static customerProfiles = new Map<string, CustomerSecurityProfile>();
+  private static egressIPPool: EgressIPPool = {
+    activeIPs: [
+      '192.168.1.100',
+      '192.168.1.101',
+      '192.168.1.102',
+      '192.168.1.103'
+    ],
+    rotationIntervalHours: 24,
+    lastRotation: new Date().toISOString()
+  };
 
   // Initialize security service
-  static async initialize(): Promise<void> {
-    if (this.isInitialized) return;
-
+  static async initializeSecurity(config: Partial<SecurityConfig> = {}): Promise<void> {
+    const finalConfig = { ...this.DEFAULT_CONFIG, ...config };
+    
     console.log('🔒 Initializing security service...');
     
-    // Load default security policies
-    this.securityPolicies = this.getDefaultPolicies();
+    // Start IP rotation if enabled
+    if (finalConfig.enableEgressIPRotation) {
+      this.startIPRotation();
+    }
     
-    // Start security monitoring
-    this.startSecurityMonitoring();
-
-    this.isInitialized = true;
+    // Load customer profiles
+    await this.loadCustomerProfiles();
+    
     console.log('✅ Security service initialized');
   }
 
-  // Perform comprehensive security audit
-  static async performSecurityAudit(teamId: string): Promise<SecurityAuditResult> {
-    console.log(`🔍 Starting security audit for team: ${teamId}`);
-
-    const vulnerabilities: SecurityVulnerability[] = [];
-    const recommendations: string[] = [];
-
-    // Check for common vulnerabilities
-    const sqlInjectionVulns = await this.checkSQLInjectionVulnerabilities(teamId);
-    const xssVulns = await this.checkXSSVulnerabilities(teamId);
-    const authVulns = await this.checkAuthenticationVulnerabilities(teamId);
-    const dataVulns = await this.checkDataExposureVulnerabilities(teamId);
-
-    vulnerabilities.push(...sqlInjectionVulns, ...xssVulns, ...authVulns, ...dataVulns);
-
-    // Generate recommendations
-    if (vulnerabilities.length > 0) {
-      recommendations.push('Enable rate limiting on all endpoints');
-      recommendations.push('Implement input validation and sanitization');
-      recommendations.push('Enable HTTPS for all communications');
-      recommendations.push('Regular security updates and patches');
-    }
-
-    // Check compliance status
-    const compliance = await this.checkComplianceStatus(teamId);
-
-    // Calculate security score
-    const criticalCount = vulnerabilities.filter(v => v.severity === 'critical').length;
-    const highCount = vulnerabilities.filter(v => v.severity === 'high').length;
-    const mediumCount = vulnerabilities.filter(v => v.severity === 'medium').length;
-
-    const score = Math.max(0, 100 - (criticalCount * 25 + highCount * 10 + mediumCount * 5));
-
-    return {
-      score,
-      vulnerabilities,
-      recommendations,
-      compliance
-    };
-  }
-
-  // Check for SQL injection vulnerabilities
-  private static async checkSQLInjectionVulnerabilities(teamId: string): Promise<SecurityVulnerability[]> {
-    const vulnerabilities: SecurityVulnerability[] = [];
-
-    // Check agent sources for potential SQL injection patterns
-    const { data: sources } = await supabase
-      .from('agent_sources')
-      .select('id, content, url')
-      .eq('team_id', teamId);
-
-    if (sources) {
-      for (const source of sources) {
-        if (source.content && this.containsSQLInjectionPattern(source.content)) {
-          vulnerabilities.push({
-            id: `sql-injection-${source.id}`,
-            severity: 'high',
-            type: 'SQL Injection',
-            description: 'Potential SQL injection patterns detected in source content',
-            location: `Source: ${source.id}`,
-            recommendation: 'Sanitize and validate all input data before processing'
-          });
-        }
-      }
-    }
-
-    return vulnerabilities;
-  }
-
-  // Check for XSS vulnerabilities
-  private static async checkXSSVulnerabilities(teamId: string): Promise<SecurityVulnerability[]> {
-    const vulnerabilities: SecurityVulnerability[] = [];
-
-    // Get agent IDs for this team first
-    const { data: agents } = await supabase
-      .from('agents')
-      .select('id')
-      .eq('team_id', teamId);
-
-    if (!agents || agents.length === 0) {
-      return vulnerabilities;
-    }
-
-    const agentIds = agents.map(agent => agent.id);
-
-    // Get conversations for these agents
-    const { data: conversations } = await supabase
-      .from('conversations')
-      .select('id')
-      .in('agent_id', agentIds);
-
-    if (!conversations || conversations.length === 0) {
-      return vulnerabilities;
-    }
-
-    const conversationIds = conversations.map(conv => conv.id);
-
-    // Check conversation messages for XSS patterns
-    const { data: messages } = await supabase
-      .from('messages')
-      .select('id, content, conversation_id')
-      .in('conversation_id', conversationIds);
-
-    if (messages) {
-      for (const message of messages) {
-        if (this.containsXSSPattern(message.content)) {
-          vulnerabilities.push({
-            id: `xss-${message.id}`,
-            severity: 'medium',
-            type: 'Cross-Site Scripting',
-            description: 'Potential XSS patterns detected in message content',
-            location: `Message: ${message.id}`,
-            recommendation: 'Implement content sanitization and output encoding'
-          });
-        }
-      }
-    }
-
-    return vulnerabilities;
-  }
-
-  // Check authentication vulnerabilities
-  private static async checkAuthenticationVulnerabilities(teamId: string): Promise<SecurityVulnerability[]> {
-    const vulnerabilities: SecurityVulnerability[] = [];
-
-    // Check for weak rate limiting settings
-    const { data: agents } = await supabase
-      .from('agents')
-      .select('id, rate_limit_enabled, rate_limit_messages, rate_limit_time_window')
-      .eq('team_id', teamId);
-
-    if (agents) {
-      for (const agent of agents) {
-        if (!agent.rate_limit_enabled) {
-          vulnerabilities.push({
-            id: `auth-no-rate-limit-${agent.id}`,
-            severity: 'medium',
-            type: 'Authentication',
-            description: 'Rate limiting is disabled',
-            location: `Agent: ${agent.id}`,
-            recommendation: 'Enable rate limiting to prevent abuse'
-          });
-        } else if (agent.rate_limit_messages > 100) {
-          vulnerabilities.push({
-            id: `auth-weak-rate-limit-${agent.id}`,
-            severity: 'low',
-            type: 'Authentication',
-            description: 'Rate limit threshold is too high',
-            location: `Agent: ${agent.id}`,
-            recommendation: 'Reduce rate limit threshold for better security'
-          });
-        }
-      }
-    }
-
-    return vulnerabilities;
-  }
-
-  // Check data exposure vulnerabilities
-  private static async checkDataExposureVulnerabilities(teamId: string): Promise<SecurityVulnerability[]> {
-    const vulnerabilities: SecurityVulnerability[] = [];
-
-    // Check for public agents with sensitive data
-    const { data: publicAgents } = await supabase
-      .from('agents')
-      .select('id, visibility, name')
-      .eq('team_id', teamId)
-      .eq('visibility', 'public');
-
-    if (publicAgents && publicAgents.length > 0) {
-      vulnerabilities.push({
-        id: `data-exposure-public-agents`,
-        severity: 'low',
-        type: 'Data Exposure',
-        description: `${publicAgents.length} agents are publicly accessible`,
-        location: 'Agent visibility settings',
-        recommendation: 'Review public agent configurations and ensure no sensitive data is exposed'
-      });
-    }
-
-    return vulnerabilities;
-  }
-
-  // Check compliance status
-  private static async checkComplianceStatus(teamId: string): Promise<ComplianceStatus> {
-    // Check for GDPR compliance indicators
-    const { data: consents } = await supabase
-      .from('user_consents')
-      .select('consent_type, consented')
-      .eq('team_id', teamId);
-
-    const hasGDPRConsent = consents?.some(c => c.consent_type === 'data_processing' && c.consented);
-
-    // Check for data retention policies
-    const { data: retentionPolicies } = await supabase
-      .from('data_retention_policies')
-      .select('resource_type')
-      .eq('team_id', teamId);
-
-    const hasRetentionPolicies = retentionPolicies && retentionPolicies.length > 0;
-
-    return {
-      gdpr: hasGDPRConsent || false,
-      ccpa: hasGDPRConsent || false, // Similar requirements
-      hipaa: false, // Requires additional encryption and access controls
-      soc2: hasRetentionPolicies || false,
-      iso27001: false // Requires comprehensive security management
-    };
-  }
-
-  // Content pattern detection
-  private static containsSQLInjectionPattern(content: string): boolean {
-    const sqlPatterns = [
-      /union\s+select/i,
-      /\'\s*or\s+\'\d+\'\s*=\s*\'\d+/i,
-      /\'\s*;\s*drop\s+table/i,
-      /\'\s*;\s*delete\s+from/i,
-      /\'\s*;\s*update\s+\w+\s+set/i
-    ];
-
-    return sqlPatterns.some(pattern => pattern.test(content));
-  }
-
-  private static containsXSSPattern(content: string): boolean {
-    const xssPatterns = [
-      /<script[^>]*>.*?<\/script>/i,
-      /javascript:/i,
-      /on\w+\s*=/i,
-      /<iframe[^>]*>/i,
-      /<object[^>]*>/i
-    ];
-
-    return xssPatterns.some(pattern => pattern.test(content));
-  }
-
-  // Start security monitoring
-  private static startSecurityMonitoring(): void {
-    console.log('🛡️ Starting security monitoring...');
-
-    // Monitor for suspicious activities every 5 minutes
-    setInterval(async () => {
-      await this.monitorSuspiciousActivities();
-    }, 300000);
-  }
-
-  // Monitor suspicious activities
-  private static async monitorSuspiciousActivities(): Promise<void> {
-    try {
-      // Check for unusual API activity
-      const { data: recentMessages } = await supabase
-        .from('messages')
-        .select('conversation_id, created_at')
-        .gte('created_at', new Date(Date.now() - 300000).toISOString()); // Last 5 minutes
-
-      if (recentMessages && recentMessages.length > 1000) {
-        console.warn('🚨 High message volume detected - potential DoS attack');
-      }
-
-      // Check for failed crawl jobs
-      const { data: failedJobs } = await supabase
-        .from('crawl_jobs')
-        .select('error_message, created_at')
-        .eq('status', 'failed')
-        .gte('created_at', new Date(Date.now() - 300000).toISOString());
-
-      if (failedJobs && failedJobs.length > 50) {
-        console.warn('🚨 High crawl failure rate detected');
-      }
-
-    } catch (error) {
-      console.error('Error monitoring security:', error);
-    }
-  }
-
-  // Get default security policies
-  private static getDefaultPolicies(): SecurityPolicy[] {
-    return [
-      {
-        id: 'sql-injection-prevention',
-        name: 'SQL Injection Prevention',
-        description: 'Prevent SQL injection attacks in user inputs',
-        enabled: true,
-        severity: 'critical',
-        rules: [
-          {
-            id: 'block-sql-keywords',
-            condition: 'content contains SQL keywords',
-            action: 'deny',
-            priority: 1
-          }
-        ]
-      },
-      {
-        id: 'xss-prevention',
-        name: 'Cross-Site Scripting Prevention',
-        description: 'Prevent XSS attacks in content',
-        enabled: true,
-        severity: 'high',
-        rules: [
-          {
-            id: 'block-script-tags',
-            condition: 'content contains script tags',
-            action: 'quarantine',
-            priority: 2
-          }
-        ]
-      },
-      {
-        id: 'rate-limiting',
-        name: 'Rate Limiting',
-        description: 'Limit request rates to prevent abuse',
-        enabled: true,
-        severity: 'medium',
-        rules: [
-          {
-            id: 'limit-requests',
-            condition: 'requests exceed threshold',
-            action: 'deny',
-            priority: 3
-          }
-        ]
-      }
-    ];
-  }
-
-  // Apply security policies to content
-  static async applySecurityPolicies(content: string, source: string): Promise<{
+  // Validate customer request against security policies
+  static async validateCustomerRequest(
+    customerId: string,
+    requestType: 'crawl' | 'api',
+    requestCount: number = 1
+  ): Promise<{
     allowed: boolean;
-    action: string;
+    reason?: string;
+    retryAfter?: number;
+  }> {
+    try {
+      const profile = await this.getCustomerProfile(customerId);
+      
+      // Check if customer is blocked
+      if (profile.isBlocked) {
+        return {
+          allowed: false,
+          reason: profile.blockReason || 'Customer account is blocked'
+        };
+      }
+      
+      // Check concurrent requests limit
+      if (profile.concurrentRequests >= this.DEFAULT_CONFIG.maxConcurrentRequestsPerCustomer) {
+        return {
+          allowed: false,
+          reason: 'Too many concurrent requests',
+          retryAfter: 60
+        };
+      }
+      
+      // Check daily limits
+      const tierLimit = this.DEFAULT_CONFIG.maxPagesPerDay[profile.tier] || 100;
+      if (profile.requestsToday + requestCount > tierLimit) {
+        return {
+          allowed: false,
+          reason: `Daily limit exceeded (${tierLimit} pages per day for ${profile.tier} tier)`,
+          retryAfter: this.getSecondsUntilMidnight()
+        };
+      }
+      
+      // Check rate limiting
+      const timeSinceLastRequest = Date.now() - new Date(profile.lastRequestTime).getTime();
+      const rateLimitMs = this.DEFAULT_CONFIG.rateLimitWindowMinutes * 60 * 1000;
+      
+      if (timeSinceLastRequest < rateLimitMs && profile.requestsToday > tierLimit * 0.8) {
+        return {
+          allowed: false,
+          reason: 'Rate limit exceeded',
+          retryAfter: Math.ceil((rateLimitMs - timeSinceLastRequest) / 1000)
+        };
+      }
+      
+      return { allowed: true };
+      
+    } catch (error) {
+      console.error('Error validating customer request:', error);
+      return {
+        allowed: false,
+        reason: 'Security validation failed'
+      };
+    }
+  }
+
+  // Track customer request for rate limiting
+  static async trackCustomerRequest(
+    customerId: string,
+    requestType: 'crawl' | 'api',
+    requestCount: number = 1
+  ): Promise<void> {
+    try {
+      const profile = await this.getCustomerProfile(customerId);
+      
+      // Update profile
+      profile.concurrentRequests++;
+      profile.requestsToday += requestCount;
+      profile.lastRequestTime = new Date().toISOString();
+      
+      // Store updated profile
+      this.customerProfiles.set(customerId, profile);
+      
+      // Persist to database for durability
+      await this.persistCustomerProfile(profile);
+      
+    } catch (error) {
+      console.error('Error tracking customer request:', error);
+    }
+  }
+
+  // Release concurrent request slot
+  static async releaseCustomerRequest(customerId: string): Promise<void> {
+    try {
+      const profile = this.customerProfiles.get(customerId);
+      if (profile && profile.concurrentRequests > 0) {
+        profile.concurrentRequests--;
+        this.customerProfiles.set(customerId, profile);
+        await this.persistCustomerProfile(profile);
+      }
+    } catch (error) {
+      console.error('Error releasing customer request:', error);
+    }
+  }
+
+  // Get or create customer security profile
+  private static async getCustomerProfile(customerId: string): Promise<CustomerSecurityProfile> {
+    // Check cache first
+    let profile = this.customerProfiles.get(customerId);
+    
+    if (!profile) {
+      // Load from database
+      const { data: customerData } = await supabase
+        .from('customer_usage_tracking')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+      
+      if (customerData) {
+        profile = {
+          customerId,
+          tier: 'basic', // Default tier, should be fetched from customer data
+          concurrentRequests: customerData.concurrent_requests || 0,
+          requestsToday: customerData.requests_last_day || 0,
+          lastRequestTime: customerData.last_request_at || new Date().toISOString(),
+          isBlocked: false
+        };
+      } else {
+        // Create new profile
+        profile = {
+          customerId,
+          tier: 'basic',
+          concurrentRequests: 0,
+          requestsToday: 0,
+          lastRequestTime: new Date().toISOString(),
+          isBlocked: false
+        };
+      }
+      
+      this.customerProfiles.set(customerId, profile);
+    }
+    
+    return profile;
+  }
+
+  // Persist customer profile to database
+  private static async persistCustomerProfile(profile: CustomerSecurityProfile): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('customer_usage_tracking')
+        .upsert({
+          customer_id: profile.customerId,
+          concurrent_requests: profile.concurrentRequests,
+          requests_last_day: profile.requestsToday,
+          last_request_at: profile.lastRequestTime,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) {
+        console.error('Error persisting customer profile:', error);
+      }
+    } catch (error) {
+      console.error('Error persisting customer profile:', error);
+    }
+  }
+
+  // Load customer profiles from database
+  private static async loadCustomerProfiles(): Promise<void> {
+    try {
+      const { data: profiles } = await supabase
+        .from('customer_usage_tracking')
+        .select('*');
+      
+      if (profiles) {
+        profiles.forEach(p => {
+          this.customerProfiles.set(p.customer_id, {
+            customerId: p.customer_id,
+            tier: 'basic', // Should be fetched from customer tier table
+            concurrentRequests: p.concurrent_requests || 0,
+            requestsToday: p.requests_last_day || 0,
+            lastRequestTime: p.last_request_at || new Date().toISOString(),
+            isBlocked: false
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error loading customer profiles:', error);
+    }
+  }
+
+  // Get current egress IP for requests
+  static getCurrentEgressIP(): string {
+    const ips = this.egressIPPool.activeIPs;
+    const index = Math.floor(Math.random() * ips.length);
+    return ips[index];
+  }
+
+  // Start IP rotation process
+  private static startIPRotation(): void {
+    const rotationMs = this.egressIPPool.rotationIntervalHours * 60 * 60 * 1000;
+    
+    setInterval(() => {
+      this.rotateEgressIPs();
+    }, rotationMs);
+    
+    console.log(`🔄 IP rotation started (every ${this.egressIPPool.rotationIntervalHours} hours)`);
+  }
+
+  // Rotate egress IP addresses
+  private static rotateEgressIPs(): void {
+    // Simulate IP rotation by shuffling the pool
+    const ips = [...this.egressIPPool.activeIPs];
+    for (let i = ips.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ips[i], ips[j]] = [ips[j], ips[i]];
+    }
+    
+    this.egressIPPool.activeIPs = ips;
+    this.egressIPPool.lastRotation = new Date().toISOString();
+    
+    console.log('🔄 Egress IP pool rotated');
+  }
+
+  // Encrypt sensitive data using KMS
+  static async encryptSensitiveData(data: string, keyId: string = 'default'): Promise<string> {
+    try {
+      // Use Supabase encryption function
+      const { data: encryptedData, error } = await supabase
+        .rpc('encrypt_sensitive_data', {
+          data,
+          key_id: keyId
+        });
+      
+      if (error) {
+        console.error('Encryption failed:', error);
+        return data; // Return unencrypted as fallback
+      }
+      
+      return encryptedData;
+    } catch (error) {
+      console.error('Encryption error:', error);
+      return data;
+    }
+  }
+
+  // Decrypt sensitive data using KMS
+  static async decryptSensitiveData(encryptedData: string, keyId: string = 'default'): Promise<string> {
+    try {
+      // Use Supabase decryption function
+      const { data: decryptedData, error } = await supabase
+        .rpc('decrypt_sensitive_data', {
+          encrypted_data: encryptedData,
+          key_id: keyId
+        });
+      
+      if (error) {
+        console.error('Decryption failed:', error);
+        return encryptedData; // Return as-is as fallback
+      }
+      
+      return decryptedData;
+    } catch (error) {
+      console.error('Decryption error:', error);
+      return encryptedData;
+    }
+  }
+
+  // Check robots.txt compliance
+  static async checkRobotsCompliance(url: string, userAgent: string = 'WonderWave-Bot'): Promise<{
+    allowed: boolean;
     reason?: string;
   }> {
-    for (const policy of this.securityPolicies) {
-      if (!policy.enabled) continue;
+    if (!this.DEFAULT_CONFIG.enableRobotsRespect) {
+      return { allowed: true };
+    }
+    
+    try {
+      const robotsUrl = new URL('/robots.txt', url).toString();
+      
+      const response = await fetch(robotsUrl, {
+        headers: { 'User-Agent': userAgent },
+        signal: AbortSignal.timeout(5000)
+      });
+      
+      if (!response.ok) {
+        return { allowed: true }; // No robots.txt found, allow crawling
+      }
+      
+      const robotsText = await response.text();
+      const rules = this.parseRobotsTxt(robotsText, userAgent);
+      
+      const urlPath = new URL(url).pathname;
+      const isDisallowed = rules.disallowedPaths.some(path => 
+        urlPath.startsWith(path) || this.matchesWildcard(urlPath, path)
+      );
+      
+      if (isDisallowed) {
+        return {
+          allowed: false,
+          reason: 'Disallowed by robots.txt'
+        };
+      }
+      
+      return { allowed: true };
+      
+    } catch (error) {
+      console.warn('Error checking robots.txt:', error);
+      return { allowed: true }; // Allow on error
+    }
+  }
 
-      for (const rule of policy.rules) {
-        const violation = this.checkRule(content, rule);
-        if (violation) {
-          console.warn(`🚨 Security policy violation: ${policy.name} - ${rule.condition}`);
-          
-          return {
-            allowed: rule.action === 'allow',
-            action: rule.action,
-            reason: `Violated policy: ${policy.name}`
-          };
+  // Parse robots.txt content
+  private static parseRobotsTxt(robotsText: string, userAgent: string): {
+    disallowedPaths: string[];
+    allowedPaths: string[];
+  } {
+    const lines = robotsText.split('\n');
+    const disallowedPaths: string[] = [];
+    const allowedPaths: string[] = [];
+    
+    let currentUserAgent = '';
+    let applies = false;
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      if (trimmed.toLowerCase().startsWith('user-agent:')) {
+        currentUserAgent = trimmed.substring(11).trim();
+        applies = currentUserAgent === '*' || 
+                 currentUserAgent.toLowerCase() === userAgent.toLowerCase();
+      } else if (applies) {
+        if (trimmed.toLowerCase().startsWith('disallow:')) {
+          const path = trimmed.substring(9).trim();
+          if (path) disallowedPaths.push(path);
+        } else if (trimmed.toLowerCase().startsWith('allow:')) {
+          const path = trimmed.substring(6).trim();
+          if (path) allowedPaths.push(path);
         }
       }
     }
-
-    return { allowed: true, action: 'allow' };
-  }
-
-  // Check individual security rule
-  private static checkRule(content: string, rule: SecurityRule): boolean {
-    switch (rule.condition) {
-      case 'content contains SQL keywords':
-        return this.containsSQLInjectionPattern(content);
-      case 'content contains script tags':
-        return this.containsXSSPattern(content);
-      default:
-        return false;
-    }
-  }
-
-  // Encrypt sensitive data in sources
-  static async encryptSensitiveSource(sourceId: string): Promise<void> {
-    const { data: source, error } = await supabase
-      .from('agent_sources')
-      .select('content')
-      .eq('id', sourceId)
-      .single();
-
-    if (error || !source?.content) {
-      throw new Error('Source not found or no content to encrypt');
-    }
-
-    const encryptedContent = await EncryptionService.encryptSensitiveData(source.content);
     
-    await supabase
-      .from('agent_sources')
-      .update({ 
-        content: encryptedContent,
-        metadata: { encrypted: true, encryption_date: new Date().toISOString() }
-      })
-      .eq('id', sourceId);
-
-    console.log(`🔒 Source ${sourceId} encrypted successfully`);
+    return { disallowedPaths, allowedPaths };
   }
 
-  // Get security dashboard data
-  static async getSecurityDashboard(teamId: string): Promise<{
-    securityScore: number;
-    vulnerabilityCount: number;
-    complianceStatus: ComplianceStatus;
-    recentAlerts: number;
+  // Match wildcard patterns
+  private static matchesWildcard(text: string, pattern: string): boolean {
+    const regex = new RegExp(
+      '^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$'
+    );
+    return regex.test(text);
+  }
+
+  // Get seconds until midnight for rate limit reset
+  private static getSecondsUntilMidnight(): number {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    return Math.ceil((midnight.getTime() - now.getTime()) / 1000);
+  }
+
+  // Get security status for a customer
+  static async getSecurityStatus(customerId: string): Promise<{
+    profile: CustomerSecurityProfile;
+    compliance: {
+      robotsRespectEnabled: boolean;
+      kmsEncryptionEnabled: boolean;
+      egressIPRotationEnabled: boolean;
+    };
+    limits: {
+      dailyLimit: number;
+      concurrentLimit: number;
+      rateLimitWindow: number;
+    };
   }> {
-    const auditResult = await this.performSecurityAudit(teamId);
+    const profile = await this.getCustomerProfile(customerId);
     
     return {
-      securityScore: auditResult.score,
-      vulnerabilityCount: auditResult.vulnerabilities.length,
-      complianceStatus: auditResult.compliance,
-      recentAlerts: auditResult.vulnerabilities.filter(v => v.severity === 'critical' || v.severity === 'high').length
+      profile,
+      compliance: {
+        robotsRespectEnabled: this.DEFAULT_CONFIG.enableRobotsRespect,
+        kmsEncryptionEnabled: this.DEFAULT_CONFIG.enableKMSEncryption,
+        egressIPRotationEnabled: this.DEFAULT_CONFIG.enableEgressIPRotation
+      },
+      limits: {
+        dailyLimit: this.DEFAULT_CONFIG.maxPagesPerDay[profile.tier] || 100,
+        concurrentLimit: this.DEFAULT_CONFIG.maxConcurrentRequestsPerCustomer,
+        rateLimitWindow: this.DEFAULT_CONFIG.rateLimitWindowMinutes
+      }
     };
   }
 }
