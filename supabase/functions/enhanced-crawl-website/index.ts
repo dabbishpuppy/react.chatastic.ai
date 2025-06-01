@@ -26,6 +26,31 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Type validation helper
+function validateSourcePageRecord(record: any, index: number): void {
+  if (typeof record.parent_source_id !== 'string') {
+    throw new Error(`Record ${index}: parent_source_id must be string (UUID), got ${typeof record.parent_source_id}`);
+  }
+  if (typeof record.customer_id !== 'string') {
+    throw new Error(`Record ${index}: customer_id must be string (UUID), got ${typeof record.customer_id}`);
+  }
+  if (typeof record.url !== 'string') {
+    throw new Error(`Record ${index}: url must be string, got ${typeof record.url}`);
+  }
+  if (typeof record.status !== 'string') {
+    throw new Error(`Record ${index}: status must be string, got ${typeof record.status}`);
+  }
+  if (typeof record.priority !== 'string') {
+    throw new Error(`Record ${index}: priority must be string, got ${typeof record.priority}`);
+  }
+  if (typeof record.retry_count !== 'number') {
+    throw new Error(`Record ${index}: retry_count must be number, got ${typeof record.retry_count}`);
+  }
+  if (typeof record.max_retries !== 'number') {
+    throw new Error(`Record ${index}: max_retries must be number, got ${typeof record.max_retries}`);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -84,7 +109,7 @@ serve(async (req) => {
 
     console.log(`📊 Discovery completed: ${discoveredUrls.length} URLs found`);
 
-    // Create parent source with minimal data
+    // Create parent source with proper boolean types
     const { data: parentSource, error: sourceError } = await supabase
       .from('agent_sources')
       .insert({
@@ -99,7 +124,15 @@ serve(async (req) => {
         completed_jobs: 0,
         failed_jobs: 0,
         links_count: discoveredUrls.length,
-        discovery_completed: false
+        discovery_completed: false, // Explicitly set as boolean
+        respect_robots: respectRobots, // Ensure boolean type
+        is_active: true, // Explicitly set as boolean
+        metadata: {
+          crawl_mode: crawlMode,
+          enable_compression: enableCompression,
+          enable_deduplication: enableDeduplication,
+          priority: priority
+        }
       })
       .select()
       .single();
@@ -110,102 +143,87 @@ serve(async (req) => {
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
-    // Test with a single minimal record first
+    // Create source_pages with strict type validation
     if (discoveredUrls.length > 0) {
-      console.log('🔍 Testing minimal single record insertion...');
+      console.log('🔍 Starting source pages insertion with type validation...');
       
-      // First, let's check the source_pages table structure
-      const { data: tableInfo, error: tableError } = await supabase
-        .from('source_pages')
-        .select('*')
-        .limit(1);
+      let insertedJobs = 0;
+      const batchSize = 10; // Small batch size for safety
       
-      if (tableError) {
-        console.log('❌ Could not check table structure:', tableError);
-      } else {
-        console.log('📋 Table structure check successful');
-      }
-
-      // Create the most minimal record possible
-      const minimalRecord = {
-        parent_source_id: parentSource.id,
-        customer_id: agent.team_id,
-        url: discoveredUrls[0],
-        status: 'pending',
-        priority: priority,
-        retry_count: 0,
-        max_retries: 3
-      };
-
-      console.log('📝 Minimal record for insertion:', JSON.stringify(minimalRecord, null, 2));
-
-      // Try inserting one record with explicit error handling
-      const { data: insertResult, error: insertError } = await supabase
-        .from('source_pages')
-        .insert([minimalRecord])
-        .select('id');
-
-      if (insertError) {
-        console.error('❌ Single record insertion failed:', {
-          error: insertError,
-          code: insertError.code,
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          recordData: minimalRecord
-        });
-        throw new Error(`Single record insertion failed: ${insertError.message}`);
-      }
-
-      console.log('✅ Single record test succeeded:', insertResult);
-
-      // If we have more URLs, insert them in very small batches
-      let insertedJobs = 1;
-      
-      if (discoveredUrls.length > 1) {
-        const remainingUrls = discoveredUrls.slice(1);
-        const batchSize = 2; // Very small batch size to minimize risk
+      for (let i = 0; i < discoveredUrls.length; i += batchSize) {
+        const batch = discoveredUrls.slice(i, i + batchSize);
+        console.log(`📦 Processing batch ${Math.floor(i/batchSize) + 1}: ${batch.length} URLs`);
         
-        for (let i = 0; i < remainingUrls.length; i += batchSize) {
-          const batch = remainingUrls.slice(i, i + batchSize);
-          console.log(`📦 Inserting batch: ${batch.length} pages`);
+        // Create properly typed records
+        const batchRecords = batch.map((discoveredUrl, batchIndex) => {
+          const record = {
+            parent_source_id: parentSource.id, // string (UUID)
+            customer_id: agent.team_id, // string (UUID)
+            url: discoveredUrl, // string
+            status: 'pending', // string
+            priority: priority, // string
+            retry_count: 0, // number
+            max_retries: 3 // number
+          };
           
-          const batchRecords = batch.map(discoveredUrl => ({
-            parent_source_id: parentSource.id,
-            customer_id: agent.team_id,
-            url: discoveredUrl,
-            status: 'pending',
-            priority: priority,
-            retry_count: 0,
-            max_retries: 3
-          }));
+          // Validate each record before insertion
+          validateSourcePageRecord(record, i + batchIndex);
+          
+          return record;
+        });
 
-          const { error: batchError } = await supabase
-            .from('source_pages')
-            .insert(batchRecords);
+        console.log(`📝 Batch ${Math.floor(i/batchSize) + 1} sample record:`, JSON.stringify(batchRecords[0], null, 2));
+
+        // Insert batch with error handling
+        const { data: batchResult, error: batchError } = await supabase
+          .from('source_pages')
+          .insert(batchRecords)
+          .select('id');
+        
+        if (batchError) {
+          console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} insertion failed:`, {
+            error: batchError,
+            code: batchError.code,
+            message: batchError.message,
+            details: batchError.details,
+            hint: batchError.hint,
+            batchSize: batch.length,
+            sampleRecord: batchRecords[0]
+          });
           
-          if (batchError) {
-            console.error(`❌ Batch insertion failed:`, batchError);
-            // Don't throw here, just log and continue
-            break;
+          // Try single record insertion for debugging
+          if (batchRecords.length > 1) {
+            console.log('🔍 Attempting single record insertion for debugging...');
+            const { error: singleError } = await supabase
+              .from('source_pages')
+              .insert([batchRecords[0]]);
+            
+            if (singleError) {
+              console.error('❌ Single record also failed:', singleError);
+            } else {
+              console.log('✅ Single record succeeded - batch size might be the issue');
+            }
           }
           
-          insertedJobs += batch.length;
-          console.log(`✅ Batch inserted successfully: ${batch.length} pages`);
+          throw new Error(`Batch insertion failed: ${batchError.message}`);
         }
+        
+        insertedJobs += batch.length;
+        console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} inserted successfully: ${batch.length} records`);
       }
 
-      // Mark discovery as completed and update parent source
+      // Update parent source with proper boolean types
       await supabase
         .from('agent_sources')
         .update({
           crawl_status: 'in_progress',
-          discovery_completed: true,
-          total_children: insertedJobs
+          discovery_completed: true, // Explicitly boolean
+          total_children: insertedJobs,
+          updated_at: new Date().toISOString()
         })
         .eq('id', parentSource.id);
 
-      console.log(`✅ Crawl initiated: ${insertedJobs} jobs created for ${discoveredUrls.length} URLs`);
+      console.log(`✅ Enhanced crawl initiated: ${insertedJobs} source pages created for ${discoveredUrls.length} URLs`);
 
       return new Response(
         JSON.stringify({
