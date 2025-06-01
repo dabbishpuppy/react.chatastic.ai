@@ -26,14 +26,14 @@ serve(async (req) => {
 
     console.log(`🔍 Aggregating status for parent source: ${parentSourceId}`)
 
-    // Get crawl jobs statistics
+    // Get source_pages statistics (correct table)
     const { data: jobs, error: jobsError } = await supabase
-      .from('crawl_jobs')
+      .from('source_pages')
       .select('*')
       .eq('parent_source_id', parentSourceId)
 
     if (jobsError) {
-      console.error('Error fetching crawl jobs:', jobsError)
+      console.error('Error fetching source pages:', jobsError)
       throw jobsError
     }
 

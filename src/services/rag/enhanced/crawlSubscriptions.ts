@@ -11,19 +11,19 @@ export class CrawlSubscriptionService {
     console.log(`📡 Setting up real-time subscription for ${parentSourceId}`);
 
     try {
-      // Subscribe to crawl_jobs changes
-      const jobsChannel = supabase
-        .channel(`crawl-jobs-${parentSourceId}`)
+      // Subscribe to source_pages changes (correct table)
+      const pagesChannel = supabase
+        .channel(`source-pages-${parentSourceId}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
-            table: 'crawl_jobs',
+            table: 'source_pages',
             filter: `parent_source_id=eq.${parentSourceId}`
           },
           async (payload) => {
-            console.log('📡 Crawl job update:', payload);
+            console.log('📡 Source page update:', payload);
             
             try {
               const status = await CrawlApiService.checkCrawlStatus(parentSourceId);
@@ -34,7 +34,7 @@ export class CrawlSubscriptionService {
           }
         )
         .subscribe((status) => {
-          console.log('📡 Subscription status:', status);
+          console.log('📡 Pages subscription status:', status);
         });
 
       // Subscribe to agent_sources changes for parent status
@@ -64,7 +64,7 @@ export class CrawlSubscriptionService {
         });
 
       return () => {
-        supabase.removeChannel(jobsChannel);
+        supabase.removeChannel(pagesChannel);
         supabase.removeChannel(sourceChannel);
       };
     } catch (error) {

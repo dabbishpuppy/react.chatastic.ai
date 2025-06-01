@@ -47,7 +47,7 @@ serve(async (req) => {
       priority = 'normal'
     } = requestBody;
 
-    console.log('🚀 Starting enhanced crawl with Zstd compression for agent', agentId, ', URL:', url);
+    console.log('🚀 Starting enhanced crawl with compression for agent', agentId, ', URL:', url);
 
     if (!agentId || !url) {
       throw new Error('Missing required fields: agentId and url');
@@ -97,6 +97,7 @@ serve(async (req) => {
       completed_jobs: 0,
       failed_jobs: 0,
       links_count: discoveredUrls.length,
+      discovery_completed: false,
       metadata: {
         crawl_initiated_at: new Date().toISOString(),
         enhanced_pipeline: true,
@@ -121,42 +122,42 @@ serve(async (req) => {
       throw new Error(`Failed to create parent source: ${sourceError.message}`);
     }
 
-    // Create crawl jobs for each discovered URL
-    const crawlJobs = discoveredUrls.map((discoveredUrl, index) => ({
+    // Create source_pages (child jobs) for each discovered URL
+    const sourcePages = discoveredUrls.map((discoveredUrl, index) => ({
       parent_source_id: parentSource.id,
+      customer_id: agent.team_id,
       url: discoveredUrl,
       status: 'pending' as const,
-      priority: priority === 'high' ? 3 : priority === 'slow' ? 1 : 2,
+      priority: priority,
       created_at: new Date().toISOString(),
-      metadata: {
-        crawl_order: index,
-        compression_enabled: enableCompression,
-        deduplication_enabled: enableDeduplication
-      }
+      retry_count: 0,
+      max_retries: 3
     }));
 
-    // Insert crawl jobs in batches to avoid timeout
+    // Insert source pages in batches to avoid timeout
     const batchSize = 50;
     let insertedJobs = 0;
     
-    for (let i = 0; i < crawlJobs.length; i += batchSize) {
-      const batch = crawlJobs.slice(i, i + batchSize);
-      const { error: jobsError } = await supabase
-        .from('crawl_jobs')
+    for (let i = 0; i < sourcePages.length; i += batchSize) {
+      const batch = sourcePages.slice(i, i + batchSize);
+      const { error: pagesError } = await supabase
+        .from('source_pages')
         .insert(batch);
       
-      if (jobsError) {
-        console.error('Error inserting crawl jobs batch:', jobsError);
+      if (pagesError) {
+        console.error('Error inserting source pages batch:', pagesError);
       } else {
         insertedJobs += batch.length;
       }
     }
 
-    // Update parent source to in_progress
+    // Mark discovery as completed and update parent source
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'in_progress',
+        discovery_completed: true,
+        total_children: insertedJobs,
         metadata: {
           ...parentSourceData.metadata,
           jobs_created_at: new Date().toISOString(),

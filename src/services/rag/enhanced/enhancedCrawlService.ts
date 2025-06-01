@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkerQueueService } from "./workerQueue";
 import { RateLimitingService } from "./rateLimiting";
@@ -127,26 +128,42 @@ export class EnhancedCrawlService {
       throw new Error(`Failed to create parent source: ${sourceError.message}`);
     }
 
-    // Enqueue jobs with worker queue
-    const jobIds = await WorkerQueueService.enqueueJobs(
-      parentSource.id,
-      customerId,
-      discoveredUrls,
-      request.priority || 'normal'
-    );
+    // Create source_pages instead of crawl_jobs
+    const sourcePages = discoveredUrls.map((discoveredUrl, index) => ({
+      parent_source_id: parentSource.id,
+      customer_id: customerId,
+      url: discoveredUrl,
+      status: 'pending' as const,
+      priority: request.priority || 'normal',
+      created_at: new Date().toISOString(),
+      retry_count: 0,
+      max_retries: 3
+    }));
+
+    // Insert source pages
+    const { data: insertedPages, error: pagesError } = await supabase
+      .from('source_pages')
+      .insert(sourcePages)
+      .select('id');
+
+    if (pagesError) {
+      throw new Error(`Failed to create source pages: ${pagesError.message}`);
+    }
 
     // Update parent source to in_progress
     const currentMetadata = parentSource.metadata as Record<string, any> || {};
     const updatedMetadata = {
       ...currentMetadata,
       jobs_enqueued_at: new Date().toISOString(),
-      job_ids: jobIds
+      page_ids: insertedPages?.map(p => p.id) || []
     };
 
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'in_progress',
+        discovery_completed: true,
+        total_children: discoveredUrls.length,
         metadata: updatedMetadata
       })
       .eq('id', parentSource.id);
@@ -154,7 +171,7 @@ export class EnhancedCrawlService {
     // Ensure worker is running
     await this.ensureWorkerRunning();
 
-    console.log(`✅ Enhanced crawl initiated: ${jobIds.length} jobs enqueued`);
+    console.log(`✅ Enhanced crawl initiated: ${discoveredUrls.length} source pages created`);
 
     return {
       parentSourceId: parentSource.id,
@@ -164,42 +181,50 @@ export class EnhancedCrawlService {
 
   // Check crawl status with enhanced metrics
   static async checkCrawlStatus(parentSourceId: string): Promise<CrawlStatus> {
-    const metrics = await WorkerQueueService.getJobMetrics(parentSourceId);
-    
-    if (!metrics) {
-      throw new Error('Parent source not found');
+    // Get source pages instead of crawl jobs
+    const { data: pages, error } = await supabase
+      .from('source_pages')
+      .select('*')
+      .eq('parent_source_id', parentSourceId);
+
+    if (error) {
+      throw new Error(`Failed to fetch source pages: ${error.message}`);
     }
 
-    const progress = metrics.totalJobs > 0 
-      ? Math.round(((metrics.completedJobs + metrics.failedJobs) / metrics.totalJobs) * 100)
+    const totalJobs = pages?.length || 0;
+    const completedJobs = pages?.filter(p => p.status === 'completed').length || 0;
+    const failedJobs = pages?.filter(p => p.status === 'failed').length || 0;
+    const inProgressJobs = pages?.filter(p => p.status === 'in_progress').length || 0;
+
+    const progress = totalJobs > 0 
+      ? Math.round(((completedJobs + failedJobs) / totalJobs) * 100)
       : 0;
 
     let status: CrawlStatus['status'] = 'pending';
-    if (metrics.completedJobs + metrics.failedJobs === metrics.totalJobs) {
+    if (completedJobs + failedJobs === totalJobs && totalJobs > 0) {
       status = 'completed';
-    } else if (metrics.inProgressJobs > 0 || metrics.completedJobs > 0) {
+    } else if (inProgressJobs > 0 || completedJobs > 0) {
       status = 'in_progress';
     }
 
-    // Estimate time remaining based on average processing time
-    let estimatedTimeRemaining: number | undefined;
-    if (status === 'in_progress' && metrics.avgProcessingTime > 0) {
-      const remainingJobs = metrics.totalJobs - metrics.completedJobs - metrics.failedJobs;
-      estimatedTimeRemaining = (remainingJobs * metrics.avgProcessingTime) / 1000; // Convert to seconds
-    }
+    // Calculate compression stats
+    const completedPages = pages?.filter(p => p.status === 'completed') || [];
+    const avgCompressionRatio = completedPages.length > 0
+      ? completedPages.reduce((sum, p) => sum + (p.compression_ratio || 0), 0) / completedPages.length
+      : 0;
+    const totalContentSize = completedPages.reduce((sum, p) => sum + (p.content_size || 0), 0);
 
     return {
       parentSourceId,
       status,
       progress,
-      totalJobs: metrics.totalJobs,
-      completedJobs: metrics.completedJobs,
-      failedJobs: metrics.failedJobs,
-      estimatedTimeRemaining,
-      compressionStats: metrics.avgCompressionRatio > 0 ? {
-        avgCompressionRatio: metrics.avgCompressionRatio,
-        totalContentSize: metrics.totalContentSize,
-        spaceSavedGB: (metrics.totalContentSize * (1 - metrics.avgCompressionRatio)) / (1024 * 1024 * 1024)
+      totalJobs,
+      completedJobs,
+      failedJobs,
+      compressionStats: avgCompressionRatio > 0 ? {
+        avgCompressionRatio,
+        totalContentSize,
+        spaceSavedGB: (totalContentSize * (1 - avgCompressionRatio)) / (1024 * 1024 * 1024)
       } : undefined
     };
   }
