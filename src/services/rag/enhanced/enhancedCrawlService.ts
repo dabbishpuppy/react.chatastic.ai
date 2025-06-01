@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WorkerQueueService } from "./workerQueue";
 import { RateLimitingService } from "./rateLimiting";
@@ -110,7 +109,7 @@ export class EnhancedCrawlService {
     );
 
     // Update parent source to in_progress
-    const currentMetadata = parentSource.metadata || {};
+    const currentMetadata = parentSource.metadata as Record<string, any> || {};
     const updatedMetadata = {
       ...currentMetadata,
       jobs_enqueued_at: new Date().toISOString(),
