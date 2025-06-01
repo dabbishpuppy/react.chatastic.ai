@@ -24,6 +24,14 @@ import EmbeddedChat from '@/pages/EmbeddedChat';
 import NotFound from '@/pages/NotFound';
 import AcceptInvitation from '@/pages/AcceptInvitation';
 
+// Settings Pages
+import GeneralSettings from '@/pages/settings/General';
+import MembersSettings from '@/pages/settings/Members';
+import PlansSettings from '@/pages/settings/Plans';
+import BillingSettings from '@/pages/settings/Billing';
+import ApiKeysSettings from '@/pages/settings/ApiKeys';
+import UsageSettings from '@/pages/settings/Usage';
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -93,11 +101,19 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              <Route path="/settings/*" element={
+              {/* Settings routes - properly nested */}
+              <Route path="/settings" element={
                 <ProtectedRoute>
                   <Settings />
                 </ProtectedRoute>
-              } />
+              }>
+                <Route path="general" element={<GeneralSettings />} />
+                <Route path="members" element={<MembersSettings />} />
+                <Route path="plans" element={<PlansSettings />} />
+                <Route path="billing" element={<BillingSettings />} />
+                <Route path="api-keys" element={<ApiKeysSettings />} />
+                <Route path="usage" element={<UsageSettings />} />
+              </Route>
               
               <Route path="/chat/:agentId" element={<EmbeddedChat />} />
               

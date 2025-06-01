@@ -39,10 +39,10 @@ const Settings = () => {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center px-4 py-2.5 my-1 text-sm rounded-md ${
+                  `flex items-center px-4 py-2.5 my-1 text-sm rounded-md transition-colors ${
                     isActive
-                      ? "bg-gray-100 font-medium"
-                      : "text-gray-700 hover:bg-gray-50"
+                      ? "bg-gray-100 font-medium text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   }`
                 }
               >
