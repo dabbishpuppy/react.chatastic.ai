@@ -3,6 +3,7 @@ import { WorkerQueueService, CrawlJob } from "./workerQueue";
 import { CompressionEngine } from "./compressionEngine";
 import { ChunkPruningService } from "./chunkPruning";
 import { GlobalDeduplicationService } from "./globalDeduplication";
+import { EnhancedContentProcessor } from "./enhancedContentProcessor";
 
 export class CrawlWorkerService {
   private static workerId: string = `worker-${Math.random().toString(36).substr(2, 9)}`;
@@ -19,7 +20,7 @@ export class CrawlWorkerService {
     this.isRunning = true;
     this.stopRequested = false;
     
-    console.log(`🚀 Starting crawl worker ${this.workerId}`);
+    console.log(`🚀 Starting enhanced crawl worker ${this.workerId}`);
 
     while (!this.stopRequested) {
       try {
@@ -36,7 +37,7 @@ export class CrawlWorkerService {
     }
 
     this.isRunning = false;
-    console.log(`🛑 Crawl worker ${this.workerId} stopped`);
+    console.log(`🛑 Enhanced crawl worker ${this.workerId} stopped`);
   }
 
   // Stop the worker
@@ -44,7 +45,7 @@ export class CrawlWorkerService {
     this.stopRequested = true;
   }
 
-  // Process a single job
+  // Process a single job with enhanced processing
   private static async processNextJob(): Promise<void> {
     const job = await WorkerQueueService.getNextJob(this.workerId);
     
@@ -62,8 +63,8 @@ export class CrawlWorkerService {
         startedAt: new Date().toISOString()
       });
 
-      // Fetch and process the page
-      const result = await this.processPage(job);
+      // Fetch and process the page with enhanced processor
+      const result = await this.processPageEnhanced(job);
 
       const processingTime = Date.now() - startTime;
 
@@ -77,7 +78,7 @@ export class CrawlWorkerService {
         duplicatesFound: result.duplicatesFound
       });
 
-      console.log(`✅ Job ${job.id} completed in ${processingTime}ms`);
+      console.log(`✅ Job ${job.id} completed in ${processingTime}ms (${result.processingMode} mode)`);
 
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -102,12 +103,13 @@ export class CrawlWorkerService {
     }
   }
 
-  // Process a single page
-  private static async processPage(job: CrawlJob): Promise<{
+  // Process a single page using enhanced content processor
+  private static async processPageEnhanced(job: CrawlJob): Promise<{
     contentSize: number;
     compressionRatio: number;
     chunksCreated: number;
     duplicatesFound: number;
+    processingMode: string;
   }> {
     // Fetch page with timeout and proper headers
     const response = await fetch(job.url, {
@@ -123,34 +125,51 @@ export class CrawlWorkerService {
     }
 
     const html = await response.text();
-    const originalSize = html.length;
 
-    // Clean and extract content
-    const cleanedContent = CompressionEngine.cleanContentForCompression(html);
-    
-    // Create semantic chunks
-    const chunks = this.createSemanticChunks(cleanedContent);
-    
-    // Prune to keep only high-quality chunks
-    const prunedChunks = ChunkPruningService.pruneChunks(chunks, 5);
-    const highQualityChunks = prunedChunks.filter(chunk => chunk.isHighValue).map(chunk => chunk.content);
+    // Create a temporary source record for processing
+    const { data: tempSource, error } = await supabase
+      .from('agent_sources')
+      .insert({
+        agent_id: job.parentSourceId, // This should be derived from parent
+        team_id: job.customerId,
+        source_type: 'website',
+        title: job.url,
+        url: job.url,
+        parent_source_id: job.parentSourceId,
+        is_active: true
+      })
+      .select()
+      .single();
 
-    // Process with global deduplication
-    const deduplicationResult = await GlobalDeduplicationService.processChunksGlobally(
-      highQualityChunks,
-      job.parentSourceId,
-      job.customerId
-    );
+    if (error || !tempSource) {
+      throw new Error(`Failed to create temp source: ${error?.message}`);
+    }
 
-    // Calculate compression ratio
-    const compressionRatio = deduplicationResult.totalCompressedSize / originalSize;
+    try {
+      // Process with enhanced content processor
+      const result = await EnhancedContentProcessor.processPageEnhanced(
+        tempSource.id,
+        job.customerId,
+        job.url,
+        html
+      );
 
-    return {
-      contentSize: originalSize,
-      compressionRatio,
-      chunksCreated: deduplicationResult.uniqueChunks,
-      duplicatesFound: deduplicationResult.duplicateChunks
-    };
+      if (!result.success) {
+        throw new Error(result.error || 'Processing failed');
+      }
+
+      return {
+        contentSize: result.contentSize,
+        compressionRatio: result.compressionRatio,
+        chunksCreated: result.chunksCreated,
+        duplicatesFound: result.duplicatesFound,
+        processingMode: result.processingMode
+      };
+
+    } finally {
+      // Clean up temp source if processing failed
+      // In production, you might want to keep it for debugging
+    }
   }
 
   // Create semantic chunks from content
