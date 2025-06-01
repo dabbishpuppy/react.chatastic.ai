@@ -1,8 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export class CompressionEngine {
-  // Actual Zstd compression with configurable levels
+  // Enhanced Zstd compression with correct API usage
   static async compressWithZstd(text: string, level: number = 19): Promise<{
     compressed: Uint8Array;
     originalSize: number;
@@ -15,9 +14,9 @@ export class CompressionEngine {
     try {
       console.log(`🗜️ Compressing ${originalSize} bytes with Zstd level ${level}...`);
       
-      // Use dynamic import for fzstd with correct API
-      const fzstd = await import('fzstd');
-      const compressed = fzstd.default.compress(originalData, level);
+      // Use dynamic import for fzstd with correct compress function
+      const { compress } = await import('fzstd');
+      const compressed = compress(originalData, level);
       const compressedSize = compressed.length;
       const ratio = compressedSize / originalSize;
       
@@ -45,9 +44,9 @@ export class CompressionEngine {
     try {
       console.log(`📦 Decompressing ${compressed.length} bytes with Zstd...`);
       
-      // Use dynamic import for fzstd with correct API
-      const fzstd = await import('fzstd');
-      const decompressed = fzstd.default.decompress(compressed);
+      // Use dynamic import for fzstd with correct decompress function
+      const { decompress } = await import('fzstd');
+      const decompressed = decompress(compressed);
       const decompressedText = new TextDecoder().decode(decompressed);
       
       console.log(`✅ Zstd decompression: ${compressed.length} → ${decompressed.length} bytes`);
@@ -103,9 +102,8 @@ export class CompressionEngine {
     compressedSize: number;
     compressionRatio: number;
   }> {
-    const result = await this.compressWithZstd(text, 19); // Maximum compression
+    const result = await this.compressWithZstd(text, 19);
     
-    // Convert to base64 for database storage
     const compressedData = btoa(String.fromCharCode(...result.compressed));
     
     return {
@@ -119,7 +117,6 @@ export class CompressionEngine {
   // Decompress text from storage
   static async decompressFromStorage(compressedData: string): Promise<string> {
     try {
-      // Convert from base64
       const compressedBytes = new Uint8Array(
         atob(compressedData).split('').map(char => char.charCodeAt(0))
       );
@@ -127,7 +124,6 @@ export class CompressionEngine {
       return await this.decompressZstd(compressedBytes);
     } catch (error) {
       console.error('Failed to decompress from storage:', error);
-      // Return as-is if decompression fails
       return compressedData;
     }
   }
