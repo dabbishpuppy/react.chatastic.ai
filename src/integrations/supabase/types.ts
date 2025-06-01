@@ -497,7 +497,9 @@ export type Database = {
           duplicates_found: number | null
           error_message: string | null
           id: string
+          max_retries: number | null
           parent_source_id: string
+          priority: string | null
           processing_time_ms: number | null
           retry_count: number
           started_at: string | null
@@ -515,7 +517,9 @@ export type Database = {
           duplicates_found?: number | null
           error_message?: string | null
           id?: string
+          max_retries?: number | null
           parent_source_id: string
+          priority?: string | null
           processing_time_ms?: number | null
           retry_count?: number
           started_at?: string | null
@@ -533,7 +537,9 @@ export type Database = {
           duplicates_found?: number | null
           error_message?: string | null
           id?: string
+          max_retries?: number | null
           parent_source_id?: string
+          priority?: string | null
           processing_time_ms?: number | null
           retry_count?: number
           started_at?: string | null
@@ -1670,6 +1676,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           id: string
+          metadata: Json | null
           name: string
           updated_at: string | null
         }
@@ -1677,6 +1684,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           id?: string
+          metadata?: Json | null
           name: string
           updated_at?: string | null
         }
@@ -1684,6 +1692,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           id?: string
+          metadata?: Json | null
           name?: string
           updated_at?: string | null
         }

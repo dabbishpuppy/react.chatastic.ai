@@ -110,22 +110,18 @@ export class EnhancedCrawlService {
     );
 
     // Update parent source to in_progress
-    const updateMetadata = parentSource.metadata ? 
-      { 
-        ...parentSource.metadata, 
-        jobs_enqueued_at: new Date().toISOString(),
-        job_ids: jobIds
-      } : 
-      {
-        jobs_enqueued_at: new Date().toISOString(),
-        job_ids: jobIds
-      };
+    const currentMetadata = parentSource.metadata || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      jobs_enqueued_at: new Date().toISOString(),
+      job_ids: jobIds
+    };
 
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'in_progress',
-        metadata: updateMetadata
+        metadata: updatedMetadata
       })
       .eq('id', parentSource.id);
 
