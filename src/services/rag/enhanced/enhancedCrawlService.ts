@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { WorkerQueueService } from "./workerQueue";
 import { RateLimitingService } from "./rateLimiting";
@@ -14,6 +13,7 @@ export interface EnhancedCrawlRequest {
   enableCompression?: boolean;
   enableDeduplication?: boolean;
   priority?: 'normal' | 'high' | 'slow';
+  crawlMode?: 'single-page' | 'sitemap-only' | 'full-website';
 }
 
 export interface CrawlStatus {
@@ -61,15 +61,29 @@ export class EnhancedCrawlService {
     }
 
     const customerId = agent.team_id;
+    const crawlMode = request.crawlMode || 'full-website';
     const maxPages = request.maxPages || 100;
 
-    // Discover links first to estimate page count
-    const discoveredUrls = await this.discoverLinks(
-      request.url, 
-      request.excludePaths, 
-      request.includePaths,
-      maxPages
-    );
+    // Discover links based on crawl mode
+    let discoveredUrls: string[] = [];
+    
+    switch (crawlMode) {
+      case 'single-page':
+        discoveredUrls = [request.url];
+        break;
+      case 'sitemap-only':
+        discoveredUrls = await this.discoverSitemapLinks(request.url);
+        break;
+      case 'full-website':
+      default:
+        discoveredUrls = await this.discoverLinks(
+          request.url, 
+          request.excludePaths, 
+          request.includePaths,
+          maxPages
+        );
+        break;
+    }
     
     // Check rate limits and quotas
     const rateLimitCheck = await RateLimitingService.canStartCrawl(customerId, discoveredUrls.length);
@@ -96,6 +110,7 @@ export class EnhancedCrawlService {
         enhanced_pipeline: true,
         worker_queue_enabled: true,
         priority: request.priority || 'normal',
+        crawlMode: crawlMode,
         maxPages: maxPages,
         enableCompression: request.enableCompression ?? true,
         enableDeduplication: request.enableDeduplication ?? true
@@ -294,6 +309,71 @@ export class EnhancedCrawlService {
       console.error('Error discovering links:', error);
       return [url]; // Fallback to just the main URL
     }
+  }
+
+  // New method to discover sitemap links
+  private static async discoverSitemapLinks(sitemapUrl: string): Promise<string[]> {
+    try {
+      console.log('🗺️ Discovering links from sitemap:', sitemapUrl);
+      
+      const response = await fetch(sitemapUrl, {
+        headers: {
+          'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
+        },
+        signal: AbortSignal.timeout(30000)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch sitemap: ${response.status}`);
+      }
+
+      const xmlText = await response.text();
+      const urls = this.parseSitemapXml(xmlText);
+      
+      console.log(`✅ Discovered ${urls.length} URLs from sitemap`);
+      return urls;
+      
+    } catch (error) {
+      console.error('Error discovering sitemap links:', error);
+      // Fallback to just the sitemap URL itself
+      return [sitemapUrl];
+    }
+  }
+
+  // Parse sitemap XML to extract URLs
+  private static parseSitemapXml(xmlText: string): string[] {
+    const urls: string[] = [];
+    
+    try {
+      // Simple regex-based XML parsing (for production, consider using a proper XML parser)
+      const locRegex = /<loc>(.*?)<\/loc>/g;
+      let match;
+      
+      while ((match = locRegex.exec(xmlText)) !== null) {
+        const url = match[1].trim();
+        if (url && url.startsWith('http')) {
+          urls.push(url);
+        }
+      }
+      
+      // If no URLs found, try sitemapindex format
+      if (urls.length === 0) {
+        const sitemapRegex = /<sitemap>[\s\S]*?<loc>(.*?)<\/loc>[\s\S]*?<\/sitemap>/g;
+        while ((match = sitemapRegex.exec(xmlText)) !== null) {
+          const sitemapUrl = match[1].trim();
+          if (sitemapUrl && sitemapUrl.startsWith('http')) {
+            // For now, just add the sitemap URL itself
+            // In production, you might want to recursively fetch sub-sitemaps
+            urls.push(sitemapUrl);
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error parsing sitemap XML:', error);
+    }
+    
+    return urls;
   }
 
   private static shouldExcludePath(path: string, excludePaths: string[]): boolean {

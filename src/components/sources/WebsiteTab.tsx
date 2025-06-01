@@ -1,8 +1,7 @@
-
 import React, { useCallback, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useWebsiteSourceOperations } from "./websites/hooks/useWebsiteSourceOperations";
-import { EnhancedWebsiteCrawlFormV2 } from "./websites/components/EnhancedWebsiteCrawlFormV2";
+import { EnhancedWebsiteCrawlFormV3 } from "./websites/components/EnhancedWebsiteCrawlFormV3";
 import WebsiteSourcesListOptimized from "./websites/components/WebsiteSourcesListOptimized";
 import ErrorBoundary from "./ErrorBoundary";
 import { useSourcesPaginated } from "@/hooks/useSourcesPaginated";
@@ -170,7 +169,7 @@ const WebsiteTabContent: React.FC = () => {
       <div>
         <h2 className="text-2xl font-semibold">Enhanced Website Training</h2>
         <p className="text-muted-foreground mt-1">
-          Production-scale crawling with worker queue, rate limiting, and compression
+          Production-scale crawling with multiple modes, worker queue, rate limiting, and compression
         </p>
       </div>
 
@@ -178,8 +177,8 @@ const WebsiteTabContent: React.FC = () => {
         {/* Queue Status Dashboard */}
         {renderQueueStatus()}
 
-        {/* Enhanced Crawl Form */}
-        <EnhancedWebsiteCrawlFormV2 onCrawlStarted={handleCrawlStarted} />
+        {/* Enhanced Crawl Form V3 */}
+        <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />
 
         {/* Progress Tracker */}
         {trackingCrawlId && (

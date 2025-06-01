@@ -2,13 +2,14 @@
 export interface EnhancedCrawlRequest {
   agentId: string;
   url: string;
+  crawlMode?: 'full-website' | 'single-page' | 'sitemap-only';
   maxPages?: number;
   excludePaths?: string[];
   includePaths?: string[];
   respectRobots?: boolean;
   enableCompression?: boolean;
   enableDeduplication?: boolean;
-  maxConcurrentJobs?: number;
+  priority?: 'normal' | 'high' | 'slow';
 }
 
 export interface CrawlStatus {
@@ -18,20 +19,10 @@ export interface CrawlStatus {
   totalJobs: number;
   completedJobs: number;
   failedJobs: number;
+  estimatedTimeRemaining?: number;
   compressionStats?: {
-    totalContentSize: number;
     avgCompressionRatio: number;
-    totalUniqueChunks: number;
-    totalDuplicateChunks: number;
+    totalContentSize: number;
+    spaceSavedGB: number;
   };
-}
-
-export interface CompressionStats {
-  totalOriginalSize: number;
-  totalCompressedSize: number;
-  totalUniqueChunks: number;
-  totalDuplicateChunks: number;
-  avgCompressionRatio: number;
-  spaceSavedBytes: number;
-  spaceSavedPercentage: number;
 }
