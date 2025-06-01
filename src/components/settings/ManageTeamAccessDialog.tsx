@@ -7,11 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { X } from "lucide-react";
+import { X, UserPlus, Settings } from "lucide-react";
 
-interface Team {
+interface TeamWithAccess {
   id: string;
   name: string;
+  userRole?: "owner" | "admin" | "member";
+  hasAccess: boolean;
 }
 
 interface ManageTeamAccessDialogProps {
@@ -31,36 +33,58 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
   member,
   onSuccess
 }) => {
-  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const [allTeams, setAllTeams] = useState<TeamWithAccess[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [selectedRole, setSelectedRole] = useState<"owner" | "admin" | "member">("member");
   const [loading, setLoading] = useState(false);
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
-      fetchAvailableTeams();
+      fetchAllTeamsWithAccess();
       setSelectedTeamId("");
       setSelectedRole("member");
     }
-  }, [isOpen, member.teams]);
+  }, [isOpen, member.user_id]);
 
-  const fetchAvailableTeams = async () => {
+  const fetchAllTeamsWithAccess = async () => {
     try {
-      const { data: teams, error } = await supabase
+      // Get all teams
+      const { data: teams, error: teamsError } = await supabase
         .from('teams')
         .select('id, name');
 
-      if (error) throw error;
+      if (teamsError) throw teamsError;
 
-      // Filter out teams the user already belongs to
-      const availableTeams = teams?.filter(team => 
-        !member.teams.includes(team.name)
-      ) || [];
+      // Get user's current team memberships with roles
+      const { data: memberships, error: membershipsError } = await supabase
+        .from('team_members')
+        .select(`
+          team_id,
+          role,
+          teams!inner(name)
+        `)
+        .eq('user_id', member.user_id);
 
-      setAvailableTeams(availableTeams);
+      if (membershipsError) throw membershipsError;
+
+      // Create membership map for quick lookup
+      const membershipMap = new Map(
+        memberships?.map(m => [m.team_id, m.role]) || []
+      );
+
+      // Combine teams with access information
+      const teamsWithAccess: TeamWithAccess[] = teams?.map(team => ({
+        id: team.id,
+        name: team.name,
+        userRole: membershipMap.get(team.id) as "owner" | "admin" | "member" | undefined,
+        hasAccess: membershipMap.has(team.id)
+      })) || [];
+
+      setAllTeams(teamsWithAccess);
     } catch (error: any) {
-      console.error('Error fetching teams:', error);
+      console.error('Error fetching teams with access:', error);
       toast({
         title: "Error loading teams",
         description: error.message,
@@ -100,8 +124,8 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
       setSelectedTeamId("");
       setSelectedRole("member");
       
-      // Refresh available teams
-      await fetchAvailableTeams();
+      // Refresh teams
+      await fetchAllTeamsWithAccess();
       
       onSuccess();
     } catch (error: any) {
@@ -116,8 +140,42 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
     }
   };
 
-  const handleRemoveTeamAccess = async (teamName: string) => {
-    if (member.teams.length <= 1) {
+  const handleRoleChange = async (teamId: string, newRole: "owner" | "admin" | "member") => {
+    setRoleUpdating(teamId);
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ role: newRole })
+        .eq('user_id', member.user_id)
+        .eq('team_id', teamId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Role updated",
+        description: "User's role has been updated successfully.",
+      });
+
+      // Refresh teams
+      await fetchAllTeamsWithAccess();
+      
+      onSuccess();
+    } catch (error: any) {
+      console.error('Error updating role:', error);
+      toast({
+        title: "Error updating role",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRoleUpdating(null);
+    }
+  };
+
+  const handleRemoveTeamAccess = async (teamId: string) => {
+    const currentMemberships = allTeams.filter(team => team.hasAccess);
+    
+    if (currentMemberships.length <= 1) {
       toast({
         title: "Cannot remove access",
         description: "User must belong to at least one team.",
@@ -128,20 +186,11 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
 
     setLoading(true);
     try {
-      // Get team ID by name
-      const { data: team, error: teamError } = await supabase
-        .from('teams')
-        .select('id')
-        .eq('name', teamName)
-        .single();
-
-      if (teamError) throw teamError;
-
       const { error } = await supabase
         .from('team_members')
         .delete()
         .eq('user_id', member.user_id)
-        .eq('team_id', team.id);
+        .eq('team_id', teamId);
 
       if (error) throw error;
 
@@ -150,8 +199,8 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
         description: "User has been removed from the team successfully.",
       });
 
-      // Refresh available teams
-      await fetchAvailableTeams();
+      // Refresh teams
+      await fetchAllTeamsWithAccess();
       
       onSuccess();
     } catch (error: any) {
@@ -166,9 +215,23 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
     }
   };
 
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return 'bg-purple-100 text-purple-800';
+      case 'admin':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const currentTeams = allTeams.filter(team => team.hasAccess);
+  const availableTeams = allTeams.filter(team => !team.hasAccess);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage Team Access</DialogTitle>
         </DialogHeader>
@@ -179,34 +242,69 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
             <p className="text-sm text-gray-900">{member.email}</p>
           </div>
 
+          {/* Current Team Memberships */}
           <div>
-            <Label className="text-sm font-medium text-gray-700 mb-2 block">Current Teams</Label>
-            <div className="flex flex-wrap gap-2">
-              {member.teams.map((teamName) => (
-                <Badge key={teamName} variant="secondary" className="flex items-center gap-2">
-                  {teamName}
-                  {member.teams.length > 1 && (
-                    <button
-                      onClick={() => handleRemoveTeamAccess(teamName)}
-                      disabled={loading}
-                      className="hover:bg-gray-200 rounded-full p-0.5"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </Badge>
-              ))}
-            </div>
+            <Label className="text-sm font-medium text-gray-700 mb-3 block">
+              Current Team Memberships ({currentTeams.length})
+            </Label>
+            
+            {currentTeams.length === 0 ? (
+              <p className="text-sm text-gray-500 italic">No team memberships</p>
+            ) : (
+              <div className="space-y-3">
+                {currentTeams.map((team) => (
+                  <div key={team.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">{team.name}</span>
+                      <Badge className={getRoleColor(team.userRole!)}>
+                        {team.userRole?.charAt(0).toUpperCase() + team.userRole?.slice(1)}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={team.userRole}
+                        onValueChange={(value: "owner" | "admin" | "member") => handleRoleChange(team.id, value)}
+                        disabled={roleUpdating === team.id}
+                      >
+                        <SelectTrigger className="w-24 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="owner">Owner</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {currentTeams.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveTeamAccess(team.id)}
+                          disabled={loading || roleUpdating === team.id}
+                          className="hover:bg-gray-100 rounded-full p-1 transition-colors"
+                        >
+                          <X size={14} className="text-red-500" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Add to New Teams */}
           {availableTeams.length > 0 && (
             <div className="space-y-4">
-              <Label className="text-sm font-medium text-gray-700">Add to Team</Label>
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <UserPlus size={16} />
+                Add to Team
+              </Label>
               
               <div className="space-y-3">
                 <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a team" />
+                    <SelectValue placeholder="Select a team to add user to" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableTeams.map((team) => (
@@ -230,14 +328,20 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
               </div>
             </div>
           )}
+
+          {availableTeams.length === 0 && currentTeams.length > 0 && (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">User has access to all available teams</p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
+          <Button variant="outline" onClick={onClose} disabled={loading || roleUpdating !== null}>
             Cancel
           </Button>
           {selectedTeamId && (
-            <Button onClick={handleAddTeamAccess} disabled={loading}>
+            <Button onClick={handleAddTeamAccess} disabled={loading || roleUpdating !== null}>
               {loading ? "Adding..." : "Add to Team"}
             </Button>
           )}
