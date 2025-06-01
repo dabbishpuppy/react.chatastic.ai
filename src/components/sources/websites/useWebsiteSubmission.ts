@@ -42,6 +42,17 @@ export const useWebsiteSubmission = () => {
 
     setIsSubmitting(true);
     try {
+      // Get team_id from agent
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('team_id')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError || !agent) {
+        throw new Error('Agent not found');
+      }
+
       // Create the source with immediate 'pending' status
       const sourceData = {
         agent_id: agentId,

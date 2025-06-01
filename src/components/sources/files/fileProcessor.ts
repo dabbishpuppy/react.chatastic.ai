@@ -4,6 +4,7 @@ import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { getFileProcessor } from '@/utils/fileProcessing';
 import { UploadedFile } from './types';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useFileProcessor = (
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>,
@@ -27,6 +28,17 @@ export const useFileProcessor = (
 
       if (!agentId) {
         throw new Error('Agent ID is required');
+      }
+
+      // Get team_id from agent
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('team_id')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError || !agent) {
+        throw new Error('Agent not found');
       }
 
       // Calculate content size in bytes

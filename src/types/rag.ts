@@ -17,13 +17,13 @@ export type AuditAction = Database['public']['Enums']['audit_action'];
 
 export interface AgentSource extends Omit<DbAgentSource, 'metadata'> {
   metadata?: Record<string, any>;
-  // Include all new parent-child tracking fields
-  avg_compression_ratio?: number;
-  children_completed?: number;
-  children_failed?: number;
-  children_pending?: number;
-  discovery_completed?: boolean;
-  total_processing_time_ms?: number;
+  // Ensure all parent-child tracking fields are defined as required
+  avg_compression_ratio: number;
+  children_completed: number;
+  children_failed: number;
+  children_pending: number;
+  discovery_completed: boolean;
+  total_processing_time_ms: number;
 }
 
 export interface SourceChunk extends Omit<DbSourceChunk, 'metadata'> {

@@ -17,6 +17,11 @@ export class SourceCreateService extends BaseSourceService {
     links_count?: number;
     parent_source_id?: string;
     is_excluded?: boolean;
+    exclude_paths?: string[];
+    include_paths?: string[];
+    respect_robots?: boolean;
+    max_concurrent_jobs?: number;
+    discovery_completed?: boolean;
   }): Promise<AgentSource> {
     try {
       const team_id = await this.getAgentTeamId(data.agent_id);

@@ -9,6 +9,7 @@ import { useRAGServices } from '@/hooks/useRAGServices';
 import { useParams } from 'react-router-dom';
 import RichTextEditor from '@/components/ui/rich-text-editor';
 import RichTextByteCounter from './RichTextByteCounter';
+import { supabase } from '@/integrations/supabase/client';
 
 const TextSourceForm: React.FC = () => {
   const { agentId } = useParams();
@@ -48,6 +49,17 @@ const TextSourceForm: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      // Get team_id from agent
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('team_id')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError || !agent) {
+        throw new Error('Agent not found');
+      }
+
       // Calculate the byte size for storage
       const byteCount = new TextEncoder().encode(plainTextContent).length;
       
