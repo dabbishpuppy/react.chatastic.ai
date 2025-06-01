@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -289,9 +289,6 @@ const ManageTeamAccessDialog: React.FC<ManageTeamAccessDialogProps> = ({
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage Team Access</DialogTitle>
-          <DialogDescription>
-            Control which teams this user has access to and manage their roles within each team.
-          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">
