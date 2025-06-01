@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,7 +85,7 @@ export const MonitoringDashboard: React.FC = () => {
 
   const handleAcknowledgeAlert = async (alertId: string) => {
     try {
-      await AlertingService.acknowledgeAlert(alertId);
+      await AlertingService.acknowledgeAlert(alertId, 'System Admin');
       await updateDashboard();
     } catch (error) {
       console.error('Error acknowledging alert:', error);
@@ -96,7 +95,7 @@ export const MonitoringDashboard: React.FC = () => {
   const handleDismissAlert = async (alertId: string) => {
     try {
       // For now, we'll just acknowledge the alert since dismissAlert doesn't exist
-      await AlertingService.acknowledgeAlert(alertId);
+      await AlertingService.acknowledgeAlert(alertId, 'System Admin');
       await updateDashboard();
     } catch (error) {
       console.error('Error dismissing alert:', error);
