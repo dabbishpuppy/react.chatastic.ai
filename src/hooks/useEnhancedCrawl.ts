@@ -1,134 +1,93 @@
-import { useState, useCallback } from 'react';
-import { CrawlApiService } from '@/services/rag/enhanced/crawlApi';
-import { CrawlSubscriptionService } from '@/services/rag/enhanced/crawlSubscriptions';
-import { EnhancedCrawlRequest, CrawlStatus } from '@/services/rag/enhanced/crawlTypes';
-import { useToast } from '@/hooks/use-toast';
+
+import { useState } from 'react';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface EnhancedCrawlRequest {
+  url: string;
+  agentId: string;
+  crawlMode: 'single-page' | 'sitemap-only' | 'full-website';
+  maxPages?: number;
+  maxDepth?: number;
+  excludePaths?: string[];
+  includePaths?: string[];
+  respectRobots?: boolean;
+  enableCompression?: boolean;
+  enableDeduplication?: boolean;
+  priority?: string;
+}
 
 export const useEnhancedCrawl = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeCrawls, setActiveCrawls] = useState<Map<string, CrawlStatus>>(new Map());
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
 
-  const initiateCrawl = useCallback(async (request: EnhancedCrawlRequest) => {
-    setIsLoading(true);
+  const initiateCrawl = async (request: EnhancedCrawlRequest) => {
+    setLoading(true);
+    
     try {
-      console.log('🚀 Starting enhanced crawl:', request);
-      
-      // Validate request before sending
-      if (!request.agentId) {
-        throw new Error('Agent ID is required');
-      }
-      if (!request.url || !request.url.trim()) {
-        throw new Error('URL is required');
+      console.log('🚀 Initiating enhanced crawl with request:', request);
+
+      // Validate required fields
+      if (!request.agentId || !request.url) {
+        throw new Error('Missing required fields: agentId and url are required');
       }
 
-      const result = await CrawlApiService.initiateCrawl(request);
-      
-      // Set up real-time subscription for this crawl
-      const unsubscribe = CrawlSubscriptionService.subscribeToCrawlUpdates(
-        result.parentSourceId,
-        (status) => {
-          console.log('📡 Received crawl status update:', status);
-          setActiveCrawls(prev => new Map(prev.set(result.parentSourceId, status)));
-          
-          // Show completion toast
-          if (status.status === 'completed') {
-            toast({
-              title: "Crawl Completed",
-              description: `Successfully crawled ${status.completedJobs} pages with ${status.failedJobs} failures.`,
-            });
-            
-            // Clean up subscription after completion
-            setTimeout(() => {
-              unsubscribe();
-              setActiveCrawls(prev => {
-                const newMap = new Map(prev);
-                newMap.delete(result.parentSourceId);
-                return newMap;
-              });
-            }, 5000);
-          } else if (status.status === 'failed') {
-            toast({
-              title: "Crawl Failed",
-              description: "The crawl encountered an error. Please try again.",
-              variant: "destructive",
-            });
-            unsubscribe();
-          }
+      // Call the enhanced crawl edge function with better error handling
+      const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
+        body: {
+          agentId: request.agentId,
+          url: request.url,
+          crawlMode: request.crawlMode || 'full-website',
+          maxPages: request.maxPages || 50,
+          maxDepth: request.maxDepth || 3,
+          excludePaths: request.excludePaths || [],
+          includePaths: request.includePaths || [],
+          respectRobots: request.respectRobots !== false,
+          enableCompression: request.enableCompression !== false,
+          enableDeduplication: request.enableDeduplication !== false,
+          priority: request.priority || 'normal'
         }
-      );
+      });
 
-      // Store the initial status
-      const initialStatus: CrawlStatus = {
-        parentSourceId: result.parentSourceId,
-        status: 'pending',
-        progress: 0,
-        totalJobs: result.totalJobs,
-        completedJobs: 0,
-        failedJobs: 0
+      if (error) {
+        console.error('❌ Enhanced crawl API error:', error);
+        throw new Error(`Crawl API error: ${error.message || 'Unknown error'}`);
+      }
+
+      if (!data || !data.success) {
+        console.error('❌ Enhanced crawl failed:', data);
+        throw new Error(data?.error || 'Enhanced crawl failed');
+      }
+
+      console.log('✅ Enhanced crawl initiated successfully:', data);
+      
+      return {
+        parentSourceId: data.parentSourceId,
+        totalJobs: data.totalJobs,
+        message: data.message
       };
-      
-      setActiveCrawls(prev => new Map(prev.set(result.parentSourceId, initialStatus)));
 
-      toast({
-        title: "Crawl Initiated",
-        description: `Starting crawl with ${result.totalJobs} pages discovered`,
-      });
-
-      return result;
-      
     } catch (error: any) {
-      console.error('Enhanced crawl error:', error);
-      toast({
-        title: "Crawl Error",
-        description: error.message || "Failed to start crawl",
-        variant: "destructive",
-      });
-      throw error;
+      console.error('❌ Enhanced crawl error:', error);
+      
+      // Handle different types of errors
+      let errorMessage = 'Failed to start enhanced crawl';
+      
+      if (error.message?.includes('Failed to fetch')) {
+        errorMessage = 'Network error: Unable to connect to the crawl service. Please check your internet connection and try again.';
+      } else if (error.message?.includes('ERR_INSUFFICIENT_RESOURCES')) {
+        errorMessage = 'Server resources temporarily unavailable. Please try again in a few moments.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [toast]);
-
-  const retryFailedJobs = useCallback(async (parentSourceId: string) => {
-    try {
-      const retriedCount = await CrawlApiService.retryFailedJobs(parentSourceId);
-      
-      toast({
-        title: "Jobs Retried",
-        description: `Retrying ${retriedCount} failed jobs`,
-      });
-      
-      return retriedCount;
-    } catch (error: any) {
-      toast({
-        title: "Retry Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      throw error;
-    }
-  }, [toast]);
-
-  const getCrawlJobs = useCallback(async (parentSourceId: string) => {
-    try {
-      return await CrawlApiService.getCrawlJobs(parentSourceId);
-    } catch (error: any) {
-      toast({
-        title: "Error Loading Jobs",
-        description: error.message,
-        variant: "destructive",
-      });
-      throw error;
-    }
-  }, [toast]);
+  };
 
   return {
     initiateCrawl,
-    retryFailedJobs,
-    getCrawlJobs,
-    isLoading,
-    activeCrawls: Array.from(activeCrawls.values()),
-    getActiveCrawlStatus: (parentSourceId: string) => activeCrawls.get(parentSourceId)
+    loading
   };
 };

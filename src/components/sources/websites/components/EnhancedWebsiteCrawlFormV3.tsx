@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
 import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
-import { Globe, FileText, Map } from 'lucide-react';
+import { Globe, FileText, Map, AlertCircle } from 'lucide-react';
 
 interface EnhancedWebsiteCrawlFormV3Props {
   onCrawlStarted?: (parentSourceId: string) => void;
@@ -28,9 +29,9 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   const [respectRobots, setRespectRobots] = useState(true);
   const [includePaths, setIncludePaths] = useState('');
   const [excludePaths, setExcludePaths] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { initiateCrawl } = useEnhancedCrawl();
+  const { initiateCrawl, loading: crawlLoading } = useEnhancedCrawl();
   const { 
     infrastructureHealth, 
     systemHealth, 
@@ -58,9 +59,18 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agentId || !url.trim()) return;
+    
+    if (!agentId || !url.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid URL",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    setLoading(true);
+    setIsSubmitting(true);
+    
     try {
       const fullUrl = url.startsWith('http') ? url : `${protocol}${url.trim()}`;
       
@@ -95,6 +105,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         agentId,
         crawlMode: finalCrawlMode,
         maxPages,
+        maxDepth,
         respectRobots,
         includePaths: includePathsArray,
         excludePaths: excludePathsArray
@@ -103,30 +114,34 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       if (result.parentSourceId) {
         toast({
           title: "Enhanced Crawl Started Successfully",
-          description: `Your ${activeTab} crawl has been initiated with production infrastructure. Monitoring ${result.parentSourceId}`,
+          description: `Your ${activeTab} crawl has been initiated. Monitoring ${result.parentSourceId}`,
         });
 
         onCrawlStarted?.(result.parentSourceId);
+        
+        // Reset form
         setUrl('');
         setIncludePaths('');
         setExcludePaths('');
       } else {
-        throw new Error('Failed to start crawl');
+        throw new Error('Failed to start crawl: No parent source ID returned');
       }
     } catch (error: any) {
       console.error('❌ Enhanced crawl submission failed:', error);
+      
       toast({
         title: "Crawl Failed",
-        description: error.message || "Failed to start the enhanced crawl",
+        description: error.message || "Failed to start the enhanced crawl. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const getInfrastructureStatus = () => {
-    if (!infrastructureHealth) return '🔄 Initializing...';
+    if (infrastructureLoading) return '🔄 Checking...';
+    if (!infrastructureHealth) return '⚠️ Unknown';
     
     const isHealthy = infrastructureHealth.overall?.status === 'healthy';
     return isHealthy ? '✅ Operational' : '⚠️ Degraded';
@@ -151,24 +166,40 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   };
 
   const getButtonText = () => {
+    if (isSubmitting || crawlLoading) {
+      switch (activeTab) {
+        case 'website':
+          return "Starting Website Crawl...";
+        case 'single-site':
+          return "Adding Page...";
+        case 'sitemap':
+          return "Starting Sitemap Crawl...";
+        default:
+          return "Processing...";
+      }
+    }
+
     switch (activeTab) {
       case 'website':
-        return loading ? "Starting Website Crawl..." : "Start Website Crawl";
+        return "Start Website Crawl";
       case 'single-site':
-        return loading ? "Adding Page..." : "Add Single Page";
+        return "Add Single Page";
       case 'sitemap':
-        return loading ? "Starting Sitemap Crawl..." : "Start Sitemap Crawl";
+        return "Start Sitemap Crawl";
       default:
-        return loading ? "Processing..." : "Start Crawl";
+        return "Start Crawl";
     }
   };
+
+  const isLoading = isSubmitting || crawlLoading;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           Enhanced Website Crawl V3
-          <div className="text-sm font-normal text-gray-600">
+          <div className="text-sm font-normal text-gray-600 flex items-center gap-2">
+            {infrastructureLoading && <AlertCircle className="h-4 w-4 animate-spin" />}
             Infrastructure: {getInfrastructureStatus()} | {getQueueInfo()}
           </div>
         </CardTitle>
@@ -215,6 +246,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder={getUrlPlaceholder()}
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -231,6 +263,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                     onChange={(e) => setIncludePaths(e.target.value)}
                     placeholder="/blog, /docs, /help"
                     className="mt-1"
+                    disabled={isLoading}
                   />
                   <p className="text-sm text-gray-500 mt-1">
                     Comma-separated paths to include
@@ -246,6 +279,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                     onChange={(e) => setExcludePaths(e.target.value)}
                     placeholder="/admin, /private, /login"
                     className="mt-1"
+                    disabled={isLoading}
                   />
                   <p className="text-sm text-gray-500 mt-1">
                     Comma-separated paths to exclude
@@ -283,7 +317,11 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                     {/* Max Pages */}
                     <div>
                       <Label htmlFor="maxPages">Max Pages</Label>
-                      <Select value={maxPages.toString()} onValueChange={(value) => setMaxPages(parseInt(value))}>
+                      <Select 
+                        value={maxPages.toString()} 
+                        onValueChange={(value) => setMaxPages(parseInt(value))}
+                        disabled={isLoading}
+                      >
                         <SelectTrigger className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -303,7 +341,11 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                     {activeTab === 'website' && (
                       <div>
                         <Label htmlFor="maxDepth">Max Depth</Label>
-                        <Select value={maxDepth.toString()} onValueChange={(value) => setMaxDepth(parseInt(value))}>
+                        <Select 
+                          value={maxDepth.toString()} 
+                          onValueChange={(value) => setMaxDepth(parseInt(value))}
+                          disabled={isLoading}
+                        >
                           <SelectTrigger className="mt-1">
                             <SelectValue />
                           </SelectTrigger>
@@ -327,6 +369,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                       checked={respectRobots}
                       onChange={(e) => setRespectRobots(e.target.checked)}
                       className="rounded border-gray-300"
+                      disabled={isLoading}
                     />
                     <Label htmlFor="respectRobots" className="text-sm">
                       Respect robots.txt and crawl delays
@@ -340,7 +383,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
             <div className="flex justify-end">
               <Button
                 type="submit"
-                disabled={loading || !url.trim()}
+                disabled={isLoading || !url.trim()}
                 className="px-8"
               >
                 {getButtonText()}

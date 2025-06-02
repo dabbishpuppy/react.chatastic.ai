@@ -9,6 +9,7 @@ import { insertSourcePagesInBatches, createParentSource, updateParentSourceStatu
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 // Initialize Supabase client
@@ -22,8 +23,37 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Method not allowed' }),
+      { 
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
+    );
+  }
+
   try {
-    const requestBody: EnhancedCrawlRequest = await req.json();
+    // Parse request body with error handling
+    let requestBody: EnhancedCrawlRequest;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('❌ Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid JSON in request body',
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
     const { 
       agentId, 
       url, 
@@ -39,6 +69,7 @@ serve(async (req) => {
 
     console.log('🚀 Starting enhanced crawl for agent', agentId, ', URL:', url);
 
+    // Validate required fields
     if (!agentId || !url) {
       throw new Error('Missing required fields: agentId and url');
     }
@@ -63,15 +94,40 @@ serve(async (req) => {
       priority: `${typeof safePriority} (${safePriority})`
     });
 
-    // Get agent and team information
-    const { data: agent, error: agentError } = await supabase
-      .from('agents')
-      .select('id, team_id')
-      .eq('id', agentId)
-      .single();
+    // Get agent and team information with retry logic
+    let agent;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    if (agentError || !agent) {
-      console.error('❌ Agent lookup error:', agentError);
+    while (retryCount < maxRetries) {
+      try {
+        const { data: agentData, error: agentError } = await supabase
+          .from('agents')
+          .select('id, team_id')
+          .eq('id', agentId)
+          .single();
+
+        if (agentError) {
+          console.error(`❌ Agent lookup error (attempt ${retryCount + 1}):`, agentError);
+          if (retryCount === maxRetries - 1) {
+            throw new Error(`Agent not found: ${agentError.message}`);
+          }
+        } else {
+          agent = agentData;
+          break;
+        }
+      } catch (lookupError) {
+        console.error(`❌ Agent lookup failed (attempt ${retryCount + 1}):`, lookupError);
+        if (retryCount === maxRetries - 1) {
+          throw new Error('Agent lookup failed after multiple attempts');
+        }
+      }
+      
+      retryCount++;
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+    }
+
+    if (!agent) {
       throw new Error('Agent not found');
     }
 
@@ -82,26 +138,36 @@ serve(async (req) => {
       throw new Error(`Invalid team_id type: expected string, got ${typeof agent.team_id}`);
     }
 
-    // Discover URLs based on crawl mode
+    // Discover URLs based on crawl mode with timeout
     let discoveredUrls: string[] = [];
     
     try {
-      switch (crawlMode) {
-        case 'single-page':
-          discoveredUrls = [url];
-          break;
-        case 'sitemap-only':
-          discoveredUrls = await discoverSitemapLinks(url);
-          break;
-        case 'full-website':
-        default:
-          discoveredUrls = await discoverLinks(url, excludePaths, includePaths, maxPages);
-          break;
-      }
+      console.log(`🔍 Starting URL discovery for mode: ${crawlMode}`);
+      
+      const discoveryPromise = (async () => {
+        switch (crawlMode) {
+          case 'single-page':
+            return [url];
+          case 'sitemap-only':
+            return await discoverSitemapLinks(url);
+          case 'full-website':
+          default:
+            return await discoverLinks(url, excludePaths, includePaths, maxPages);
+        }
+      })();
+
+      // Add timeout to discovery
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('URL discovery timeout')), 30000); // 30 second timeout
+      });
+
+      discoveredUrls = await Promise.race([discoveryPromise, timeoutPromise]) as string[];
+      
     } catch (discoveryError) {
       console.error('❌ URL discovery error:', discoveryError);
       // Fallback to single URL to ensure we have something to process
       discoveredUrls = [url];
+      console.log('🔄 Falling back to single URL due to discovery error');
     }
 
     console.log(`📊 Discovery completed: ${discoveredUrls.length} URLs found`);
@@ -110,16 +176,35 @@ serve(async (req) => {
       throw new Error('No URLs discovered for crawling');
     }
 
-    // Create parent source
-    const parentSource = await createParentSource(agentId, agent.team_id, {
-      url,
-      totalJobs: discoveredUrls.length,
-      respectRobots,
-      crawlMode,
-      enableCompression,
-      enableDeduplication,
-      priority: safePriority  // Use the string-safe priority
-    });
+    // Create parent source with retry logic
+    let parentSource;
+    retryCount = 0;
+
+    while (retryCount < maxRetries) {
+      try {
+        parentSource = await createParentSource(agentId, agent.team_id, {
+          url,
+          totalJobs: discoveredUrls.length,
+          respectRobots,
+          crawlMode,
+          enableCompression,
+          enableDeduplication,
+          priority: safePriority
+        });
+        break;
+      } catch (createError) {
+        console.error(`❌ Parent source creation failed (attempt ${retryCount + 1}):`, createError);
+        if (retryCount === maxRetries - 1) {
+          throw new Error(`Failed to create parent source: ${createError.message}`);
+        }
+        retryCount++;
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+      }
+    }
+
+    if (!parentSource) {
+      throw new Error('Failed to create parent source after multiple attempts');
+    }
 
     console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
@@ -173,15 +258,19 @@ serve(async (req) => {
       console.error('❌ Source pages insertion failed:', insertError);
       
       // Update parent source to failed status
-      await updateParentSourceStatus(parentSource.id, 'failed', {
-        discoveryCompleted: true,
-        totalChildren: 0,
-        additionalMetadata: {
-          ...parentSource.metadata,
-          insertion_failed_at: new Date().toISOString(),
-          insertion_error: insertError instanceof Error ? insertError.message : String(insertError)
-        }
-      });
+      try {
+        await updateParentSourceStatus(parentSource.id, 'failed', {
+          discoveryCompleted: true,
+          totalChildren: 0,
+          additionalMetadata: {
+            ...parentSource.metadata,
+            insertion_failed_at: new Date().toISOString(),
+            insertion_error: insertError instanceof Error ? insertError.message : String(insertError)
+          }
+        });
+      } catch (updateError) {
+        console.error('❌ Failed to update parent source status:', updateError);
+      }
 
       throw new Error(`Source pages insertion failed: ${insertError instanceof Error ? insertError.message : String(insertError)}`);
     }
@@ -197,7 +286,7 @@ serve(async (req) => {
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400
+        status: 500
       }
     );
   }
