@@ -22,8 +22,7 @@ export const useSourcesListLogic = (
     setOptimisticSources(sources);
   }, [sources]);
 
-  const handleDeleteClick = (source: AgentSource, event: React.MouseEvent) => {
-    event.stopPropagation();
+  const handleDeleteClick = (source: AgentSource) => {
     setDeleteSource(source);
   };
 
