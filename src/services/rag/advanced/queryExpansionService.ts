@@ -1,7 +1,7 @@
 
 import { ConversationContextManager, ContextualQuery } from './conversationContextManager';
 import { QueryExpansion } from './types';
-import { ExpansionStrategiesManager } from './expansionStrategies';
+import { ExpansionStrategiesManager, ExpansionStrategy } from './expansionStrategies';
 import { SynonymService } from './synonymService';
 import { ConceptExpansionService } from './conceptExpansionService';
 import { ExpansionEngine } from './expansionEngine';
@@ -13,7 +13,7 @@ export class QueryExpansionService {
     query: string,
     agentId: string,
     conversationId?: string,
-    strategies?: Partial<Record<string, import('./expansionStrategies').ExpansionStrategy>>
+    strategies?: Partial<Record<string, ExpansionStrategy>>
   ): Promise<QueryExpansion> {
     console.log('🔍 Expanding query:', { query: query.substring(0, 50) + '...' });
 
@@ -95,13 +95,13 @@ export class QueryExpansionService {
     return expansions;
   }
 
-  static getExpansionStrategies(): Record<string, import('./expansionStrategies').ExpansionStrategy> {
+  static getExpansionStrategies(): Record<string, ExpansionStrategy> {
     return ExpansionStrategiesManager.getExpansionStrategies();
   }
 
   static updateExpansionStrategy(
     strategyName: string,
-    updates: Partial<import('./expansionStrategies').ExpansionStrategy>
+    updates: Partial<ExpansionStrategy>
   ): boolean {
     return ExpansionStrategiesManager.updateExpansionStrategy(strategyName, updates);
   }
