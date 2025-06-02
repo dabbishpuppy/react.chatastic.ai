@@ -13,7 +13,7 @@ interface WebsiteSourceInfoProps {
   content?: string;
   childSources?: any[];
   isChild?: boolean;
-  sourcePages?: { id: string; status: string }[];
+  sourcePages?: { id: string; status: string; content_size?: number }[];
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -32,6 +32,10 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // For parent sources, show count from sourcePages if available, otherwise use linksCount
   const displayLinksCount = !isChild ? (sourcePages?.length || linksCount || 0) : undefined;
   
+  // Calculate total size from sourcePages for parent sources
+  const totalSize = !isChild && sourcePages?.length ? 
+    sourcePages.reduce((sum, page) => sum + (page.content_size || 0), 0) : 0;
+  
   // Calculate status counts from sourcePages for parent sources
   const statusCounts = !isChild && sourcePages?.length ? {
     completed: sourcePages.filter(p => p.status === 'completed').length,
@@ -47,6 +51,13 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     } catch {
       return url;
     }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
   const getStatusText = () => {
@@ -92,6 +103,12 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <span>{Math.round(content.length / 1024)} KB</span>
           )}
         </div>
+        
+        {!isChild && totalSize > 0 && (
+          <div className="text-xs text-gray-600 mt-1">
+            Total size: {formatBytes(totalSize)}
+          </div>
+        )}
         
         {getStatusText() && (
           <div className="text-xs text-gray-600 mt-1">

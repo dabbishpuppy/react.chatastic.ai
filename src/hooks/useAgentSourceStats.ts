@@ -1,7 +1,6 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AgentSourceStats {
@@ -15,122 +14,154 @@ interface AgentSourceStats {
   };
 }
 
-interface RPCResponse {
-  total_sources: number;
-  total_bytes: number;
-  sources_by_type: {
-    text: { count: number; size: number };
-    file: { count: number; size: number };
-    website: { count: number; size: number };
-    qa: { count: number; size: number };
-  };
-}
-
-const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats> => {
-  console.log(`📊 Fetching source stats for agent: ${agentId}`);
-  
-  const { data, error } = await supabase.rpc('get_agent_source_stats', {
-    target_agent_id: agentId
-  });
-
-  if (error) {
-    console.error('❌ Error fetching stats:', error);
-    throw error;
-  }
-
-  if (data && data.length > 0) {
-    const result = data[0] as RPCResponse;
-    const stats = {
-      totalSources: result.total_sources || 0,
-      totalBytes: result.total_bytes || 0,
-      sourcesByType: (typeof result.sources_by_type === 'object' && result.sources_by_type !== null) 
-        ? result.sources_by_type as { 
-            text: { count: number; size: number }; 
-            file: { count: number; size: number }; 
-            website: { count: number; size: number }; 
-            qa: { count: number; size: number }; 
-          }
-        : { 
-            text: { count: 0, size: 0 }, 
-            file: { count: 0, size: 0 }, 
-            website: { count: 0, size: 0 }, 
-            qa: { count: 0, size: 0 } 
-          }
-    };
-    console.log(`✅ Stats fetched:`, stats);
-    return stats;
-  } else {
-    console.log('📊 No stats data returned, using defaults');
-    return {
-      totalSources: 0,
-      totalBytes: 0,
-      sourcesByType: { 
-        text: { count: 0, size: 0 }, 
-        file: { count: 0, size: 0 }, 
-        website: { count: 0, size: 0 }, 
-        qa: { count: 0, size: 0 } 
-      }
-    };
-  }
-};
-
 export const useAgentSourceStats = () => {
   const { agentId } = useParams();
-  const queryClient = useQueryClient();
-
-  const { data: stats, isLoading: loading, error, refetch } = useQuery({
-    queryKey: ['agent-source-stats', agentId],
-    queryFn: () => fetchAgentSourceStats(agentId!),
-    enabled: !!agentId,
-    staleTime: 0, // Always consider data stale to ensure fresh fetches
-    refetchInterval: 2000, // Refetch every 2 seconds for real-time updates
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+  const [stats, setStats] = useState<AgentSourceStats>({
+    totalSources: 0,
+    totalBytes: 0,
+    sourcesByType: {
+      text: { count: 0, size: 0 },
+      file: { count: 0, size: 0 },
+      website: { count: 0, size: 0 },
+      qa: { count: 0, size: 0 }
+    }
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Set up real-time subscription for agent_sources table changes
+  const fetchStats = async () => {
+    if (!agentId) return;
+
+    try {
+      console.log('📊 Fetching agent source stats for:', agentId);
+      
+      // Get basic source stats
+      const { data: sources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('source_type, content')
+        .eq('agent_id', agentId)
+        .eq('is_active', true);
+
+      if (sourcesError) throw sourcesError;
+
+      // Get website source pages total size
+      const { data: websiteSourcesWithPages, error: websiteError } = await supabase
+        .from('agent_sources')
+        .select(`
+          id,
+          source_type,
+          content,
+          source_pages!inner(content_size)
+        `)
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .eq('is_active', true)
+        .is('parent_source_id', null);
+
+      if (websiteError) {
+        console.error('Error fetching website source pages:', websiteError);
+      }
+
+      console.log('📊 Raw sources data:', sources);
+      console.log('📊 Website sources with pages:', websiteSourcesWithPages);
+
+      // Calculate stats
+      const statsByType = {
+        text: { count: 0, size: 0 },
+        file: { count: 0, size: 0 },
+        website: { count: 0, size: 0 },
+        qa: { count: 0, size: 0 }
+      };
+
+      let totalBytes = 0;
+      let totalSources = 0;
+
+      // Process regular sources (text, file, qa)
+      sources?.forEach(source => {
+        if (source.source_type === 'website' && !source.parent_source_id) {
+          // Skip website parent sources, we'll handle them separately
+          return;
+        }
+        
+        if (source.source_type !== 'website') {
+          const contentSize = source.content ? new Blob([source.content]).size : 0;
+          statsByType[source.source_type as keyof typeof statsByType].count++;
+          statsByType[source.source_type as keyof typeof statsByType].size += contentSize;
+          totalBytes += contentSize;
+          totalSources++;
+        }
+      });
+
+      // Process website sources with their crawled pages
+      websiteSourcesWithPages?.forEach(websiteSource => {
+        statsByType.website.count++;
+        totalSources++;
+        
+        // Calculate total size from all source pages
+        const websiteSize = websiteSource.source_pages?.reduce((sum: number, page: any) => {
+          return sum + (page.content_size || 0);
+        }, 0) || 0;
+        
+        statsByType.website.size += websiteSize;
+        totalBytes += websiteSize;
+      });
+
+      console.log('📊 Calculated stats:', { totalSources, totalBytes, statsByType });
+
+      setStats({
+        totalSources,
+        totalBytes,
+        sourcesByType: statsByType
+      });
+    } catch (err: any) {
+      console.error('❌ Error fetching agent source stats:', err);
+      setError(err.message || 'Failed to fetch source stats');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, [agentId]);
+
+  // Set up real-time subscription
   useEffect(() => {
     if (!agentId) return;
 
-    console.log(`🔄 Setting up real-time subscription for agent sources: ${agentId}`);
-
     const channel = supabase
-      .channel('agent-sources-stats')
+      .channel(`agent-source-stats-${agentId}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'agent_sources',
           filter: `agent_id=eq.${agentId}`
         },
-        (payload) => {
-          console.log('📡 Real-time agent_sources change detected:', payload);
-          // Invalidate and refetch the stats query
-          queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
+        () => {
+          console.log('📡 Agent sources changed, refetching stats');
+          fetchStats();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'source_pages'
+        },
+        () => {
+          console.log('📡 Source pages changed, refetching stats');
+          fetchStats();
         }
       )
       .subscribe();
 
     return () => {
-      console.log('🔌 Cleaning up agent sources stats subscription');
       supabase.removeChannel(channel);
     };
-  }, [agentId, queryClient]);
+  }, [agentId]);
 
-  return {
-    stats: stats || {
-      totalSources: 0,
-      totalBytes: 0,
-      sourcesByType: { 
-        text: { count: 0, size: 0 }, 
-        file: { count: 0, size: 0 }, 
-        website: { count: 0, size: 0 }, 
-        qa: { count: 0, size: 0 } 
-      }
-    },
-    loading,
-    error: error?.message || null,
-    refetch
-  };
+  return { stats, loading, error, refetch: fetchStats };
 };

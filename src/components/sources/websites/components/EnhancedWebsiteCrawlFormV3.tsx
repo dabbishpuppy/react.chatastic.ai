@@ -1,228 +1,208 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
-import { useParams } from 'react-router-dom';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Globe, FileText, Map, Settings } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
+import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
 
-interface Props {
+interface EnhancedWebsiteCrawlFormV3Props {
   onCrawlStarted?: (parentSourceId: string) => void;
 }
 
-const EnhancedWebsiteCrawlFormV3: React.FC<Props> = ({ onCrawlStarted }) => {
+const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
+  onCrawlStarted
+}) => {
   const { agentId } = useParams();
-  const { initiateCrawl, isLoading } = useEnhancedCrawl();
-  
   const [url, setUrl] = useState('');
-  const [crawlMode, setCrawlMode] = useState<'full-website' | 'single-page' | 'sitemap-only'>('full-website');
-  const [maxPages, setMaxPages] = useState(100);
-  const [excludePaths, setExcludePaths] = useState('/wp-json/*, /wp-admin/*, /xmlrpc.php, /checkout/*, /cart/*');
+  const [crawlMode, setCrawlMode] = useState<'single' | 'sitemap' | 'discovery'>('discovery');
+  const [maxPages, setMaxPages] = useState(50);
+  const [maxDepth, setMaxDepth] = useState(3);
   const [respectRobots, setRespectRobots] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  const { submitEnhancedCrawl } = useEnhancedCrawl();
+  const { 
+    healthStatus, 
+    queueMetrics, 
+    connectionPoolStatus,
+    initializeInfrastructure 
+  } = useProductionInfrastructure();
+
+  // Initialize infrastructure on mount
+  useEffect(() => {
+    initializeInfrastructure();
+  }, [initializeInfrastructure]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!agentId) {
-      toast({
-        title: "Error",
-        description: "No agent ID found",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!agentId || !url.trim()) return;
 
-    if (!url.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a URL",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate sitemap URL
-    if (crawlMode === 'sitemap-only' && !url.toLowerCase().includes('sitemap')) {
-      toast({
-        title: "Warning",
-        description: "For sitemap crawling, the URL should typically end with 'sitemap.xml' or contain 'sitemap'",
-        variant: "destructive"
-      });
-      return;
-    }
-
+    setLoading(true);
     try {
-      const excludePathsArray = excludePaths
-        .split(',')
-        .map(path => path.trim())
-        .filter(path => path.length > 0);
-
-      const result = await initiateCrawl({
-        agentId,
+      console.log('🚀 Starting enhanced crawl with V3 form:', {
         url: url.trim(),
         crawlMode,
-        maxPages: crawlMode === 'single-page' ? 1 : maxPages,
-        excludePaths: excludePathsArray,
+        maxPages,
+        maxDepth,
         respectRobots,
-        enableCompression: true,
-        enableDeduplication: true,
-        priority: 'normal'
+        agentId
       });
 
-      if (result && onCrawlStarted) {
-        onCrawlStarted(result.parentSourceId);
+      const result = await submitEnhancedCrawl({
+        url: url.trim(),
+        agentId,
+        crawlMode,
+        maxPages,
+        maxDepth,
+        respectRobots
+      });
+
+      if (result.success && result.parentSourceId) {
+        toast({
+          title: "Enhanced Crawl Started Successfully",
+          description: `Your ${crawlMode} crawl has been initiated with production infrastructure. Monitoring ${result.parentSourceId}`,
+        });
+
+        onCrawlStarted?.(result.parentSourceId);
+        setUrl('');
+      } else {
+        throw new Error(result.error || 'Failed to start crawl');
       }
-
-      // Clear form
-      setUrl('');
-      setCrawlMode('full-website');
-      setMaxPages(100);
-      setExcludePaths('/wp-json/*, /wp-admin/*, /xmlrpc.php, /checkout/*, /cart/*');
-      setRespectRobots(true);
-
-    } catch (error) {
-      console.error('Error starting crawl:', error);
+    } catch (error: any) {
+      console.error('❌ Enhanced crawl submission failed:', error);
+      toast({
+        title: "Crawl Failed",
+        description: error.message || "Failed to start the enhanced crawl",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getPlaceholder = () => {
-    switch (crawlMode) {
-      case 'full-website':
-        return 'https://example.com';
-      case 'single-page':
-        return 'https://example.com/specific-page';
-      case 'sitemap-only':
-        return 'https://example.com/sitemap.xml';
-    }
+  const getInfrastructureStatus = () => {
+    if (!healthStatus) return '🔄 Initializing...';
+    
+    const isHealthy = healthStatus.database && healthStatus.queue && healthStatus.workers;
+    return isHealthy ? '✅ Operational' : '⚠️ Degraded';
   };
 
-  const getCrawlModeDescription = () => {
-    switch (crawlMode) {
-      case 'full-website':
-        return 'Crawl the entire website by discovering and following all internal links';
-      case 'single-page':
-        return 'Crawl only the specific URL provided, no link discovery';
-      case 'sitemap-only':
-        return 'Parse sitemap.xml file and crawl only URLs listed in the sitemap';
-    }
+  const getQueueInfo = () => {
+    if (!queueMetrics) return 'Queue: Loading...';
+    return `Queue: ${queueMetrics.pending || 0} pending, ${queueMetrics.active || 0} active`;
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          Enhanced Website Crawling
+        <CardTitle className="flex items-center justify-between">
+          Enhanced Website Crawl V3
+          <div className="text-sm font-normal text-gray-600">
+            Infrastructure: {getInfrastructureStatus()} | {getQueueInfo()}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Crawl Mode Selection with Tabs */}
-          <div className="space-y-2">
-            <Label>Crawl Mode</Label>
-            <Tabs value={crawlMode} onValueChange={(value: any) => setCrawlMode(value)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="full-website" className="flex items-center gap-2">
-                  <Globe className="w-4 h-4" />
-                  Full Website
-                </TabsTrigger>
-                <TabsTrigger value="single-page" className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Single Page
-                </TabsTrigger>
-                <TabsTrigger value="sitemap-only" className="flex items-center gap-2">
-                  <Map className="w-4 h-4" />
-                  Sitemap Only
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <p className="text-sm text-muted-foreground">
-              {getCrawlModeDescription()}
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* URL Input */}
+            <div className="md:col-span-2">
+              <Label htmlFor="url">Website URL</Label>
+              <Input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://example.com"
+                required
+                className="mt-1"
+              />
+            </div>
+
+            {/* Crawl Mode */}
+            <div>
+              <Label htmlFor="crawlMode">Crawl Mode</Label>
+              <Select value={crawlMode} onValueChange={(value: 'single' | 'sitemap' | 'discovery') => setCrawlMode(value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="single">Single Page</SelectItem>
+                  <SelectItem value="sitemap">Sitemap Discovery</SelectItem>
+                  <SelectItem value="discovery">Smart Discovery</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Max Pages */}
+            {crawlMode !== 'single' && (
+              <div>
+                <Label htmlFor="maxPages">Max Pages</Label>
+                <Select value={maxPages.toString()} onValueChange={(value) => setMaxPages(parseInt(value))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 pages</SelectItem>
+                    <SelectItem value="25">25 pages</SelectItem>
+                    <SelectItem value="50">50 pages</SelectItem>
+                    <SelectItem value="100">100 pages</SelectItem>
+                    <SelectItem value="250">250 pages</SelectItem>
+                    <SelectItem value="500">500 pages</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Max Depth */}
+            {crawlMode === 'discovery' && (
+              <div>
+                <Label htmlFor="maxDepth">Max Depth</Label>
+                <Select value={maxDepth.toString()} onValueChange={(value) => setMaxDepth(parseInt(value))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 level</SelectItem>
+                    <SelectItem value="2">2 levels</SelectItem>
+                    <SelectItem value="3">3 levels</SelectItem>
+                    <SelectItem value="4">4 levels</SelectItem>
+                    <SelectItem value="5">5 levels</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Respect Robots */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="respectRobots"
+                checked={respectRobots}
+                onChange={(e) => setRespectRobots(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="respectRobots" className="text-sm">
+                Respect robots.txt
+              </Label>
+            </div>
           </div>
 
-          {/* URL Input */}
-          <div className="space-y-2">
-            <Label htmlFor="url">Website URL</Label>
-            <Input
-              id="url"
-              type="url"
-              placeholder={getPlaceholder()}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-            />
+          {/* Submit Button - Right aligned */}
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              disabled={loading || !url.trim()}
+              className="px-8"
+            >
+              {loading ? "Starting Crawl..." : "Start Website Crawl"}
+            </Button>
           </div>
-
-          {/* Advanced Settings Accordion */}
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="advanced">
-              <AccordionTrigger className="flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                Advanced Settings
-              </AccordionTrigger>
-              <AccordionContent className="space-y-4 pt-4">
-                {/* Max Pages - Only show for full website mode */}
-                {crawlMode === 'full-website' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="maxPages">Maximum Pages to Crawl</Label>
-                    <Input
-                      id="maxPages"
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={maxPages}
-                      onChange={(e) => setMaxPages(parseInt(e.target.value) || 100)}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Limit the number of pages to crawl (1-1000)
-                    </p>
-                  </div>
-                )}
-
-                {/* Exclude Paths - Only show for full website and sitemap modes */}
-                {(crawlMode === 'full-website' || crawlMode === 'sitemap-only') && (
-                  <div className="space-y-2">
-                    <Label htmlFor="excludePaths">Exclude Paths</Label>
-                    <Textarea
-                      id="excludePaths"
-                      placeholder="/wp-json/*, /wp-admin/*, /checkout/*"
-                      value={excludePaths}
-                      onChange={(e) => setExcludePaths(e.target.value)}
-                      rows={3}
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Comma-separated list of paths to exclude (wildcards supported with *)
-                    </p>
-                  </div>
-                )}
-
-                {/* Respect Robots.txt */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="respectRobots"
-                    checked={respectRobots}
-                    onCheckedChange={setRespectRobots}
-                  />
-                  <Label htmlFor="respectRobots">Respect robots.txt</Label>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Follow robots.txt directives when crawling (recommended)
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          {/* Submit Button */}
-          <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? 'Starting Crawl...' : `Start ${crawlMode === 'single-page' ? 'Single Page' : crawlMode === 'sitemap-only' ? 'Sitemap' : 'Website'} Crawl`}
-          </Button>
         </form>
       </CardContent>
     </Card>

@@ -54,7 +54,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     try {
       const { data, error } = await supabase
         .from('source_pages')
-        .select('id, status')
+        .select('id, status, content_size')
         .eq('parent_source_id', source.id);
 
       if (error) {
