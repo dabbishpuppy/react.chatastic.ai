@@ -1,4 +1,3 @@
-
 import { RAGRetrainingService } from './ragRetrainingService';
 import { RAGModelManagement } from './ragModelManagement';
 import { PerformanceMonitor } from '../performance/performanceMonitor';
@@ -165,7 +164,7 @@ export class RAGAgentLifecycle {
         issues.push('Critical retraining needed');
         recommendations.push('Schedule immediate retraining');
       } else if (retrainingCheck.urgency === 'medium') {
-        status = status === 'critical' ? 'critical' : 'warning';
+        status = 'warning';
         issues.push('Retraining recommended');
         recommendations.push('Schedule retraining within 24 hours');
       }
@@ -240,7 +239,7 @@ export class RAGAgentLifecycle {
       issues.push('Low relevance scores');
       recommendations.push('Retrain with better data');
     } else if (mockPerformance.averageRelevanceScore < 0.7) {
-      status = status === 'critical' ? 'critical' : 'warning';
+      status = 'warning';
       issues.push('Declining relevance scores');
       recommendations.push('Consider knowledge base updates');
     }

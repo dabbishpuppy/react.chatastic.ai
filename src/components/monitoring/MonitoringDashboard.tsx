@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, Play, Square, Settings } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { ServiceOrchestrator } from '@/services/rag/enhanced/serviceOrchestrator';
 import { MetricsCollectionService } from '@/services/rag/enhanced/metricsCollectionService';
 import { AlertingService } from '@/services/rag/enhanced/alertingService';
 import { ServiceStatusCard } from './ServiceStatusCard';
 import { SystemOverview } from './SystemOverview';
 import { AlertsPanel } from './AlertsPanel';
+import { ServiceControlPanel } from './ServiceControlPanel';
 
 export const MonitoringDashboard: React.FC = () => {
   const [orchestratorStatus, setOrchestratorStatus] = useState<any>(null);
@@ -134,53 +134,12 @@ export const MonitoringDashboard: React.FC = () => {
       </div>
 
       {/* Control Panel */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Service Control
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 items-center">
-            <div className="flex gap-2">
-              <Button
-                onClick={handleStartServices}
-                disabled={isLoading || orchestratorStatus?.isRunning}
-                size="sm"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Start All Services
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleStopServices}
-                disabled={isLoading || !orchestratorStatus?.isRunning}
-                size="sm"
-              >
-                <Square className="h-4 w-4 mr-2" />
-                Stop All Services
-              </Button>
-            </div>
-            
-            {orchestratorStatus && (
-              <div className="flex items-center gap-4 text-sm">
-                <div>
-                  Status: <span className={orchestratorStatus.isRunning ? 'text-green-600' : 'text-red-600'}>
-                    {orchestratorStatus.isRunning ? 'Running' : 'Stopped'}
-                  </span>
-                </div>
-                <div>
-                  Uptime: {Math.floor(orchestratorStatus.uptime / 60)}m {orchestratorStatus.uptime % 60}s
-                </div>
-                <div>
-                  Health: <span className="font-medium">{orchestratorStatus.overallHealth}%</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <ServiceControlPanel
+        orchestratorStatus={orchestratorStatus}
+        isLoading={isLoading}
+        onStartServices={handleStartServices}
+        onStopServices={handleStopServices}
+      />
 
       {/* Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-4">

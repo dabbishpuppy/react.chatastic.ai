@@ -1,30 +1,9 @@
 
 import { useState, useCallback } from 'react';
-import { 
-  ragIntegrationTests, 
-  advancedRAGTests,
-  OrchestrationTests,
-  ServiceOrchestrationTests,
-  IntegrationTests,
-  enhancedQueryEngineTests,
-  type TestResult, 
-  type PerformanceBenchmark,
-  type AdvancedRAGTestResult,
-  type OrchestrationTestResult,
-  type ServiceOrchestrationTestResult,
-  type IntegrationTestResult,
-  type EnhancedQueryEngineTestResult
-} from '@/services/rag/testing';
+import { useBasicRAGTesting } from './useBasicRAGTesting';
+import { useAdvancedRAGTesting } from './useAdvancedRAGTesting';
 
 export const useRAGTesting = () => {
-  const [isRunning, setIsRunning] = useState(false);
-  const [testResults, setTestResults] = useState<TestResult[]>([]);
-  const [advancedTestResults, setAdvancedTestResults] = useState<AdvancedRAGTestResult[]>([]);
-  const [orchestrationTestResults, setOrchestrationTestResults] = useState<OrchestrationTestResult[]>([]);
-  const [serviceOrchestrationTestResults, setServiceOrchestrationTestResults] = useState<ServiceOrchestrationTestResult[]>([]);
-  const [integrationTestResults, setIntegrationTestResults] = useState<IntegrationTestResult[]>([]);
-  const [enhancedQueryEngineTestResults, setEnhancedQueryEngineTestResults] = useState<EnhancedQueryEngineTestResult[]>([]);
-  const [benchmarks, setBenchmarks] = useState<PerformanceBenchmark[]>([]);
   const [summary, setSummary] = useState<{
     totalTests: number;
     passed: number;
@@ -32,121 +11,14 @@ export const useRAGTesting = () => {
     averageDuration: number;
   } | null>(null);
 
-  // Run all integration tests
-  const runTests = useCallback(async () => {
-    setIsRunning(true);
-    try {
-      const results = await ragIntegrationTests.runAllTests();
-      setTestResults(results.results);
-      setBenchmarks(results.benchmarks);
-      setSummary(results.summary);
-      return results;
-    } catch (error) {
-      console.error('Failed to run RAG tests:', error);
-      throw error;
-    } finally {
-      setIsRunning(false);
-    }
-  }, []);
-
-  // Run advanced RAG tests
-  const runAdvancedTests = useCallback(async () => {
-    setIsRunning(true);
-    try {
-      const results = await advancedRAGTests.runAllTests();
-      setAdvancedTestResults(results);
-      
-      const summary = advancedRAGTests.getTestSummary();
-      setSummary(summary);
-      
-      return results;
-    } catch (error) {
-      console.error('Failed to run advanced RAG tests:', error);
-      throw error;
-    } finally {
-      setIsRunning(false);
-    }
-  }, []);
-
-  // Run orchestration tests
-  const runOrchestrationTests = useCallback(async () => {
-    setIsRunning(true);
-    try {
-      const results = await OrchestrationTests.runAllTests();
-      setOrchestrationTestResults(results);
-      
-      const summary = OrchestrationTests.getTestSummary();
-      setSummary(summary);
-      
-      return results;
-    } catch (error) {
-      console.error('Failed to run orchestration tests:', error);
-      throw error;
-    } finally {
-      setIsRunning(false);
-    }
-  }, []);
-
-  // Run service orchestration tests
-  const runServiceOrchestrationTests = useCallback(async () => {
-    setIsRunning(true);
-    try {
-      const results = await ServiceOrchestrationTests.runAllTests();
-      setServiceOrchestrationTestResults(results);
-      
-      const summary = ServiceOrchestrationTests.getTestSummary();
-      setSummary(summary);
-      
-      return results;
-    } catch (error) {
-      console.error('Failed to run service orchestration tests:', error);
-      throw error;
-    } finally {
-      setIsRunning(false);
-    }
-  }, []);
-
-  // Run integration tests
-  const runIntegrationTests = useCallback(async () => {
-    setIsRunning(true);
-    try {
-      const results = await IntegrationTests.runAllTests();
-      setIntegrationTestResults(results);
-      
-      const summary = IntegrationTests.getTestSummary();
-      setSummary(summary);
-      
-      return results;
-    } catch (error) {
-      console.error('Failed to run integration tests:', error);
-      throw error;
-    } finally {
-      setIsRunning(false);
-    }
-  }, []);
-
-  // Run enhanced query engine tests
-  const runEnhancedQueryEngineTests = useCallback(async () => {
-    setIsRunning(true);
-    try {
-      const results = await enhancedQueryEngineTests.runAllTests();
-      setEnhancedQueryEngineTestResults(results);
-      
-      const summary = enhancedQueryEngineTests.getTestSummary();
-      setSummary(summary);
-      
-      return results;
-    } catch (error) {
-      console.error('Failed to run enhanced query engine tests:', error);
-      throw error;
-    } finally {
-      setIsRunning(false);
-    }
-  }, []);
+  const basicTesting = useBasicRAGTesting();
+  const advancedTesting = useAdvancedRAGTesting();
 
   // Run all tests (updated to include enhanced query engine tests)
   const runAllTests = useCallback(async () => {
-    setIsRunning(true);
+    const isRunning = basicTesting.isRunning || advancedTesting.isRunning;
+    if (isRunning) return;
+
     try {
       const [
         integrationResults, 
@@ -156,17 +28,15 @@ export const useRAGTesting = () => {
         fullIntegrationResults,
         enhancedQueryEngineResults
       ] = await Promise.all([
-        ragIntegrationTests.runAllTests(),
-        advancedRAGTests.runAllTests(),
-        OrchestrationTests.runAllTests(),
-        ServiceOrchestrationTests.runAllTests(),
-        IntegrationTests.runAllTests(),
-        enhancedQueryEngineTests.runAllTests()
+        basicTesting.runTests(),
+        advancedTesting.runAdvancedTests(),
+        advancedTesting.runOrchestrationTests(),
+        advancedTesting.runServiceOrchestrationTests(),
+        advancedTesting.runIntegrationTests(),
+        advancedTesting.runEnhancedQueryEngineTests()
       ]);
 
-      setEnhancedQueryEngineTestResults(enhancedQueryEngineResults);
-
-      // Combine summaries (updated)
+      // Combine summaries
       const combinedSummary = {
         totalTests: integrationResults.summary.totalTests + 
                    advancedResults.length + 
@@ -210,68 +80,37 @@ export const useRAGTesting = () => {
     } catch (error) {
       console.error('Failed to run all RAG tests:', error);
       throw error;
-    } finally {
-      setIsRunning(false);
     }
-  }, []);
+  }, [basicTesting, advancedTesting]);
 
-  // Get detailed report (updated)
-  const getDetailedReport = useCallback(() => {
-    const integrationReport = ragIntegrationTests.generateDetailedReport();
-    const advancedSummary = advancedRAGTests.getTestSummary();
-    const orchestrationSummary = OrchestrationTests.getTestSummary();
-    const serviceOrchestrationSummary = ServiceOrchestrationTests.getTestSummary();
-    const integrationSummary = IntegrationTests.getTestSummary();
-    const enhancedQueryEngineSummary = enhancedQueryEngineTests.getTestSummary();
-    
-    return {
-      ...integrationReport,
-      advancedTestResults,
-      orchestrationTestResults,
-      serviceOrchestrationTestResults,
-      integrationTestResults,
-      enhancedQueryEngineTestResults,
-      advancedSummary,
-      orchestrationSummary,
-      serviceOrchestrationSummary,
-      integrationSummary,
-      enhancedQueryEngineSummary
-    };
-  }, [advancedTestResults, orchestrationTestResults, serviceOrchestrationTestResults, integrationTestResults, enhancedQueryEngineTestResults]);
-
-  // Clear test results (updated)
+  // Clear all results
   const clearResults = useCallback(() => {
-    setTestResults([]);
-    setAdvancedTestResults([]);
-    setOrchestrationTestResults([]);
-    setServiceOrchestrationTestResults([]);
-    setIntegrationTestResults([]);
-    setEnhancedQueryEngineTestResults([]);
-    setBenchmarks([]);
+    basicTesting.clearResults();
+    advancedTesting.clearResults();
     setSummary(null);
-  }, []);
+  }, [basicTesting, advancedTesting]);
 
   return {
-    // State (updated)
-    isRunning,
-    testResults,
-    advancedTestResults,
-    orchestrationTestResults,
-    serviceOrchestrationTestResults,
-    integrationTestResults,
-    enhancedQueryEngineTestResults,
-    benchmarks,
+    // State
+    isRunning: basicTesting.isRunning || advancedTesting.isRunning,
+    testResults: basicTesting.testResults,
+    advancedTestResults: advancedTesting.advancedTestResults,
+    orchestrationTestResults: advancedTesting.orchestrationTestResults,
+    serviceOrchestrationTestResults: advancedTesting.serviceOrchestrationTestResults,
+    integrationTestResults: advancedTesting.integrationTestResults,
+    enhancedQueryEngineTestResults: advancedTesting.enhancedQueryEngineTestResults,
+    benchmarks: basicTesting.benchmarks,
     summary,
 
-    // Actions (updated)
-    runTests: runTests,
-    runAdvancedTests: runAdvancedTests,
-    runOrchestrationTests: runOrchestrationTests,
-    runServiceOrchestrationTests: runServiceOrchestrationTests,
-    runIntegrationTests,
-    runEnhancedQueryEngineTests,
+    // Actions
+    runTests: basicTesting.runTests,
+    runAdvancedTests: advancedTesting.runAdvancedTests,
+    runOrchestrationTests: advancedTesting.runOrchestrationTests,
+    runServiceOrchestrationTests: advancedTesting.runServiceOrchestrationTests,
+    runIntegrationTests: advancedTesting.runIntegrationTests,
+    runEnhancedQueryEngineTests: advancedTesting.runEnhancedQueryEngineTests,
     runAllTests,
-    getDetailedReport,
+    getDetailedReport: basicTesting.getDetailedReport,
     clearResults
   };
 };

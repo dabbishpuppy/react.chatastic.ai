@@ -1,14 +1,12 @@
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { useRAGTesting } from '@/hooks/useRAGTesting';
 import { RAGSystemValidator } from '@/utils/ragSystemValidator';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { FailedTestsPanel } from './FailedTestsPanel';
 import { TestSummaryCard } from './TestSummaryCard';
 import { DetailedTestResults } from './DetailedTestResults';
+import { TestControlPanel } from './TestControlPanel';
+import { SystemValidationResults } from './SystemValidationResults';
 
 export const RAGSystemTestRunner = () => {
   const {
@@ -63,19 +61,6 @@ export const RAGSystemTestRunner = () => {
     }
   };
 
-  const getTestStatusIcon = (passed: boolean) => {
-    return passed ? (
-      <CheckCircle className="h-4 w-4 text-green-500" />
-    ) : (
-      <XCircle className="h-4 w-4 text-red-500" />
-    );
-  };
-
-  const getProgressPercentage = () => {
-    if (!summary) return 0;
-    return summary.totalTests > 0 ? (summary.passed / summary.totalTests) * 100 : 0;
-  };
-
   // Collect all test results for display
   const getAllTestResults = () => {
     const allResults = [
@@ -110,77 +95,21 @@ export const RAGSystemTestRunner = () => {
     return failedTests;
   };
 
-  const failedTests = getAllFailedTests();
   const allTestResults = getAllTestResults();
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            RAG System Integration Tests
-          </CardTitle>
-          <CardDescription>
-            Comprehensive testing suite for refactored orchestration services
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
-            <Button 
-              onClick={handleRunAllTests} 
-              disabled={isRunning}
-              className="flex-1"
-            >
-              {isRunning ? 'Running Tests...' : 'Run All Tests'}
-            </Button>
-            <Button 
-              onClick={runOrchestrationTests} 
-              disabled={isRunning}
-              variant="outline"
-            >
-              Orchestration Tests
-            </Button>
-            <Button 
-              onClick={runServiceOrchestrationTests} 
-              disabled={isRunning}
-              variant="outline"
-            >
-              Service Tests
-            </Button>
-            <Button 
-              onClick={runIntegrationTests} 
-              disabled={isRunning}
-              variant="outline"
-            >
-              Integration Tests
-            </Button>
-          </div>
-
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleSystemValidation} 
-              disabled={isValidating}
-              variant="secondary"
-            >
-              {isValidating ? 'Validating...' : 'Validate System'}
-            </Button>
-            <Button onClick={clearResults} variant="ghost">
-              Clear Results
-            </Button>
-          </div>
-
-          {isRunning && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Running tests...</span>
-                <span>{summary ? `${summary.passed}/${summary.totalTests}` : '0/0'}</span>
-              </div>
-              <Progress value={getProgressPercentage()} className="w-full" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <TestControlPanel
+        isRunning={isRunning}
+        summary={summary}
+        onRunAllTests={handleRunAllTests}
+        onRunOrchestrationTests={runOrchestrationTests}
+        onRunServiceOrchestrationTests={runServiceOrchestrationTests}
+        onRunIntegrationTests={runIntegrationTests}
+        onValidateSystem={handleSystemValidation}
+        onClearResults={clearResults}
+        isValidating={isValidating}
+      />
 
       {summary && <TestSummaryCard summary={summary} />}
 
@@ -193,44 +122,7 @@ export const RAGSystemTestRunner = () => {
       )}
 
       {validationResults && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {validationResults.success ? (
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-500" />
-              )}
-              System Validation Results
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 rounded-lg bg-gray-50">
-              <p className={validationResults.success ? 'text-green-700' : 'text-red-700'}>
-                {validationResults.message}
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                {getTestStatusIcon(validationResults.details.importExports)}
-                <span>Import/Export Chains</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {getTestStatusIcon(validationResults.details.functionality)}
-                <span>Core Functionality</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {getTestStatusIcon(validationResults.details.performance)}
-                <span>Performance Tracking</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {getTestStatusIcon(validationResults.details.integration)}
-                <span>Service Integration</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <SystemValidationResults validationResults={validationResults} />
       )}
     </div>
   );
