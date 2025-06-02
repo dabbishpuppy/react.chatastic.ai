@@ -26,7 +26,7 @@ export class RealDatabasePartitioningService {
       const partitionedTables = [
         'crawl_jobs_part_0', 'crawl_jobs_part_1', 'crawl_jobs_part_2', 'crawl_jobs_part_3',
         'crawl_jobs_part_4', 'crawl_jobs_part_5', 'crawl_jobs_part_6', 'crawl_jobs_part_7'
-      ];
+      ] as const;
 
       const partitionStats: PartitionMetrics[] = [];
 
