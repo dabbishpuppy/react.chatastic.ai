@@ -76,7 +76,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               <MoreHorizontal size={iconSize} />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent>
+          <DropdownMenuContent className="bg-white border shadow-lg z-50">
             {showRecrawl && (
               <DropdownMenuItem 
                 onClick={() => setShowRecrawlConfirm(true)} 
