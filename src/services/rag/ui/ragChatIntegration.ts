@@ -206,10 +206,10 @@ export class RAGChatIntegration {
 
   private static formatSources(ragResponse: RAGResponse): ChatRAGResult['sources'] {
     return ragResponse.queryResult.rankedContext.chunks.map(chunk => ({
-      id: chunk.sourceId,
+      id: chunk.chunkId,
       name: chunk.metadata.sourceName,
       type: chunk.metadata.sourceType,
-      relevance: Math.round(chunk.similarity * 100) / 100
+      relevance: Math.round(chunk.relevanceScore * 100) / 100
     }));
   }
 
