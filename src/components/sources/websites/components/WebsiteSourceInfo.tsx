@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -32,8 +33,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // For parent sources, show count from sourcePages if available, otherwise use linksCount
   const displayLinksCount = !isChild ? (sourcePages?.length || linksCount || 0) : undefined;
   
-  // Calculate total size from sourcePages for parent sources
-  const totalSize = !isChild && sourcePages?.length ? 
+  // Calculate total compressed size from sourcePages for parent sources
+  const totalCompressedSize = !isChild && sourcePages?.length ? 
     sourcePages.reduce((sum, page) => sum + (page.content_size || 0), 0) : 0;
   
   // Calculate status counts from sourcePages for parent sources
@@ -78,6 +79,18 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     return null;
   };
 
+  // Create a mock source object for the formatter to handle size calculation properly
+  const sourceForSizeCalculation = {
+    source_type: 'website',
+    metadata: {
+      ...metadata,
+      total_content_size: totalCompressedSize > 0 ? totalCompressedSize : undefined,
+      compressed_size: metadata?.compressed_size,
+      file_size: metadata?.file_size
+    },
+    content: content
+  };
+
   return (
     <div className="flex items-center">
       <div className="w-3 h-3 rounded-full bg-blue-500 mr-3 flex-shrink-0"></div>
@@ -98,10 +111,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </>
           )}
           
-          {!isChild && totalSize > 0 && (
+          {!isChild && totalCompressedSize > 0 && (
             <>
               <span>•</span>
-              <span>{formatBytes(totalSize)}</span>
+              <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
+            </>
+          )}
+          
+          {isChild && content && (
+            <>
+              <span>•</span>
+              <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
             </>
           )}
           
@@ -109,13 +129,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <>
               <span>•</span>
               <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
-            </>
-          )}
-          
-          {content && (
-            <>
-              <span>•</span>
-              <span>{Math.round(content.length / 1024)} KB</span>
             </>
           )}
         </div>

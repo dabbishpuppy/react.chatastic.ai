@@ -180,7 +180,7 @@ serve(async (req) => {
       await processMultiplePages(source_id, agentId, teamId, url, {
         maxPages: max_pages,
         maxDepth: max_depth,
-        concurrency,
+        concurrency: concurrency,
         includePaths: include_paths,
         excludePaths: exclude_paths,
         enableContentPipeline: enable_content_pipeline
@@ -255,166 +255,6 @@ async function processSinglePage(
   }
 }
 
-async function processMultiplePages(
-  sourceId: string,
-  agentId: string, 
-  teamId: string,
-  initialUrl: string,
-  options: {
-    maxPages: number;
-    maxDepth: number;
-    concurrency: number;
-    includePaths: string[];
-    excludePaths: string[];
-    enableContentPipeline: boolean;
-  }
-) {
-  try {
-    await logCrawlEvent('info', 'Starting multiple pages processing', {
-      sourceId,
-      initialUrl,
-      options
-    });
-    
-    const discoveredUrls = await discoverUrls(initialUrl, options.maxDepth, options.maxPages);
-    await logCrawlEvent('info', 'URLs discovered', { 
-      sourceId, 
-      discoveredCount: discoveredUrls.length 
-    });
-    
-    const filteredUrls = filterUrlsByPaths(discoveredUrls, options.includePaths, options.excludePaths);
-    await logCrawlEvent('info', 'URLs filtered', { 
-      sourceId, 
-      filteredCount: filteredUrls.length,
-      originalCount: discoveredUrls.length
-    });
-    
-    const totalPages = Math.min(filteredUrls.length, options.maxPages);
-    let processedCount = 0;
-    const batchSize = options.concurrency;
-
-    // Process URLs in batches
-    for (let i = 0; i < totalPages; i += batchSize) {
-      const batch = filteredUrls.slice(i, i + batchSize);
-      
-      const batchPromises = batch.map(async (url) => {
-        try {
-          // Create child source for each URL
-          const { data: childSource } = await supabase
-            .from('agent_sources')
-            .insert({
-              agent_id: agentId,
-              team_id: teamId,
-              parent_source_id: sourceId,
-              source_type: 'website',
-              title: url,
-              url: url,
-              crawl_status: 'in_progress',
-              is_active: true
-            })
-            .select('id')
-            .single();
-
-          if (childSource) {
-            // Fetch and process the page
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; WonderwaveBot/1.0)',
-              },
-            });
-
-            if (response.ok) {
-              const htmlContent = await response.text();
-              
-              if (options.enableContentPipeline) {
-                await processWithContentPipeline(childSource.id, agentId, teamId, url, htmlContent);
-              } else {
-                await processBasicContent(childSource.id, url, htmlContent);
-              }
-
-              await updateSourceStatus(childSource.id, 'completed');
-            } else {
-              await updateSourceStatus(childSource.id, 'failed', 0, 0, `HTTP ${response.status}`);
-            }
-          }
-          
-          processedCount++;
-          
-          // Update parent source progress
-          const progress = Math.round((processedCount / totalPages) * 100);
-          await updateSourceStatus(sourceId, 'in_progress', progress, processedCount);
-
-        } catch (error) {
-          await logCrawlEvent('error', 'Error processing URL in batch', { 
-            sourceId, 
-            url, 
-            error: error.message 
-          });
-        }
-      });
-
-      await Promise.allSettled(batchPromises);
-    }
-
-    // Update final status
-    await updateSourceStatus(sourceId, 'completed', 100, processedCount);
-
-    await logCrawlEvent('info', 'Multiple pages processing completed', {
-      sourceId,
-      totalProcessed: processedCount,
-      totalPages
-    });
-
-  } catch (error) {
-    await logCrawlEvent('error', 'Multiple pages processing failed', { 
-      sourceId, 
-      initialUrl, 
-      error: error.message 
-    });
-    
-    await updateSourceStatus(sourceId, 'failed', 0, 0, error.message);
-    throw error;
-  }
-}
-
-function filterUrlsByPaths(urls: string[], includePaths: string[], excludePaths: string[]): string[] {
-  return urls.filter(url => {
-    try {
-      const urlObj = new URL(url);
-      const path = urlObj.pathname;
-      
-      if (includePaths.length > 0) {
-        const matchesInclude = includePaths.some(pattern => {
-          const regexPattern = pattern.replace(/\*/g, '.*');
-          const regex = new RegExp(`^${regexPattern}`, 'i');
-          return regex.test(path);
-        });
-        
-        if (!matchesInclude) {
-          return false;
-        }
-      }
-      
-      if (excludePaths.length > 0) {
-        const matchesExclude = excludePaths.some(pattern => {
-          const regexPattern = pattern.replace(/\*/g, '.*');
-          const regex = new RegExp(`^${regexPattern}`, 'i');
-          return regex.test(path);
-        });
-        
-        if (matchesExclude) {
-          return false;
-        }
-      }
-      
-      return true;
-    } catch (error) {
-      console.error(`Error filtering URL ${url}:`, error);
-      return false;
-    }
-  });
-}
-
 async function processWithContentPipeline(
   sourceId: string,
   agentId: string,
@@ -428,6 +268,9 @@ async function processWithContentPipeline(
     const summary = generateSummary(extractedContent.content);
     const keywords = extractKeywords(extractedContent.content);
     
+    // Calculate actual content size (compressed size for storage efficiency)
+    const actualContentSize = compressedContent.compressedSize;
+    
     await supabase
       .from('agent_sources')
       .update({
@@ -439,7 +282,22 @@ async function processWithContentPipeline(
         extraction_method: 'readability',
         compression_ratio: compressedContent.ratio,
         original_size: compressedContent.originalSize,
-        compressed_size: compressedContent.compressedSize
+        compressed_size: actualContentSize,
+        metadata: {
+          file_size: actualContentSize,
+          compressed_size: actualContentSize,
+          compression_ratio: compressedContent.ratio,
+          content_type: 'text/html'
+        }
+      })
+      .eq('id', sourceId);
+
+    // Also update source_pages with compressed size
+    await supabase
+      .from('source_pages')
+      .update({
+        content_size: actualContentSize,
+        compression_ratio: compressedContent.ratio
       })
       .eq('id', sourceId);
 
@@ -473,15 +331,32 @@ async function processBasicContent(sourceId: string, url: string, htmlContent: s
     .replace(/\s+/g, ' ')
     .trim();
 
-  const contentSize = new TextEncoder().encode(textContent).length;
+  // Calculate compressed content size for more accurate size reporting
+  const compressed = await compressText(textContent);
+  const actualContentSize = compressed.compressedSize;
 
   await supabase
     .from('agent_sources')
     .update({
       title: url,
       content: textContent.substring(0, 10000),
-      original_size: contentSize,
-      compressed_size: Math.min(contentSize, 10000)
+      original_size: compressed.originalSize,
+      compressed_size: actualContentSize,
+      metadata: {
+        file_size: actualContentSize,
+        compressed_size: actualContentSize,
+        compression_ratio: compressed.ratio,
+        content_type: 'text/html'
+      }
+    })
+    .eq('id', sourceId);
+
+  // Also update source_pages with compressed size
+  await supabase
+    .from('source_pages')
+    .update({
+      content_size: actualContentSize,
+      compression_ratio: compressed.ratio
     })
     .eq('id', sourceId);
 }
@@ -557,7 +432,7 @@ function createSemanticChunks(content: string) {
   
   if (estimatedTokens <= targetChunkSize) {
     return [{
-      content,
+      content: content,
       tokenCount: estimatedTokens,
       chunkIndex: 0,
       metadata: {
@@ -616,6 +491,231 @@ function createSemanticChunks(content: string) {
   }
 
   return chunks;
+}
+
+async function processMultiplePages(
+  sourceId: string,
+  agentId: string, 
+  teamId: string,
+  initialUrl: string,
+  options: {
+    maxPages: number;
+    maxDepth: number;
+    concurrency: number;
+    includePaths: string[];
+    excludePaths: string[];
+    enableContentPipeline: boolean;
+  }
+) {
+  try {
+    await logCrawlEvent('info', 'Starting multiple pages processing', {
+      sourceId,
+      initialUrl,
+      options
+    });
+    
+    const discoveredUrls = await discoverUrls(initialUrl, options.maxDepth, options.maxPages);
+    await logCrawlEvent('info', 'URLs discovered', { 
+      sourceId, 
+      discoveredCount: discoveredUrls.length 
+    });
+    
+    const filteredUrls = filterUrlsByPaths(discoveredUrls, options.includePaths, options.excludePaths);
+    await logCrawlEvent('info', 'URLs filtered', { 
+      sourceId, 
+      filteredCount: filteredUrls.length,
+      originalCount: discoveredUrls.length
+    });
+    
+    const totalPages = Math.min(filteredUrls.length, options.maxPages);
+    let processedCount = 0;
+    let totalCompressedSize = 0;
+    const batchSize = options.concurrency;
+
+    // Process URLs in batches
+    for (let i = 0; i < totalPages; i += batchSize) {
+      const batch = filteredUrls.slice(i, i + batchSize);
+      
+      const batchPromises = batch.map(async (url) => {
+        try {
+          // Create child source for each URL
+          const { data: childSource } = await supabase
+            .from('agent_sources')
+            .insert({
+              agent_id: agentId,
+              team_id: teamId,
+              parent_source_id: sourceId,
+              source_type: 'website',
+              title: url,
+              url: url,
+              crawl_status: 'in_progress',
+              is_active: true
+            })
+            .select('id')
+            .single();
+
+          if (childSource) {
+            // Also create source_pages entry for tracking
+            const { data: sourcePage } = await supabase
+              .from('source_pages')
+              .insert({
+                id: childSource.id,
+                parent_source_id: sourceId,
+                customer_id: teamId,
+                url: url,
+                status: 'in_progress'
+              })
+              .select('id')
+              .single();
+
+            // Fetch and process the page
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; WonderwaveBot/1.0)',
+              },
+            });
+
+            if (response.ok) {
+              const htmlContent = await response.text();
+              
+              if (options.enableContentPipeline) {
+                await processWithContentPipeline(childSource.id, agentId, teamId, url, htmlContent);
+              } else {
+                await processBasicContent(childSource.id, url, htmlContent);
+              }
+
+              // Get the compressed size for tracking
+              const { data: updatedSource } = await supabase
+                .from('agent_sources')
+                .select('compressed_size')
+                .eq('id', childSource.id)
+                .single();
+
+              if (updatedSource?.compressed_size) {
+                totalCompressedSize += updatedSource.compressed_size;
+              }
+
+              await updateSourceStatus(childSource.id, 'completed');
+              
+              // Update source_pages status
+              await supabase
+                .from('source_pages')
+                .update({ status: 'completed' })
+                .eq('id', childSource.id);
+            } else {
+              await updateSourceStatus(childSource.id, 'failed', 0, 0, `HTTP ${response.status}`);
+              
+              // Update source_pages status
+              await supabase
+                .from('source_pages')
+                .update({ 
+                  status: 'failed',
+                  error_message: `HTTP ${response.status}`
+                })
+                .eq('id', childSource.id);
+            }
+          }
+          
+          processedCount++;
+          
+          // Update parent source progress and total compressed size
+          const progress = Math.round((processedCount / totalPages) * 100);
+          await supabase
+            .from('agent_sources')
+            .update({
+              crawl_status: 'in_progress',
+              progress: progress,
+              links_count: processedCount,
+              metadata: {
+                total_content_size: totalCompressedSize,
+                last_progress_update: new Date().toISOString()
+              }
+            })
+            .eq('id', sourceId);
+
+        } catch (error) {
+          await logCrawlEvent('error', 'Error processing URL in batch', { 
+            sourceId, 
+            url, 
+            error: error.message 
+          });
+        }
+      });
+
+      await Promise.allSettled(batchPromises);
+    }
+
+    // Update final status with total compressed size
+    await supabase
+      .from('agent_sources')
+      .update({
+        crawl_status: 'completed',
+        progress: 100,
+        links_count: processedCount,
+        metadata: {
+          total_content_size: totalCompressedSize,
+          last_progress_update: new Date().toISOString(),
+          compression_summary: `Processed ${processedCount} pages with total compressed size of ${totalCompressedSize} bytes`
+        }
+      })
+      .eq('id', sourceId);
+
+    await logCrawlEvent('info', 'Multiple pages processing completed', {
+      sourceId,
+      totalProcessed: processedCount,
+      totalPages,
+      totalCompressedSize
+    });
+
+  } catch (error) {
+    await logCrawlEvent('error', 'Multiple pages processing failed', { 
+      sourceId, 
+      initialUrl, 
+      error: error.message 
+    });
+    
+    await updateSourceStatus(sourceId, 'failed', 0, 0, error.message);
+    throw error;
+  }
+}
+
+// remaining helper functions
+function filterUrlsByPaths(urls: string[], includePaths: string[], excludePaths: string[]): string[] {
+  return urls.filter(url => {
+    try {
+      const urlObj = new URL(url);
+      const path = urlObj.pathname;
+      
+      if (includePaths.length > 0) {
+        const matchesInclude = includePaths.some(pattern => {
+          const regexPattern = pattern.replace(/\*/g, '.*');
+          const regex = new RegExp(`^${regexPattern}`, 'i');
+          return regex.test(path);
+        });
+        
+        if (!matchesInclude) {
+          return false;
+        }
+      }
+      
+      if (excludePaths.length > 0) {
+        const matchesExclude = excludePaths.some(pattern => {
+          const regexPattern = pattern.replace(/\*/g, '.*');
+          const regex = new RegExp(`^${regexPattern}`, 'i');
+          return regex.test(path);
+        });
+        
+        if (matchesExclude) {
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error(`Error filtering URL ${url}:`, error);
+      return false;
+    }
+  });
 }
 
 async function discoverUrls(startUrl: string, maxDepth: number, maxPages: number): Promise<string[]> {
