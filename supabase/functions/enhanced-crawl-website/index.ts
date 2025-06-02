@@ -42,7 +42,7 @@ serve(async (req) => {
 
   try {
     // Parse request body with error handling
-    let requestBody: EnhancedCrawlRequest;
+    let requestBody: EnhancedCrawlRequest & { discoverOnly?: boolean };
     try {
       requestBody = await req.json();
     } catch (parseError) {
@@ -70,11 +70,12 @@ serve(async (req) => {
       respectRobots = true,
       enableCompression = true,
       enableDeduplication = true,
-      priority = 'normal'
+      priority = 'normal',
+      discoverOnly = false
     } = requestBody;
 
     console.log('🚀 Starting enhanced crawl for agent', agentId, ', URL:', url);
-    console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths });
+    console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths, discoverOnly });
 
     // Validate required fields
     if (!agentId || !url) {
@@ -146,32 +147,6 @@ serve(async (req) => {
       throw new Error(`Invalid team_id type: expected string, got ${typeof agent.team_id}`);
     }
 
-    // Initialize usage tracking for the customer
-    try {
-      console.log('🔧 Initializing usage tracking for team:', agent.team_id);
-      
-      await supabase
-        .from('customer_usage_tracking')
-        .upsert({
-          customer_id: agent.team_id,
-          concurrent_requests: 0,
-          requests_last_minute: 0,
-          requests_last_hour: 0,
-          requests_last_day: 0,
-          minute_reset_at: new Date().toISOString(),
-          hour_reset_at: new Date().toISOString(),
-          day_reset_at: new Date().toISOString(),
-          last_request_at: new Date().toISOString()
-        }, {
-          onConflict: 'customer_id'
-        });
-        
-      console.log('✅ Usage tracking initialized');
-    } catch (usageError) {
-      console.warn('⚠️ Failed to initialize usage tracking:', usageError);
-      // Continue with crawl even if usage tracking fails
-    }
-
     // Discover URLs based on crawl mode with timeout
     let discoveredUrls: string[] = [];
     
@@ -208,6 +183,21 @@ serve(async (req) => {
 
     if (discoveredUrls.length === 0) {
       throw new Error('No URLs discovered for crawling');
+    }
+
+    // If this is discovery only, return the URLs without creating database records
+    if (discoverOnly) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          urls: discoveredUrls,
+          message: `Discovered ${discoveredUrls.length} URLs`
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
     }
 
     // Create parent source with retry logic

@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { EnhancedCrawlService } from '@/services/rag/enhanced/enhancedCrawlService';
 
 export interface EnhancedCrawlRequest {
   url: string;
@@ -35,32 +34,40 @@ export const useEnhancedCrawl = () => {
       // Ensure priority is properly typed
       const priority: 'normal' | 'high' | 'slow' = request.priority || 'normal';
 
-      // Use the enhanced crawl service instead of direct edge function call
-      const result = await EnhancedCrawlService.initiateCrawl({
-        url: request.url,
-        agentId: request.agentId,
-        crawlMode: request.crawlMode || 'full-website',
-        maxPages: request.maxPages || 50,
-        excludePaths: request.excludePaths || [],
-        includePaths: request.includePaths || [],
-        respectRobots: request.respectRobots !== false,
-        enableCompression: request.enableCompression !== false,
-        enableDeduplication: request.enableDeduplication !== false,
-        priority
+      // Call the enhanced-crawl-website edge function directly
+      const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
+        body: {
+          url: request.url,
+          agentId: request.agentId,
+          crawlMode: request.crawlMode || 'full-website',
+          maxPages: request.maxPages || 50,
+          maxDepth: request.maxDepth || 3,
+          excludePaths: request.excludePaths || [],
+          includePaths: request.includePaths || [],
+          respectRobots: request.respectRobots !== false,
+          enableCompression: request.enableCompression !== false,
+          enableDeduplication: request.enableDeduplication !== false,
+          priority
+        }
       });
 
-      console.log('✅ Enhanced crawl initiated successfully:', result);
+      if (error) {
+        console.error('❌ Enhanced crawl error:', error);
+        throw error;
+      }
+
+      console.log('✅ Enhanced crawl initiated successfully:', data);
       
       // Show success message with compression info
       toast({
         title: "Crawl Started",
-        description: `Started processing ${result.totalJobs} pages with compression enabled. Content will be fetched and compressed automatically.`,
+        description: `Started processing ${data.totalJobs} pages with compression enabled. Content will be fetched and compressed automatically.`,
       });
       
       return {
-        parentSourceId: result.parentSourceId,
-        totalJobs: result.totalJobs,
-        message: `Enhanced crawl with compression initiated for ${result.totalJobs} pages`
+        parentSourceId: data.parentSourceId,
+        totalJobs: data.totalJobs,
+        message: `Enhanced crawl with compression initiated for ${data.totalJobs} pages`
       };
 
     } catch (error: any) {
@@ -99,7 +106,11 @@ export const useEnhancedCrawl = () => {
     try {
       console.log('🔄 Manually triggering source page processing...');
       
-      await EnhancedCrawlService.startSourcePageProcessing();
+      const { data, error } = await supabase.functions.invoke('process-source-pages');
+      
+      if (error) {
+        throw error;
+      }
       
       toast({
         title: "Processing Started",
@@ -122,16 +133,47 @@ export const useEnhancedCrawl = () => {
     try {
       console.log('🔄 Retrying failed jobs for:', parentSourceId);
       
-      // Use the enhanced service for retry
-      const retriedCount = await EnhancedCrawlService.retryFailedJobs(parentSourceId);
+      // Get failed jobs and mark them for retry
+      const { data: failedJobs, error: fetchError } = await supabase
+        .from('source_pages')
+        .select('id')
+        .eq('parent_source_id', parentSourceId)
+        .eq('status', 'failed');
 
-      console.log('✅ Successfully retried failed jobs:', retriedCount);
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!failedJobs || failedJobs.length === 0) {
+        toast({
+          title: "No Failed Jobs",
+          description: "No failed jobs found to retry.",
+        });
+        return 0;
+      }
+
+      // Reset failed jobs to pending for reprocessing
+      const { error: updateError } = await supabase
+        .from('source_pages')
+        .update({ 
+          status: 'pending',
+          retry_count: 0,
+          error_message: null
+        })
+        .eq('parent_source_id', parentSourceId)
+        .eq('status', 'failed');
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      console.log('✅ Successfully retried failed jobs:', failedJobs.length);
       toast({
         title: "Jobs Retried",
-        description: `Successfully retried ${retriedCount} failed jobs.`,
+        description: `Successfully retried ${failedJobs.length} failed jobs.`,
       });
 
-      return retriedCount;
+      return failedJobs.length;
     } catch (error) {
       console.error('Error retrying failed jobs:', error);
       toast({
