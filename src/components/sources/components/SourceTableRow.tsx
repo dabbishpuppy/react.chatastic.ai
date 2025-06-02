@@ -1,98 +1,135 @@
 
 import React from 'react';
-import { TableCell, TableRow } from '@/components/ui/table';
+import { AgentSource } from '@/types/rag';
+import { Checkbox } from '@/components/ui/checkbox';
+import SourceIcon from './SourceIcon';
+import SourceTypeLabel from './SourceTypeLabel';
+import { formatDistanceToNow } from 'date-fns';
+import { formatFileSize } from './SourceSizeFormatter';
 import { Button } from '@/components/ui/button';
-import { 
-  MoreHorizontal, 
-  ChevronRight, 
-  Trash2
-} from 'lucide-react';
+import { MoreHorizontal, Trash2, Eye } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { AgentSource } from '@/types/rag';
-import { formatDistanceToNow } from 'date-fns';
-import SourceIcon from './SourceIcon';
-import SourceTypeLabel from './SourceTypeLabel';
-import { formatFileSize } from './SourceSizeFormatter';
+import QASourceItem from '../QA/QASourceItem';
 
 interface SourceTableRowProps {
   source: AgentSource;
-  onRowClick: (source: AgentSource) => void;
-  onDeleteClick: (source: AgentSource, event: React.MouseEvent) => void;
-  onNavigateClick: (source: AgentSource, event: React.MouseEvent) => void;
+  isSelected: boolean;
+  onSelect: (selected: boolean) => void;
+  onDelete: (source: AgentSource) => void;
+  onView?: (source: AgentSource) => void;
 }
 
 const SourceTableRow: React.FC<SourceTableRowProps> = ({
   source,
-  onRowClick,
-  onDeleteClick,
-  onNavigateClick
+  isSelected,
+  onSelect,
+  onDelete,
+  onView
 }) => {
+  // Special rendering for Q&A sources
+  if (source.source_type === 'qa') {
+    return (
+      <div className="relative">
+        <div className="absolute left-4 top-4 z-10">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onSelect}
+          />
+        </div>
+        <div className="absolute right-4 top-4 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {onView && (
+                <DropdownMenuItem onClick={() => onView(source)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem 
+                onClick={() => onDelete(source)}
+                className="text-red-600"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="pl-10 pr-12">
+          <QASourceItem source={source} />
+        </div>
+      </div>
+    );
+  }
+
+  // Default table row rendering for other source types
   return (
-    <TableRow 
-      className="cursor-pointer hover:bg-gray-50 transition-opacity duration-200"
-      onClick={() => onRowClick(source)}
-    >
-      <TableCell className="font-medium">
-        <div className="flex items-center">
-          <div className="flex-shrink-0 mr-3">
-            <SourceIcon type={source.source_type} />
-          </div>
-          <div>
-            <div className="font-medium">{source.title}</div>
+    <tr className="border-b border-gray-100 hover:bg-gray-50">
+      <td className="px-4 py-3">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={onSelect}
+        />
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center space-x-3">
+          <SourceIcon sourceType={source.source_type} />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-gray-900 truncate">
+              {source.title}
+            </div>
             {source.url && (
-              <div className="text-sm text-gray-500 truncate max-w-[200px]">
+              <div className="text-xs text-gray-500 truncate">
                 {source.url}
               </div>
             )}
           </div>
         </div>
-      </TableCell>
-      <TableCell>
-        <SourceTypeLabel type={source.source_type} />
-      </TableCell>
-      <TableCell>{formatFileSize(source)}</TableCell>
-      <TableCell className="text-gray-500">
+      </td>
+      <td className="px-4 py-3">
+        <SourceTypeLabel sourceType={source.source_type} />
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-500">
+        {formatFileSize(source)}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-500">
         {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end space-x-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal size={18} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem 
-                onClick={(e) => onDeleteClick(source, e)}
-                className="text-red-600 text-sm"
-              >
-                <Trash2 size={16} className="mr-2" />
-                Delete
+      </td>
+      <td className="px-4 py-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {onView && (
+              <DropdownMenuItem onClick={() => onView(source)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8"
-            onClick={(e) => onNavigateClick(source, e)}
-          >
-            <ChevronRight size={18} />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
+            )}
+            <DropdownMenuItem 
+              onClick={() => onDelete(source)}
+              className="text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+    </tr>
   );
 };
 
