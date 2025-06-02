@@ -46,7 +46,6 @@ export const useAgentSourceStats = () => {
     try {
       console.log('📊 Fetching agent source stats using RPC for:', agentId);
       
-      // Use the RPC function for accurate stats calculation
       const { data, error: rpcError } = await supabase
         .rpc('get_agent_source_stats', { target_agent_id: agentId });
 
@@ -59,7 +58,6 @@ export const useAgentSourceStats = () => {
         
         console.log('📊 RPC processed result:', result);
         
-        // Safely extract and validate the sources_by_type data
         const sourcesByType = result.sources_by_type || {
           text: { count: 0, size: 0 },
           file: { count: 0, size: 0 },
@@ -85,7 +83,6 @@ export const useAgentSourceStats = () => {
         });
       } else {
         console.log('📊 No data returned from RPC');
-        // Fallback to empty stats
         setStats({
           totalSources: 0,
           totalBytes: 0,
@@ -109,9 +106,11 @@ export const useAgentSourceStats = () => {
     fetchStats();
   }, [agentId]);
 
-  // Set up real-time subscription
+  // Enhanced real-time subscription with immediate refresh triggers
   useEffect(() => {
     if (!agentId) return;
+
+    console.log(`📡 Setting up enhanced real-time subscriptions for agent: ${agentId}`);
 
     const channel = supabase
       .channel(`agent-source-stats-${agentId}`)
@@ -123,8 +122,8 @@ export const useAgentSourceStats = () => {
           table: 'agent_sources',
           filter: `agent_id=eq.${agentId}`
         },
-        () => {
-          console.log('📡 Agent sources changed, refetching stats');
+        (payload) => {
+          console.log('📡 Agent sources changed:', payload.eventType, payload);
           fetchStats();
         }
       )
@@ -135,14 +134,34 @@ export const useAgentSourceStats = () => {
           schema: 'public',
           table: 'source_pages'
         },
-        () => {
-          console.log('📡 Source pages changed, refetching stats');
+        (payload) => {
+          console.log('📡 Source pages changed:', payload.eventType, payload);
+          // Immediate refetch for any source_pages changes
           fetchStats();
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'source_chunks'
+        },
+        (payload) => {
+          console.log('📡 Source chunks changed:', payload.eventType, payload);
+          // Also refresh when chunks are updated (they affect size calculations)
+          fetchStats();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Real-time subscription active for agent source stats');
+        }
+      });
 
     return () => {
+      console.log('🔌 Cleaning up enhanced real-time subscriptions');
       supabase.removeChannel(channel);
     };
   }, [agentId]);

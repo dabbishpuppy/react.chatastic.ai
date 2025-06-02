@@ -39,22 +39,26 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   const [childPages, setChildPages] = useState<SourcePage[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Format size with compression indicators
+  // Format size with compression indicators - improved logic
   const formatSize = (contentSize?: number, compressionRatio?: number) => {
-    if (!contentSize) return null;
+    if (!contentSize || contentSize <= 0) return null;
 
-    // If we have compression ratio, show compressed size
-    if (compressionRatio && compressionRatio > 0 && compressionRatio < 1) {
+    // Only show compression info if we have a valid ratio that indicates actual compression
+    if (compressionRatio && compressionRatio > 0 && compressionRatio < 0.95) {
       const compressedSize = Math.round(contentSize * compressionRatio);
       const savings = Math.round((1 - compressionRatio) * 100);
-      return {
-        size: compressedSize < 1024 ? `${compressedSize} B` : `${Math.round(compressedSize / 1024)} KB`,
-        isCompressed: true,
-        savings: savings
-      };
+      
+      // Only show if the savings are meaningful (>= 5%)
+      if (savings >= 5) {
+        return {
+          size: compressedSize < 1024 ? `${compressedSize} B` : `${Math.round(compressedSize / 1024)} KB`,
+          isCompressed: true,
+          savings: savings
+        };
+      }
     }
 
-    // Otherwise show original size
+    // Show original size without compression info
     const size = contentSize < 1024 ? `${contentSize} B` : `${Math.round(contentSize / 1024)} KB`;
     return {
       size,
@@ -172,7 +176,6 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
   const handleDelete = async (page: SourcePage) => {
     try {
-      // Delete from source_pages table directly
       const { error } = await supabase
         .from('source_pages')
         .delete()
@@ -183,13 +186,11 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         throw error;
       }
 
-      // Remove from local state immediately for better UX
       setChildPages(prev => prev.filter(p => p.id !== page.id));
       
       console.log(`Successfully deleted source page: ${page.id}`);
     } catch (error) {
       console.error('Failed to delete source page:', error);
-      // Re-fetch to ensure state consistency on error
       fetchChildPages();
       throw error;
     }

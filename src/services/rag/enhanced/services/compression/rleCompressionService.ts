@@ -1,93 +1,145 @@
 
 export class RLECompressionService {
-  // Ultra-aggressive RLE compression targeting maximum efficiency
+  // Enhanced ultra-aggressive RLE compression
   static async ultraAggressiveRLE(data: Uint8Array): Promise<Uint8Array> {
-    const compressed: number[] = [];
-    let i = 0;
+    console.log(`🔄 Starting enhanced RLE compression on ${data.length} bytes...`);
     
-    // Build frequency table for smart encoding
-    const frequency = new Map<number, number>();
-    for (const byte of data) {
-      frequency.set(byte, (frequency.get(byte) || 0) + 1);
-    }
+    // Convert to string for pattern-based compression
+    const text = new TextDecoder().decode(data);
     
-    // Sort by frequency for optimal encoding
-    const sortedBytes = Array.from(frequency.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([byte]) => byte);
+    // Apply multiple RLE strategies
+    let compressed = text;
     
-    // Create mapping for most frequent bytes to shortest codes
-    const byteMap = new Map<number, number>();
-    sortedBytes.slice(0, 16).forEach((byte, index) => {
-      byteMap.set(byte, index + 240); // Use high values 240-255 for frequent bytes
+    // Strategy 1: Compress repeated characters (enhanced)
+    compressed = this.compressRepeatedChars(compressed);
+    
+    // Strategy 2: Compress repeated words and phrases
+    compressed = this.compressRepeatedPatterns(compressed);
+    
+    // Strategy 3: Compress common sequences
+    compressed = this.compressCommonSequences(compressed);
+    
+    // Strategy 4: Byte-level RLE on the result
+    const intermediateBytes = new TextEncoder().encode(compressed);
+    const finalCompressed = this.byteLevelRLE(intermediateBytes);
+    
+    const originalSize = data.length;
+    const compressedSize = finalCompressed.length;
+    const ratio = (compressedSize / originalSize * 100).toFixed(1);
+    
+    console.log(`✅ Enhanced RLE: ${originalSize} → ${compressedSize} bytes (${ratio}% of original)`);
+    
+    return finalCompressed;
+  }
+
+  // Compress repeated characters more aggressively
+  private static compressRepeatedChars(text: string): string {
+    // Compress runs of 2+ identical characters
+    return text.replace(/(.)\1+/g, (match, char) => {
+      const count = match.length;
+      if (count >= 2) {
+        // Use special encoding: ∞{char}{count}
+        return `∞${char}${count}`;
+      }
+      return match;
+    });
+  }
+
+  // Compress repeated words and short phrases
+  private static compressRepeatedPatterns(text: string): string {
+    const words = text.split(/\s+/);
+    const wordCounts = new Map<string, number>();
+    
+    // Count word frequencies
+    words.forEach(word => {
+      if (word.length >= 3) {
+        wordCounts.set(word, (wordCounts.get(word) || 0) + 1);
+      }
     });
     
-    while (i < data.length) {
-      const current = data[i];
-      let count = 1;
+    // Replace frequent words with shorter tokens
+    let compressed = text;
+    let tokenIndex = 0;
+    
+    wordCounts.forEach((count, word) => {
+      if (count >= 3 && word.length > 4) {
+        const token = `∇${tokenIndex.toString(36)}`;
+        // Only replace if token is shorter
+        if (token.length < word.length) {
+          const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+          compressed = compressed.replace(regex, token);
+          tokenIndex++;
+        }
+      }
+    });
+    
+    return compressed;
+  }
+
+  // Compress common sequences and patterns
+  private static compressCommonSequences(text: string): string {
+    const commonSequences = [
+      // Common HTML/web patterns
+      { pattern: /\s+/g, replacement: ' ' },
+      { pattern: /\s*\n\s*/g, replacement: '\n' },
+      { pattern: /\s*,\s*/g, replacement: ',' },
+      { pattern: /\s*\.\s*/g, replacement: '.' },
+      { pattern: /\s*:\s*/g, replacement: ':' },
+      { pattern: /\s*;\s*/g, replacement: ';' },
       
-      // Count consecutive identical bytes (ultra-aggressive threshold)
-      while (i + count < data.length && data[i + count] === current && count < 255) {
+      // Common word endings
+      { pattern: /tion\b/g, replacement: '∴n' },
+      { pattern: /ing\b/g, replacement: '∴g' },
+      { pattern: /ment\b/g, replacement: '∴m' },
+      { pattern: /ness\b/g, replacement: '∴s' },
+      { pattern: /able\b/g, replacement: '∴a' },
+      
+      // Common prefixes
+      { pattern: /\bthe\s+/g, replacement: '∅' },
+      { pattern: /\band\s+/g, replacement: '∧' },
+      { pattern: /\bwith\s+/g, replacement: '∇' },
+    ];
+
+    let compressed = text;
+    commonSequences.forEach(({ pattern, replacement }) => {
+      compressed = compressed.replace(pattern, replacement);
+    });
+
+    return compressed;
+  }
+
+  // Enhanced byte-level RLE
+  private static byteLevelRLE(data: Uint8Array): Uint8Array {
+    const result: number[] = [];
+    let i = 0;
+
+    while (i < data.length) {
+      const currentByte = data[i];
+      let count = 1;
+
+      // Count consecutive identical bytes
+      while (i + count < data.length && data[i + count] === currentByte && count < 255) {
         count++;
       }
-      
-      // Apply ultra-aggressive RLE - compress runs of 2 or more
-      if (count >= 2) {
-        compressed.push(255, count, current); // 255 is escape byte
+
+      if (count >= 3) {
+        // Use RLE encoding: [255, byte, count]
+        result.push(255, currentByte, count);
       } else {
-        // Use frequency-based encoding for single bytes
-        const mappedByte = byteMap.get(current);
-        if (mappedByte !== undefined) {
-          compressed.push(mappedByte);
-        } else {
-          // Common character optimizations
-          if (current === 32) { // Space
-            compressed.push(254); // Special marker for space
-          } else if (current >= 65 && current <= 90) { // Uppercase A-Z
-            compressed.push(253, current - 65); // Compressed uppercase
-          } else if (current >= 97 && current <= 122) { // Lowercase a-z
-            compressed.push(252, current - 97); // Compressed lowercase
+        // Store bytes as-is if not worth compressing
+        for (let j = 0; j < count; j++) {
+          // If we encounter 255, escape it as [255, 255, 1]
+          if (currentByte === 255) {
+            result.push(255, 255, 1);
           } else {
-            compressed.push(current);
+            result.push(currentByte);
           }
         }
       }
-      
-      i += count;
-    }
-    
-    return new Uint8Array(compressed);
-  }
 
-  // Maximum RLE compression with ultra-aggressive settings
-  static async maximumRLECompression(data: Uint8Array): Promise<Uint8Array> {
-    const compressed: number[] = [];
-    let i = 0;
-    
-    while (i < data.length) {
-      const current = data[i];
-      let count = 1;
-      
-      // Count consecutive identical bytes (more aggressive)
-      while (i + count < data.length && data[i + count] === current && count < 255) {
-        count++;
-      }
-      
-      // Use RLE for runs of 2 or more (very aggressive)
-      if (count > 1) {
-        compressed.push(255, count, current); // 255 is escape byte
-      } else {
-        // For single bytes, check if they're common and can be optimized
-        if (current === 32) { // Space character
-          compressed.push(254); // Special marker for space
-        } else {
-          compressed.push(current);
-        }
-      }
-      
       i += count;
     }
-    
-    return new Uint8Array(compressed);
+
+    return new Uint8Array(result);
   }
 }
