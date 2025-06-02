@@ -1,6 +1,6 @@
-
-import { RAGQueryEngine, RAGQueryRequest, RAGQueryResult } from './queryProcessing/ragQueryEngine';
-import { LLMRouter, LLMRequest, LLMResponse } from './llm/llmRouter';
+import { RequestProcessor, ResponseCoordinator, PerformanceTracker, StreamingManager } from './orchestration';
+import { RAGQueryRequest, RAGQueryResult } from './queryProcessing/ragQueryEngine';
+import { LLMRequest, LLMResponse } from './llm/llmRouter';
 import { ResponsePostProcessor, PostProcessingOptions, ProcessedResponse } from './llm/responsePostProcessor';
 import { StreamingHandler, StreamingOptions } from './llm/streamingHandler';
 
@@ -67,143 +67,35 @@ export class RAGOrchestrator {
   static async processRAGRequest(request: RAGRequest): Promise<RAGResponse> {
     const startTime = Date.now();
     
-    console.log('🎯 Starting RAG request processing:', {
-      query: request.query.substring(0, 50) + '...',
-      agentId: request.agentId,
-      streaming: request.options?.streaming || false
-    });
-
     try {
-      // Step 1: Query Processing Pipeline
-      const queryStartTime = Date.now();
+      // Validate and prepare request
+      RequestProcessor.validateRequest(request);
+      const processedRequest = RequestProcessor.setDefaultOptions(request);
+
+      // Process the request
+      const response = await ResponseCoordinator.processRAGRequest(processedRequest);
       
-      const queryRequest: RAGQueryRequest = {
-        query: request.query,
-        agentId: request.agentId,
-        conversationId: request.conversationId,
-        searchFilters: request.options?.searchFilters,
-        rankingOptions: request.options?.rankingOptions
-      };
-
-      const queryResult = await RAGQueryEngine.processQuery(queryRequest);
-      const queryProcessingTime = Date.now() - queryStartTime;
-
-      // Step 2: LLM Response Generation
-      const llmStartTime = Date.now();
-      
-      const llmRequest: LLMRequest = {
-        query: request.query,
-        context: this.buildContextString(queryResult),
-        agentId: request.agentId,
-        conversationId: request.conversationId,
-        systemPrompt: request.options?.llmOptions?.systemPrompt,
-        temperature: request.options?.llmOptions?.temperature,
-        maxTokens: request.options?.llmOptions?.maxTokens,
-        stream: request.options?.streaming
-      };
-
-      let llmResponse: LLMResponse;
-
-      if (request.options?.streaming) {
-        // Handle streaming response
-        llmResponse = await this.handleStreamingLLMResponse(
-          llmRequest,
-          queryResult,
-          request.options.streamingOptions
-        );
-      } else {
-        // Handle standard response
-        llmResponse = await LLMRouter.generateResponse(llmRequest, queryResult);
-      }
-
-      const llmResponseTime = Date.now() - llmStartTime;
-
-      // Step 3: Post-processing
-      const postProcessStartTime = Date.now();
-      
-      const processedResponse = await ResponsePostProcessor.processResponse(
-        llmResponse,
-        request.options?.postProcessing
-      );
-
-      const postProcessingTime = Date.now() - postProcessStartTime;
+      // Record performance metrics
       const totalTime = Date.now() - startTime;
-
-      const response: RAGResponse = {
-        query: request.query,
-        agentId: request.agentId,
-        conversationId: request.conversationId,
-        queryResult,
-        llmResponse,
-        processedResponse,
-        performance: {
-          totalTime,
-          queryProcessingTime,
-          llmResponseTime,
-          postProcessingTime
-        }
-      };
+      PerformanceTracker.recordRequest(request.agentId, totalTime, true);
 
       console.log('✅ RAG request processing complete:', {
-        totalTime,
-        queryTime: queryProcessingTime,
-        llmTime: llmResponseTime,
-        postProcessTime: postProcessingTime,
-        finalContentLength: processedResponse.content.length,
-        sources: queryResult.rankedContext.sources.length
+        totalTime: response.performance.totalTime,
+        queryTime: response.performance.queryProcessingTime,
+        llmTime: response.performance.llmResponseTime,
+        postProcessTime: response.performance.postProcessingTime,
+        finalContentLength: response.processedResponse.content.length,
+        sources: response.queryResult.rankedContext.sources.length
       });
 
       return response;
 
     } catch (error) {
+      // Record failed request
+      const totalTime = Date.now() - startTime;
+      PerformanceTracker.recordRequest(request.agentId, totalTime, false);
+      
       console.error('❌ RAG request processing failed:', error);
-      throw error;
-    }
-  }
-
-  private static buildContextString(queryResult: RAGQueryResult): string {
-    if (queryResult.rankedContext.chunks.length === 0) {
-      return 'No relevant context found.';
-    }
-
-    return queryResult.rankedContext.chunks
-      .map((chunk, index) => `Context ${index + 1}: ${chunk.content}`)
-      .join('\n\n');
-  }
-
-  private static async handleStreamingLLMResponse(
-    llmRequest: LLMRequest,
-    queryResult: RAGQueryResult,
-    streamingOptions?: StreamingOptions
-  ): Promise<LLMResponse> {
-    const streamId = `rag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    console.log('🌊 Handling streaming LLM response:', streamId);
-
-    try {
-      // Use StreamingHandler to manage the streaming response
-      const fullResponse = await StreamingHandler.handleStreamingResponse(
-        streamId,
-        llmRequest,
-        streamingOptions || {}
-      );
-
-      // Return a standard LLMResponse format
-      return {
-        content: fullResponse,
-        provider: 'openai', // This would be determined by LLMRouter
-        model: 'gpt-4o-mini',
-        tokensUsed: fullResponse.split(' ').length, // Rough estimate
-        cost: 0.001, // Would be calculated based on actual usage
-        responseTime: 0, // Set by StreamingHandler
-        sources: queryResult.rankedContext.chunks.map(chunk => ({
-          sourceId: chunk.sourceId,
-          sourceName: chunk.metadata.sourceName,
-          chunkIndex: chunk.metadata.chunkIndex
-        }))
-      };
-    } catch (error) {
-      console.error('❌ Streaming LLM response failed:', error);
       throw error;
     }
   }
@@ -254,10 +146,15 @@ export class RAGOrchestrator {
     successRate: number;
     activeStreams: number;
   } {
+    const metrics = PerformanceTracker.getMetrics();
     return {
-      averageResponseTime: 0, // Would be tracked over time
-      successRate: 0.95, // Would be calculated from actual metrics
-      activeStreams: StreamingHandler.getActiveStreamsCount()
+      averageResponseTime: metrics.averageResponseTime,
+      successRate: metrics.successRate,
+      activeStreams: StreamingManager.getActiveStreamsCount()
     };
+  }
+
+  static getAgentPerformanceMetrics(agentId: string) {
+    return PerformanceTracker.getAgentMetrics(agentId);
   }
 }
