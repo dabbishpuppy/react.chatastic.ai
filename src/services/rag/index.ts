@@ -2,6 +2,7 @@
 // Export all RAG services for easy importing
 export * from './queryProcessing';
 export * from './llm';
+export * from './performance';
 export { RAGOrchestrator } from './ragOrchestrator';
 
 // Export UI integration
@@ -10,6 +11,9 @@ export type { ChatRAGOptions, ChatRAGResult } from './ui/ragChatIntegration';
 
 // Main types
 export type { RAGRequest, RAGResponse } from './ragOrchestrator';
+
+// Export enhanced services
+export { RAGQueryEngineEnhanced } from './enhanced/ragQueryEngineEnhanced';
 
 // Export core services
 export { AgentSourceService } from './agentSourceService';
