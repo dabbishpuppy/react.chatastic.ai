@@ -12,6 +12,11 @@ export { SynonymService } from './synonymService';
 export { ConceptExpansionService } from './conceptExpansionService';
 export { ExpansionEngine } from './expansionEngine';
 
+// Export conversation services
+export { ConversationMemoryManager } from './conversation/memoryManager';
+export { ConversationContextAnalyzer } from './conversation/contextAnalyzer';
+export { ConversationQueryEnhancer } from './conversation/queryEnhancer';
+
 // Export types
 export type { 
   ConversationMemory, 
@@ -28,3 +33,8 @@ export type {
   QueryAnalysis,
   QueryExpansion
 } from './types';
+
+// Export conversation types
+export type {
+  ContextAnalysisConfig
+} from './conversation/types';
