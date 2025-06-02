@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { 
   ProductionInfrastructureService, 
@@ -15,17 +14,56 @@ export const useProductionInfrastructure = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Load infrastructure health
+  // Load infrastructure health with proper error handling
   const loadInfrastructureHealth = useCallback(async () => {
     try {
       setLoading(true);
       const health = await ProductionInfrastructureService.getInfrastructureHealth();
-      setInfrastructureHealth(health);
+      
+      // Ensure health percentage is a valid number
+      if (health && typeof health === 'object') {
+        const healthPercentage = health.healthPercentage || health.health || 0;
+        const validatedHealth = {
+          ...health,
+          healthPercentage: isNaN(healthPercentage) ? 0 : Math.max(0, Math.min(100, healthPercentage)),
+          healthy: healthPercentage >= 70,
+          queueDepth: health.queueDepth || 0,
+          activeWorkers: health.activeWorkers || 0,
+          errorRate: isNaN(health.errorRate) ? 0 : health.errorRate
+        };
+        
+        console.log('📊 Infrastructure health:', `${validatedHealth.healthPercentage}%`, validatedHealth.healthy ? '(healthy)' : '(critical)');
+        setInfrastructureHealth(validatedHealth);
+      } else {
+        // Fallback health data
+        const fallbackHealth = {
+          healthPercentage: 0,
+          healthy: false,
+          queueDepth: 0,
+          activeWorkers: 0,
+          errorRate: 0,
+          status: 'unavailable'
+        };
+        console.log('📊 Infrastructure health: 0% (unavailable - using fallback)');
+        setInfrastructureHealth(fallbackHealth);
+      }
     } catch (error) {
       console.error('Failed to load infrastructure health:', error);
+      
+      // Set fallback health data on error
+      const fallbackHealth = {
+        healthPercentage: 0,
+        healthy: false,
+        queueDepth: 0,
+        activeWorkers: 0,
+        errorRate: 1.0,
+        status: 'error'
+      };
+      setInfrastructureHealth(fallbackHealth);
+      
       toast({
-        title: "Error",
-        description: "Failed to load infrastructure health",
+        title: "Warning",
+        description: "Infrastructure health monitoring unavailable",
         variant: "destructive"
       });
     } finally {
@@ -33,23 +71,54 @@ export const useProductionInfrastructure = () => {
     }
   }, [toast]);
 
-  // Load system health summary
+  // Load system health summary with error handling
   const loadSystemHealth = useCallback(async () => {
     try {
       const health = await MonitoringAndAlertingService.getSystemHealthSummary();
-      setSystemHealth(health);
+      
+      if (health && typeof health === 'object') {
+        // Validate numeric values
+        const validatedSystemHealth = {
+          ...health,
+          cpuUsage: isNaN(health.cpuUsage) ? 0 : Math.max(0, Math.min(100, health.cpuUsage)),
+          memoryUsage: isNaN(health.memoryUsage) ? 0 : Math.max(0, Math.min(100, health.memoryUsage)),
+          responseTime: isNaN(health.responseTime) ? 0 : Math.max(0, health.responseTime)
+        };
+        setSystemHealth(validatedSystemHealth);
+      }
     } catch (error) {
       console.error('Failed to load system health:', error);
+      setSystemHealth({
+        cpuUsage: 0,
+        memoryUsage: 0,
+        responseTime: 0,
+        status: 'unavailable'
+      });
     }
   }, []);
 
-  // Load autoscaling status
+  // Load autoscaling status with error handling
   const loadAutoscalingStatus = useCallback(async () => {
     try {
       const status = await AutoscalingService.getAutoscalingStatus();
-      setAutoscalingStatus(status);
+      
+      if (status && typeof status === 'object') {
+        const validatedStatus = {
+          ...status,
+          currentWorkers: isNaN(status.currentWorkers) ? 0 : Math.max(0, status.currentWorkers),
+          targetWorkers: isNaN(status.targetWorkers) ? 0 : Math.max(0, status.targetWorkers),
+          scalingActivity: status.scalingActivity || false
+        };
+        setAutoscalingStatus(validatedStatus);
+      }
     } catch (error) {
       console.error('Failed to load autoscaling status:', error);
+      setAutoscalingStatus({
+        currentWorkers: 0,
+        targetWorkers: 0,
+        scalingActivity: false,
+        status: 'unavailable'
+      });
     }
   }, []);
 
