@@ -6,6 +6,12 @@ export { IntelligentRoutingService } from './intelligentRoutingService';
 export { IntentAnalyzer } from './intentAnalyzer';
 export { RoutingDecisionMaker } from './routingDecisionMaker';
 
+// Export expansion services
+export { ExpansionStrategiesManager } from './expansionStrategies';
+export { SynonymService } from './synonymService';
+export { ConceptExpansionService } from './conceptExpansionService';
+export { ExpansionEngine } from './expansionEngine';
+
 // Export types
 export type { 
   ConversationMemory, 
@@ -14,7 +20,7 @@ export type {
 
 export type { 
   ExpansionStrategy 
-} from './queryExpansionService';
+} from './expansionStrategies';
 
 export type { 
   QueryIntent, 
