@@ -14,6 +14,17 @@ interface AgentSourceStats {
   };
 }
 
+interface RpcStatsResponse {
+  total_sources: number;
+  total_bytes: number;
+  sources_by_type: {
+    text: { count: number; size: number };
+    file: { count: number; size: number };
+    website: { count: number; size: number };
+    qa: { count: number; size: number };
+  };
+}
+
 export const useAgentSourceStats = () => {
   const { agentId } = useParams();
   const [stats, setStats] = useState<AgentSourceStats>({
@@ -44,15 +55,24 @@ export const useAgentSourceStats = () => {
       console.log('📊 RPC response:', data);
 
       if (data && data.length > 0) {
-        const result = data[0];
+        const result = data[0] as RpcStatsResponse;
+        
+        // Safely extract and validate the sources_by_type data
+        const sourcesByType = result.sources_by_type || {
+          text: { count: 0, size: 0 },
+          file: { count: 0, size: 0 },
+          website: { count: 0, size: 0 },
+          qa: { count: 0, size: 0 }
+        };
+        
         setStats({
           totalSources: result.total_sources || 0,
           totalBytes: result.total_bytes || 0,
-          sourcesByType: result.sources_by_type || {
-            text: { count: 0, size: 0 },
-            file: { count: 0, size: 0 },
-            website: { count: 0, size: 0 },
-            qa: { count: 0, size: 0 }
+          sourcesByType: {
+            text: sourcesByType.text || { count: 0, size: 0 },
+            file: sourcesByType.file || { count: 0, size: 0 },
+            website: sourcesByType.website || { count: 0, size: 0 },
+            qa: sourcesByType.qa || { count: 0, size: 0 }
           }
         });
       } else {
