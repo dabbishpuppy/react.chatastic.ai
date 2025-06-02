@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import RichTextEditor from '@/components/ui/rich-text-editor';
+import RichTextByteCounter from '@/components/sources/text/RichTextByteCounter';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { useParams } from 'react-router-dom';
 
@@ -108,7 +109,10 @@ const QASourceForm: React.FC = () => {
           </div>
           
           <div>
-            <Label htmlFor="answer">Answer</Label>
+            <div className="flex justify-between items-center mb-2">
+              <Label htmlFor="answer">Answer</Label>
+              <RichTextByteCounter html={answer} />
+            </div>
             <RichTextEditor
               value={answer}
               onChange={setAnswer}
