@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect, useCallback } from 'react';
 import { 
   ProductionInfrastructureService, 
@@ -81,12 +79,12 @@ export const useProductionInfrastructure = () => {
       
       if (health && typeof health === 'object') {
         // Validate numeric values from the correct SystemMetrics structure with proper null checks
-        const metrics = health.metrics || {};
+        const metrics = (health as any).metrics;
         const validatedSystemHealth = {
           ...health,
-          cpuUsage: typeof metrics.cpuUsage === 'number' && !isNaN(metrics.cpuUsage) ? Math.max(0, Math.min(100, metrics.cpuUsage)) : 0,
-          memoryUsage: typeof metrics.memoryUsage === 'number' && !isNaN(metrics.memoryUsage) ? Math.max(0, Math.min(100, metrics.memoryUsage)) : 0,
-          responseTime: typeof metrics.responseTime === 'number' && !isNaN(metrics.responseTime) ? Math.max(0, metrics.responseTime) : 0
+          cpuUsage: typeof metrics?.cpuUsage === 'number' && !isNaN(metrics.cpuUsage) ? Math.max(0, Math.min(100, metrics.cpuUsage)) : 0,
+          memoryUsage: typeof metrics?.memoryUsage === 'number' && !isNaN(metrics.memoryUsage) ? Math.max(0, Math.min(100, metrics.memoryUsage)) : 0,
+          responseTime: typeof metrics?.responseTime === 'number' && !isNaN(metrics.responseTime) ? Math.max(0, metrics.responseTime) : 0
         };
         setSystemHealth(validatedSystemHealth);
       }
@@ -108,12 +106,12 @@ export const useProductionInfrastructure = () => {
       
       if (status && typeof status === 'object') {
         // Access the correct properties from autoscaling status with proper null checks
-        const metrics = status.metrics || {};
+        const metrics = (status as any).metrics;
         const validatedStatus = {
           ...status,
-          currentWorkers: typeof status.currentWorkers === 'number' && !isNaN(status.currentWorkers) ? Math.max(0, status.currentWorkers) : 0,
-          targetWorkers: typeof metrics.targetWorkers === 'number' && !isNaN(metrics.targetWorkers) ? Math.max(0, metrics.targetWorkers) : 0,
-          scalingActivity: Boolean(status.active)
+          currentWorkers: typeof (status as any).currentWorkers === 'number' && !isNaN((status as any).currentWorkers) ? Math.max(0, (status as any).currentWorkers) : 0,
+          targetWorkers: typeof metrics?.targetWorkers === 'number' && !isNaN(metrics.targetWorkers) ? Math.max(0, metrics.targetWorkers) : 0,
+          scalingActivity: Boolean((status as any).active)
         };
         setAutoscalingStatus(validatedStatus);
       }
@@ -256,4 +254,3 @@ export const useProductionInfrastructure = () => {
     loadAutoscalingStatus
   };
 };
-
