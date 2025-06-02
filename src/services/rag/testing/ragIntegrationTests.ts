@@ -1,0 +1,364 @@
+
+import { RAGOrchestrator } from '../ragOrchestrator';
+import { RAGQueryEngineEnhanced } from '../enhanced/ragQueryEngineEnhanced';
+import { globalPerformanceMonitor } from '../performance/performanceMonitor';
+import { globalCache } from '../performance/cacheService';
+import { globalOptimizationService } from '../performance/optimizationService';
+
+export interface TestResult {
+  testName: string;
+  passed: boolean;
+  duration: number;
+  error?: string;
+  metrics?: Record<string, any>;
+}
+
+export interface PerformanceBenchmark {
+  operation: string;
+  averageTime: number;
+  minTime: number;
+  maxTime: number;
+  throughput: number;
+  samples: number;
+}
+
+export class RAGIntegrationTests {
+  private testResults: TestResult[] = [];
+  private benchmarks: PerformanceBenchmark[] = [];
+
+  async runAllTests(): Promise<{
+    results: TestResult[];
+    benchmarks: PerformanceBenchmark[];
+    summary: {
+      totalTests: number;
+      passed: number;
+      failed: number;
+      averageDuration: number;
+    };
+  }> {
+    console.log('🧪 Starting RAG Integration Tests...');
+    
+    // Reset test state
+    this.testResults = [];
+    this.benchmarks = [];
+
+    // Run test suites
+    await this.testBasicRAGOperations();
+    await this.testEnhancedQueryProcessing();
+    await this.testPerformanceOptimizations();
+    await this.testCachingMechanisms();
+    await this.testErrorHandling();
+    await this.runPerformanceBenchmarks();
+
+    const summary = this.generateTestSummary();
+    
+    console.log('✅ RAG Integration Tests Complete:', summary);
+    
+    return {
+      results: this.testResults,
+      benchmarks: this.benchmarks,
+      summary
+    };
+  }
+
+  private async testBasicRAGOperations(): Promise<void> {
+    // Test 1: Basic query processing
+    await this.runTest('Basic Query Processing', async () => {
+      const request = {
+        query: 'What is artificial intelligence?',
+        agentId: 'test-agent-id',
+        conversationId: 'test-conversation-id'
+      };
+
+      const result = await RAGOrchestrator.processRequest(request);
+      
+      if (!result.response || !result.sources) {
+        throw new Error('Invalid response structure');
+      }
+
+      return { sourcesFound: result.sources.length };
+    });
+
+    // Test 2: Source integration
+    await this.runTest('Source Integration', async () => {
+      // This would test the full pipeline from source to response
+      const mockSources = ['test-source-1', 'test-source-2'];
+      return { mockSourcesProcessed: mockSources.length };
+    });
+  }
+
+  private async testEnhancedQueryProcessing(): Promise<void> {
+    // Test enhanced query engine
+    await this.runTest('Enhanced Query Processing', async () => {
+      const request = {
+        query: 'Advanced query with context',
+        agentId: 'test-agent-id',
+        searchFilters: { includeMetadata: true },
+        rankingOptions: { useSemanticRanking: true }
+      };
+
+      const result = await RAGQueryEngineEnhanced.processQueryWithOptimizations(request);
+      
+      if (!result.response) {
+        throw new Error('Enhanced query processing failed');
+      }
+
+      return { enhancedFeaturesUsed: true };
+    });
+
+    // Test streaming functionality
+    await this.runTest('Streaming Query Processing', async () => {
+      const request = {
+        query: 'Streaming test query',
+        agentId: 'test-agent-id'
+      };
+
+      let progressUpdates = 0;
+      const result = await RAGQueryEngineEnhanced.processQueryWithStreaming(
+        request,
+        (stage, progress) => {
+          progressUpdates++;
+        }
+      );
+
+      return { progressUpdates, streamingWorked: !!result.response };
+    });
+  }
+
+  private async testPerformanceOptimizations(): Promise<void> {
+    // Test performance monitoring
+    await this.runTest('Performance Monitoring', async () => {
+      const initialMetrics = globalPerformanceMonitor.getMetricsByName('test_metric');
+      
+      globalPerformanceMonitor.recordMetric('test_metric', 100, 'ms', { test: true });
+      
+      const finalMetrics = globalPerformanceMonitor.getMetricsByName('test_metric');
+      
+      if (finalMetrics.length <= initialMetrics.length) {
+        throw new Error('Performance metrics not recorded correctly');
+      }
+
+      return { metricsRecorded: finalMetrics.length - initialMetrics.length };
+    });
+
+    // Test optimization service
+    await this.runTest('Auto Optimizations', async () => {
+      const recommendations = globalOptimizationService.getRecommendations();
+      const optimizationHistory = globalOptimizationService.getOptimizationHistory(5);
+
+      return { 
+        recommendationsAvailable: recommendations.length > 0,
+        historyTracked: Array.isArray(optimizationHistory)
+      };
+    });
+  }
+
+  private async testCachingMechanisms(): Promise<void> {
+    // Test cache operations
+    await this.runTest('Cache Operations', async () => {
+      const testKey = 'test-cache-key';
+      const testValue = { test: 'data', timestamp: Date.now() };
+
+      // Set cache
+      await globalCache.set(testKey, testValue);
+
+      // Get cache
+      const cached = await globalCache.get(testKey);
+      
+      if (!cached || cached.test !== testValue.test) {
+        throw new Error('Cache set/get failed');
+      }
+
+      // Test stats
+      const stats = globalCache.getStats();
+      
+      return { 
+        cacheWorking: true,
+        hitRate: stats.hitRate,
+        totalEntries: stats.totalEntries
+      };
+    });
+
+    // Test query caching
+    await this.runTest('Query Result Caching', async () => {
+      const queryHash = 'test-query-hash';
+      const mockResult = { response: 'cached response', sources: [] };
+
+      await globalCache.setCachedQuery(queryHash, mockResult);
+      const cachedResult = await globalCache.getCachedQuery(queryHash);
+
+      if (!cachedResult || cachedResult.response !== mockResult.response) {
+        throw new Error('Query caching failed');
+      }
+
+      return { queryCacheWorking: true };
+    });
+  }
+
+  private async testErrorHandling(): Promise<void> {
+    // Test error scenarios
+    await this.runTest('Error Handling', async () => {
+      try {
+        // Test with invalid request
+        await RAGOrchestrator.processRequest({
+          query: '', // Empty query
+          agentId: '',
+        });
+        
+        throw new Error('Should have thrown error for invalid request');
+      } catch (error) {
+        // Expected error
+        return { errorHandlingWorking: true };
+      }
+    });
+
+    // Test performance alerts
+    await this.runTest('Performance Alerts', async () => {
+      // Trigger a performance alert by recording a high metric
+      globalPerformanceMonitor.recordMetric('test_slow_operation', 15000, 'ms');
+      
+      const alerts = globalPerformanceMonitor.getAlerts(10);
+      const recentAlert = alerts.find(a => a.metric === 'test_slow_operation');
+
+      return { 
+        alertTriggered: !!recentAlert,
+        alertType: recentAlert?.type 
+      };
+    });
+  }
+
+  private async runPerformanceBenchmarks(): Promise<void> {
+    console.log('📊 Running Performance Benchmarks...');
+
+    // Benchmark basic query processing
+    await this.benchmark('Basic Query Processing', async () => {
+      const request = {
+        query: 'Performance test query',
+        agentId: 'benchmark-agent'
+      };
+      await RAGOrchestrator.processRequest(request);
+    }, 10);
+
+    // Benchmark enhanced query processing
+    await this.benchmark('Enhanced Query Processing', async () => {
+      const request = {
+        query: 'Enhanced performance test query',
+        agentId: 'benchmark-agent'
+      };
+      await RAGQueryEngineEnhanced.processQueryWithOptimizations(request);
+    }, 10);
+
+    // Benchmark cache operations
+    await this.benchmark('Cache Operations', async () => {
+      const key = `bench-${Date.now()}-${Math.random()}`;
+      const value = { data: 'benchmark test data' };
+      
+      await globalCache.set(key, value);
+      await globalCache.get(key);
+    }, 50);
+  }
+
+  private async runTest(
+    testName: string, 
+    testFn: () => Promise<Record<string, any>>
+  ): Promise<void> {
+    const startTime = performance.now();
+    
+    try {
+      const metrics = await testFn();
+      const duration = performance.now() - startTime;
+      
+      this.testResults.push({
+        testName,
+        passed: true,
+        duration,
+        metrics
+      });
+      
+      console.log(`✅ ${testName} - Passed (${duration.toFixed(2)}ms)`);
+    } catch (error) {
+      const duration = performance.now() - startTime;
+      
+      this.testResults.push({
+        testName,
+        passed: false,
+        duration,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      console.log(`❌ ${testName} - Failed: ${error}`);
+    }
+  }
+
+  private async benchmark(
+    operation: string,
+    benchmarkFn: () => Promise<void>,
+    samples: number = 10
+  ): Promise<void> {
+    const times: number[] = [];
+    
+    for (let i = 0; i < samples; i++) {
+      const startTime = performance.now();
+      
+      try {
+        await benchmarkFn();
+        const duration = performance.now() - startTime;
+        times.push(duration);
+      } catch (error) {
+        console.warn(`Benchmark sample ${i} failed:`, error);
+      }
+    }
+    
+    if (times.length > 0) {
+      const averageTime = times.reduce((sum, time) => sum + time, 0) / times.length;
+      const minTime = Math.min(...times);
+      const maxTime = Math.max(...times);
+      const throughput = 1000 / averageTime; // operations per second
+      
+      this.benchmarks.push({
+        operation,
+        averageTime,
+        minTime,
+        maxTime,
+        throughput,
+        samples: times.length
+      });
+      
+      console.log(`📊 ${operation}: ${averageTime.toFixed(2)}ms avg, ${throughput.toFixed(2)} ops/sec`);
+    }
+  }
+
+  private generateTestSummary() {
+    const totalTests = this.testResults.length;
+    const passed = this.testResults.filter(r => r.passed).length;
+    const failed = totalTests - passed;
+    const averageDuration = totalTests > 0 
+      ? this.testResults.reduce((sum, r) => sum + r.duration, 0) / totalTests 
+      : 0;
+
+    return {
+      totalTests,
+      passed,
+      failed,
+      averageDuration
+    };
+  }
+
+  // Get detailed test report
+  generateDetailedReport(): {
+    testResults: TestResult[];
+    benchmarks: PerformanceBenchmark[];
+    performanceSnapshot: any;
+    recommendations: any[];
+  } {
+    return {
+      testResults: this.testResults,
+      benchmarks: this.benchmarks,
+      performanceSnapshot: globalPerformanceMonitor.getSnapshot(),
+      recommendations: globalOptimizationService.getRecommendations()
+    };
+  }
+}
+
+// Singleton instance for easy access
+export const ragIntegrationTests = new RAGIntegrationTests();

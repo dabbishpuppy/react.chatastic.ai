@@ -3,6 +3,8 @@
 export * from './queryProcessing';
 export * from './llm';
 export * from './performance';
+export * from './testing';
+export * from './deployment';
 export { RAGOrchestrator } from './ragOrchestrator';
 
 // Export UI integration
