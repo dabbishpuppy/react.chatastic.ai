@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { EnhancedCrawlRequest } from './types.ts';
@@ -68,6 +67,7 @@ serve(async (req) => {
     } = requestBody;
 
     console.log('🚀 Starting enhanced crawl for agent', agentId, ', URL:', url);
+    console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths });
 
     // Validate required fields
     if (!agentId || !url) {
@@ -149,7 +149,7 @@ serve(async (req) => {
           case 'single-page':
             return [url];
           case 'sitemap-only':
-            return await discoverSitemapLinks(url);
+            return await discoverSitemapLinks(url, excludePaths, includePaths);
           case 'full-website':
           default:
             return await discoverLinks(url, excludePaths, includePaths, maxPages);

@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface EnhancedCrawlRequest {
   url: string;
   agentId: string;
-  crawlMode: 'single-page' | 'sitemap-only' | 'full-website';
+  crawlMode?: 'single-page' | 'sitemap-only' | 'full-website';
   maxPages?: number;
   maxDepth?: number;
   excludePaths?: string[];
@@ -86,8 +86,32 @@ export const useEnhancedCrawl = () => {
     }
   };
 
+  // Add the missing properties that other components expect
+  const isLoading = loading;
+  
+  const retryFailedJobs = async (parentSourceId: string) => {
+    // Placeholder implementation
+    console.log('Retry failed jobs for:', parentSourceId);
+  };
+
+  const getCrawlJobs = async (parentSourceId: string) => {
+    // Placeholder implementation
+    console.log('Get crawl jobs for:', parentSourceId);
+    return [];
+  };
+
+  const getActiveCrawlStatus = async (parentSourceId: string) => {
+    // Placeholder implementation
+    console.log('Get active crawl status for:', parentSourceId);
+    return null;
+  };
+
   return {
     initiateCrawl,
-    loading
+    loading,
+    isLoading,
+    retryFailedJobs,
+    getCrawlJobs,
+    getActiveCrawlStatus
   };
 };

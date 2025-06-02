@@ -6,6 +6,10 @@ export async function discoverLinks(
   maxPages: number = 100
 ): Promise<string[]> {
   try {
+    console.log('🔍 Starting link discovery for:', url);
+    console.log('📋 Exclude paths:', excludePaths);
+    console.log('📋 Include paths:', includePaths);
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
@@ -14,6 +18,7 @@ export async function discoverLinks(
     });
 
     if (!response.ok) {
+      console.log('❌ Failed to fetch main URL, using fallback');
       return [url]; // Fallback to just the main URL
     }
 
@@ -31,10 +36,21 @@ export async function discoverLinks(
           const fullUrl = linkUrl.href;
           const path = linkUrl.pathname;
           
-          // Apply filters
-          if (shouldExcludePath(path, excludePaths)) continue;
-          if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) continue;
+          console.log('🔗 Checking path:', path);
           
+          // Apply exclude filters first
+          if (shouldExcludePath(path, excludePaths)) {
+            console.log('❌ Excluding path:', path);
+            continue;
+          }
+          
+          // Apply include filters if specified
+          if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) {
+            console.log('⚠️ Path not in include list:', path);
+            continue;
+          }
+          
+          console.log('✅ Including path:', path);
           discovered.add(fullUrl);
           
           // Limit discovery to prevent runaway crawls
@@ -45,18 +61,32 @@ export async function discoverLinks(
       }
     }
 
+    console.log(`📊 Discovery completed: ${discovered.size} URLs found after filtering`);
     return Array.from(discovered);
   } catch (error) {
-    console.error('Error discovering links:', error);
+    console.error('❌ Error discovering links:', error);
     return [url]; // Fallback to just the main URL
   }
 }
 
-export async function discoverSitemapLinks(sitemapUrl: string): Promise<string[]> {
+export async function discoverSitemapLinks(
+  sitemapUrl: string,
+  excludePaths: string[] = [],
+  includePaths: string[] = []
+): Promise<string[]> {
   try {
     console.log('🗺️ Discovering links from sitemap:', sitemapUrl);
+    console.log('📋 Exclude paths:', excludePaths);
+    console.log('📋 Include paths:', includePaths);
     
-    const response = await fetch(sitemapUrl, {
+    // Try to find sitemap.xml if not explicitly provided
+    let actualSitemapUrl = sitemapUrl;
+    if (!sitemapUrl.includes('sitemap')) {
+      const baseUrl = new URL(sitemapUrl);
+      actualSitemapUrl = `${baseUrl.protocol}//${baseUrl.hostname}/sitemap.xml`;
+    }
+    
+    const response = await fetch(actualSitemapUrl, {
       headers: {
         'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
       },
@@ -64,18 +94,43 @@ export async function discoverSitemapLinks(sitemapUrl: string): Promise<string[]
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch sitemap: ${response.status}`);
+      console.log('❌ Sitemap not found, falling back to main URL');
+      return [sitemapUrl];
     }
 
     const xmlText = await response.text();
-    const urls = parseSitemapXml(xmlText);
+    const allUrls = parseSitemapXml(xmlText);
     
-    console.log(`✅ Discovered ${urls.length} URLs from sitemap`);
-    return urls;
+    // Apply filtering to sitemap URLs
+    const filteredUrls = allUrls.filter(url => {
+      try {
+        const urlObj = new URL(url);
+        const path = urlObj.pathname;
+        
+        // Apply exclude filters
+        if (shouldExcludePath(path, excludePaths)) {
+          console.log('❌ Excluding sitemap URL:', path);
+          return false;
+        }
+        
+        // Apply include filters if specified
+        if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) {
+          console.log('⚠️ Sitemap URL not in include list:', path);
+          return false;
+        }
+        
+        console.log('✅ Including sitemap URL:', path);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+    
+    console.log(`✅ Discovered ${filteredUrls.length} URLs from sitemap after filtering (${allUrls.length} total)`);
+    return filteredUrls;
     
   } catch (error) {
-    console.error('Error discovering sitemap links:', error);
-    // Fallback to just the sitemap URL itself
+    console.error('❌ Error discovering sitemap links:', error);
     return [sitemapUrl];
   }
 }
@@ -107,7 +162,7 @@ function parseSitemapXml(xmlText: string): string[] {
     }
     
   } catch (error) {
-    console.error('Error parsing sitemap XML:', error);
+    console.error('❌ Error parsing sitemap XML:', error);
   }
   
   return urls;
@@ -115,25 +170,44 @@ function parseSitemapXml(xmlText: string): string[] {
 
 function shouldExcludePath(path: string, excludePaths: string[]): boolean {
   const defaultExcludes = [
-    '/wp-json/*', '/wp-admin/*', '/xmlrpc.php', '/checkout/*', 
-    '/cart/*', '/admin/*', '/api/*', '*.json', '*.xml', '*.rss'
+    '/wp-json/*', '/wp-admin/*', '/wp-content/*', '/xmlrpc.php', '/checkout/*', 
+    '/cart/*', '/admin/*', '/api/*', '*.json', '*.xml', '*.rss', '*.css', '*.js',
+    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.svg', '*.ico', '*.pdf'
   ];
   
   const allExcludes = [...defaultExcludes, ...excludePaths];
   
   return allExcludes.some(pattern => {
-    if (pattern.endsWith('*')) {
-      return path.startsWith(pattern.slice(0, -1));
+    // Handle glob patterns
+    if (pattern.includes('*')) {
+      const regex = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
+      return regex.test(path);
     }
-    return path === pattern;
+    
+    // Handle exact matches or prefix matches
+    if (pattern.endsWith('/')) {
+      return path.toLowerCase().startsWith(pattern.toLowerCase());
+    }
+    
+    return path.toLowerCase().includes(pattern.toLowerCase());
   });
 }
 
 function shouldIncludePath(path: string, includePaths: string[]): boolean {
+  if (includePaths.length === 0) return true;
+  
   return includePaths.some(pattern => {
-    if (pattern.endsWith('*')) {
-      return path.startsWith(pattern.slice(0, -1));
+    // Handle glob patterns
+    if (pattern.includes('*')) {
+      const regex = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
+      return regex.test(path);
     }
-    return path === pattern;
+    
+    // Handle exact matches or prefix matches
+    if (pattern.endsWith('/')) {
+      return path.toLowerCase().startsWith(pattern.toLowerCase());
+    }
+    
+    return path.toLowerCase().includes(pattern.toLowerCase());
   });
 }
