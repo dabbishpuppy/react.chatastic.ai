@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,7 +73,7 @@ export const useAgentSourceStats = () => {
           qa: { count: 0, size: 0 }
         };
         
-        console.log('📊 Website stats from RPC:', {
+        console.log('📊 Website stats from RPC - child pages count and compressed size:', {
           websiteCount: sourcesByType.website?.count,
           websiteSize: sourcesByType.website?.size,
           totalBytes: result.total_bytes
@@ -149,7 +150,7 @@ export const useAgentSourceStats = () => {
           table: 'source_pages'
         },
         (payload) => {
-          console.log('📡 Source pages changed:', {
+          console.log('📡 Source pages changed - this affects website link count and size:', {
             event: payload.eventType,
             pageId: (payload.new as any)?.id || (payload.old as any)?.id,
             parentSourceId: (payload.new as any)?.parent_source_id || (payload.old as any)?.parent_source_id,

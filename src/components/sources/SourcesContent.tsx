@@ -37,7 +37,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
       case 'text':
         return count === 1 ? '1 Text File' : `${count} Text Files`;
       case 'website':
-        // For website sources, show the child page count as "Links"
+        // FIXED: For website sources, show the child page count as "Links"
         return count === 1 ? '1 Link' : `${count} Links`;
       case 'qa':
         return count === 1 ? '1 Q&A' : `${count} Q&A`;
@@ -81,7 +81,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   const calculatedTotal = sourcesByType.text.size + sourcesByType.file.size + sourcesByType.website.size + sourcesByType.qa.size;
   const displayTotalSize = formatBytes(calculatedTotal);
 
-  console.log('📊 Size calculation:', {
+  console.log('📊 Size calculation with compressed website content:', {
     websiteSize: sourcesByType.website.size,
     websiteSizeFormatted: formatBytes(sourcesByType.website.size),
     calculatedTotal,

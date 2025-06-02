@@ -16,8 +16,9 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  console.log(`📊 SourcesWidget render: tab=${currentTab}`, {
-    websiteStats: stats.sourcesByType.website,
+  console.log(`📊 SourcesWidget render with enhanced website stats: tab=${currentTab}`, {
+    websiteLinksCount: stats.sourcesByType.website.count,
+    websiteCompressedSize: stats.sourcesByType.website.size,
     totalBytes: stats.totalBytes,
     allStats: stats
   });

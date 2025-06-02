@@ -1,5 +1,6 @@
 
--- Update the get_agent_source_stats function to properly handle compressed website content
+-- Update the get_agent_source_stats function to properly handle website sources
+-- This migration fixes the website source counting and size calculation
 CREATE OR REPLACE FUNCTION public.get_agent_source_stats(target_agent_id uuid)
 RETURNS TABLE(total_sources integer, total_bytes bigint, sources_by_type jsonb)
 LANGUAGE plpgsql
@@ -48,28 +49,25 @@ BEGIN
     AND source_type = 'file' 
     AND is_active = true;
 
-  -- Count website parent sources only and use aggregated compressed size
+  -- FIXED: Count website sources using child pages and their compressed content
   SELECT 
-    COUNT(*),
+    COALESCE(COUNT(sp.id), 0) as page_count,
     COALESCE(SUM(
       CASE 
-        WHEN parent_source_id IS NULL THEN
-          -- For parent sources, use the aggregated compressed_content_size if available
-          COALESCE(
-            NULLIF(compressed_content_size, 0),
-            NULLIF(compressed_size, 0),
-            NULLIF(total_content_size, 0),
-            LENGTH(COALESCE(content, ''))
-          )
+        WHEN sp.content_size IS NOT NULL AND sp.content_size > 0 AND sp.compression_ratio IS NOT NULL 
+        THEN ROUND(sp.content_size * sp.compression_ratio)
+        WHEN sp.content_size IS NOT NULL AND sp.content_size > 0 
+        THEN sp.content_size
         ELSE 0
       END
-    ), 0)
+    ), 0) as total_compressed_size
   INTO website_count, website_size
   FROM agent_sources ags
+  LEFT JOIN source_pages sp ON sp.parent_source_id = ags.id AND sp.status = 'completed'
   WHERE ags.agent_id = target_agent_id 
     AND ags.source_type = 'website' 
     AND ags.is_active = true
-    AND ags.parent_source_id IS NULL;
+    AND ags.parent_source_id IS NULL; -- Only parent sources
 
   -- Count Q&A sources and calculate size from metadata file_size or content length
   SELECT 
@@ -87,7 +85,7 @@ BEGIN
     AND source_type = 'qa' 
     AND is_active = true;
 
-  -- Calculate total size
+  -- Calculate total size including compressed website content
   total_size := text_size + file_size + website_size + qa_size;
 
   RETURN QUERY SELECT 
