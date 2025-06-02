@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { EnhancedCrawlRequest } from './types.ts';
@@ -11,9 +12,15 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Initialize Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Initialize Supabase client with proper error handling
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing Supabase configuration');
+  throw new Error('Missing Supabase configuration');
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
@@ -74,7 +81,7 @@ serve(async (req) => {
       throw new Error('Missing required fields: agentId and url');
     }
 
-    // Validate input parameters early to catch type issues - ensure strings
+    // Validate input parameters early to catch type issues
     if (typeof agentId !== 'string') {
       throw new Error(`agentId must be a string, got ${typeof agentId}`);
     }
@@ -94,13 +101,15 @@ serve(async (req) => {
       priority: `${typeof safePriority} (${safePriority})`
     });
 
-    // Get agent and team information with retry logic
+    // Get agent and team information with retry logic and proper error handling
     let agent;
     let retryCount = 0;
     const maxRetries = 3;
 
     while (retryCount < maxRetries) {
       try {
+        console.log(`🔍 Fetching agent data (attempt ${retryCount + 1}/${maxRetries})`);
+        
         const { data: agentData, error: agentError } = await supabase
           .from('agents')
           .select('id, team_id')
@@ -114,6 +123,7 @@ serve(async (req) => {
           }
         } else {
           agent = agentData;
+          console.log('✅ Agent found:', { id: agent.id, team_id: agent.team_id });
           break;
         }
       } catch (lookupError) {
@@ -131,11 +141,35 @@ serve(async (req) => {
       throw new Error('Agent not found');
     }
 
-    console.log('✅ Agent found:', agent.team_id);
-
     // Validate that we have valid UUIDs
     if (typeof agent.team_id !== 'string') {
       throw new Error(`Invalid team_id type: expected string, got ${typeof agent.team_id}`);
+    }
+
+    // Initialize usage tracking for the customer
+    try {
+      console.log('🔧 Initializing usage tracking for team:', agent.team_id);
+      
+      await supabase
+        .from('customer_usage_tracking')
+        .upsert({
+          customer_id: agent.team_id,
+          concurrent_requests: 0,
+          requests_last_minute: 0,
+          requests_last_hour: 0,
+          requests_last_day: 0,
+          minute_reset_at: new Date().toISOString(),
+          hour_reset_at: new Date().toISOString(),
+          day_reset_at: new Date().toISOString(),
+          last_request_at: new Date().toISOString()
+        }, {
+          onConflict: 'customer_id'
+        });
+        
+      console.log('✅ Usage tracking initialized');
+    } catch (usageError) {
+      console.warn('⚠️ Failed to initialize usage tracking:', usageError);
+      // Continue with crawl even if usage tracking fails
     }
 
     // Discover URLs based on crawl mode with timeout
@@ -182,6 +216,8 @@ serve(async (req) => {
 
     while (retryCount < maxRetries) {
       try {
+        console.log(`🔧 Creating parent source (attempt ${retryCount + 1}/${maxRetries})`);
+        
         parentSource = await createParentSource(agentId, agent.team_id, {
           url,
           totalJobs: discoveredUrls.length,
@@ -191,6 +227,7 @@ serve(async (req) => {
           enableDeduplication,
           priority: safePriority
         });
+        console.log('✅ Parent source created:', parentSource.id);
         break;
       } catch (createError) {
         console.error(`❌ Parent source creation failed (attempt ${retryCount + 1}):`, createError);
@@ -205,8 +242,6 @@ serve(async (req) => {
     if (!parentSource) {
       throw new Error('Failed to create parent source after multiple attempts');
     }
-
-    console.log(`✅ Parent source created with ID: ${parentSource.id}`);
 
     // Validate parent source ID before proceeding
     if (!parentSource.id || typeof parentSource.id !== 'string') {
@@ -235,7 +270,8 @@ serve(async (req) => {
         additionalMetadata: {
           ...parentSource.metadata,
           insertion_completed_at: new Date().toISOString(),
-          type_validation_passed: true
+          type_validation_passed: true,
+          api_authentication_verified: true
         }
       });
 
@@ -265,7 +301,8 @@ serve(async (req) => {
           additionalMetadata: {
             ...parentSource.metadata,
             insertion_failed_at: new Date().toISOString(),
-            insertion_error: insertError instanceof Error ? insertError.message : String(insertError)
+            insertion_error: insertError instanceof Error ? insertError.message : String(insertError),
+            api_authentication_error: insertError.message?.includes('No API key') || false
           }
         });
       } catch (updateError) {
@@ -278,15 +315,39 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ Error in enhanced crawl:', error);
     
+    // Provide more specific error messages based on error type
+    let errorMessage = 'Unknown error occurred';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      if (error.message.includes('authentication') || error.message.includes('No API key')) {
+        statusCode = 401;
+        errorMessage = 'Authentication failed. Please ensure proper API credentials are configured.';
+      } else if (error.message.includes('rate limit')) {
+        statusCode = 429;
+        errorMessage = 'Rate limit exceeded. Please try again later.';
+      } else if (error.message.includes('Invalid JSON')) {
+        statusCode = 400;
+      } else if (error.message.includes('Missing required fields')) {
+        statusCode = 400;
+      }
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        timestamp: new Date().toISOString()
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+        debugInfo: {
+          errorType: error.constructor.name,
+          originalMessage: error instanceof Error ? error.message : String(error)
+        }
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500
+        status: statusCode
       }
     );
   }
