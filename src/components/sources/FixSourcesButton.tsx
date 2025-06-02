@@ -5,9 +5,15 @@ import { RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
+interface FixSourcesResult {
+  success: boolean;
+  fixed_sources: number;
+  timestamp: string;
+}
+
 const FixSourcesButton: React.FC = () => {
   const [isFixing, setIsFixing] = useState(false);
-  const [lastResult, setLastResult] = useState<any>(null);
+  const [lastResult, setLastResult] = useState<FixSourcesResult | null>(null);
 
   const handleFixSources = async () => {
     setIsFixing(true);
@@ -20,14 +26,16 @@ const FixSourcesButton: React.FC = () => {
         throw error;
       }
       
-      setLastResult(data);
+      // Cast the Json type to our expected interface
+      const result = data as FixSourcesResult;
+      setLastResult(result);
       
       toast({
         title: "Sources Fixed",
-        description: `Successfully fixed ${data.fixed_sources} parent sources with missing size data.`,
+        description: `Successfully fixed ${result.fixed_sources} parent sources with missing size data.`,
       });
       
-      console.log('✅ Fix completed:', data);
+      console.log('✅ Fix completed:', result);
     } catch (error) {
       console.error('❌ Failed to fix sources:', error);
       toast({
