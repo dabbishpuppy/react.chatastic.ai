@@ -2,7 +2,7 @@
 import { AgentSource } from '@/types/rag';
 
 export const formatFileSize = (source: AgentSource) => {
-  // For Q&A sources, calculate size from content or metadata
+  // For Q&A sources, calculate size from content (answer only) or metadata
   if (source.source_type === 'qa') {
     // First check if metadata has file_size
     if (source.metadata) {
@@ -12,9 +12,9 @@ export const formatFileSize = (source: AgentSource) => {
       }
     }
     
-    // Calculate from content if available - strip HTML for Q&A to match the form counter
+    // Calculate from content if available (content should be the answer only)
     if (source.content && source.content.length > 0) {
-      // For Q&A sources, strip HTML to get plain text size (matching the form counter)
+      // For Q&A sources, strip HTML to get plain text size of the answer
       const stripHtml = (htmlString: string) => {
         const tmp = document.createElement('div');
         tmp.innerHTML = htmlString;

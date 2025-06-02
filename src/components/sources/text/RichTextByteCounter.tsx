@@ -14,16 +14,8 @@ const RichTextByteCounter: React.FC<RichTextByteCounterProps> = ({ html, questio
     return tmp.textContent || tmp.innerText || '';
   };
 
-  let contentToMeasure = html;
-  
-  // For Q&A sources, calculate the full content that will be stored
-  if (question !== undefined) {
-    const plainQuestion = question.replace(/<[^>]*>/g, '');
-    const qaContent = `Question: ${plainQuestion}\n\nAnswer: ${html}`;
-    contentToMeasure = qaContent;
-  }
-
-  const plainText = stripHtml(contentToMeasure);
+  // For Q&A sources, only measure the answer content (not the full stored structure)
+  const plainText = stripHtml(html);
   const byteCount = new TextEncoder().encode(plainText).length;
   
   const formatBytes = (bytes: number) => {

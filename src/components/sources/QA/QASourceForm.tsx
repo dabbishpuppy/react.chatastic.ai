@@ -40,31 +40,28 @@ const QASourceForm: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Create Q&A source with structured content
-      const qaContent = `Question: ${question.replace(/<[^>]*>/g, '')}\n\nAnswer: ${answer}`;
-      
-      // Calculate content size for metadata using plain text (matching the form counter)
+      // Store only the answer content, not the formatted Q&A structure
       const stripHtml = (htmlString: string) => {
         const tmp = document.createElement('div');
         tmp.innerHTML = htmlString;
         return tmp.textContent || tmp.innerText || '';
       };
       
-      const plainTextContent = stripHtml(qaContent);
-      const contentSize = new TextEncoder().encode(plainTextContent).length;
+      const plainTextAnswer = stripHtml(answer);
+      const contentSize = new TextEncoder().encode(plainTextAnswer).length;
       
       await sources.createSource({
         agent_id: agentId,
         team_id: '', // Will be set by the service based on agent
         source_type: 'qa',
         title: title,
-        content: qaContent,
+        content: answer, // Store only the answer content
         metadata: {
-          question: question.replace(/<[^>]*>/g, ''), // Store plain text question
-          answer: answer, // Store rich text answer
+          question: question.replace(/<[^>]*>/g, ''), // Store plain text question in metadata
+          answer: answer, // Store rich text answer in metadata
           qa_type: 'manual',
-          file_size: contentSize, // Store the calculated plain text content size
-          content_type: 'text/plain'
+          file_size: contentSize, // Store the answer content size
+          content_type: 'text/html'
         }
       });
 
@@ -118,7 +115,7 @@ const QASourceForm: React.FC = () => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <Label htmlFor="answer">Answer</Label>
-              <RichTextByteCounter html={answer} question={question} />
+              <RichTextByteCounter html={answer} />
             </div>
             <RichTextEditor
               value={answer}
