@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { 
   ProductionInfrastructureService, 
@@ -22,14 +23,15 @@ export const useProductionInfrastructure = () => {
       
       // Ensure health percentage is a valid number
       if (health && typeof health === 'object') {
-        const healthPercentage = health.healthPercentage || health.health || 0;
+        // Access the correct properties from InfrastructureHealth interface
+        const healthScore = health.overall?.healthScore || 0;
         const validatedHealth = {
           ...health,
-          healthPercentage: isNaN(healthPercentage) ? 0 : Math.max(0, Math.min(100, healthPercentage)),
-          healthy: healthPercentage >= 70,
-          queueDepth: health.queueDepth || 0,
-          activeWorkers: health.activeWorkers || 0,
-          errorRate: isNaN(health.errorRate) ? 0 : health.errorRate
+          healthPercentage: isNaN(healthScore) ? 0 : Math.max(0, Math.min(100, healthScore)),
+          healthy: healthScore >= 70,
+          queueDepth: health.connectionPools?.queuedRequests || 0,
+          activeWorkers: health.connectionPools?.activeConnections || 0,
+          errorRate: isNaN(health.rateLimiting?.throttledRequests || 0) ? 0 : (health.rateLimiting?.throttledRequests || 0) / 100
         };
         
         console.log('📊 Infrastructure health:', `${validatedHealth.healthPercentage}%`, validatedHealth.healthy ? '(healthy)' : '(critical)');
@@ -77,12 +79,13 @@ export const useProductionInfrastructure = () => {
       const health = await MonitoringAndAlertingService.getSystemHealthSummary();
       
       if (health && typeof health === 'object') {
-        // Validate numeric values
+        // Validate numeric values from the correct SystemMetrics structure
+        const metrics = health.metrics || {};
         const validatedSystemHealth = {
           ...health,
-          cpuUsage: isNaN(health.cpuUsage) ? 0 : Math.max(0, Math.min(100, health.cpuUsage)),
-          memoryUsage: isNaN(health.memoryUsage) ? 0 : Math.max(0, Math.min(100, health.memoryUsage)),
-          responseTime: isNaN(health.responseTime) ? 0 : Math.max(0, health.responseTime)
+          cpuUsage: isNaN(metrics.cpuUsage) ? 0 : Math.max(0, Math.min(100, metrics.cpuUsage)),
+          memoryUsage: isNaN(metrics.memoryUsage) ? 0 : Math.max(0, Math.min(100, metrics.memoryUsage)),
+          responseTime: isNaN(metrics.responseTime) ? 0 : Math.max(0, metrics.responseTime)
         };
         setSystemHealth(validatedSystemHealth);
       }
@@ -103,11 +106,13 @@ export const useProductionInfrastructure = () => {
       const status = await AutoscalingService.getAutoscalingStatus();
       
       if (status && typeof status === 'object') {
+        // Access the correct properties from autoscaling status
+        const metrics = status.metrics || {};
         const validatedStatus = {
           ...status,
           currentWorkers: isNaN(status.currentWorkers) ? 0 : Math.max(0, status.currentWorkers),
-          targetWorkers: isNaN(status.targetWorkers) ? 0 : Math.max(0, status.targetWorkers),
-          scalingActivity: status.scalingActivity || false
+          targetWorkers: isNaN(metrics.targetWorkers) ? 0 : Math.max(0, metrics.targetWorkers),
+          scalingActivity: status.active || false
         };
         setAutoscalingStatus(validatedStatus);
       }
