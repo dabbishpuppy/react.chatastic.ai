@@ -16,10 +16,10 @@ export class CompressionService {
       'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'man', 'end', 'why', 'let', 'put', 'say', 'she', 'too', 'use',
       
       // Medium frequency words
-      'about', 'after', 'again', 'before', 'being', 'below', 'between', 'both', 'during', 'each', 'few', 'from', 'further', 'here', 'how', 'into', 'more', 'most', 'other', 'over', 'same', 'some', 'such', 'than', 'that', 'their', 'them', 'these', 'they', 'this', 'those', 'through', 'time', 'very', 'when', 'where', 'which', 'while', 'with', 'would', 'your',
+      'about', 'after', 'again', 'before', 'being', 'below', 'between', 'both', 'during', 'each', 'few', 'from', 'further', 'here', 'into', 'more', 'most', 'other', 'over', 'same', 'some', 'such', 'than', 'that', 'their', 'them', 'these', 'they', 'this', 'those', 'through', 'time', 'very', 'when', 'where', 'which', 'while', 'with', 'would', 'your',
       
       // Website-specific boilerplate (aggressive targeting)
-      'contact', 'privacy', 'terms', 'policy', 'service', 'services', 'product', 'products', 'company', 'business', 'website', 'page', 'home', 'about', 'information', 'content', 'copyright', 'reserved', 'rights', 'click', 'here', 'more', 'read', 'learn', 'view', 'see', 'find', 'search', 'menu', 'navigation', 'subscribe', 'newsletter', 'follow', 'share', 'social', 'media'
+      'contact', 'privacy', 'terms', 'policy', 'service', 'services', 'product', 'products', 'company', 'business', 'website', 'page', 'home', 'information', 'content', 'copyright', 'reserved', 'rights', 'click', 'more', 'read', 'learn', 'view', 'see', 'find', 'search', 'menu', 'navigation', 'subscribe', 'newsletter', 'follow', 'share', 'social', 'media'
     ];
     
     const dictionaryText = commonPatterns.join(' ');
@@ -93,7 +93,7 @@ export class CompressionService {
 
   // Ultra-aggressive text preprocessing for maximum compression
   private static ultraAggressivePreprocessing(text: string): string {
-    // Enhanced dictionary with ultra-short replacements
+    // Enhanced dictionary with ultra-short replacements (fixed duplicate keys)
     const ultraCompressionDict: Record<string, string> = {
       // Ultra-common words to single characters
       'the': '∅',
@@ -121,14 +121,12 @@ export class CompressionService {
       'through': '⊕',
       'between': '⊗',
       
-      // Website-specific ultra-compression
+      // Website-specific ultra-compression (fixed duplicate keys)
       'click': '©',
       'here': '®',
-      'more': '™',
-      'read': '§',
-      'learn': '¶',
+      'read': '™',
+      'learn': '§',
       'contact': 'Ç',
-      'about': 'Ü',
       'home': 'Ñ',
       'page': 'ß',
       'menu': 'Ø',
