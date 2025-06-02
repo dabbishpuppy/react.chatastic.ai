@@ -1,19 +1,20 @@
 
-export interface CompressionResult {
-  compressed: Uint8Array;
-  originalSize: number;
-  compressedSize: number;
-  ratio: number;
-  method: string;
-  savings: number;
-}
-
+// Types for compression functionality
 export interface ContentAnalysis {
-  contentType: 'informational' | 'content-rich' | 'template' | 'mixed';
+  contentType: 'content-rich' | 'informational' | 'template' | 'mixed';
   density: number;
   uniqueWords: number;
   repeatedPhrases: string[];
   boilerplateRatio: number;
+}
+
+export interface CompressionResult {
+  compressedChunks: string[];
+  originalSize: number;
+  compressedSize: number;
+  compressionRatio: number;
+  processingTime: number;
+  strategy: string;
 }
 
 export interface DeduplicationResult {
@@ -23,9 +24,15 @@ export interface DeduplicationResult {
 }
 
 export interface CompressionStats {
+  totalSavings: number;
+  averageCompressionRatio: number;
+  totalProcessedChunks: number;
   totalOriginalSize: number;
   totalCompressedSize: number;
-  averageCompressionRatio: number;
-  spaceSaved: number;
-  recommendations: string[];
+  strategiesUsed: string[];
+  processingTimeStats: {
+    average: number;
+    min: number;
+    max: number;
+  };
 }
