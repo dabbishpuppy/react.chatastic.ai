@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -15,7 +14,7 @@ export interface ImportJob {
   id: string;
   agentId: string;
   teamId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
   totalPairs: number;
   processedPairs: number;
   failedPairs: number;
@@ -74,7 +73,7 @@ export class BatchQAImportService {
         sourceFile: file.name
       };
 
-      // Store job in database (without metadata support)
+      // Store job in database
       const { error: jobError } = await supabase
         .from('agent_training_jobs')
         .insert({
@@ -190,11 +189,11 @@ export class BatchQAImportService {
     console.log(`🔄 Processing batch import job: ${jobId}`);
 
     try {
-      // Update job status to processing
+      // Update job status to in_progress
       await supabase
         .from('agent_training_jobs')
         .update({
-          status: 'processing',
+          status: 'in_progress',
           started_at: new Date().toISOString()
         })
         .eq('id', jobId);
@@ -230,10 +229,10 @@ export class BatchQAImportService {
               team_id: job.agent_id, // Use agent_id as fallback since we don't have team_id stored
               source_type: 'qa',
               title,
-              content: qaPair.answer,
+              content: qaPair.answer, // Store only the answer content
               metadata: {
-                question: qaPair.question,
-                answer: qaPair.answer,
+                question: qaPair.question.replace(/<[^>]*>/g, ''), // Store plain text question in metadata
+                answer: qaPair.answer, // Store rich text answer in metadata
                 category: qaPair.category,
                 tags: qaPair.tags || [],
                 qa_type: 'imported',
@@ -408,7 +407,7 @@ export class BatchQAImportService {
       id: jobId,
       agentId: job.agent_id,
       teamId: job.agent_id, // Fallback
-      status: job.status as any,
+      status: job.status === 'in_progress' ? 'in_progress' : job.status as any,
       totalPairs: job.total_sources || 0,
       processedPairs: job.processed_sources || 0,
       failedPairs: 0, // Would need separate tracking
@@ -437,7 +436,7 @@ export class BatchQAImportService {
       id: job.id,
       agentId: job.agent_id,
       teamId: job.agent_id, // Fallback
-      status: job.status as any,
+      status: job.status === 'in_progress' ? 'in_progress' : job.status as any,
       totalPairs: job.total_sources || 0,
       processedPairs: job.processed_sources || 0,
       failedPairs: 0,

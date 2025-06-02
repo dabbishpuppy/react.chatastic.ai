@@ -6,7 +6,7 @@ export interface BatchJob {
   id: string;
   agentId: string;
   chunkIds: string[];
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
   progress: number;
   totalChunks: number;
   processedChunks: number;
@@ -40,16 +40,6 @@ export class EmbeddingBatchProcessor {
     const texts = chunks?.map(chunk => chunk.content) || [];
     const costEstimate = MultiLLMEmbeddingRouter.estimateCost(texts, provider);
 
-    const jobMetadata = {
-      type: 'embedding_batch',
-      chunk_ids: chunkIds,
-      estimated_cost: costEstimate.estimatedCost,
-      provider: provider || 'openai-small',
-      progress: 0,
-      failed_chunks: 0,
-      actual_cost: 0
-    };
-
     const batchJob: BatchJob = {
       id: crypto.randomUUID(),
       agentId,
@@ -63,7 +53,7 @@ export class EmbeddingBatchProcessor {
       actualCost: 0
     };
 
-    // Store job metadata in agent_training_jobs table (without metadata column)
+    // Store job metadata in agent_training_jobs table
     const { error: jobError } = await supabase
       .from('agent_training_jobs')
       .insert({
@@ -104,18 +94,17 @@ export class EmbeddingBatchProcessor {
       throw new Error(`Job ${jobId} is not in pending status: ${job.status}`);
     }
 
-    // Update job status to processing
+    // Update job status to in_progress
     await supabase
       .from('agent_training_jobs')
       .update({ 
-        status: 'processing',
+        status: 'in_progress',
         started_at: new Date().toISOString()
       })
       .eq('id', jobId);
 
     try {
-      // For now, simulate chunk processing since we don't have the chunk_ids stored
-      // In a real implementation, you'd store this in a separate job_metadata table
+      // Simulate processing chunks since we don't have the chunk_ids stored
       let processedChunks = 0;
       let failedChunks = 0;
       let totalCost = 0;
@@ -261,7 +250,7 @@ export class EmbeddingBatchProcessor {
         completed_at: new Date().toISOString()
       })
       .eq('id', jobId)
-      .in('status', ['pending', 'processing']);
+      .in('status', ['pending', 'in_progress']);
 
     if (error) {
       throw new Error(`Failed to cancel job: ${error.message}`);

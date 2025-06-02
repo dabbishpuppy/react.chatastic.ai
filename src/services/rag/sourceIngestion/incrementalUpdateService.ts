@@ -19,19 +19,31 @@ export class IncrementalUpdateService {
 
     const nextUpdate = this.calculateNextUpdate(frequency);
 
-    // Update using standard update method (without supabase.raw)
+    // Get current metadata first
+    const { data: currentSource, error: fetchError } = await supabase
+      .from('agent_sources')
+      .select('metadata')
+      .eq('id', sourceId)
+      .single();
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch source: ${fetchError.message}`);
+    }
+
+    const currentMetadata = currentSource?.metadata as any || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      incremental_update: {
+        enabled: true,
+        frequency: frequency,
+        next_update: nextUpdate.toISOString(),
+        scheduled_at: new Date().toISOString()
+      }
+    };
+
     const { error } = await supabase
       .from('agent_sources')
-      .update({
-        metadata: {
-          incremental_update: {
-            enabled: true,
-            frequency: frequency,
-            next_update: nextUpdate.toISOString(),
-            scheduled_at: new Date().toISOString()
-          }
-        }
-      })
+      .update({ metadata: updatedMetadata })
       .eq('id', sourceId);
 
     if (error) {

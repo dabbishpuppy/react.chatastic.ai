@@ -96,13 +96,26 @@ export class SourceOperationsSystem {
   ): Promise<void> {
     console.log(`🔗 Tracking dependencies for source: ${sourceId}`);
 
+    // Use regular update instead of raw SQL
+    const { data: currentSource, error: fetchError } = await supabase
+      .from('agent_sources')
+      .select('metadata')
+      .eq('id', sourceId)
+      .single();
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch source: ${fetchError.message}`);
+    }
+
+    const currentMetadata = currentSource?.metadata as any || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      dependencies: dependencies
+    };
+
     const { error } = await supabase
       .from('agent_sources')
-      .update({
-        metadata: supabase.raw(`
-          metadata || jsonb_build_object('dependencies', $1::jsonb)
-        `, [JSON.stringify(dependencies)])
-      })
+      .update({ metadata: updatedMetadata })
       .eq('id', sourceId);
 
     if (error) {
@@ -129,7 +142,8 @@ export class SourceOperationsSystem {
     }
 
     const changes: string[] = [];
-    const lastProcessed = source.metadata?.last_processed_at;
+    const metadata = source.metadata as any;
+    const lastProcessed = metadata?.last_processed_at;
     
     if (!lastProcessed) {
       changes.push('Never processed');
@@ -138,9 +152,9 @@ export class SourceOperationsSystem {
     }
 
     // Check if content hash has changed (if tracked)
-    if (source.metadata?.content_hash) {
+    if (metadata?.content_hash) {
       const currentHash = await this.calculateContentHash(source.content || '');
-      if (currentHash !== source.metadata.content_hash) {
+      if (currentHash !== metadata.content_hash) {
         changes.push('Content hash changed');
       }
     }

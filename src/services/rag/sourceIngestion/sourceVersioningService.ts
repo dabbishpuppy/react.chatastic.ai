@@ -7,64 +7,69 @@ export interface SourceVersion {
   content: string;
   metadata: Record<string, any>;
   createdAt: string;
-  createdBy?: string;
-  isActive: boolean;
-  changeReason?: string;
-  contentHash: string;
+  createdBy: string;
+  changeDescription?: string;
+  size: number;
 }
 
 export class SourceVersioningService {
-  // Create a new version when source content changes
+  // Create a new version of a source
   static async createVersion(
     sourceId: string,
     content: string,
-    metadata: Record<string, any> = {},
-    changeReason?: string
+    changeDescription?: string,
+    metadata?: Record<string, any>
   ): Promise<SourceVersion> {
     console.log(`📝 Creating new version for source: ${sourceId}`);
 
-    // Get current max version
-    const { data: maxVersionData, error: versionError } = await supabase
+    // Get the current source to determine next version number
+    const { data: source, error: sourceError } = await supabase
       .from('agent_sources')
       .select('metadata')
       .eq('id', sourceId)
       .single();
 
-    if (versionError) {
-      throw new Error(`Failed to get source: ${versionError.message}`);
+    if (sourceError) {
+      throw new Error(`Source not found: ${sourceError.message}`);
     }
 
-    const currentVersion = maxVersionData?.metadata?.current_version || 0;
+    const currentMetadata = source.metadata as any || {};
+    const currentVersion = currentMetadata.current_version || 0;
     const nextVersion = currentVersion + 1;
 
-    // Calculate content hash
-    const contentHash = await this.calculateContentHash(content);
-
-    // Store version in metadata (since we don't have a separate versions table)
-    const versionData: SourceVersion = {
-      id: `${sourceId}_v${nextVersion}`,
+    const versionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    
+    const version: SourceVersion = {
+      id: versionId,
       sourceId,
       version: nextVersion,
       content,
-      metadata,
-      createdAt: new Date().toISOString(),
-      isActive: true,
-      changeReason,
-      contentHash
+      metadata: metadata || {},
+      createdAt: now,
+      createdBy: 'system', // Would normally get from auth context
+      changeDescription,
+      size: new TextEncoder().encode(content).length
     };
 
-    // Update source with new version
+    // Store version data in metadata instead of separate table
+    const versions = currentMetadata.versions || [];
+    versions.push(version);
+
+    // Update source with new version info
+    const updatedMetadata = {
+      ...currentMetadata,
+      current_version: nextVersion,
+      versions: versions.slice(-10), // Keep only last 10 versions
+      last_version_created: now
+    };
+
     const { error: updateError } = await supabase
       .from('agent_sources')
       .update({
         content,
-        metadata: supabase.raw(`
-          metadata || jsonb_build_object(
-            'current_version', $1,
-            'versions', COALESCE(metadata->'versions', '[]'::jsonb) || $2::jsonb,
-            'content_hash', $3
-          )
-        `, [nextVersion, JSON.stringify([versionData]), contentHash])
+        metadata: updatedMetadata,
+        updated_at: now
       })
       .eq('id', sourceId);
 
@@ -73,32 +78,29 @@ export class SourceVersioningService {
     }
 
     console.log(`✅ Created version ${nextVersion} for source: ${sourceId}`);
-    return versionData;
+    return version;
   }
 
   // Get all versions for a source
-  static async getVersions(sourceId: string): Promise<SourceVersion[]> {
-    console.log(`📚 Getting versions for source: ${sourceId}`);
-
+  static async getSourceVersions(sourceId: string): Promise<SourceVersion[]> {
     const { data: source, error } = await supabase
       .from('agent_sources')
       .select('metadata')
       .eq('id', sourceId)
       .single();
 
-    if (error) {
-      throw new Error(`Failed to get source: ${error.message}`);
+    if (error || !source) {
+      console.error('Failed to get source versions:', error);
+      return [];
     }
 
-    const versions = source?.metadata?.versions || [];
-    return versions.sort((a: SourceVersion, b: SourceVersion) => b.version - a.version);
+    const metadata = source.metadata as any || {};
+    return metadata.versions || [];
   }
 
   // Get a specific version
   static async getVersion(sourceId: string, version: number): Promise<SourceVersion | null> {
-    console.log(`🔍 Getting version ${version} for source: ${sourceId}`);
-
-    const versions = await this.getVersions(sourceId);
+    const versions = await this.getSourceVersions(sourceId);
     return versions.find(v => v.version === version) || null;
   }
 
@@ -106,177 +108,169 @@ export class SourceVersioningService {
   static async rollbackToVersion(
     sourceId: string, 
     targetVersion: number,
-    reason?: string
+    changeDescription?: string
   ): Promise<SourceVersion> {
-    console.log(`⏪ Rolling back source ${sourceId} to version ${targetVersion}`);
+    console.log(`🔄 Rolling back source ${sourceId} to version ${targetVersion}`);
 
     const targetVersionData = await this.getVersion(sourceId, targetVersion);
     if (!targetVersionData) {
       throw new Error(`Version ${targetVersion} not found`);
     }
 
-    // Create a new version with the rollback content
-    const rollbackVersion = await this.createVersion(
+    // Create a new version with the rolled-back content
+    return this.createVersion(
       sourceId,
       targetVersionData.content,
-      {
-        ...targetVersionData.metadata,
-        rollback_from_version: targetVersion,
-        rollback_reason: reason
-      },
-      `Rollback to version ${targetVersion}${reason ? `: ${reason}` : ''}`
+      changeDescription || `Rollback to version ${targetVersion}`,
+      targetVersionData.metadata
     );
-
-    // Trigger reprocessing of chunks
-    await this.triggerReprocessing(sourceId);
-
-    console.log(`✅ Rolled back to version ${targetVersion}, created new version ${rollbackVersion.version}`);
-    return rollbackVersion;
   }
 
   // Compare two versions
   static async compareVersions(
-    sourceId: string,
-    version1: number,
+    sourceId: string, 
+    version1: number, 
     version2: number
   ): Promise<{
-    version1: SourceVersion;
-    version2: SourceVersion;
-    differences: {
+    oldVersion: SourceVersion;
+    newVersion: SourceVersion;
+    changes: {
       contentChanged: boolean;
+      sizeChange: number;
       metadataChanged: boolean;
-      changeSummary: string[];
     };
   }> {
-    console.log(`🔄 Comparing versions ${version1} and ${version2} for source: ${sourceId}`);
-
-    const [v1, v2] = await Promise.all([
+    const [oldVersion, newVersion] = await Promise.all([
       this.getVersion(sourceId, version1),
       this.getVersion(sourceId, version2)
     ]);
 
-    if (!v1 || !v2) {
+    if (!oldVersion || !newVersion) {
       throw new Error('One or both versions not found');
     }
 
-    const contentChanged = v1.contentHash !== v2.contentHash;
-    const metadataChanged = JSON.stringify(v1.metadata) !== JSON.stringify(v2.metadata);
-    
-    const changeSummary: string[] = [];
-    if (contentChanged) changeSummary.push('Content modified');
-    if (metadataChanged) changeSummary.push('Metadata updated');
-
-    // Basic content difference analysis
-    if (contentChanged) {
-      const lengthDiff = v2.content.length - v1.content.length;
-      if (lengthDiff > 0) changeSummary.push(`+${lengthDiff} characters`);
-      else if (lengthDiff < 0) changeSummary.push(`${lengthDiff} characters`);
-    }
+    const contentChanged = oldVersion.content !== newVersion.content;
+    const sizeChange = newVersion.size - oldVersion.size;
+    const metadataChanged = JSON.stringify(oldVersion.metadata) !== JSON.stringify(newVersion.metadata);
 
     return {
-      version1: v1,
-      version2: v2,
-      differences: {
+      oldVersion,
+      newVersion,
+      changes: {
         contentChanged,
-        metadataChanged,
-        changeSummary
+        sizeChange,
+        metadataChanged
       }
     };
   }
 
-  // Clean up old versions (keep only recent versions)
-  static async cleanupOldVersions(
+  // Auto-create version on content change
+  static async autoVersionOnChange(
     sourceId: string,
-    keepVersions: number = 10
-  ): Promise<number> {
-    console.log(`🧹 Cleaning up old versions for source: ${sourceId}, keeping ${keepVersions}`);
+    newContent: string,
+    changeDescription?: string
+  ): Promise<{ versionCreated: boolean; version?: SourceVersion }> {
+    console.log(`🔍 Checking if auto-versioning needed for source: ${sourceId}`);
 
-    const versions = await this.getVersions(sourceId);
-    
-    if (versions.length <= keepVersions) {
-      console.log('No cleanup needed');
+    const { data: source, error } = await supabase
+      .from('agent_sources')
+      .select('content, metadata')
+      .eq('id', sourceId)
+      .single();
+
+    if (error || !source) {
+      return { versionCreated: false };
+    }
+
+    // Check if content has changed
+    const currentContent = source.content || '';
+    if (currentContent === newContent) {
+      console.log('No content change detected, skipping versioning');
+      return { versionCreated: false };
+    }
+
+    // Create new version
+    const version = await this.createVersion(
+      sourceId,
+      newContent,
+      changeDescription || 'Auto-version on content change'
+    );
+
+    return { versionCreated: true, version };
+  }
+
+  // Delete old versions (keep last N versions)
+  static async cleanupOldVersions(sourceId: string, keepLast: number = 5): Promise<number> {
+    console.log(`🧹 Cleaning up old versions for source: ${sourceId}, keeping last ${keepLast}`);
+
+    const { data: source, error } = await supabase
+      .from('agent_sources')
+      .select('metadata')
+      .eq('id', sourceId)
+      .single();
+
+    if (error || !source) {
       return 0;
     }
 
-    const versionsToKeep = versions.slice(0, keepVersions);
-    const cleanedCount = versions.length - keepVersions;
+    const metadata = source.metadata as any || {};
+    const versions = metadata.versions || [];
 
-    // Update source to keep only recent versions
-    const { error } = await supabase
-      .from('agent_sources')
-      .update({
-        metadata: supabase.raw(`
-          metadata || jsonb_build_object('versions', $1::jsonb)
-        `, [JSON.stringify(versionsToKeep)])
-      })
-      .eq('id', sourceId);
-
-    if (error) {
-      throw new Error(`Failed to cleanup versions: ${error.message}`);
+    if (versions.length <= keepLast) {
+      return 0;
     }
 
-    console.log(`✅ Cleaned up ${cleanedCount} old versions`);
-    return cleanedCount;
-  }
+    // Keep only the last N versions
+    const versionsToKeep = versions.slice(-keepLast);
+    const deletedCount = versions.length - versionsToKeep.length;
 
-  private static async calculateContentHash(content: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(content);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  }
+    const updatedMetadata = {
+      ...metadata,
+      versions: versionsToKeep
+    };
 
-  private static async triggerReprocessing(sourceId: string): Promise<void> {
-    console.log(`🔄 Triggering reprocessing for source: ${sourceId}`);
-
-    // Delete existing chunks to force reprocessing
-    const { error: deleteError } = await supabase
-      .from('source_chunks')
-      .delete()
-      .eq('source_id', sourceId);
-
-    if (deleteError) {
-      console.error('Failed to delete chunks:', deleteError);
-    }
-
-    // Mark source for reprocessing
     const { error: updateError } = await supabase
       .from('agent_sources')
-      .update({
-        metadata: supabase.raw(`
-          metadata || jsonb_build_object('needs_reprocessing', true)
-        `)
-      })
+      .update({ metadata: updatedMetadata })
       .eq('id', sourceId);
 
     if (updateError) {
-      console.error('Failed to mark for reprocessing:', updateError);
+      throw new Error(`Failed to cleanup versions: ${updateError.message}`);
     }
+
+    console.log(`✅ Cleaned up ${deletedCount} old versions`);
+    return deletedCount;
   }
 
   // Get version history summary
   static async getVersionHistory(sourceId: string): Promise<{
     totalVersions: number;
     currentVersion: number;
-    recentChanges: Array<{
-      version: number;
-      createdAt: string;
-      changeReason?: string;
-      contentLength: number;
-    }>;
+    firstVersion?: SourceVersion;
+    lastVersion?: SourceVersion;
+    totalSizeChange: number;
   }> {
-    const versions = await this.getVersions(sourceId);
+    const versions = await this.getSourceVersions(sourceId);
     
+    if (versions.length === 0) {
+      return {
+        totalVersions: 0,
+        currentVersion: 0,
+        totalSizeChange: 0
+      };
+    }
+
+    const sortedVersions = versions.sort((a, b) => a.version - b.version);
+    const firstVersion = sortedVersions[0];
+    const lastVersion = sortedVersions[sortedVersions.length - 1];
+    const totalSizeChange = lastVersion.size - firstVersion.size;
+
     return {
       totalVersions: versions.length,
-      currentVersion: versions[0]?.version || 0,
-      recentChanges: versions.slice(0, 5).map(v => ({
-        version: v.version,
-        createdAt: v.createdAt,
-        changeReason: v.changeReason,
-        contentLength: v.content.length
-      }))
+      currentVersion: lastVersion.version,
+      firstVersion,
+      lastVersion,
+      totalSizeChange
     };
   }
 }
