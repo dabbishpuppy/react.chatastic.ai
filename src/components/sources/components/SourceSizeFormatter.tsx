@@ -12,9 +12,17 @@ export const formatFileSize = (source: AgentSource) => {
       }
     }
     
-    // Calculate from content if available
+    // Calculate from content if available - strip HTML for Q&A to match the form counter
     if (source.content && source.content.length > 0) {
-      const bytes = new TextEncoder().encode(source.content).length;
+      // For Q&A sources, strip HTML to get plain text size (matching the form counter)
+      const stripHtml = (htmlString: string) => {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = htmlString;
+        return tmp.textContent || tmp.innerText || '';
+      };
+      
+      const plainText = stripHtml(source.content);
+      const bytes = new TextEncoder().encode(plainText).length;
       return formatBytes(bytes);
     }
     

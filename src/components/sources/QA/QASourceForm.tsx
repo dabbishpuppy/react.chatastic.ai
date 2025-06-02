@@ -43,8 +43,15 @@ const QASourceForm: React.FC = () => {
       // Create Q&A source with structured content
       const qaContent = `Question: ${question.replace(/<[^>]*>/g, '')}\n\nAnswer: ${answer}`;
       
-      // Calculate content size for metadata
-      const contentSize = new TextEncoder().encode(qaContent).length;
+      // Calculate content size for metadata using plain text (matching the form counter)
+      const stripHtml = (htmlString: string) => {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = htmlString;
+        return tmp.textContent || tmp.innerText || '';
+      };
+      
+      const plainTextContent = stripHtml(qaContent);
+      const contentSize = new TextEncoder().encode(plainTextContent).length;
       
       await sources.createSource({
         agent_id: agentId,
@@ -56,7 +63,7 @@ const QASourceForm: React.FC = () => {
           question: question.replace(/<[^>]*>/g, ''), // Store plain text question
           answer: answer, // Store rich text answer
           qa_type: 'manual',
-          file_size: contentSize, // Store the calculated content size
+          file_size: contentSize, // Store the calculated plain text content size
           content_type: 'text/plain'
         }
       });
