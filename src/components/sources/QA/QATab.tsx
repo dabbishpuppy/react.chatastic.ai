@@ -43,12 +43,28 @@ const QATab: React.FC = () => {
     handleDeleteClick,
     handleDeleteConfirm,
     handleRowClick,
-  } = useSourcesListLogic(sources, () => {
+  } = useSourcesListLogic(sources, (sourceId) => {
+    // Invalidate and refetch QA sources when a source is deleted
     queryClient.invalidateQueries({ 
       queryKey: ['sources', agentId, 'qa'] 
     });
+    queryClient.invalidateQueries({ 
+      queryKey: ['sources', agentId] 
+    });
     refetch();
   });
+
+  // Set up real-time subscription for source changes
+  React.useEffect(() => {
+    if (!agentId) return;
+
+    const intervalId = setInterval(() => {
+      // Refetch data every 2 seconds to catch any changes
+      refetch();
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [agentId, refetch]);
 
   if (isLoading && optimisticSources.length === 0) {
     return (

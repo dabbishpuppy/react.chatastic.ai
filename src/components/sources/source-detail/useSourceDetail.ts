@@ -2,145 +2,117 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRAGServices } from '@/hooks/useRAGServices';
+import { toast } from '@/hooks/use-toast';
 import { AgentSource } from '@/types/rag';
-import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 export const useSourceDetail = () => {
   const { agentId, sourceId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { sources } = useRAGServices();
-  const { toast } = useToast();
   
   const [source, setSource] = useState<AgentSource | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
 
   useEffect(() => {
-    if (agentId && sourceId) {
-      fetchSource();
-    }
-  }, [agentId, sourceId]);
-
-  const fetchSource = async () => {
-    try {
-      setLoading(true);
-      const sourceData = await sources.getSourceWithStats(sourceId!);
-      setSource(sourceData);
-      setEditTitle(sourceData.title);
-      setEditContent(sourceData.content || '');
-    } catch (error) {
-      console.error('Error fetching source:', error);
+    const fetchSource = async () => {
+      if (!sourceId) return;
       
-      if (error instanceof Error && error.message.includes('not found')) {
+      try {
+        setLoading(true);
+        const sourceData = await sources.getSourceWithStats(sourceId);
+        setSource(sourceData);
+        setEditTitle(sourceData.title);
+        setEditContent(sourceData.content || '');
+      } catch (error) {
+        console.error('Error fetching source:', error);
         toast({
-          title: "Source Not Found",
-          description: "This source may have been deleted or moved. Redirecting to sources page.",
-          variant: "destructive"
+          title: 'Error',
+          description: 'Failed to load source details',
+          variant: 'destructive',
         });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to load source details",
-          variant: "destructive"
-        });
+      } finally {
+        setLoading(false);
       }
-      
-      navigate(`/agent/${agentId}/sources?tab=text`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
-  };
+    fetchSource();
+  }, [sourceId, sources]);
 
   const handleSave = async () => {
-    if (!source || !editTitle.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Title is required",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!source) return;
 
-    // Check if content is HTML or plain text
-    const isHtmlContent = source.metadata?.isHtml || editContent.includes('<');
-    const contentToSave = editContent.trim();
-    
+    setIsSaving(true);
     try {
-      setSaving(true);
-      
-      // Calculate size for metadata
-      const plainText = isHtmlContent ? stripHtml(contentToSave) : contentToSave;
-      const byteCount = new TextEncoder().encode(plainText).length;
-      
       await sources.updateSource(source.id, {
-        title: editTitle.trim(),
-        content: contentToSave,
-        metadata: {
-          ...source.metadata,
-          original_size: byteCount,
-          file_size: byteCount,
-          content_type: isHtmlContent ? 'text/html' : 'text/plain',
-          isHtml: isHtmlContent
-        }
+        title: editTitle,
+        content: editContent,
       });
+
+      setSource(prev => prev ? {
+        ...prev,
+        title: editTitle,
+        content: editContent,
+      } : null);
+
+      setIsEditing(false);
       
       toast({
-        title: "Success",
-        description: "Source updated successfully"
+        title: 'Success',
+        description: 'Source updated successfully',
       });
-      
-      setIsEditing(false);
-      fetchSource();
     } catch (error) {
       console.error('Error updating source:', error);
       toast({
-        title: "Error",
-        description: "Failed to update source",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to update source',
+        variant: 'destructive',
       });
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!source) return;
+    if (!source || !agentId) return;
 
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
       await sources.deleteSource(source.id);
       
-      toast({
-        title: "Success",
-        description: "Source deleted successfully"
-      });
+      // Invalidate all relevant queries to ensure data consistency
+      queryClient.invalidateQueries({ queryKey: ['sources'] });
+      queryClient.invalidateQueries({ queryKey: ['sources', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['sources', agentId, source.source_type] });
       
-      const tabMap = {
+      toast({
+        title: 'Success',
+        description: 'Source deleted successfully',
+      });
+
+      // Navigate back to the appropriate tab based on source type
+      const tabMap: Record<string, string> = {
+        'qa': 'qa',
         'text': 'text',
-        'file': 'files',
         'website': 'website',
-        'qa': 'qa'
+        'file': 'files'
       };
-      const tab = tabMap[source.source_type] || 'text';
+      
+      const tab = tabMap[source.source_type] || 'files';
       navigate(`/agent/${agentId}/sources?tab=${tab}`);
     } catch (error) {
       console.error('Error deleting source:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete source",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to delete source',
+        variant: 'destructive',
       });
     } finally {
       setIsDeleting(false);
@@ -149,25 +121,26 @@ export const useSourceDetail = () => {
   };
 
   const handleBackClick = () => {
-    if (!source) {
-      navigate(`/agent/${agentId}/sources?tab=text`);
-      return;
-    }
-
-    const tabMap = {
+    if (!agentId || !source) return;
+    
+    // Navigate back to the appropriate tab based on source type
+    const tabMap: Record<string, string> = {
+      'qa': 'qa',
       'text': 'text',
-      'file': 'files',
       'website': 'website',
-      'qa': 'qa'
+      'file': 'files'
     };
-    const tab = tabMap[source.source_type] || 'text';
+    
+    const tab = tabMap[source.source_type] || 'files';
     navigate(`/agent/${agentId}/sources?tab=${tab}`);
   };
 
   const handleCancelEdit = () => {
+    if (!source) return;
+    
+    setEditTitle(source.title);
+    setEditContent(source.content || '');
     setIsEditing(false);
-    setEditTitle(source?.title || '');
-    setEditContent(source?.content || '');
   };
 
   return {
