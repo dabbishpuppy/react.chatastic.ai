@@ -1,9 +1,9 @@
 
 // Re-export the modular crawl worker services for backward compatibility
-export { CrawlWorkerService, WorkerCore, ChunkProcessor } from './crawlWorker';
+export { CrawlWorkerService, WorkerCore, ChunkProcessor } from './crawlWorker/index';
 
 // Legacy exports - these now point to the modular implementation
-import { CrawlWorkerService } from './crawlWorker';
+import { CrawlWorkerService } from './crawlWorker/index';
 
 export class CrawlWorkerServiceLegacy {
   static async startWorker(): Promise<void> {

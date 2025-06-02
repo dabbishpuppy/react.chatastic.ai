@@ -103,16 +103,17 @@ export class OptimizationEngine {
 
     // Get current system recommendations
     const recommendations = globalOptimizationService.getRecommendations();
+    const recommendationStrategies = recommendations.map(r => r.strategy);
 
     // Apply caching optimizations
-    if (recommendations.some(r => r.includes('cache'))) {
+    if (recommendationStrategies.includes('query_caching')) {
       // Enable more aggressive caching
       optimizedRequest.cacheStrategy = 'aggressive';
       optimizations.push('aggressive_caching');
     }
 
     // Apply filtering optimizations
-    if (recommendations.some(r => r.includes('filter'))) {
+    if (recommendationStrategies.some(strategy => strategy.includes('filter'))) {
       optimizedRequest.searchFilters = {
         ...optimizedRequest.searchFilters,
         minSimilarity: Math.max(optimizedRequest.searchFilters?.minSimilarity || 0.3, 0.4)
@@ -121,7 +122,7 @@ export class OptimizationEngine {
     }
 
     // Apply ranking optimizations
-    if (recommendations.some(r => r.includes('ranking'))) {
+    if (recommendationStrategies.some(strategy => strategy.includes('ranking'))) {
       optimizedRequest.rankingOptions = {
         ...optimizedRequest.rankingOptions,
         diversityThreshold: 0.8,

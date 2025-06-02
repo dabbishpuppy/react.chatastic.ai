@@ -40,7 +40,7 @@ export { EnhancedContentProcessor } from './enhancedContentProcessor';
 
 // Modular Compression Services
 export { CompressionEngine } from './compression';
-export { CompressionEngine as AdvancedCompressionEngine } from './advancedCompressionEngine';
+export { AdvancedCompressionEngine } from './advancedCompressionEngine';
 
 // API and Subscriptions
 export { CrawlApiService } from './crawlApi';

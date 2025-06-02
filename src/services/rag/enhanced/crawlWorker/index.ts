@@ -1,4 +1,7 @@
 
+import { WorkerCore } from './workerCore';
+import { ChunkProcessor } from './chunkProcessor';
+
 export { WorkerCore } from './workerCore';
 export { ChunkProcessor } from './chunkProcessor';
 
