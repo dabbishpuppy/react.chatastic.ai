@@ -1,4 +1,3 @@
-
 import { QueryContext, QueryPreprocessingResult } from './queryPreprocessor';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -111,8 +110,9 @@ export class AdvancedQueryPreprocessor {
 
   private static async getConversationContext(conversationId: string): Promise<ConversationContext> {
     try {
+      // Use the correct table and column names from the database schema
       const { data: messages } = await supabase
-        .from('conversation_messages')
+        .from('messages')
         .select('content, is_agent, created_at')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: false })
