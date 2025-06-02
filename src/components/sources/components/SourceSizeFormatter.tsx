@@ -42,8 +42,15 @@ export const formatFileSize = (source: AgentSource): string => {
   return `${formattedSize} ${sizes[i]}`;
 };
 
-export const getCompressionInfo = (source: AgentSource): { ratio: number; originalSize: number; compressedSize: number } | null => {
-  // Only show compression info for website sources that have compression data
+export const getCompressionInfo = (source: AgentSource): { 
+  ratio: number; 
+  originalSize: number; 
+  compressedSize: number;
+  method?: string;
+  spaceSaved?: number;
+  processingMode?: string;
+} | null => {
+  // Show compression info for website sources that have compression data
   if (source.source_type !== 'website') {
     return null;
   }
@@ -77,7 +84,17 @@ export const getCompressionInfo = (source: AgentSource): { ratio: number; origin
 
   // Only return if we have meaningful data
   if (originalSize > 0 && compressedSize > 0 && ratio > 0) {
-    return { ratio, originalSize, compressedSize };
+    const spaceSaved = originalSize - compressedSize;
+    const metadata = source.metadata as any;
+    
+    return { 
+      ratio, 
+      originalSize, 
+      compressedSize,
+      method: metadata?.compression_method || 'standard',
+      spaceSaved,
+      processingMode: metadata?.processing_mode || 'chunking'
+    };
   }
 
   return null;
@@ -92,11 +109,66 @@ export const isShowingCompressedSize = (source: AgentSource): boolean => {
   return false;
 };
 
-// Helper function to get compression savings percentage
+// Enhanced compression savings calculation
 export const getCompressionSavings = (source: AgentSource): number | null => {
   const compressionInfo = getCompressionInfo(source);
   if (!compressionInfo) return null;
   
   const { ratio } = compressionInfo;
   return Math.round((1 - ratio) * 100);
+};
+
+// New: Get advanced compression details
+export const getAdvancedCompressionDetails = (source: AgentSource): {
+  method: string;
+  processingMode: string;
+  spaceSavedKB: number;
+  optimizationLevel: 'basic' | 'advanced' | 'maximum';
+} | null => {
+  const compressionInfo = getCompressionInfo(source);
+  if (!compressionInfo) return null;
+  
+  const metadata = source.metadata as any;
+  const spaceSavedKB = Math.round((compressionInfo.spaceSaved || 0) / 1024);
+  
+  // Determine optimization level based on compression ratio and method
+  let optimizationLevel: 'basic' | 'advanced' | 'maximum' = 'basic';
+  if (compressionInfo.ratio < 0.3) optimizationLevel = 'maximum';
+  else if (compressionInfo.ratio < 0.5) optimizationLevel = 'advanced';
+  
+  return {
+    method: compressionInfo.method || 'standard',
+    processingMode: compressionInfo.processingMode || 'chunking',
+    spaceSavedKB,
+    optimizationLevel
+  };
+};
+
+// New: Format compression efficiency display
+export const formatCompressionEfficiency = (source: AgentSource): string | null => {
+  const details = getAdvancedCompressionDetails(source);
+  const savings = getCompressionSavings(source);
+  
+  if (!details || !savings) return null;
+  
+  const efficiency = savings >= 70 ? 'Excellent' : 
+                    savings >= 50 ? 'Very Good' : 
+                    savings >= 30 ? 'Good' : 'Standard';
+  
+  return `${efficiency} (${savings}% saved)`;
+};
+
+// New: Get compression method display name
+export const getCompressionMethodDisplay = (method: string): string => {
+  const methodMap: Record<string, string> = {
+    'enhanced-gzip': 'Enhanced GZIP',
+    'advanced': 'Advanced Compression',
+    'enhanced-rle': 'Enhanced RLE',
+    'gzip-dictionary': 'GZIP with Dictionary',
+    'maximum': 'Maximum Efficiency',
+    'standard': 'Standard',
+    'none': 'Uncompressed'
+  };
+  
+  return methodMap[method] || method;
 };
