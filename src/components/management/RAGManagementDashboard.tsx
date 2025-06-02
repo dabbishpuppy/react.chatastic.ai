@@ -192,7 +192,7 @@ const RAGManagementDashboard: React.FC<RAGManagementDashboardProps> = ({ agentId
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Button 
-                  onClick={() => startRetraining(agentId)}
+                  onClick={() => startRetraining({ force: false })}
                   disabled={isStartingRetraining}
                   className="w-full"
                 >
@@ -257,7 +257,7 @@ const RAGManagementDashboard: React.FC<RAGManagementDashboardProps> = ({ agentId
                       </div>
                       
                       <Button 
-                        onClick={() => startRetraining(agentId)}
+                        onClick={() => startRetraining({ force: false })}
                         disabled={isStartingRetraining}
                         className="w-full"
                       >

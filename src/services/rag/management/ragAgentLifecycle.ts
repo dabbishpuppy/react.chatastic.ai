@@ -1,7 +1,7 @@
 
 import { RAGRetrainingService } from './ragRetrainingService';
 import { RAGModelManagement } from './ragModelManagement';
-import { RAGPerformanceMonitor } from '../performance/performanceMonitor';
+import { PerformanceMonitor } from '../performance/performanceMonitor';
 
 export interface AgentLifecycleStage {
   stage: 'development' | 'training' | 'validation' | 'production' | 'maintenance' | 'deprecated';
@@ -71,11 +71,11 @@ export class RAGAgentLifecycle {
 
     const issues: string[] = [];
     const recommendations: string[] = [];
-    const components = {
-      knowledge: 'healthy' as const,
-      models: 'healthy' as const,
-      performance: 'healthy' as const,
-      infrastructure: 'healthy' as const
+    let components = {
+      knowledge: 'healthy' as 'healthy' | 'warning' | 'critical',
+      models: 'healthy' as 'healthy' | 'warning' | 'critical',
+      performance: 'healthy' as 'healthy' | 'warning' | 'critical',
+      infrastructure: 'healthy' as 'healthy' | 'warning' | 'critical'
     };
 
     try {
@@ -104,8 +104,9 @@ export class RAGAgentLifecycle {
       recommendations.push(...infraHealth.recommendations);
 
       // Determine overall health
-      const criticalCount = Object.values(components).filter(c => c === 'critical').length;
-      const warningCount = Object.values(components).filter(c => c === 'warning').length;
+      const componentValues = Object.values(components);
+      const criticalCount = componentValues.filter(c => c === 'critical').length;
+      const warningCount = componentValues.filter(c => c === 'warning').length;
 
       let overall: AgentHealth['overall'] = 'healthy';
       if (criticalCount > 0) {
@@ -215,7 +216,7 @@ export class RAGAgentLifecycle {
     const recommendations: string[] = [];
     let status: 'healthy' | 'warning' | 'critical' = 'healthy';
 
-    const performance = RAGPerformanceMonitor.getAgentPerformance(agentId);
+    const performance = PerformanceMonitor.getAgentPerformance(agentId);
     if (performance) {
       // Check response time
       if (performance.averageResponseTime > 5000) {
@@ -264,8 +265,7 @@ export class RAGAgentLifecycle {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const fullTask: MaintenanceTask = {
       id: taskId,
-      ...task,
-      status: 'pending'
+      ...task
     };
 
     const tasks = this.maintenanceTasks.get(task.agentId) || [];
@@ -359,7 +359,8 @@ export class RAGAgentLifecycle {
         type: 'retraining',
         priority: 'critical',
         description: 'Critical knowledge base issues detected',
-        estimatedDuration: 60
+        estimatedDuration: 60,
+        status: 'pending'
       });
       scheduledTasks.push(this.getTaskById(taskId)!);
     }
@@ -370,7 +371,8 @@ export class RAGAgentLifecycle {
         type: 'model_update',
         priority: 'medium',
         description: 'Model performance optimization needed',
-        estimatedDuration: 30
+        estimatedDuration: 30,
+        status: 'pending'
       });
       scheduledTasks.push(this.getTaskById(taskId)!);
     }
@@ -381,7 +383,8 @@ export class RAGAgentLifecycle {
         type: 'performance_optimization',
         priority: 'high',
         description: 'Critical performance issues detected',
-        estimatedDuration: 45
+        estimatedDuration: 45,
+        status: 'pending'
       });
       scheduledTasks.push(this.getTaskById(taskId)!);
     }
