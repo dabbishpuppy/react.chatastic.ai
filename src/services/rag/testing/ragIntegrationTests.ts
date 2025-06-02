@@ -70,13 +70,13 @@ export class RAGIntegrationTests {
         conversationId: 'test-conversation-id'
       };
 
-      const result = await RAGOrchestrator.processRequest(request);
+      const result = await RAGOrchestrator.processRAGRequest(request);
       
-      if (!result.response || !result.sources) {
+      if (!result.processedResponse || !result.queryResult) {
         throw new Error('Invalid response structure');
       }
 
-      return { sourcesFound: result.sources.length };
+      return { sourcesFound: result.queryResult.rankedContext.sources.length };
     });
 
     // Test 2: Source integration
@@ -93,13 +93,19 @@ export class RAGIntegrationTests {
       const request = {
         query: 'Advanced query with context',
         agentId: 'test-agent-id',
-        searchFilters: { includeMetadata: true },
-        rankingOptions: { useSemanticRanking: true }
+        searchFilters: { 
+          sourceTypes: ['text' as const],
+          maxResults: 5
+        },
+        rankingOptions: { 
+          maxChunks: 3,
+          maxTokens: 1000
+        }
       };
 
       const result = await RAGQueryEngineEnhanced.processQueryWithOptimizations(request);
       
-      if (!result.response) {
+      if (!result.rankedContext) {
         throw new Error('Enhanced query processing failed');
       }
 
@@ -121,7 +127,7 @@ export class RAGIntegrationTests {
         }
       );
 
-      return { progressUpdates, streamingWorked: !!result.response };
+      return { progressUpdates, streamingWorked: !!result.rankedContext };
     });
   }
 
@@ -157,7 +163,7 @@ export class RAGIntegrationTests {
     // Test cache operations
     await this.runTest('Cache Operations', async () => {
       const testKey = 'test-cache-key';
-      const testValue = { test: 'data', timestamp: Date.now() };
+      const testValue = { data: 'test data', timestamp: Date.now() };
 
       // Set cache
       await globalCache.set(testKey, testValue);
@@ -165,7 +171,7 @@ export class RAGIntegrationTests {
       // Get cache
       const cached = await globalCache.get(testKey);
       
-      if (!cached || cached.test !== testValue.test) {
+      if (!cached || (cached as any).data !== testValue.data) {
         throw new Error('Cache set/get failed');
       }
 
@@ -182,12 +188,20 @@ export class RAGIntegrationTests {
     // Test query caching
     await this.runTest('Query Result Caching', async () => {
       const queryHash = 'test-query-hash';
-      const mockResult = { response: 'cached response', sources: [] };
+      const mockResult = { 
+        rankedContext: { 
+          chunks: [], 
+          sources: [], 
+          totalRelevanceScore: 0 
+        },
+        searchResults: [],
+        processingTime: 100
+      };
 
       await globalCache.setCachedQuery(queryHash, mockResult);
       const cachedResult = await globalCache.getCachedQuery(queryHash);
 
-      if (!cachedResult || cachedResult.response !== mockResult.response) {
+      if (!cachedResult || cachedResult.processingTime !== mockResult.processingTime) {
         throw new Error('Query caching failed');
       }
 
@@ -200,14 +214,17 @@ export class RAGIntegrationTests {
     await this.runTest('Error Handling', async () => {
       try {
         // Test with invalid request
-        await RAGOrchestrator.processRequest({
+        await RAGOrchestrator.processRAGRequest({
           query: '', // Empty query
           agentId: '',
         });
         
         throw new Error('Should have thrown error for invalid request');
       } catch (error) {
-        // Expected error
+        // Expected error - check if it's the right type of error
+        if (error instanceof Error && error.message === 'Should have thrown error for invalid request') {
+          throw error;
+        }
         return { errorHandlingWorking: true };
       }
     });
@@ -236,7 +253,7 @@ export class RAGIntegrationTests {
         query: 'Performance test query',
         agentId: 'benchmark-agent'
       };
-      await RAGOrchestrator.processRequest(request);
+      await RAGOrchestrator.processRAGRequest(request);
     }, 10);
 
     // Benchmark enhanced query processing

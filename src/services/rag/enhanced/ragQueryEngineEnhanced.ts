@@ -128,8 +128,8 @@ export class RAGQueryEngineEnhanced extends RAGQueryEngine {
       JSON.stringify(request.rankingOptions || {})
     ];
     
-    // Use the static method from CacheService directly
-    return globalCache.constructor.generateKey(...keyParts);
+    // Create hash from key parts
+    return keyParts.map(part => encodeURIComponent(part)).join(':');
   }
 
   private static async processWithProgressTracking(
