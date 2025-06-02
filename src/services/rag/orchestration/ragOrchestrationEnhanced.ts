@@ -1,4 +1,3 @@
-
 import { RAGOrchestrator, RAGRequest, RAGResponse } from '../ragOrchestrator';
 import { RAGLLMIntegration, RAGLLMRequest } from '../llm/ragLLMIntegration';
 import { RAGStreamingProcessor, RAGStreamingOptions } from '../streaming/ragStreamingProcessor';
@@ -75,13 +74,24 @@ export class RAGOrchestrationEnhanced {
               preprocessingResult: {
                 originalQuery: request.query,
                 confidence: 1.0,
-                context: { normalizedQuery: request.query, keywords: [] },
+                context: { 
+                  originalQuery: request.query,
+                  normalizedQuery: request.query, 
+                  keywords: [],
+                  intent: 'general',
+                  agentId: request.agentId
+                },
                 searchQueries: [request.query]
               },
               searchResults: [],
               rankedContext: {
                 chunks: [],
-                sources: cachedEntry.sources.map(s => ({ sourceId: s.id, sourceName: s.name })),
+                sources: cachedEntry.sources.map(s => ({ 
+                  sourceId: s.id, 
+                  sourceName: s.name,
+                  chunkCount: 1,
+                  averageRelevance: s.relevance
+                })),
                 totalTokens: 0,
                 relevanceScore: 0.8
               },

@@ -1,4 +1,3 @@
-
 import { LLMRouter, LLMRequest, LLMResponse } from './llmRouter';
 import { StreamingHandler, StreamingOptions } from './streamingHandler';
 import { RAGQueryResult } from '../queryProcessing/ragQueryEngine';
@@ -96,11 +95,27 @@ export class RAGLLMIntegration {
       context: this.buildRAGContextString(request.ragContext)
     };
 
-    return StreamingHandler.handleStreamingResponse(
+    // Return the full LLM response from streaming handler
+    const fullResponse = await StreamingHandler.handleStreamingResponse(
       streamId,
       enhancedRequest,
       streamingOptions
     );
+
+    // Convert string response to proper LLMResponse object
+    return {
+      content: fullResponse,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      tokensUsed: fullResponse.split(' ').length,
+      cost: 0.001,
+      responseTime: 0,
+      sources: request.ragContext.rankedContext.chunks.map(chunk => ({
+        sourceId: chunk.sourceId,
+        sourceName: chunk.metadata.sourceName,
+        chunkIndex: chunk.metadata.chunkIndex
+      }))
+    };
   }
 
   private static buildRAGContextString(ragResult: RAGQueryResult): string {
