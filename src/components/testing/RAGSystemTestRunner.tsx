@@ -1,0 +1,304 @@
+
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { useRAGTesting } from '@/hooks/useRAGTesting';
+import { RAGSystemValidator } from '@/utils/ragSystemValidator';
+import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+
+export const RAGSystemTestRunner = () => {
+  const {
+    isRunning,
+    testResults,
+    orchestrationTestResults,
+    serviceOrchestrationTestResults,
+    integrationTestResults,
+    summary,
+    runAllTests,
+    runOrchestrationTests,
+    runServiceOrchestrationTests,
+    runIntegrationTests,
+    clearResults
+  } = useRAGTesting();
+
+  const [validationResults, setValidationResults] = useState<any>(null);
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleRunAllTests = async () => {
+    try {
+      clearResults();
+      console.log('🧪 Starting comprehensive integration tests...');
+      const results = await runAllTests();
+      console.log('✅ All tests completed:', results);
+    } catch (error) {
+      console.error('❌ Test execution failed:', error);
+    }
+  };
+
+  const handleSystemValidation = async () => {
+    setIsValidating(true);
+    try {
+      console.log('🔍 Starting system validation...');
+      const results = await RAGSystemValidator.validateRefactoredSystem();
+      setValidationResults(results);
+      console.log('🔍 System validation completed:', results);
+    } catch (error) {
+      console.error('❌ System validation failed:', error);
+      setValidationResults({
+        success: false,
+        message: `Validation failed: ${error}`,
+        details: {
+          importExports: false,
+          functionality: false,
+          performance: false,
+          integration: false
+        }
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const getTestStatusIcon = (passed: boolean) => {
+    return passed ? (
+      <CheckCircle className="h-4 w-4 text-green-500" />
+    ) : (
+      <XCircle className="h-4 w-4 text-red-500" />
+    );
+  };
+
+  const getProgressPercentage = () => {
+    if (!summary) return 0;
+    return summary.totalTests > 0 ? (summary.passed / summary.totalTests) * 100 : 0;
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            RAG System Integration Tests
+          </CardTitle>
+          <CardDescription>
+            Comprehensive testing suite for refactored orchestration services
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              onClick={handleRunAllTests} 
+              disabled={isRunning}
+              className="flex-1"
+            >
+              {isRunning ? 'Running Tests...' : 'Run All Tests'}
+            </Button>
+            <Button 
+              onClick={runOrchestrationTests} 
+              disabled={isRunning}
+              variant="outline"
+            >
+              Orchestration Tests
+            </Button>
+            <Button 
+              onClick={runServiceOrchestrationTests} 
+              disabled={isRunning}
+              variant="outline"
+            >
+              Service Tests
+            </Button>
+            <Button 
+              onClick={runIntegrationTests} 
+              disabled={isRunning}
+              variant="outline"
+            >
+              Integration Tests
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSystemValidation} 
+              disabled={isValidating}
+              variant="secondary"
+            >
+              {isValidating ? 'Validating...' : 'Validate System'}
+            </Button>
+            <Button onClick={clearResults} variant="ghost">
+              Clear Results
+            </Button>
+          </div>
+
+          {isRunning && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Running tests...</span>
+                <span>{summary ? `${summary.passed}/${summary.totalTests}` : '0/0'}</span>
+              </div>
+              <Progress value={getProgressPercentage()} className="w-full" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {summary && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Test Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{summary.totalTests}</div>
+                <div className="text-sm text-gray-600">Total Tests</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{summary.passed}</div>
+                <div className="text-sm text-gray-600">Passed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">{summary.failed}</div>
+                <div className="text-sm text-gray-600">Failed</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  {summary.averageDuration.toFixed(1)}ms
+                </div>
+                <div className="text-sm text-gray-600">Avg Duration</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {validationResults && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {validationResults.success ? (
+                <CheckCircle className="h-5 w-5 text-green-500" />
+              ) : (
+                <XCircle className="h-5 w-5 text-red-500" />
+              )}
+              System Validation Results
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="p-4 rounded-lg bg-gray-50">
+              <p className={validationResults.success ? 'text-green-700' : 'text-red-700'}>
+                {validationResults.message}
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                {getTestStatusIcon(validationResults.details.importExports)}
+                <span>Import/Export Chains</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getTestStatusIcon(validationResults.details.functionality)}
+                <span>Core Functionality</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getTestStatusIcon(validationResults.details.performance)}
+                <span>Performance Tracking</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getTestStatusIcon(validationResults.details.integration)}
+                <span>Service Integration</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {integrationTestResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Integration Test Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {integrationTestResults.map((test, index) => (
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    {getTestStatusIcon(test.passed)}
+                    <span className="font-medium">{test.testName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={test.passed ? "default" : "destructive"}>
+                      {test.passed ? "PASS" : "FAIL"}
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {test.duration.toFixed(2)}ms
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {serviceOrchestrationTestResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Service Orchestration Test Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {serviceOrchestrationTestResults.map((test, index) => (
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    {getTestStatusIcon(test.passed)}
+                    <span className="font-medium">{test.testName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={test.passed ? "default" : "destructive"}>
+                      {test.passed ? "PASS" : "FAIL"}
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {test.duration.toFixed(2)}ms
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {orchestrationTestResults.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Orchestration Test Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {orchestrationTestResults.map((test, index) => (
+                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-2">
+                    {getTestStatusIcon(test.passed)}
+                    <span className="font-medium">{test.testName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={test.passed ? "default" : "destructive"}>
+                      {test.passed ? "PASS" : "FAIL"}
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {test.duration.toFixed(2)}ms
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default RAGSystemTestRunner;
