@@ -1,7 +1,7 @@
 
 import { ContentAnalysisService } from './services/contentAnalysisService';
 import { ContentCleaningService } from './services/contentCleaningService';
-import { CompressionService } from './services/compressionService';
+import { CompressionService } from './services/compression/compressionService';
 import { DeduplicationService } from './services/deduplicationService';
 import { CompressionStatsService } from './services/compressionStatsService';
 
