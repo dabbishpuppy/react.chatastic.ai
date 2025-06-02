@@ -78,7 +78,7 @@ export class RAGOrchestrationEnhanced {
                   originalQuery: request.query,
                   normalizedQuery: request.query, 
                   keywords: [],
-                  intent: 'general',
+                  intent: 'question',
                   agentId: request.agentId
                 },
                 searchQueries: [request.query]
@@ -93,7 +93,14 @@ export class RAGOrchestrationEnhanced {
                   averageRelevance: s.relevance
                 })),
                 totalTokens: 0,
-                relevanceScore: 0.8
+                relevanceScore: 0.8,
+                diversityScore: 0.5,
+                processingMetrics: {
+                  searchTime: 0,
+                  rankingTime: 0,
+                  filteringTime: 0,
+                  totalProcessingTime: 0
+                }
               },
               processingTimeMs: 0
             },
