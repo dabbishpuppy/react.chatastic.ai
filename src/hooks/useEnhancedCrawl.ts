@@ -15,7 +15,7 @@ export interface EnhancedCrawlRequest {
   respectRobots?: boolean;
   enableCompression?: boolean;
   enableDeduplication?: boolean;
-  priority?: string;
+  priority?: 'normal' | 'high' | 'slow';
 }
 
 export const useEnhancedCrawl = () => {
@@ -32,6 +32,9 @@ export const useEnhancedCrawl = () => {
         throw new Error('Missing required fields: agentId and url are required');
       }
 
+      // Ensure priority is properly typed
+      const priority: 'normal' | 'high' | 'slow' = request.priority || 'normal';
+
       // Use the enhanced crawl service instead of direct edge function call
       const result = await EnhancedCrawlService.initiateCrawl({
         url: request.url,
@@ -43,7 +46,7 @@ export const useEnhancedCrawl = () => {
         respectRobots: request.respectRobots !== false,
         enableCompression: request.enableCompression !== false,
         enableDeduplication: request.enableDeduplication !== false,
-        priority: request.priority || 'normal'
+        priority
       });
 
       console.log('✅ Enhanced crawl initiated successfully:', result);
