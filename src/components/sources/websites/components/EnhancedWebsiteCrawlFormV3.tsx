@@ -22,7 +22,6 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   const [activeTab, setActiveTab] = useState('website');
   const [url, setUrl] = useState('');
   const [protocol, setProtocol] = useState('https://');
-  const [crawlMode, setCrawlMode] = useState<'single' | 'sitemap' | 'discovery'>('discovery');
   const [maxPages, setMaxPages] = useState(50);
   const [maxDepth, setMaxDepth] = useState(3);
   const [respectRobots, setRespectRobots] = useState(true);
@@ -43,6 +42,19 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
     loadInfrastructureHealth();
   }, [loadInfrastructureHealth]);
 
+  const getUrlPlaceholder = () => {
+    switch (activeTab) {
+      case 'website':
+        return 'example.com';
+      case 'single-site':
+        return 'example.com/specific-page';
+      case 'sitemap':
+        return 'example.com';
+      default:
+        return 'example.com';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agentId || !url.trim()) return;
@@ -53,27 +65,24 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       
       console.log('🚀 Starting enhanced crawl with V3 form:', {
         url: fullUrl,
-        crawlMode,
+        activeTab,
         maxPages,
         maxDepth,
         respectRobots,
         includePaths,
         excludePaths,
-        agentId,
-        activeTab
+        agentId
       });
 
-      // Convert tab and crawl mode to the expected format
+      // Convert tab to the expected crawl mode format
       let finalCrawlMode: 'single-page' | 'sitemap-only' | 'full-website' = 'full-website';
       
       if (activeTab === 'single-site') {
         finalCrawlMode = 'single-page';
       } else if (activeTab === 'sitemap') {
         finalCrawlMode = 'sitemap-only';
-      } else if (crawlMode === 'single') {
-        finalCrawlMode = 'single-page';
-      } else if (crawlMode === 'sitemap') {
-        finalCrawlMode = 'sitemap-only';
+      } else {
+        finalCrawlMode = 'full-website';
       }
 
       // Parse include/exclude paths
@@ -194,7 +203,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                   type="text"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="example.com or example.com/page"
+                  placeholder={getUrlPlaceholder()}
                   required
                 />
               </div>
@@ -202,59 +211,40 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
 
             <TabsContent value="website" className="space-y-6 mt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Crawl Mode */}
+                {/* Max Pages */}
                 <div>
-                  <Label htmlFor="crawlMode">Crawl Mode</Label>
-                  <Select value={crawlMode} onValueChange={(value: 'single' | 'sitemap' | 'discovery') => setCrawlMode(value)}>
+                  <Label htmlFor="maxPages">Max Pages</Label>
+                  <Select value={maxPages.toString()} onValueChange={(value) => setMaxPages(parseInt(value))}>
                     <SelectTrigger className="mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="single">Single Page</SelectItem>
-                      <SelectItem value="sitemap">Sitemap Discovery</SelectItem>
-                      <SelectItem value="discovery">Smart Discovery</SelectItem>
+                      <SelectItem value="10">10 pages</SelectItem>
+                      <SelectItem value="25">25 pages</SelectItem>
+                      <SelectItem value="50">50 pages</SelectItem>
+                      <SelectItem value="100">100 pages</SelectItem>
+                      <SelectItem value="250">250 pages</SelectItem>
+                      <SelectItem value="500">500 pages</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Max Pages */}
-                {crawlMode !== 'single' && (
-                  <div>
-                    <Label htmlFor="maxPages">Max Pages</Label>
-                    <Select value={maxPages.toString()} onValueChange={(value) => setMaxPages(parseInt(value))}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10 pages</SelectItem>
-                        <SelectItem value="25">25 pages</SelectItem>
-                        <SelectItem value="50">50 pages</SelectItem>
-                        <SelectItem value="100">100 pages</SelectItem>
-                        <SelectItem value="250">250 pages</SelectItem>
-                        <SelectItem value="500">500 pages</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
                 {/* Max Depth */}
-                {crawlMode === 'discovery' && (
-                  <div>
-                    <Label htmlFor="maxDepth">Max Depth</Label>
-                    <Select value={maxDepth.toString()} onValueChange={(value) => setMaxDepth(parseInt(value))}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 level</SelectItem>
-                        <SelectItem value="2">2 levels</SelectItem>
-                        <SelectItem value="3">3 levels</SelectItem>
-                        <SelectItem value="4">4 levels</SelectItem>
-                        <SelectItem value="5">5 levels</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <div>
+                  <Label htmlFor="maxDepth">Max Depth</Label>
+                  <Select value={maxDepth.toString()} onValueChange={(value) => setMaxDepth(parseInt(value))}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 level</SelectItem>
+                      <SelectItem value="2">2 levels</SelectItem>
+                      <SelectItem value="3">3 levels</SelectItem>
+                      <SelectItem value="4">4 levels</SelectItem>
+                      <SelectItem value="5">5 levels</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Include/Exclude Paths */}
