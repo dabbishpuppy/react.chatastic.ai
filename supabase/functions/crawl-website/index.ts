@@ -532,6 +532,7 @@ async function processMultiplePages(
     const totalPages = Math.min(filteredUrls.length, options.maxPages);
     let processedCount = 0;
     let totalCompressedSize = 0;
+    let totalOriginalSize = 0;
     const batchSize = options.concurrency;
 
     // Process URLs in batches
@@ -586,15 +587,18 @@ async function processMultiplePages(
                 await processBasicContent(childSource.id, url, htmlContent);
               }
 
-              // Get the compressed size for tracking
+              // Get the compressed and original sizes for tracking
               const { data: updatedSource } = await supabase
                 .from('agent_sources')
-                .select('compressed_size')
+                .select('compressed_size, original_size')
                 .eq('id', childSource.id)
                 .single();
 
               if (updatedSource?.compressed_size) {
                 totalCompressedSize += updatedSource.compressed_size;
+              }
+              if (updatedSource?.original_size) {
+                totalOriginalSize += updatedSource.original_size;
               }
 
               await updateSourceStatus(childSource.id, 'completed');
@@ -620,9 +624,9 @@ async function processMultiplePages(
           
           processedCount++;
           
-          // Update parent source progress and total compressed size
+          // Update parent source progress with aggregated sizes
           const progress = Math.round((processedCount / totalPages) * 100);
-          const avgCompressionRatio = totalCompressedSize > 0 ? totalCompressedSize / (processedCount * 10000) : null; // Rough estimate
+          const avgCompressionRatio = totalOriginalSize > 0 ? totalCompressedSize / totalOriginalSize : null;
           
           await supabase
             .from('agent_sources')
@@ -630,6 +634,9 @@ async function processMultiplePages(
               crawl_status: 'in_progress',
               progress: progress,
               links_count: processedCount,
+              original_size: totalOriginalSize,
+              compressed_size: totalCompressedSize,
+              compression_ratio: avgCompressionRatio,
               metadata: {
                 total_content_size: totalCompressedSize,
                 compression_ratio: avgCompressionRatio,
@@ -651,16 +658,18 @@ async function processMultiplePages(
     }
 
     // Calculate final compression ratio
-    const finalCompressionRatio = totalCompressedSize > 0 && processedCount > 0 ? 
-      totalCompressedSize / (processedCount * 15000) : null; // More realistic estimate based on average page size
+    const finalCompressionRatio = totalOriginalSize > 0 ? totalCompressedSize / totalOriginalSize : null;
 
-    // Update final status with total compressed size and meaningful compression ratio
+    // Update final status with aggregated sizes
     await supabase
       .from('agent_sources')
       .update({
         crawl_status: 'completed',
         progress: 100,
         links_count: processedCount,
+        original_size: totalOriginalSize,
+        compressed_size: totalCompressedSize,
+        compression_ratio: finalCompressionRatio,
         metadata: {
           total_content_size: totalCompressedSize,
           compression_ratio: finalCompressionRatio,
@@ -674,7 +683,8 @@ async function processMultiplePages(
       sourceId,
       totalProcessed: processedCount,
       totalPages,
-      totalCompressedSize
+      totalCompressedSize,
+      totalOriginalSize
     });
 
   } catch (error) {
@@ -689,7 +699,8 @@ async function processMultiplePages(
   }
 }
 
-// remaining helper functions
+// ... keep existing code (helper functions)
+
 function filterUrlsByPaths(urls: string[], includePaths: string[], excludePaths: string[]): string[] {
   return urls.filter(url => {
     try {
