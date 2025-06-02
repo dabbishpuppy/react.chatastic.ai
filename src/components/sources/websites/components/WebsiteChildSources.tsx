@@ -160,16 +160,25 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             </p>
           </div>
           
-          <div className="flex items-center gap-4 text-xs text-gray-500">
+          <div className="flex items-center text-xs text-gray-500">
             <span>Added {formatDistanceToNow(new Date(page.created_at), { addSuffix: true })}</span>
             {page.content_size && (
-              <span>{Math.round(page.content_size / 1024)} KB</span>
+              <>
+                <span className="mx-2">•</span>
+                <span>{Math.round(page.content_size / 1024)} KB</span>
+              </>
             )}
             {page.chunks_created && page.chunks_created > 0 && (
-              <span>{page.chunks_created} chunks</span>
+              <>
+                <span className="mx-2">•</span>
+                <span>{page.chunks_created} chunks</span>
+              </>
             )}
             {page.processing_time_ms && (
-              <span>{page.processing_time_ms}ms</span>
+              <>
+                <span className="mx-2">•</span>
+                <span>{page.processing_time_ms}ms</span>
+              </>
             )}
           </div>
           
