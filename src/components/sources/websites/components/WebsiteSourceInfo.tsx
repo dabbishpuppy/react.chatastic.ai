@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
+import { formatFileSize, isShowingCompressedSize, getCompressionSavings } from '@/components/sources/components/SourceSizeFormatter';
+import { Badge } from '@/components/ui/badge';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -98,6 +100,9 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     return content && content.length > 0;
   };
 
+  const showingCompressed = isShowingCompressedSize(sourceForSizeCalculation as any);
+  const compressionSavings = getCompressionSavings(sourceForSizeCalculation as any);
+
   return (
     <div className="flex items-center">
       {/* Remove blue dot for child sources, keep for parent sources */}
@@ -123,7 +128,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           {shouldShowSize() && (
             <>
               <span>•</span>
-              <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
+              <div className="flex items-center gap-1">
+                <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
+                {showingCompressed && (
+                  <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                    Compressed
+                  </Badge>
+                )}
+                {compressionSavings && compressionSavings > 0 && (
+                  <span className="text-green-600">({compressionSavings}% smaller)</span>
+                )}
+              </div>
             </>
           )}
           

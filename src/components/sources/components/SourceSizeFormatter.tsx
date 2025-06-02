@@ -4,15 +4,15 @@ import { AgentSource } from '@/types/rag';
 export const formatFileSize = (source: AgentSource): string => {
   let sizeInBytes = 0;
 
-  // Handle different source types with priority for aggregated data
+  // Handle different source types with priority for compressed data
   if (source.source_type === 'website') {
-    // For website sources, prioritize aggregated database fields
-    if (source.total_content_size && source.total_content_size > 0) {
-      sizeInBytes = source.total_content_size;
-    } else if (source.compressed_content_size && source.compressed_content_size > 0) {
+    // For website sources, prioritize compressed sizes first
+    if (source.compressed_content_size && source.compressed_content_size > 0) {
       sizeInBytes = source.compressed_content_size;
     } else if (source.compressed_size && source.compressed_size > 0) {
       sizeInBytes = source.compressed_size;
+    } else if (source.total_content_size && source.total_content_size > 0) {
+      sizeInBytes = source.total_content_size;
     } else if (source.original_size && source.original_size > 0) {
       sizeInBytes = source.original_size;
     } else if (source.content) {
@@ -81,4 +81,22 @@ export const getCompressionInfo = (source: AgentSource): { ratio: number; origin
   }
 
   return null;
+};
+
+// Helper function to determine if we're showing compressed size
+export const isShowingCompressedSize = (source: AgentSource): boolean => {
+  if (source.source_type === 'website') {
+    return (source.compressed_content_size && source.compressed_content_size > 0) ||
+           (source.compressed_size && source.compressed_size > 0);
+  }
+  return false;
+};
+
+// Helper function to get compression savings percentage
+export const getCompressionSavings = (source: AgentSource): number | null => {
+  const compressionInfo = getCompressionInfo(source);
+  if (!compressionInfo) return null;
+  
+  const { ratio } = compressionInfo;
+  return Math.round((1 - ratio) * 100);
 };

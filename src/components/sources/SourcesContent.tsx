@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { File, FileText, Globe, HelpCircle } from 'lucide-react';
 import ProcessingTrigger from './ProcessingTrigger';
 
@@ -103,6 +105,11 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
                 <span className="text-sm text-gray-700">
                   {getSourceLabel(sourcesByType[type].count, type)}
                 </span>
+                {type === 'website' && sourcesByType[type].size > 0 && (
+                  <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                    Compressed
+                  </Badge>
+                )}
               </div>
               <span className="text-sm font-semibold text-gray-900">
                 {formatBytes(sourcesByType[type].size)}
@@ -115,7 +122,14 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
         <Separator className="border-dashed" />
 
         <div className="flex justify-between items-center">
-          <span className="text-sm font-bold text-gray-900">Total size:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-gray-900">Total size:</span>
+            {sourcesByType.website.size > 0 && (
+              <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                Optimized
+              </Badge>
+            )}
+          </div>
           <div className="text-sm">
             <span className="font-bold text-gray-900">{displayTotalSize}</span>
             <span className="text-gray-600 ml-1">/ 33 MB</span>
