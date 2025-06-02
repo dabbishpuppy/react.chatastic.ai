@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface VectorSearchOptions {
@@ -126,9 +125,9 @@ export class OptimizedVectorSearch {
             sourceId: item.source_chunks?.source_id || '',
             sourceType: sourceData?.source_type || '',
             sourceTitle: sourceData?.title || '',
-            metadata: metadata ? (typeof metadata === 'object' ? metadata : {}) : undefined,
+            metadata: metadata ? (typeof metadata === 'object' ? metadata : {}) : {},
             chunkIndex: item.source_chunks?.chunk_index || 0
-          };
+          } as VectorSearchResult;
         })
         .filter((item): item is VectorSearchResult => item !== null)
         .sort((a, b) => b.similarity - a.similarity);
@@ -259,7 +258,7 @@ export class OptimizedVectorSearch {
         sourceId: chunk.source_id,
         sourceType: chunk.agent_sources?.source_type || '',
         sourceTitle: chunk.agent_sources?.title || '',
-        metadata: metadata ? (typeof metadata === 'object' ? metadata : {}) : undefined,
+        metadata: metadata ? (typeof metadata === 'object' ? metadata : {}) : {},
         chunkIndex: chunk.chunk_index
       };
     });
@@ -297,12 +296,10 @@ export class OptimizedVectorSearch {
       
       if (exactMatches > 0) {
         matches++;
-        // Score based on frequency and keyword length
         totalScore += exactMatches * (keywordLower.length / contentWords.length);
       }
     }
 
-    // Normalize score
     return Math.min(matches / keywords.length + totalScore, 1);
   }
 
@@ -314,26 +311,22 @@ export class OptimizedVectorSearch {
   ): VectorSearchResult[] {
     const resultMap = new Map<string, VectorSearchResult>();
 
-    // Add vector results with boost
     vectorResults.forEach(result => {
       resultMap.set(result.chunkId, {
         ...result,
-        similarity: result.similarity * 1.1 // Boost vector similarity
+        similarity: result.similarity * 1.1
       });
     });
 
-    // Add keyword results or boost existing ones
     keywordResults.forEach(result => {
       const existing = resultMap.get(result.chunkId);
       if (existing) {
-        // Combine scores
         existing.similarity = Math.min(existing.similarity + result.similarity * 0.3, 1);
       } else {
         resultMap.set(result.chunkId, result);
       }
     });
 
-    // Sort by combined similarity and return top results
     return Array.from(resultMap.values())
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, maxResults);
@@ -344,16 +337,13 @@ export class OptimizedVectorSearch {
     results: VectorSearchResult[],
     queryEmbedding: number[]
   ): Promise<VectorSearchResult[]> {
-    // For now, implement simple reranking based on content length and recency
     return results.map(result => {
       let rerankScore = result.similarity;
 
-      // Boost longer, more comprehensive content
       const contentLength = result.content.length;
       if (contentLength > 500) rerankScore += 0.05;
       if (contentLength > 1000) rerankScore += 0.05;
 
-      // Boost content with better structure (has headings, lists, etc.)
       if (/#{1,6}\s|<h[1-6]>|\n\s*[-*+]\s/i.test(result.content)) {
         rerankScore += 0.03;
       }
@@ -375,8 +365,6 @@ export class OptimizedVectorSearch {
     avgResultsCount: number;
     popularSources: Array<{ sourceId: string; title: string; searchCount: number }>;
   }> {
-    // This would require implementing search logging
-    // For now, return mock data
     return {
       totalSearches: 0,
       avgQueryTime: 0,
@@ -388,9 +376,6 @@ export class OptimizedVectorSearch {
   // Create optimized indexes for vector search
   static async optimizeVectorIndexes(): Promise<void> {
     console.log('🚀 Optimizing vector search indexes');
-
-    // This would typically involve database-specific operations
-    // For pgvector, we'd create HNSW or IVFFlat indexes
     console.log('✅ Vector indexes optimization completed (placeholder)');
   }
 }
