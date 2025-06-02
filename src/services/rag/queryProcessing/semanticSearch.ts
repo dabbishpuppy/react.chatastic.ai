@@ -16,7 +16,7 @@ export interface SemanticSearchResult {
 }
 
 export interface SearchFilters {
-  sourceTypes?: string[];
+  sourceTypes?: ('text' | 'file' | 'website' | 'qa')[];
   sources?: string[];
   minSimilarity?: number;
   maxResults?: number;
@@ -47,7 +47,6 @@ export class SemanticSearchService {
           content,
           chunk_index,
           created_at,
-          embedding,
           agent_sources!inner(
             id,
             agent_id,
