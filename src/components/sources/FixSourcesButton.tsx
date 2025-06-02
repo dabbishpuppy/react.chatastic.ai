@@ -26,8 +26,8 @@ const FixSourcesButton: React.FC = () => {
         throw error;
       }
       
-      // Cast the Json type to our expected interface
-      const result = data as FixSourcesResult;
+      // Safe casting with unknown first
+      const result = data as unknown as FixSourcesResult;
       setLastResult(result);
       
       toast({
