@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import WebsiteSourceActions from './WebsiteSourceActions';
@@ -16,6 +16,7 @@ interface SourcePage {
   content_size?: number;
   chunks_created?: number;
   processing_time_ms?: number;
+  compression_ratio?: number;
 }
 
 interface WebsiteChildSourcesProps {
@@ -37,6 +38,30 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 }) => {
   const [childPages, setChildPages] = useState<SourcePage[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Format size with compression indicators
+  const formatSize = (contentSize?: number, compressionRatio?: number) => {
+    if (!contentSize) return null;
+
+    // If we have compression ratio, show compressed size
+    if (compressionRatio && compressionRatio > 0 && compressionRatio < 1) {
+      const compressedSize = Math.round(contentSize * compressionRatio);
+      const savings = Math.round((1 - compressionRatio) * 100);
+      return {
+        size: compressedSize < 1024 ? `${compressedSize} B` : `${Math.round(compressedSize / 1024)} KB`,
+        isCompressed: true,
+        savings: savings
+      };
+    }
+
+    // Otherwise show original size
+    const size = contentSize < 1024 ? `${contentSize} B` : `${Math.round(contentSize / 1024)} KB`;
+    return {
+      size,
+      isCompressed: false,
+      savings: null
+    };
+  };
 
   // Fetch child pages from source_pages table
   const fetchChildPages = async () => {
@@ -145,80 +170,94 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     return `${baseClasses} ${colorClasses[status as keyof typeof colorClasses] || 'bg-gray-100 text-gray-800'}`;
   };
 
-  const renderChildPage = (page: SourcePage) => (
-    <div key={page.id} className="flex items-center justify-between p-3 pl-16 hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0">
-      <div className="flex items-center flex-1 min-w-0">
-        <input 
-          type="checkbox" 
-          className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0" 
-        />
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-sm font-medium text-gray-900 truncate" title={page.url}>
-              {page.url}
-            </p>
+  const renderChildPage = (page: SourcePage) => {
+    const sizeInfo = formatSize(page.content_size, page.compression_ratio);
+    
+    return (
+      <div key={page.id} className="flex items-center justify-between p-3 pl-16 hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0">
+        <div className="flex items-center flex-1 min-w-0">
+          <input 
+            type="checkbox" 
+            className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0" 
+          />
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-gray-900 truncate" title={page.url}>
+                {page.url}
+              </p>
+            </div>
+            
+            <div className="flex items-center text-xs text-gray-500">
+              <span>Added {formatDistanceToNow(new Date(page.created_at), { addSuffix: true })}</span>
+              {sizeInfo && (
+                <>
+                  <span className="mx-2">•</span>
+                  <div className="flex items-center gap-1">
+                    <span>{sizeInfo.size}</span>
+                    {sizeInfo.isCompressed && (
+                      <>
+                        <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                          Compressed
+                        </Badge>
+                        <span className="text-green-600">({sizeInfo.savings}% smaller)</span>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              {page.chunks_created && page.chunks_created > 0 && (
+                <>
+                  <span className="mx-2">•</span>
+                  <span>{page.chunks_created} chunks</span>
+                </>
+              )}
+              {page.processing_time_ms && (
+                <>
+                  <span className="mx-2">•</span>
+                  <span>{page.processing_time_ms}ms</span>
+                </>
+              )}
+            </div>
+            
+            {page.error_message && (
+              <p className="text-xs text-red-600 mt-1 truncate" title={page.error_message}>
+                Error: {page.error_message}
+              </p>
+            )}
           </div>
           
-          <div className="flex items-center text-xs text-gray-500">
-            <span>Added {formatDistanceToNow(new Date(page.created_at), { addSuffix: true })}</span>
-            {page.content_size && (
-              <>
-                <span className="mx-2">•</span>
-                <span>{Math.round(page.content_size / 1024)} KB</span>
-              </>
-            )}
-            {page.chunks_created && page.chunks_created > 0 && (
-              <>
-                <span className="mx-2">•</span>
-                <span>{page.chunks_created} chunks</span>
-              </>
-            )}
-            {page.processing_time_ms && (
-              <>
-                <span className="mx-2">•</span>
-                <span>{page.processing_time_ms}ms</span>
-              </>
-            )}
+          <div className="ml-4 flex-shrink-0">
+            <span className={getStatusBadge(page.status)}>
+              {page.status.replace('_', ' ')}
+            </span>
           </div>
-          
-          {page.error_message && (
-            <p className="text-xs text-red-600 mt-1 truncate" title={page.error_message}>
-              Error: {page.error_message}
-            </p>
-          )}
         </div>
         
         <div className="ml-4 flex-shrink-0">
-          <span className={getStatusBadge(page.status)}>
-            {page.status.replace('_', ' ')}
-          </span>
+          <WebsiteSourceActions
+            source={{
+              id: page.id,
+              url: page.url,
+              title: page.url,
+              source_type: 'website',
+              agent_id: '',
+              team_id: '',
+              created_at: page.created_at,
+              crawl_status: page.status,
+              is_active: true
+            } as any}
+            onEdit={onEdit}
+            onExclude={onExclude}
+            onDelete={onDelete}
+            onRecrawl={onRecrawl}
+            showRecrawl={false}
+            isChild={true}
+          />
         </div>
       </div>
-      
-      <div className="ml-4 flex-shrink-0">
-        <WebsiteSourceActions
-          source={{
-            id: page.id,
-            url: page.url,
-            title: page.url,
-            source_type: 'website',
-            agent_id: '',
-            team_id: '',
-            created_at: page.created_at,
-            crawl_status: page.status,
-            is_active: true
-          } as any}
-          onEdit={onEdit}
-          onExclude={onExclude}
-          onDelete={onDelete}
-          onRecrawl={onRecrawl}
-          showRecrawl={false}
-          isChild={true}
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
