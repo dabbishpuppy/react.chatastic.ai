@@ -1,15 +1,16 @@
-
 import { useState, useCallback } from 'react';
 import { 
   ragIntegrationTests, 
   advancedRAGTests,
   orchestrationTests,
   serviceOrchestrationTests,
+  integrationTests,
   type TestResult, 
   type PerformanceBenchmark,
   type AdvancedRAGTestResult,
   type OrchestrationTestResult,
-  type ServiceOrchestrationTestResult
+  type ServiceOrchestrationTestResult,
+  type IntegrationTestResult
 } from '@/services/rag/testing';
 
 export const useRAGTesting = () => {
@@ -18,6 +19,7 @@ export const useRAGTesting = () => {
   const [advancedTestResults, setAdvancedTestResults] = useState<AdvancedRAGTestResult[]>([]);
   const [orchestrationTestResults, setOrchestrationTestResults] = useState<OrchestrationTestResult[]>([]);
   const [serviceOrchestrationTestResults, setServiceOrchestrationTestResults] = useState<ServiceOrchestrationTestResult[]>([]);
+  const [integrationTestResults, setIntegrationTestResults] = useState<IntegrationTestResult[]>([]);
   const [benchmarks, setBenchmarks] = useState<PerformanceBenchmark[]>([]);
   const [summary, setSummary] = useState<{
     totalTests: number;
@@ -100,15 +102,41 @@ export const useRAGTesting = () => {
     }
   }, []);
 
-  // Run all tests (integration + advanced + orchestration + service orchestration)
+  // Run integration tests
+  const runIntegrationTests = useCallback(async () => {
+    setIsRunning(true);
+    try {
+      const results = await integrationTests.runAllTests();
+      setIntegrationTestResults(results);
+      
+      const summary = integrationTests.getTestSummary();
+      setSummary(summary);
+      
+      return results;
+    } catch (error) {
+      console.error('Failed to run integration tests:', error);
+      throw error;
+    } finally {
+      setIsRunning(false);
+    }
+  }, []);
+
+  // Run all tests (integration + advanced + orchestration + service orchestration + integration)
   const runAllTests = useCallback(async () => {
     setIsRunning(true);
     try {
-      const [integrationResults, advancedResults, orchestrationResults, serviceOrchestrationResults] = await Promise.all([
+      const [
+        integrationResults, 
+        advancedResults, 
+        orchestrationResults, 
+        serviceOrchestrationResults,
+        fullIntegrationResults
+      ] = await Promise.all([
         ragIntegrationTests.runAllTests(),
         advancedRAGTests.runAllTests(),
         orchestrationTests.runAllTests(),
-        serviceOrchestrationTests.runAllTests()
+        serviceOrchestrationTests.runAllTests(),
+        integrationTests.runAllTests()
       ]);
 
       setTestResults(integrationResults.results);
@@ -116,27 +144,32 @@ export const useRAGTesting = () => {
       setAdvancedTestResults(advancedResults);
       setOrchestrationTestResults(orchestrationResults);
       setServiceOrchestrationTestResults(serviceOrchestrationResults);
+      setIntegrationTestResults(fullIntegrationResults);
 
       // Combine summaries
       const combinedSummary = {
         totalTests: integrationResults.summary.totalTests + 
                    advancedResults.length + 
                    orchestrationResults.length + 
-                   serviceOrchestrationResults.length,
+                   serviceOrchestrationResults.length +
+                   fullIntegrationResults.length,
         passed: integrationResults.summary.passed + 
                advancedResults.filter(r => r.passed).length + 
                orchestrationResults.filter(r => r.passed).length + 
-               serviceOrchestrationResults.filter(r => r.passed).length,
+               serviceOrchestrationResults.filter(r => r.passed).length +
+               fullIntegrationResults.filter(r => r.passed).length,
         failed: integrationResults.summary.failed + 
                advancedResults.filter(r => !r.passed).length + 
                orchestrationResults.filter(r => !r.passed).length + 
-               serviceOrchestrationResults.filter(r => !r.passed).length,
+               serviceOrchestrationResults.filter(r => !r.passed).length +
+               fullIntegrationResults.filter(r => !r.passed).length,
         averageDuration: [
           integrationResults.summary.averageDuration,
           advancedResults.reduce((sum, r) => sum + r.duration, 0) / (advancedResults.length || 1),
           orchestrationResults.reduce((sum, r) => sum + r.duration, 0) / (orchestrationResults.length || 1),
-          serviceOrchestrationResults.reduce((sum, r) => sum + r.duration, 0) / (serviceOrchestrationResults.length || 1)
-        ].reduce((sum, avg) => sum + avg, 0) / 4
+          serviceOrchestrationResults.reduce((sum, r) => sum + r.duration, 0) / (serviceOrchestrationResults.length || 1),
+          fullIntegrationResults.reduce((sum, r) => sum + r.duration, 0) / (fullIntegrationResults.length || 1)
+        ].reduce((sum, avg) => sum + avg, 0) / 5
       };
       
       setSummary(combinedSummary);
@@ -146,6 +179,7 @@ export const useRAGTesting = () => {
         advanced: advancedResults,
         orchestration: orchestrationResults,
         serviceOrchestration: serviceOrchestrationResults,
+        fullIntegration: fullIntegrationResults,
         summary: combinedSummary
       };
     } catch (error) {
@@ -162,17 +196,20 @@ export const useRAGTesting = () => {
     const advancedSummary = advancedRAGTests.getTestSummary();
     const orchestrationSummary = orchestrationTests.getTestSummary();
     const serviceOrchestrationSummary = serviceOrchestrationTests.getTestSummary();
+    const integrationSummary = integrationTests.getTestSummary();
     
     return {
       ...integrationReport,
       advancedTestResults,
       orchestrationTestResults,
       serviceOrchestrationTestResults,
+      integrationTestResults,
       advancedSummary,
       orchestrationSummary,
-      serviceOrchestrationSummary
+      serviceOrchestrationSummary,
+      integrationSummary
     };
-  }, [advancedTestResults, orchestrationTestResults, serviceOrchestrationTestResults]);
+  }, [advancedTestResults, orchestrationTestResults, serviceOrchestrationTestResults, integrationTestResults]);
 
   // Clear test results
   const clearResults = useCallback(() => {
@@ -180,6 +217,7 @@ export const useRAGTesting = () => {
     setAdvancedTestResults([]);
     setOrchestrationTestResults([]);
     setServiceOrchestrationTestResults([]);
+    setIntegrationTestResults([]);
     setBenchmarks([]);
     setSummary(null);
   }, []);
@@ -191,14 +229,16 @@ export const useRAGTesting = () => {
     advancedTestResults,
     orchestrationTestResults,
     serviceOrchestrationTestResults,
+    integrationTestResults,
     benchmarks,
     summary,
 
     // Actions
-    runTests,
-    runAdvancedTests,
-    runOrchestrationTests,
-    runServiceOrchestrationTests,
+    runTests: runTests,
+    runAdvancedTests: runAdvancedTests,
+    runOrchestrationTests: runOrchestrationTests,
+    runServiceOrchestrationTests: runServiceOrchestrationTests,
+    runIntegrationTests,
     runAllTests,
     getDetailedReport,
     clearResults

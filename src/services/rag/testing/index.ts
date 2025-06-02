@@ -1,3 +1,4 @@
+
 // Export testing utilities
 export { RAGIntegrationTests, ragIntegrationTests } from './ragIntegrationTests';
 export { AdvancedRAGTests, advancedRAGTests } from './advancedRAGTests';
@@ -11,3 +12,7 @@ export type { OrchestrationTestResult } from './orchestrationTests';
 // Export service orchestration tests
 export { ServiceOrchestrationTests, serviceOrchestrationTests } from './serviceOrchestrationTests';
 export type { ServiceOrchestrationTestResult } from './serviceOrchestrationTests';
+
+// Export integration tests
+export { IntegrationTests, integrationTests } from './integrationTests';
+export type { IntegrationTestResult } from './integrationTests';
