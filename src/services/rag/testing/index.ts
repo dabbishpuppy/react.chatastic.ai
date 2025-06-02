@@ -1,21 +1,16 @@
-// Export testing utilities
-export { RAGIntegrationTests, ragIntegrationTests } from './ragIntegrationTests';
-export { AdvancedRAGTests, advancedRAGTests } from './advancedRAGTests';
+
+// Re-export all test types and classes
 export type { TestResult, PerformanceBenchmark } from './ragIntegrationTests';
 export type { AdvancedRAGTestResult } from './advancedRAGTests';
-
-// Export orchestration tests
-export { OrchestrationTests, orchestrationTests } from './orchestrationTests';
 export type { OrchestrationTestResult } from './orchestrationTests';
-
-// Export service orchestration tests
-export { ServiceOrchestrationTests, serviceOrchestrationTests } from './serviceOrchestrationTests';
 export type { ServiceOrchestrationTestResult } from './serviceOrchestrationTests';
-
-// Export integration tests
-export { IntegrationTests, integrationTests } from './integrationTests';
 export type { IntegrationTestResult } from './integrationTests';
-
-// Enhanced Query Engine Tests
-export { EnhancedQueryEngineTests, enhancedQueryEngineTests } from './enhancedQueryEngineTests';
 export type { EnhancedQueryEngineTestResult } from './enhancedQueryEngineTests';
+
+// Export test instances
+export { ragIntegrationTests } from './ragIntegrationTests';
+export { advancedRAGTests } from './advancedRAGTests';
+export { orchestrationTests } from './orchestrationTests';
+export { serviceOrchestrationTests } from './serviceOrchestrationTests';
+export { integrationTests } from './integrationTests';
+export { enhancedQueryEngineTests } from './enhancedQueryEngineTests';

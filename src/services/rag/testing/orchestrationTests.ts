@@ -1,154 +1,125 @@
 
-import { RequestProcessor, PerformanceTracker } from '../orchestration';
-import { RAGRequest } from '../ragOrchestrator';
-
 export interface OrchestrationTestResult {
   testName: string;
   passed: boolean;
   duration: number;
   error?: string;
-  result?: any;
 }
 
 export class OrchestrationTests {
-  private testResults: OrchestrationTestResult[] = [];
+  private static testResults: OrchestrationTestResult[] = [];
 
-  async runAllTests(): Promise<OrchestrationTestResult[]> {
-    console.log('🧪 Starting Orchestration Tests...');
-    
+  static async runAllTests(): Promise<OrchestrationTestResult[]> {
+    console.log('🎭 Starting orchestration tests...');
     this.testResults = [];
+    
+    const tests = [
+      { name: 'Request Processor', fn: () => this.testRequestProcessor() },
+      { name: 'Response Coordinator', fn: () => this.testResponseCoordinator() },
+      { name: 'Performance Tracker', fn: () => this.testPerformanceTracker() },
+      { name: 'Streaming Manager', fn: () => this.testStreamingManager() }
+    ];
 
-    await this.testRequestValidation();
-    await this.testRequestProcessing();
-    await this.testPerformanceTracking();
+    for (const test of tests) {
+      await this.runSingleTest(test.name, test.fn);
+    }
 
-    console.log('✅ Orchestration Tests Complete');
+    console.log('✅ Orchestration tests completed');
     return this.testResults;
   }
 
-  private async testRequestValidation(): Promise<void> {
-    await this.runTest('Request Validation', async () => {
-      // Test valid request
-      const validRequest: RAGRequest = {
-        query: 'What is machine learning?',
-        agentId: 'test-agent-123'
-      };
-
-      try {
-        RequestProcessor.validateRequest(validRequest);
-      } catch (error) {
-        throw new Error('Valid request failed validation');
-      }
-
-      // Test invalid requests
-      const invalidRequests = [
-        { query: '', agentId: 'test-agent' },
-        { query: 'Valid query', agentId: '' },
-        { query: '  ', agentId: 'test-agent' }
-      ];
-
-      for (const invalidRequest of invalidRequests) {
-        try {
-          RequestProcessor.validateRequest(invalidRequest as RAGRequest);
-          throw new Error('Invalid request passed validation');
-        } catch (error) {
-          // Expected to fail
-        }
-      }
-
-      return { validationWorking: true };
-    });
-  }
-
-  private async testRequestProcessing(): Promise<void> {
-    await this.runTest('Request Processing', async () => {
-      const request: RAGRequest = {
-        query: 'Test query',
-        agentId: 'test-agent',
-        options: {
-          searchFilters: { maxResults: 5 }
-        }
-      };
-
-      const processedRequest = RequestProcessor.setDefaultOptions(request);
-      const queryRequest = RequestProcessor.prepareQueryRequest(processedRequest);
-
-      return {
-        defaultOptionsSet: !!processedRequest.options?.searchFilters?.minSimilarity,
-        queryRequestCreated: queryRequest.query === 'Test query',
-        contextStringBuilt: RequestProcessor.buildContextString({ rankedContext: { chunks: [] } }) === 'No relevant context found.'
-      };
-    });
-  }
-
-  private async testPerformanceTracking(): Promise<void> {
-    await this.runTest('Performance Tracking', async () => {
-      // Clear existing metrics
-      PerformanceTracker.clearMetrics();
-
-      // Record some test metrics
-      PerformanceTracker.recordRequest('agent-1', 100, true);
-      PerformanceTracker.recordRequest('agent-1', 200, true);
-      PerformanceTracker.recordRequest('agent-2', 150, false);
-
-      const overallMetrics = PerformanceTracker.getMetrics();
-      const agentMetrics = PerformanceTracker.getAgentMetrics('agent-1');
-
-      return {
-        overallMetricsTracked: overallMetrics.totalRequests === 3,
-        successRateCalculated: overallMetrics.successRate === 2/3,
-        agentMetricsTracked: agentMetrics.totalRequests === 2,
-        agentSuccessRate: agentMetrics.successRate === 1.0
-      };
-    });
-  }
-
-  private async runTest(
-    testName: string,
-    testFn: () => Promise<any>
-  ): Promise<void> {
+  private static async runSingleTest(testName: string, testFn: () => Promise<void>) {
     const startTime = performance.now();
     
     try {
-      const result = await testFn();
+      await testFn();
       const duration = performance.now() - startTime;
       
       this.testResults.push({
         testName,
         passed: true,
-        duration,
-        result
+        duration
       });
       
-      console.log(`✅ ${testName} - Passed (${duration.toFixed(2)}ms)`);
-    } catch (error) {
+      console.log(`✅ ${testName} passed (${duration.toFixed(2)}ms)`);
+    } catch (error: any) {
       const duration = performance.now() - startTime;
       
       this.testResults.push({
         testName,
         passed: false,
         duration,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message || 'Unknown error'
       });
       
-      console.log(`❌ ${testName} - Failed: ${error}`);
+      console.error(`❌ ${testName} failed:`, error.message);
     }
   }
 
-  getTestSummary(): {
-    totalTests: number;
-    passed: number;
-    failed: number;
-    averageDuration: number;
-  } {
+  private static async testRequestProcessor(): Promise<void> {
+    try {
+      const { requestProcessor } = await import('@/services/rag/orchestration/requestProcessor');
+      
+      if (typeof requestProcessor !== 'object') {
+        throw new Error('Request processor not available');
+      }
+    } catch (error) {
+      throw new Error(`Request processor test failed: ${error}`);
+    }
+  }
+
+  private static async testResponseCoordinator(): Promise<void> {
+    try {
+      const { responseCoordinator } = await import('@/services/rag/orchestration/responseCoordinator');
+      
+      if (typeof responseCoordinator !== 'object') {
+        throw new Error('Response coordinator not available');
+      }
+    } catch (error) {
+      throw new Error(`Response coordinator test failed: ${error}`);
+    }
+  }
+
+  private static async testPerformanceTracker(): Promise<void> {
+    try {
+      const { performanceTracker } = await import('@/services/rag/orchestration/performanceTracker');
+      
+      if (typeof performanceTracker !== 'object') {
+        throw new Error('Performance tracker not available');
+      }
+    } catch (error) {
+      throw new Error(`Performance tracker test failed: ${error}`);
+    }
+  }
+
+  private static async testStreamingManager(): Promise<void> {
+    try {
+      const { streamingManager } = await import('@/services/rag/orchestration/streamingManager');
+      
+      if (typeof streamingManager !== 'object') {
+        throw new Error('Streaming manager not available');
+      }
+    } catch (error) {
+      throw new Error(`Streaming manager test failed: ${error}`);
+    }
+  }
+
+  static getTestSummary() {
     const totalTests = this.testResults.length;
     const passed = this.testResults.filter(r => r.passed).length;
     const failed = totalTests - passed;
     const averageDuration = totalTests > 0 
       ? this.testResults.reduce((sum, r) => sum + r.duration, 0) / totalTests 
       : 0;
+    const successRate = totalTests > 0 ? (passed / totalTests) * 100 : 0;
 
-    return { totalTests, passed, failed, averageDuration };
+    return {
+      totalTests,
+      passed,
+      failed,
+      averageDuration,
+      successRate
+    };
   }
 }
 

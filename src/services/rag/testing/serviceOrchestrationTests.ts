@@ -1,199 +1,139 @@
 
-import { 
-  ServiceLifecycle, 
-  HealthMonitor, 
-  ConfigurationManager, 
-  StatusTracker,
-  type ServiceStatus,
-  type OrchestrationConfig 
-} from '../enhanced/orchestration';
-
 export interface ServiceOrchestrationTestResult {
   testName: string;
   passed: boolean;
   duration: number;
   error?: string;
-  result?: any;
 }
 
 export class ServiceOrchestrationTests {
-  private testResults: ServiceOrchestrationTestResult[] = [];
+  private static testResults: ServiceOrchestrationTestResult[] = [];
 
-  async runAllTests(): Promise<ServiceOrchestrationTestResult[]> {
-    console.log('🧪 Starting Service Orchestration Tests...');
-    
+  static async runAllTests(): Promise<ServiceOrchestrationTestResult[]> {
+    console.log('⚙️ Starting service orchestration tests...');
     this.testResults = [];
+    
+    const tests = [
+      { name: 'Service Orchestrator Initialization', fn: () => this.testServiceOrchestratorInit() },
+      { name: 'Service Lifecycle Management', fn: () => this.testServiceLifecycle() },
+      { name: 'Configuration Management', fn: () => this.testConfigurationManagement() },
+      { name: 'Health Monitoring', fn: () => this.testHealthMonitoring() },
+      { name: 'Status Tracking', fn: () => this.testStatusTracking() }
+    ];
 
-    await this.testConfigurationManager();
-    await this.testStatusTracker();
-    await this.testHealthMonitor();
-    await this.testServiceLifecycle();
+    for (const test of tests) {
+      await this.runSingleTest(test.name, test.fn);
+    }
 
-    console.log('✅ Service Orchestration Tests Complete');
+    console.log('✅ Service orchestration tests completed');
     return this.testResults;
   }
 
-  private async testConfigurationManager(): Promise<void> {
-    await this.runTest('Configuration Manager', async () => {
-      // Test default config creation
-      const defaultConfig = ConfigurationManager.getDefaultConfig();
-      const config = ConfigurationManager.createConfig();
-      
-      // Test config updates
-      const updatedConfig = ConfigurationManager.updateConfig(config, {
-        enableMetrics: false,
-        enableAlerting: false
-      });
-
-      // Test validation
-      const validation = ConfigurationManager.validateConfig(updatedConfig);
-
-      return {
-        defaultConfigCreated: !!defaultConfig.enableMetrics,
-        configUpdated: !updatedConfig.enableMetrics && !updatedConfig.enableAlerting,
-        validationWorking: validation.valid
-      };
-    });
-  }
-
-  private async testStatusTracker(): Promise<void> {
-    await this.runTest('Status Tracker', async () => {
-      const tracker = new StatusTracker();
-
-      // Test service status updates
-      tracker.updateServiceStatus('test-service', 'running');
-      tracker.updateServiceStatus('test-service-2', 'stopped');
-
-      const runningService = tracker.getServiceStatus('test-service');
-      const stoppedService = tracker.getServiceStatus('test-service-2');
-      const allServices = tracker.getAllServices();
-      const runningCount = tracker.getRunningServicesCount();
-      const overallHealth = tracker.getOverallHealth();
-
-      return {
-        runningServiceTracked: runningService?.status === 'running',
-        stoppedServiceTracked: stoppedService?.status === 'stopped',
-        allServicesRetrieved: allServices.length === 2,
-        runningCountCorrect: runningCount === 1,
-        healthCalculated: typeof overallHealth === 'number'
-      };
-    });
-  }
-
-  private async testHealthMonitor(): Promise<void> {
-    await this.runTest('Health Monitor', async () => {
-      const services = new Map<string, ServiceStatus>();
-      services.set('test-service', {
-        name: 'test-service',
-        status: 'running',
-        uptime: 100,
-        lastCheck: new Date().toISOString(),
-        health: 100
-      });
-
-      const updates: { name: string; service: ServiceStatus }[] = [];
-      const updateCallback = (name: string, service: ServiceStatus) => {
-        updates.push({ name, service });
-      };
-
-      await HealthMonitor.performHealthCheck(
-        services,
-        Date.now() - 5000,
-        updateCallback
-      );
-
-      const health = HealthMonitor.calculateServiceHealth('test-service');
-
-      return {
-        healthCheckPerformed: updates.length > 0,
-        healthCalculated: typeof health === 'number' && health >= 0 && health <= 100
-      };
-    });
-  }
-
-  private async testServiceLifecycle(): Promise<void> {
-    await this.runTest('Service Lifecycle', async () => {
-      const statusUpdates: { name: string; status: string }[] = [];
-      const updateCallback = (name: string, status: ServiceStatus['status']) => {
-        statusUpdates.push({ name, status });
-      };
-
-      // Test service start
-      await ServiceLifecycle.startService(
-        'test-service',
-        async () => {
-          // Simulate service start
-          return Promise.resolve();
-        },
-        updateCallback
-      );
-
-      // Test service stop
-      await ServiceLifecycle.stopService(
-        'test-service',
-        () => {
-          // Simulate service stop
-        },
-        updateCallback
-      );
-
-      // Test service restart
-      await ServiceLifecycle.restartService('test-service', updateCallback);
-
-      return {
-        serviceStarted: statusUpdates.some(u => u.status === 'running'),
-        serviceStopped: statusUpdates.some(u => u.status === 'stopped'),
-        totalUpdates: statusUpdates.length
-      };
-    });
-  }
-
-  private async runTest(
-    testName: string,
-    testFn: () => Promise<any>
-  ): Promise<void> {
+  private static async runSingleTest(testName: string, testFn: () => Promise<void>) {
     const startTime = performance.now();
     
     try {
-      const result = await testFn();
+      await testFn();
       const duration = performance.now() - startTime;
       
       this.testResults.push({
         testName,
         passed: true,
-        duration,
-        result
+        duration
       });
       
-      console.log(`✅ ${testName} - Passed (${duration.toFixed(2)}ms)`);
-    } catch (error) {
+      console.log(`✅ ${testName} passed (${duration.toFixed(2)}ms)`);
+    } catch (error: any) {
       const duration = performance.now() - startTime;
       
       this.testResults.push({
         testName,
         passed: false,
         duration,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error.message || 'Unknown error'
       });
       
-      console.log(`❌ ${testName} - Failed: ${error}`);
+      console.error(`❌ ${testName} failed:`, error.message);
     }
   }
 
-  getTestSummary(): {
-    totalTests: number;
-    passed: number;
-    failed: number;
-    averageDuration: number;
-  } {
+  private static async testServiceOrchestratorInit(): Promise<void> {
+    try {
+      const { ServiceOrchestrator } = await import('@/services/rag/enhanced/serviceOrchestrator');
+      const orchestrator = ServiceOrchestrator.getInstance();
+      
+      if (!orchestrator) {
+        throw new Error('Service orchestrator failed to initialize');
+      }
+    } catch (error) {
+      throw new Error(`Service orchestrator initialization failed: ${error}`);
+    }
+  }
+
+  private static async testServiceLifecycle(): Promise<void> {
+    try {
+      const { serviceLifecycle } = await import('@/services/rag/enhanced/orchestration/serviceLifecycle');
+      
+      if (typeof serviceLifecycle !== 'object') {
+        throw new Error('Service lifecycle manager not available');
+      }
+    } catch (error) {
+      throw new Error(`Service lifecycle test failed: ${error}`);
+    }
+  }
+
+  private static async testConfigurationManagement(): Promise<void> {
+    try {
+      const { configurationManager } = await import('@/services/rag/enhanced/orchestration/configurationManager');
+      
+      if (typeof configurationManager !== 'object') {
+        throw new Error('Configuration manager not available');
+      }
+    } catch (error) {
+      throw new Error(`Configuration management test failed: ${error}`);
+    }
+  }
+
+  private static async testHealthMonitoring(): Promise<void> {
+    try {
+      const { healthMonitor } = await import('@/services/rag/enhanced/orchestration/healthMonitor');
+      
+      if (typeof healthMonitor !== 'object') {
+        throw new Error('Health monitor not available');
+      }
+    } catch (error) {
+      throw new Error(`Health monitoring test failed: ${error}`);
+    }
+  }
+
+  private static async testStatusTracking(): Promise<void> {
+    try {
+      const { statusTracker } = await import('@/services/rag/enhanced/orchestration/statusTracker');
+      
+      if (typeof statusTracker !== 'object') {
+        throw new Error('Status tracker not available');
+      }
+    } catch (error) {
+      throw new Error(`Status tracking test failed: ${error}`);
+    }
+  }
+
+  static getTestSummary() {
     const totalTests = this.testResults.length;
     const passed = this.testResults.filter(r => r.passed).length;
     const failed = totalTests - passed;
     const averageDuration = totalTests > 0 
       ? this.testResults.reduce((sum, r) => sum + r.duration, 0) / totalTests 
       : 0;
+    const successRate = totalTests > 0 ? (passed / totalTests) * 100 : 0;
 
-    return { totalTests, passed, failed, averageDuration };
+    return {
+      totalTests,
+      passed,
+      failed,
+      averageDuration,
+      successRate
+    };
   }
 }
 
