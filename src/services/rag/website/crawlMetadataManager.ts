@@ -29,6 +29,8 @@ export class CrawlMetadataManager {
       advanced_compression_enabled: options.enableAdvancedCompression || false
     };
 
+    console.log(`🎯 Updating source metadata with advanced compression: ${options.enableAdvancedCompression}`);
+
     const { error } = await supabase
       .from('agent_sources')
       .update({
