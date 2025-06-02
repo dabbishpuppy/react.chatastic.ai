@@ -65,6 +65,20 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
 
   const sourceTypes = ['file', 'text', 'website', 'qa'] as const;
 
+  // Calculate actual total from the individual sizes to ensure accuracy
+  const calculatedTotal = sourcesByType.text.size + sourcesByType.file.size + sourcesByType.website.size + sourcesByType.qa.size;
+  const displayTotalSize = formatBytes(calculatedTotal);
+
+  console.log('📊 Size calculation debug:', {
+    text: sourcesByType.text.size,
+    file: sourcesByType.file.size,
+    website: sourcesByType.website.size,
+    qa: sourcesByType.qa.size,
+    calculatedTotal,
+    displayTotalSize,
+    providedTotalSize: totalSize
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -97,7 +111,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
         <div className="flex justify-between items-center">
           <span className="text-sm font-bold text-gray-900">Total size:</span>
           <div className="text-sm">
-            <span className="font-bold text-gray-900">{totalSize}</span>
+            <span className="font-bold text-gray-900">{displayTotalSize}</span>
             <span className="text-gray-600 ml-1">/ 33 MB</span>
           </div>
         </div>

@@ -2,7 +2,7 @@
 import { AgentSource } from '@/types/rag';
 
 export const formatFileSize = (source: AgentSource) => {
-  // For Q&A sources, calculate size from content (answer only) or metadata
+  // For Q&A sources, prioritize metadata file_size, then calculate from content
   if (source.source_type === 'qa') {
     // First check if metadata has file_size
     if (source.metadata) {
@@ -33,41 +33,42 @@ export const formatFileSize = (source: AgentSource) => {
   if (source.source_type === 'website') {
     const metadata = source.metadata as any;
     
-    // 1. Check for total compressed content size from child pages (parent sources)
+    // 1. Check for total_content_size from metadata (parent sources)
     if (metadata?.total_content_size && typeof metadata.total_content_size === 'number' && metadata.total_content_size > 0) {
-      const bytes = metadata.total_content_size;
-      return formatBytes(bytes);
+      return formatBytes(metadata.total_content_size);
     }
     
-    // 2. Check for compressed size from metadata (individual pages)
-    if (metadata?.compressed_size && typeof metadata.compressed_size === 'number' && metadata.compressed_size > 0) {
-      const bytes = metadata.compressed_size;
-      return formatBytes(bytes);
-    }
-    
-    // 3. Check for file_size (processed content size)
+    // 2. Check for file_size (processed content size)
     if (metadata?.file_size && typeof metadata.file_size === 'number' && metadata.file_size > 0) {
-      const bytes = metadata.file_size;
+      return formatBytes(metadata.file_size);
+    }
+    
+    // 3. Check for compressed_size from metadata (individual pages)
+    if (metadata?.compressed_size && typeof metadata.compressed_size === 'number' && metadata.compressed_size > 0) {
+      return formatBytes(metadata.compressed_size);
+    }
+    
+    // 4. Fall back to content length if available
+    if (source.content && source.content.length > 0) {
+      const bytes = new TextEncoder().encode(source.content).length;
       return formatBytes(bytes);
     }
   }
 
-  // For all other source types, prioritize file_size (processed content size) from metadata
+  // For all other source types (text, file), prioritize file_size from metadata
   if (source.metadata) {
     const metadata = source.metadata as any;
     if (metadata.file_size && typeof metadata.file_size === 'number' && metadata.file_size > 0) {
-      const bytes = metadata.file_size;
-      return formatBytes(bytes);
+      return formatBytes(metadata.file_size);
     }
     
     // Check for compressed_size as fallback
     if (metadata.compressed_size && typeof metadata.compressed_size === 'number' && metadata.compressed_size > 0) {
-      const bytes = metadata.compressed_size;
-      return formatBytes(bytes);
+      return formatBytes(metadata.compressed_size);
     }
   }
 
-  // Only fall back to raw content length if no compressed/processed size is available and content exists
+  // Fall back to raw content length if no processed size is available and content exists
   if (source.content && source.content.length > 0) {
     const bytes = new TextEncoder().encode(source.content).length;
     return formatBytes(bytes);
