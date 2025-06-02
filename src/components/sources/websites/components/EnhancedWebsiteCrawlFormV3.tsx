@@ -11,7 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
 import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
-import { Globe, FileText, Map, AlertCircle } from 'lucide-react';
+import { Globe, FileText, Map } from 'lucide-react';
 
 interface EnhancedWebsiteCrawlFormV3Props {
   onCrawlStarted?: (parentSourceId: string) => void;
@@ -139,19 +139,6 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
     }
   };
 
-  const getInfrastructureStatus = () => {
-    if (infrastructureLoading) return '🔄 Checking...';
-    if (!infrastructureHealth) return '⚠️ Unknown';
-    
-    const isHealthy = infrastructureHealth.overall?.status === 'healthy';
-    return isHealthy ? '✅ Operational' : '⚠️ Degraded';
-  };
-
-  const getQueueInfo = () => {
-    if (!infrastructureHealth?.connectionPools) return 'Queue: Loading...';
-    return `Queue: ${infrastructureHealth.connectionPools.queuedRequests || 0} queued, ${infrastructureHealth.connectionPools.activeConnections || 0} active`;
-  };
-
   const getTabDescription = () => {
     switch (activeTab) {
       case 'website':
@@ -196,12 +183,8 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle>
           Enhanced Website Crawl V3
-          <div className="text-sm font-normal text-gray-600 flex items-center gap-2">
-            {infrastructureLoading && <AlertCircle className="h-4 w-4 animate-spin" />}
-            Infrastructure: {getInfrastructureStatus()} | {getQueueInfo()}
-          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
