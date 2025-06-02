@@ -104,7 +104,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
       case 'completed':
         return {
           icon: <CheckCircle size={14} className="mr-1" />,
-          text: isChild ? 'Completed' : `Completed (${realtimeData.linksCount} pages)`,
+          text: 'Completed',
           className: 'bg-green-100 text-green-800 border-green-200'
         };
       case 'failed':
@@ -143,6 +143,9 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
 
   const statusConfig = getStatusConfig(realtimeData.status);
 
+  // Show progress bar only for parent sources and only when not completed
+  const shouldShowProgressBar = !isChild && realtimeData.status !== 'completed';
+
   return (
     <div className="flex items-center gap-3">
       <Badge className={`${statusConfig.className} border flex-shrink-0`}>
@@ -150,8 +153,8 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
         {statusConfig.text}
       </Badge>
       
-      {/* Always show progress bar for parent sources */}
-      {!isChild && (
+      {/* Show progress bar for parent sources only when not completed */}
+      {shouldShowProgressBar && (
         <div className="w-20 bg-gray-200 rounded-full h-2 flex-shrink-0">
           <div 
             className={`h-2 rounded-full transition-all duration-300 ${getProgressBarColor()}`}
