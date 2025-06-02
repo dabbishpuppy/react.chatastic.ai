@@ -13,6 +13,12 @@ export const useAdvancedRAG = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState<QueryAnalysis | null>(null);
   const [conversationContext, setConversationContext] = useState<ConversationMemory | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Clear any previous errors
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   // Analyze and route query
   const analyzeQuery = useCallback(async (
@@ -21,6 +27,8 @@ export const useAdvancedRAG = () => {
     conversationId?: string
   ) => {
     setIsAnalyzing(true);
+    setError(null);
+    
     try {
       const analysis = await IntelligentRoutingService.analyzeAndRoute(
         query,
@@ -30,6 +38,8 @@ export const useAdvancedRAG = () => {
       setCurrentAnalysis(analysis);
       return analysis;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to analyze query';
+      setError(errorMessage);
       console.error('Failed to analyze query:', error);
       throw error;
     } finally {
@@ -43,6 +53,8 @@ export const useAdvancedRAG = () => {
     agentId: string,
     conversationId?: string
   ) => {
+    setError(null);
+    
     try {
       const expansion = await QueryExpansionService.expandQuery(
         query,
@@ -51,6 +63,8 @@ export const useAdvancedRAG = () => {
       );
       return expansion;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to expand query';
+      setError(errorMessage);
       console.error('Failed to expand query:', error);
       throw error;
     }
@@ -61,6 +75,8 @@ export const useAdvancedRAG = () => {
     conversationId: string,
     agentId: string
   ) => {
+    setError(null);
+    
     try {
       const context = await ConversationContextManager.getConversationContext(
         conversationId,
@@ -69,6 +85,8 @@ export const useAdvancedRAG = () => {
       setConversationContext(context);
       return context;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to get conversation context';
+      setError(errorMessage);
       console.error('Failed to get conversation context:', error);
       throw error;
     }
@@ -80,6 +98,8 @@ export const useAdvancedRAG = () => {
     userMessage: string,
     assistantResponse?: string
   ) => {
+    setError(null);
+    
     try {
       await ConversationContextManager.updateConversationContext(
         conversationId,
@@ -87,7 +107,7 @@ export const useAdvancedRAG = () => {
         assistantResponse
       );
       
-      // Refresh context
+      // Refresh context if we have one loaded
       if (conversationContext?.conversationId === conversationId) {
         const updated = await ConversationContextManager.getConversationContext(
           conversationId,
@@ -96,6 +116,8 @@ export const useAdvancedRAG = () => {
         setConversationContext(updated);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update conversation context';
+      setError(errorMessage);
       console.error('Failed to update conversation context:', error);
       throw error;
     }
@@ -108,6 +130,8 @@ export const useAdvancedRAG = () => {
     conversationId?: string
   ) => {
     setIsAnalyzing(true);
+    setError(null);
+    
     try {
       const analyses = await IntelligentRoutingService.batchAnalyzeQueries(
         queries,
@@ -116,6 +140,8 @@ export const useAdvancedRAG = () => {
       );
       return analyses;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to batch analyze queries';
+      setError(errorMessage);
       console.error('Failed to batch analyze queries:', error);
       throw error;
     } finally {
@@ -125,7 +151,12 @@ export const useAdvancedRAG = () => {
 
   // Get expansion strategies
   const getExpansionStrategies = useCallback(() => {
-    return QueryExpansionService.getExpansionStrategies();
+    try {
+      return QueryExpansionService.getExpansionStrategies();
+    } catch (error) {
+      console.warn('Failed to get expansion strategies:', error);
+      return {};
+    }
   }, []);
 
   // Update expansion strategy
@@ -133,17 +164,38 @@ export const useAdvancedRAG = () => {
     strategyName: string,
     updates: any
   ) => {
-    return QueryExpansionService.updateExpansionStrategy(strategyName, updates);
+    try {
+      return QueryExpansionService.updateExpansionStrategy(strategyName, updates);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update expansion strategy';
+      setError(errorMessage);
+      console.error('Failed to update expansion strategy:', error);
+      return false;
+    }
   }, []);
 
   // Get routing statistics
   const getRoutingStatistics = useCallback(() => {
-    return IntelligentRoutingService.getRoutingStatistics();
+    try {
+      return IntelligentRoutingService.getRoutingStatistics();
+    } catch (error) {
+      console.warn('Failed to get routing statistics:', error);
+      return {
+        totalQueries: 0,
+        routeDistribution: {},
+        averageConfidence: 0,
+        averageProcessingTime: 0
+      };
+    }
   }, []);
 
   // Clean up old conversations
   const cleanupOldConversations = useCallback(() => {
-    ConversationContextManager.cleanupOldConversations();
+    try {
+      ConversationContextManager.cleanupOldConversations();
+    } catch (error) {
+      console.warn('Failed to cleanup old conversations:', error);
+    }
   }, []);
 
   return {
@@ -151,6 +203,7 @@ export const useAdvancedRAG = () => {
     isAnalyzing,
     currentAnalysis,
     conversationContext,
+    error,
 
     // Actions
     analyzeQuery,
@@ -165,7 +218,8 @@ export const useAdvancedRAG = () => {
     getRoutingStatistics,
 
     // Maintenance
-    cleanupOldConversations
+    cleanupOldConversations,
+    clearError
   };
 };
 

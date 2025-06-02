@@ -7,6 +7,9 @@ export * from './testing';
 export * from './deployment';
 export { RAGOrchestrator } from './ragOrchestrator';
 
+// Export advanced RAG services
+export * from './advanced';
+
 // Export UI integration
 export { RAGChatIntegration } from './ui/ragChatIntegration';
 export type { ChatRAGOptions, ChatRAGResult } from './ui/ragChatIntegration';

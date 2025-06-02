@@ -17,11 +17,12 @@ export { ConversationMemoryManager } from './conversation/memoryManager';
 export { ConversationContextAnalyzer } from './conversation/contextAnalyzer';
 export { ConversationQueryEnhancer } from './conversation/queryEnhancer';
 
-// Export types
+// Export types - organized by module
 export type { 
   ConversationMemory, 
-  ContextualQuery 
-} from './conversationContextManager';
+  ContextualQuery,
+  ContextAnalysisConfig
+} from './conversation/types';
 
 export type { 
   ExpansionStrategy 
@@ -33,8 +34,3 @@ export type {
   QueryAnalysis,
   QueryExpansion
 } from './types';
-
-// Export conversation types
-export type {
-  ContextAnalysisConfig
-} from './conversation/types';
