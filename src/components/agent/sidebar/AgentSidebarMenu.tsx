@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -18,7 +17,8 @@ import {
   ChevronUp,
   LayoutDashboard,
   MessageSquare,
-  UserRound
+  UserRound,
+  Cog
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
 import SidebarSubmenuItem from "./SidebarSubmenuItem";
@@ -70,7 +70,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     }));
   }, [activeTab, location]);
 
-  // Main menu items - removed the chatbot-demo item
+  // Main menu items - added the management item
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "playground", label: "Playground", icon: <FileText size={18} /> },
@@ -109,6 +109,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
         { id: "integrations", label: "Integrations", path: "integrations", icon: <Bot size={14} /> }
       ]
     },
+    { id: "management", label: "Management", icon: <Cog size={18} /> },
     { 
       id: "settings", 
       label: "Settings", 
@@ -157,6 +158,8 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
       navigate(`/agent/${agentId}/actions`, { replace: true });
     } else if (tabId === "connect") {
       navigate(`/agent/${agentId}/integrations`, { replace: true });
+    } else if (tabId === "management") {
+      navigate(`/agent/${agentId}/management`, { replace: true });
     } else if (tabId === "settings") {
       navigate(`/agent/${agentId}/settings`, { replace: true });
     }

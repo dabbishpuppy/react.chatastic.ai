@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -19,6 +20,7 @@ import ActivityPage from '@/pages/ActivityPage';
 import LeadsPage from '@/pages/LeadsPage';
 import IntegrationsPage from '@/pages/IntegrationsPage';
 import AgentSettingsPage from '@/pages/AgentSettingsPage';
+import ManagementPage from '@/pages/ManagementPage';
 import Settings from '@/pages/Settings';
 import EmbeddedChat from '@/pages/EmbeddedChat';
 import NotFound from '@/pages/NotFound';
@@ -105,6 +107,12 @@ function App() {
               <Route path="/agent/:agentId/integrations" element={
                 <ProtectedRoute>
                   <IntegrationsPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/agent/:agentId/management" element={
+                <ProtectedRoute>
+                  <ManagementPage />
                 </ProtectedRoute>
               } />
               
