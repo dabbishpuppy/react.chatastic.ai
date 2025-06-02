@@ -72,8 +72,6 @@ export class RAGOrchestrationEnhanced {
             queryResult: {
               query: request.query,
               preprocessingResult: {
-                originalQuery: request.query,
-                confidence: 1.0,
                 context: { 
                   originalQuery: request.query,
                   normalizedQuery: request.query, 
@@ -81,7 +79,8 @@ export class RAGOrchestrationEnhanced {
                   intent: 'question',
                   agentId: request.agentId
                 },
-                searchQueries: [request.query]
+                searchQueries: [request.query],
+                confidence: 1.0
               },
               searchResults: [],
               rankedContext: {
@@ -96,10 +95,9 @@ export class RAGOrchestrationEnhanced {
                 relevanceScore: 0.8,
                 diversityScore: 0.5,
                 processingMetrics: {
-                  searchTime: 0,
-                  rankingTime: 0,
-                  filteringTime: 0,
-                  totalProcessingTime: 0
+                  originalChunks: 0,
+                  filteredChunks: 0,
+                  rankingTime: 0
                 }
               },
               processingTimeMs: 0
