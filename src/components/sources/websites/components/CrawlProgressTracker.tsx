@@ -54,10 +54,8 @@ const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
 
   const handleRetryFailed = async () => {
     try {
-      const retriedCount = await retryFailedJobs(parentSourceId);
-      if (retriedCount > 0) {
-        await loadJobs();
-      }
+      await retryFailedJobs(parentSourceId);
+      await loadJobs();
     } catch (error) {
       console.error('Failed to retry jobs:', error);
     }
@@ -89,10 +87,10 @@ const CrawlProgressTracker: React.FC<CrawlProgressTrackerProps> = ({
       <CardContent>
         <div className="space-y-4">
           <CrawlProgressStats
-            progress={crawlStatus.progress}
-            completedJobs={crawlStatus.completedJobs}
-            failedJobs={crawlStatus.failedJobs}
-            totalJobs={crawlStatus.totalJobs}
+            progress={crawlStatus.progress || 0}
+            completedJobs={crawlStatus.completedJobs || 0}
+            failedJobs={crawlStatus.failedJobs || 0}
+            totalJobs={crawlStatus.totalJobs || 0}
           />
 
           {crawlStatus.compressionStats && (
