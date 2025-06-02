@@ -118,7 +118,7 @@ const QASourceForm: React.FC = () => {
           <div>
             <div className="flex justify-between items-center mb-2">
               <Label htmlFor="answer">Answer</Label>
-              <RichTextByteCounter html={answer} />
+              <RichTextByteCounter html={answer} question={question} />
             </div>
             <RichTextEditor
               value={answer}
