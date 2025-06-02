@@ -54,13 +54,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     }
   };
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${Math.round(bytes / (1024 * 1024))} MB`;
-  };
-
   const getStatusText = () => {
     if (isChild) return null;
     
@@ -84,11 +77,22 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     source_type: 'website',
     metadata: {
       ...metadata,
-      total_content_size: totalCompressedSize > 0 ? totalCompressedSize : undefined,
+      // Use aggregated size from parent source metadata if available, otherwise calculate from sourcePages
+      total_content_size: metadata?.total_content_size || totalCompressedSize || undefined,
       compressed_size: metadata?.compressed_size,
       file_size: metadata?.file_size
     },
     content: content
+  };
+
+  const shouldShowSize = () => {
+    // For parent sources, show size if we have meaningful compressed content
+    if (!isChild) {
+      return (metadata?.total_content_size && metadata.total_content_size > 0) || 
+             (totalCompressedSize > 0);
+    }
+    // For child sources, show size if we have content
+    return content && content.length > 0;
   };
 
   return (
@@ -111,14 +115,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </>
           )}
           
-          {!isChild && totalCompressedSize > 0 && (
-            <>
-              <span>•</span>
-              <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
-            </>
-          )}
-          
-          {isChild && content && (
+          {shouldShowSize() && (
             <>
               <span>•</span>
               <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
