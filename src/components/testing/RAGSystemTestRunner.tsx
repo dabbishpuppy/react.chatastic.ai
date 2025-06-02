@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,6 +76,17 @@ export const RAGSystemTestRunner = () => {
     return summary.totalTests > 0 ? (summary.passed / summary.totalTests) * 100 : 0;
   };
 
+  // Collect all test results for display
+  const getAllTestResults = () => {
+    const allResults = [
+      ...testResults,
+      ...integrationTestResults,
+      ...serviceOrchestrationTestResults,
+      ...orchestrationTestResults
+    ];
+    return allResults;
+  };
+
   // Collect all failed tests from all test suites
   const getAllFailedTests = () => {
     const failedTests: Array<{testName: string, error?: string, duration: number, suite: string}> = [];
@@ -91,10 +103,15 @@ export const RAGSystemTestRunner = () => {
       failedTests.push({...test, suite: 'Orchestration Tests'})
     );
 
+    testResults.filter(t => !t.passed).forEach(test => 
+      failedTests.push({...test, suite: 'RAG Integration Tests'})
+    );
+
     return failedTests;
   };
 
   const failedTests = getAllFailedTests();
+  const allTestResults = getAllTestResults();
 
   return (
     <div className="space-y-6">
@@ -167,31 +184,13 @@ export const RAGSystemTestRunner = () => {
 
       {summary && <TestSummaryCard summary={summary} />}
 
-      {/* Show detailed test results with descriptions */}
-      {testResults.length > 0 && (
+      {/* Show detailed test results right after the summary */}
+      {allTestResults.length > 0 && (
         <DetailedTestResults 
-          title="RAG Integration Test Details" 
-          results={testResults} 
+          title="All Test Results" 
+          results={allTestResults} 
         />
       )}
-
-      <DetailedTestResults 
-        title="Integration Test Details" 
-        results={integrationTestResults} 
-      />
-
-      <DetailedTestResults 
-        title="Service Orchestration Test Details" 
-        results={serviceOrchestrationTestResults} 
-      />
-
-      <DetailedTestResults 
-        title="Orchestration Test Details" 
-        results={orchestrationTestResults} 
-      />
-
-      {/* Keep the failed tests panel for quick overview */}
-      <FailedTestsPanel failedTests={failedTests} />
 
       {validationResults && (
         <Card>
