@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
@@ -97,7 +96,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
 
   return (
     <div className="flex items-center">
-      <div className="w-3 h-3 rounded-full bg-blue-500 mr-3 flex-shrink-0"></div>
+      {/* Remove blue dot for child sources, keep for parent sources */}
+      {!isChild && <div className="w-3 h-3 rounded-full bg-blue-500 mr-3 flex-shrink-0"></div>}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <p className="text-sm font-medium text-gray-900 truncate" title={url}>
@@ -106,6 +106,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
         </div>
         
         <div className="flex items-center gap-1 text-xs text-gray-500">
+          {/* Use consistent date format for both parent and child sources */}
           <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
           
           {!isChild && displayLinksCount > 0 && (
