@@ -2,6 +2,7 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AgentSource } from '@/types/rag';
 import DeleteSourceDialog from './DeleteSourceDialog';
 import SourceTableRow from './components/SourceTableRow';
@@ -28,7 +29,6 @@ const SourcesList: React.FC<SourcesListProps> = ({
     handleDeleteClick,
     handleDeleteConfirm,
     handleRowClick,
-    handleNavigateClick
   } = useSourcesListLogic(sources, onSourceDeleted);
 
   if (loading) {
@@ -69,6 +69,13 @@ const SourcesList: React.FC<SourcesListProps> = ({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[50px]">
+                <Checkbox
+                  checked={false}
+                  onCheckedChange={() => {}}
+                  aria-label="Select all sources"
+                />
+              </TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Size</TableHead>
@@ -84,7 +91,7 @@ const SourcesList: React.FC<SourcesListProps> = ({
                 isSelected={false}
                 onSelect={() => {}}
                 onDelete={handleDeleteClick}
-                onView={() => handleRowClick(source)}
+                onView={handleRowClick}
               />
             ))}
           </TableBody>
