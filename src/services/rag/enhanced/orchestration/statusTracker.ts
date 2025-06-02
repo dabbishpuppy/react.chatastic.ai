@@ -10,6 +10,10 @@ export class StatusTracker extends ServiceManager {
     return this.getAllServices().filter(service => service.status === status);
   }
 
+  getServiceStatus(serviceName: string): ServiceStatus | null {
+    return this.getService(serviceName);
+  }
+
   getServiceUptime(serviceName: string): number {
     const service = this.getService(serviceName);
     return service ? service.uptime : 0;

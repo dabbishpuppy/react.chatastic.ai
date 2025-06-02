@@ -1,6 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { CompressionEngine } from "../enhanced/compression";
-import type { CompressionResult } from "../enhanced/compression";
 
 export class EnhancedPageProcessor {
   static async processPageContentAdvanced(
@@ -102,53 +102,31 @@ export class EnhancedPageProcessor {
       strategy: string;
     }
   ) {
-    const { error } = await supabase
-      .from('source_pages')
-      .update({
-        chunks_created: chunks.length,
-        original_content_size: metadata.originalSize,
-        compressed_size: metadata.compressedSize,
-        compression_ratio: metadata.compressionRatio,
-        duplicates_removed: metadata.duplicatesRemoved,
-        sentence_deduplication: metadata.sentenceDeduplication,
-        processing_mode: metadata.processingMode,
-        strategy: metadata.strategy
-      })
-      .eq('source_id', sourceId);
+    console.log('💾 Storing advanced chunks with metadata...');
+
+    const chunksToInsert = chunks.map((content, index) => ({
+      source_id: sourceId,
+      chunk_index: index,
+      content: content,
+      token_count: Math.ceil(content.length / 4), // Rough token estimation
+      metadata: {
+        url,
+        ...metadata,
+        chunkIndex: index
+      }
+    }));
+
+    const { data, error } = await supabase
+      .from('source_chunks')
+      .insert(chunksToInsert);
 
     if (error) {
-      console.error('Failed to update source page metadata:', error);
-      throw error;
+      console.error('❌ Failed to store chunks:', error);
+      throw new Error(`Failed to store chunks: ${error.message}`);
     }
 
-    // Store each chunk in the database
-    for (const chunk of chunks) {
-      const { error: chunkError } = await supabase
-        .from('source_chunks')
-        .insert([
-          {
-            source_id: sourceId,
-            agent_id: agentId,
-            team_id: teamId,
-            url: url,
-            content: chunk,
-            metadata: {
-              originalSize: metadata.originalSize,
-              compressedSize: metadata.compressedSize,
-              compressionRatio: metadata.compressionRatio,
-              duplicatesRemoved: metadata.duplicatesRemoved,
-              sentenceDeduplication: metadata.sentenceDeduplication,
-              processingMode: metadata.processingMode,
-              strategy: metadata.strategy
-            }
-          }
-        ]);
-
-      if (chunkError) {
-        console.error('Failed to store chunk:', chunkError);
-        throw chunkError;
-      }
-    }
+    console.log('✅ Successfully stored chunks with advanced metadata');
+    return data;
   }
 
   private static extractTextContent(htmlContent: string): string {
