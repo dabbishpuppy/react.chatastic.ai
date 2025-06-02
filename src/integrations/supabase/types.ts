@@ -2055,6 +2055,10 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: Json
       }
+      fix_existing_parent_sources: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_agent_source_stats: {
         Args: { target_agent_id: string }
         Returns: {

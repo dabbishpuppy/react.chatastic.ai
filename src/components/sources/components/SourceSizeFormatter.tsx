@@ -1,85 +1,84 @@
 
 import { AgentSource } from '@/types/rag';
 
-export const formatFileSize = (source: AgentSource) => {
-  // For Q&A sources, prioritize metadata file_size, then calculate from content
-  if (source.source_type === 'qa') {
-    // First check if metadata has file_size
-    if (source.metadata) {
-      const metadata = source.metadata as any;
-      if (metadata.file_size && typeof metadata.file_size === 'number' && metadata.file_size > 0) {
-        return formatBytes(metadata.file_size);
-      }
-    }
-    
-    // Calculate from content if available (content should be the answer only)
-    if (source.content && source.content.length > 0) {
-      // For Q&A sources, strip HTML to get plain text size of the answer
-      const stripHtml = (htmlString: string) => {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = htmlString;
-        return tmp.textContent || tmp.innerText || '';
-      };
-      
-      const plainText = stripHtml(source.content);
-      const bytes = new TextEncoder().encode(plainText).length;
-      return formatBytes(bytes);
-    }
-    
-    return '0 B';
-  }
+export const formatFileSize = (source: AgentSource): string => {
+  let sizeInBytes = 0;
 
-  // For website sources, prioritize aggregated and compressed content sizes
+  // Handle different source types with priority for aggregated data
   if (source.source_type === 'website') {
-    const metadata = source.metadata as any;
-    
-    // 1. Check for total_content_size from metadata (parent sources)
-    if (metadata?.total_content_size && typeof metadata.total_content_size === 'number' && metadata.total_content_size > 0) {
-      return formatBytes(metadata.total_content_size);
+    // For website sources, prioritize aggregated compressed size
+    if (source.compressed_content_size && source.compressed_content_size > 0) {
+      sizeInBytes = source.compressed_content_size;
+    } else if (source.compressed_size && source.compressed_size > 0) {
+      sizeInBytes = source.compressed_size;
+    } else if (source.total_content_size && source.total_content_size > 0) {
+      sizeInBytes = source.total_content_size;
+    } else if (source.original_size && source.original_size > 0) {
+      sizeInBytes = source.original_size;
+    } else if (source.content) {
+      sizeInBytes = source.content.length;
     }
-    
-    // 2. Check for file_size (processed content size)
-    if (metadata?.file_size && typeof metadata.file_size === 'number' && metadata.file_size > 0) {
-      return formatBytes(metadata.file_size);
-    }
-    
-    // 3. Check for compressed_size from metadata (individual pages)
-    if (metadata?.compressed_size && typeof metadata.compressed_size === 'number' && metadata.compressed_size > 0) {
-      return formatBytes(metadata.compressed_size);
-    }
-    
-    // 4. Fall back to content length if available
-    if (source.content && source.content.length > 0) {
-      const bytes = new TextEncoder().encode(source.content).length;
-      return formatBytes(bytes);
-    }
-  }
-
-  // For all other source types (text, file), prioritize file_size from metadata
-  if (source.metadata) {
-    const metadata = source.metadata as any;
-    if (metadata.file_size && typeof metadata.file_size === 'number' && metadata.file_size > 0) {
-      return formatBytes(metadata.file_size);
-    }
-    
-    // Check for compressed_size as fallback
-    if (metadata.compressed_size && typeof metadata.compressed_size === 'number' && metadata.compressed_size > 0) {
-      return formatBytes(metadata.compressed_size);
+  } else {
+    // For non-website sources, use file_size from metadata first
+    if (source.metadata?.file_size && source.metadata.file_size > 0) {
+      sizeInBytes = source.metadata.file_size;
+    } else if (source.original_size && source.original_size > 0) {
+      sizeInBytes = source.original_size;
+    } else if (source.content) {
+      sizeInBytes = source.content.length;
     }
   }
 
-  // Fall back to raw content length if no processed size is available and content exists
-  if (source.content && source.content.length > 0) {
-    const bytes = new TextEncoder().encode(source.content).length;
-    return formatBytes(bytes);
-  }
+  // Convert bytes to human readable format
+  if (sizeInBytes === 0) return "0 B";
   
-  return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(sizeInBytes) / Math.log(k));
+  
+  const size = sizeInBytes / Math.pow(k, i);
+  const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
+  
+  return `${formattedSize} ${sizes[i]}`;
 };
 
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
+export const getCompressionInfo = (source: AgentSource): { ratio: number; originalSize: number; compressedSize: number } | null => {
+  // Only show compression info for website sources that have compression data
+  if (source.source_type !== 'website') {
+    return null;
+  }
+
+  let originalSize = 0;
+  let compressedSize = 0;
+  let ratio = 0;
+
+  // Get original size (uncompressed)
+  if (source.total_content_size && source.total_content_size > 0) {
+    originalSize = source.total_content_size;
+  } else if (source.original_size && source.original_size > 0) {
+    originalSize = source.original_size;
+  }
+
+  // Get compressed size
+  if (source.compressed_content_size && source.compressed_content_size > 0) {
+    compressedSize = source.compressed_content_size;
+  } else if (source.compressed_size && source.compressed_size > 0) {
+    compressedSize = source.compressed_size;
+  }
+
+  // Calculate ratio
+  if (source.global_compression_ratio && source.global_compression_ratio > 0) {
+    ratio = source.global_compression_ratio;
+  } else if (source.compression_ratio && source.compression_ratio > 0) {
+    ratio = source.compression_ratio;
+  } else if (originalSize > 0 && compressedSize > 0) {
+    ratio = compressedSize / originalSize;
+  }
+
+  // Only return if we have meaningful data
+  if (originalSize > 0 && compressedSize > 0 && ratio > 0) {
+    return { ratio, originalSize, compressedSize };
+  }
+
+  return null;
 };
