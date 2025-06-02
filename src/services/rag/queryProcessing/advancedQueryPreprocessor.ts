@@ -1,262 +1,279 @@
-import { QueryContext, QueryPreprocessingResult } from './queryPreprocessor';
+
+import { QueryPreprocessor, QueryContext, QueryPreprocessingResult } from './queryPreprocessor';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ConversationContext {
-  conversationId: string;
-  recentMessages: Array<{
-    content: string;
-    isAgent: boolean;
+  previousQueries: string[];
+  conversationFlow: Array<{
+    query: string;
+    response: string;
     timestamp: string;
+    topics: string[];
   }>;
-  topics: string[];
-  entities: string[];
+  userPreferences: {
+    responseStyle: 'concise' | 'detailed' | 'technical';
+    preferredSources: string[];
+    excludedTopics: string[];
+  };
 }
 
 export interface AdvancedQueryAnalysis {
   intentConfidence: number;
-  complexity: 'simple' | 'moderate' | 'complex';
-  requiresContext: boolean;
+  topicCategories: string[];
+  urgencyLevel: 'low' | 'medium' | 'high';
+  complexityScore: number;
+  requiredContext: string[];
   suggestedFilters: {
-    sourceTypes?: string[];
-    timeRange?: { start: Date; end: Date };
-    topics?: string[];
+    sourceTypes: string[];
+    dateRange?: { start: Date; end: Date };
+    relevanceThreshold: number;
   };
-  conversationContext?: ConversationContext;
 }
 
-export class AdvancedQueryPreprocessor {
-  static async analyzeQuery(
+export class AdvancedQueryPreprocessor extends QueryPreprocessor {
+  static async preprocessQueryWithContext(
     query: string,
     agentId: string,
-    conversationId?: string
-  ): Promise<AdvancedQueryAnalysis> {
-    console.log('🧠 Performing advanced query analysis:', {
+    conversationId?: string,
+    conversationContext?: ConversationContext
+  ): Promise<QueryPreprocessingResult & { 
+    analysis: AdvancedQueryAnalysis;
+    conversationContext?: ConversationContext;
+  }> {
+    console.log('🔍 Advanced query preprocessing:', {
       query: query.substring(0, 50) + '...',
-      agentId,
-      conversationId
+      hasContext: !!conversationContext
     });
 
-    try {
-      // Analyze query complexity
-      const complexity = this.analyzeComplexity(query);
-      
-      // Determine if conversation context is needed
-      const requiresContext = this.requiresConversationContext(query);
-      
-      // Get conversation context if available
-      let conversationContext: ConversationContext | undefined;
-      if (conversationId && requiresContext) {
-        conversationContext = await this.getConversationContext(conversationId);
-      }
-      
-      // Suggest intelligent filters
-      const suggestedFilters = this.suggestFilters(query, conversationContext);
-      
-      // Calculate intent confidence
-      const intentConfidence = this.calculateIntentConfidence(query, conversationContext);
+    // Get basic preprocessing
+    const basicResult = await this.preprocessQuery(query, agentId, conversationId);
 
-      const analysis: AdvancedQueryAnalysis = {
-        intentConfidence,
-        complexity,
-        requiresContext,
-        suggestedFilters,
-        conversationContext
-      };
+    // Perform advanced analysis
+    const analysis = this.performAdvancedAnalysis(query, conversationContext);
 
-      console.log('✅ Advanced query analysis complete:', {
-        complexity,
-        intentConfidence,
-        requiresContext,
-        suggestedFilters: Object.keys(suggestedFilters)
-      });
+    // Enhance context with conversation history
+    const enhancedContext = await this.enhanceWithConversationContext(
+      basicResult.context,
+      conversationContext,
+      conversationId
+    );
 
-      return analysis;
-    } catch (error) {
-      console.error('❌ Advanced query analysis failed:', error);
-      // Return fallback analysis
-      return {
-        intentConfidence: 0.5,
-        complexity: 'moderate',
-        requiresContext: false,
-        suggestedFilters: {}
-      };
-    }
+    // Generate contextual search queries
+    const contextualQueries = this.generateContextualSearchQueries(
+      query,
+      basicResult.searchQueries,
+      analysis,
+      conversationContext
+    );
+
+    console.log('✅ Advanced preprocessing complete:', {
+      intentConfidence: analysis.intentConfidence,
+      complexityScore: analysis.complexityScore,
+      contextualQueries: contextualQueries.length
+    });
+
+    return {
+      ...basicResult,
+      context: enhancedContext,
+      searchQueries: contextualQueries,
+      analysis,
+      conversationContext
+    };
   }
 
-  private static analyzeComplexity(query: string): 'simple' | 'moderate' | 'complex' {
-    const words = query.split(' ').length;
-    const hasMultipleQuestions = (query.match(/\?/g) || []).length > 1;
-    const hasConjunctions = /\b(and|or|but|however|moreover|furthermore)\b/i.test(query);
+  private static performAdvancedAnalysis(
+    query: string,
+    conversationContext?: ConversationContext
+  ): AdvancedQueryAnalysis {
+    const words = query.toLowerCase().split(' ');
     
-    if (words > 20 || hasMultipleQuestions || hasConjunctions) {
-      return 'complex';
-    } else if (words > 8 || query.includes('?')) {
-      return 'moderate';
-    } else {
-      return 'simple';
-    }
-  }
-
-  private static requiresConversationContext(query: string): boolean {
-    const contextIndicators = [
-      'this', 'that', 'it', 'they', 'them', 'previous', 'before', 'earlier',
-      'above', 'mentioned', 'discussed', 'said', 'told', 'explain more',
-      'continue', 'expand', 'elaborate', 'follow up'
-    ];
+    // Detect intent confidence
+    const questionIndicators = ['what', 'how', 'why', 'when', 'where', 'who', 'which', 'can', 'is', 'are'];
+    const actionIndicators = ['create', 'make', 'build', 'show', 'help', 'find', 'explain'];
     
-    const queryLower = query.toLowerCase();
-    return contextIndicators.some(indicator => queryLower.includes(indicator));
+    const hasQuestionWords = words.some(word => questionIndicators.includes(word));
+    const hasActionWords = words.some(word => actionIndicators.includes(word));
+    const hasQuestionMark = query.includes('?');
+    
+    let intentConfidence = 0.5;
+    if (hasQuestionWords || hasQuestionMark) intentConfidence += 0.3;
+    if (hasActionWords) intentConfidence += 0.2;
+    if (query.length > 20) intentConfidence += 0.1;
+
+    // Detect topic categories
+    const topicCategories = this.detectTopicCategories(words);
+
+    // Assess urgency
+    const urgencyIndicators = ['urgent', 'immediately', 'asap', 'quickly', 'now', 'emergency'];
+    const urgencyLevel = words.some(word => urgencyIndicators.includes(word)) ? 'high' : 'medium';
+
+    // Calculate complexity
+    const complexityScore = Math.min(
+      0.3 + (words.length / 50) + (topicCategories.length / 10),
+      1.0
+    );
+
+    // Determine required context
+    const requiredContext = this.determineRequiredContext(words, conversationContext);
+
+    // Suggest filters
+    const suggestedFilters = {
+      sourceTypes: this.suggestSourceTypes(topicCategories),
+      relevanceThreshold: complexityScore > 0.7 ? 0.8 : 0.6
+    };
+
+    return {
+      intentConfidence,
+      topicCategories,
+      urgencyLevel,
+      complexityScore,
+      requiredContext,
+      suggestedFilters
+    };
   }
 
-  private static async getConversationContext(conversationId: string): Promise<ConversationContext> {
-    try {
-      // Use the correct table and column names from the database schema
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('content, is_agent, created_at')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false })
-        .limit(10);
+  private static detectTopicCategories(words: string[]): string[] {
+    const topicMap: Record<string, string[]> = {
+      'technical': ['api', 'code', 'programming', 'development', 'software', 'system'],
+      'business': ['sales', 'revenue', 'customer', 'marketing', 'strategy', 'growth'],
+      'support': ['help', 'issue', 'problem', 'error', 'bug', 'troubleshoot'],
+      'product': ['feature', 'functionality', 'product', 'service', 'offering'],
+      'data': ['analytics', 'report', 'metrics', 'data', 'statistics', 'numbers']
+    };
 
-      if (!messages) {
-        return {
-          conversationId,
-          recentMessages: [],
-          topics: [],
-          entities: []
-        };
+    const categories: string[] = [];
+    for (const [category, keywords] of Object.entries(topicMap)) {
+      if (keywords.some(keyword => words.includes(keyword))) {
+        categories.push(category);
       }
+    }
 
-      const recentMessages = messages.map(msg => ({
-        content: msg.content,
-        isAgent: msg.is_agent,
-        timestamp: msg.created_at
+    return categories.length > 0 ? categories : ['general'];
+  }
+
+  private static determineRequiredContext(
+    words: string[],
+    conversationContext?: ConversationContext
+  ): string[] {
+    const context: string[] = [];
+
+    // Check for references to previous conversation
+    const referenceWords = ['this', 'that', 'previous', 'earlier', 'above', 'before'];
+    if (referenceWords.some(word => words.includes(word))) {
+      context.push('conversation_history');
+    }
+
+    // Check for comparison requests
+    const comparisonWords = ['compare', 'difference', 'versus', 'vs', 'better', 'best'];
+    if (comparisonWords.some(word => words.includes(word))) {
+      context.push('comparative_data');
+    }
+
+    // Check for temporal references
+    const timeWords = ['recent', 'latest', 'current', 'today', 'yesterday', 'last'];
+    if (timeWords.some(word => words.includes(word))) {
+      context.push('temporal_data');
+    }
+
+    return context;
+  }
+
+  private static suggestSourceTypes(topicCategories: string[]): string[] {
+    const sourceTypeMap: Record<string, string[]> = {
+      'technical': ['documentation', 'api_docs', 'code_examples'],
+      'business': ['reports', 'presentations', 'case_studies'],
+      'support': ['faq', 'troubleshooting', 'user_guides'],
+      'product': ['product_docs', 'feature_specs', 'user_manuals'],
+      'data': ['analytics', 'reports', 'dashboards']
+    };
+
+    const suggestedTypes = new Set<string>();
+    for (const category of topicCategories) {
+      if (sourceTypeMap[category]) {
+        sourceTypeMap[category].forEach(type => suggestedTypes.add(type));
+      }
+    }
+
+    return suggestedTypes.size > 0 ? Array.from(suggestedTypes) : ['text', 'document'];
+  }
+
+  private static async enhanceWithConversationContext(
+    context: QueryContext,
+    conversationContext?: ConversationContext,
+    conversationId?: string
+  ): Promise<QueryContext> {
+    if (!conversationContext && conversationId) {
+      // Fetch conversation context from database
+      try {
+        const { data: messages } = await supabase
+          .from('conversation_messages')
+          .select('content, is_agent, created_at')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (messages) {
+          conversationContext = this.buildConversationContext(messages);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch conversation context:', error);
+      }
+    }
+
+    return {
+      ...context,
+      conversationHistory: conversationContext?.conversationFlow || [],
+      userPreferences: conversationContext?.userPreferences
+    };
+  }
+
+  private static buildConversationContext(messages: any[]): ConversationContext {
+    const conversationFlow = messages
+      .filter(msg => !msg.is_agent)
+      .slice(0, 5)
+      .map(msg => ({
+        query: msg.content,
+        response: '',
+        timestamp: msg.created_at,
+        topics: this.detectTopicCategories(msg.content.toLowerCase().split(' '))
       }));
 
-      // Extract topics and entities from recent messages
-      const topics = this.extractTopics(recentMessages);
-      const entities = this.extractEntities(recentMessages);
-
-      return {
-        conversationId,
-        recentMessages,
-        topics,
-        entities
-      };
-    } catch (error) {
-      console.error('❌ Failed to get conversation context:', error);
-      return {
-        conversationId,
-        recentMessages: [],
-        topics: [],
-        entities: []
-      };
-    }
-  }
-
-  private static extractTopics(messages: ConversationContext['recentMessages']): string[] {
-    // Simple topic extraction based on common patterns
-    const topicKeywords = new Set<string>();
-    
-    messages.forEach(msg => {
-      const words = msg.content.toLowerCase().split(/\s+/);
-      words.forEach(word => {
-        if (word.length > 4 && !this.isStopWord(word)) {
-          topicKeywords.add(word);
-        }
-      });
-    });
-
-    return Array.from(topicKeywords).slice(0, 10);
-  }
-
-  private static extractEntities(messages: ConversationContext['recentMessages']): string[] {
-    // Simple entity extraction (capitalized words, dates, numbers)
-    const entities = new Set<string>();
-    
-    messages.forEach(msg => {
-      // Extract capitalized words (potential proper nouns)
-      const capitalizedWords = msg.content.match(/\b[A-Z][a-z]+\b/g);
-      if (capitalizedWords) {
-        capitalizedWords.forEach(word => entities.add(word));
+    return {
+      previousQueries: conversationFlow.map(flow => flow.query),
+      conversationFlow,
+      userPreferences: {
+        responseStyle: 'detailed',
+        preferredSources: [],
+        excludedTopics: []
       }
-
-      // Extract dates
-      const dates = msg.content.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}-\d{2}\b/g);
-      if (dates) {
-        dates.forEach(date => entities.add(date));
-      }
-    });
-
-    return Array.from(entities).slice(0, 15);
+    };
   }
 
-  private static suggestFilters(
-    query: string,
+  private static generateContextualSearchQueries(
+    originalQuery: string,
+    basicQueries: string[],
+    analysis: AdvancedQueryAnalysis,
     conversationContext?: ConversationContext
-  ): AdvancedQueryAnalysis['suggestedFilters'] {
-    const filters: AdvancedQueryAnalysis['suggestedFilters'] = {};
+  ): string[] {
+    const queries = [...basicQueries];
 
-    // Suggest source types based on query content
-    const queryLower = query.toLowerCase();
-    if (queryLower.includes('document') || queryLower.includes('file') || queryLower.includes('pdf')) {
-      filters.sourceTypes = ['file'];
-    } else if (queryLower.includes('website') || queryLower.includes('page') || queryLower.includes('link')) {
-      filters.sourceTypes = ['website'];
-    } else if (queryLower.includes('question') || queryLower.includes('answer') || queryLower.includes('faq')) {
-      filters.sourceTypes = ['qa'];
+    // Add topic-specific queries
+    for (const topic of analysis.topicCategories) {
+      queries.push(`${originalQuery} ${topic}`);
     }
 
-    // Suggest time range based on temporal indicators
-    if (queryLower.includes('recent') || queryLower.includes('latest') || queryLower.includes('new')) {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      filters.timeRange = { start: thirtyDaysAgo, end: new Date() };
+    // Add context-aware queries if conversation history exists
+    if (conversationContext?.previousQueries.length) {
+      const recentQuery = conversationContext.previousQueries[0];
+      queries.push(`${recentQuery} ${originalQuery}`);
     }
 
-    // Use conversation context for topic suggestions
-    if (conversationContext?.topics && conversationContext.topics.length > 0) {
-      filters.topics = conversationContext.topics.slice(0, 5);
+    // Add complexity-based variations
+    if (analysis.complexityScore > 0.7) {
+      queries.push(`detailed explanation ${originalQuery}`);
+      queries.push(`comprehensive guide ${originalQuery}`);
     }
 
-    return filters;
-  }
-
-  private static calculateIntentConfidence(
-    query: string,
-    conversationContext?: ConversationContext
-  ): number {
-    let confidence = 0.5; // Base confidence
-
-    // Clear question format increases confidence
-    if (query.includes('?')) confidence += 0.2;
-    
-    // Specific keywords increase confidence
-    const specificKeywords = ['how', 'what', 'when', 'where', 'why', 'who', 'explain', 'describe'];
-    if (specificKeywords.some(keyword => query.toLowerCase().includes(keyword))) {
-      confidence += 0.15;
-    }
-
-    // Conversation context increases confidence
-    if (conversationContext && conversationContext.recentMessages.length > 0) {
-      confidence += 0.1;
-    }
-
-    // Query length affects confidence
-    const words = query.split(' ').length;
-    if (words >= 5 && words <= 15) {
-      confidence += 0.05;
-    }
-
-    return Math.min(confidence, 1.0);
-  }
-
-  private static isStopWord(word: string): boolean {
-    const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'have',
-      'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could'
-    ]);
-    return stopWords.has(word.toLowerCase());
+    return [...new Set(queries)]; // Remove duplicates
   }
 }

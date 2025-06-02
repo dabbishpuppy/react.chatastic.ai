@@ -1,23 +1,32 @@
+
 import { SemanticSearchResult } from './semanticSearch';
 import { QueryContext } from './queryPreprocessor';
-import { IntelligentContextFilter, FilteredContext } from './intelligentContextFilter';
-import { AdvancedQueryPreprocessor, AdvancedQueryAnalysis } from './advancedQueryPreprocessor';
 
 export interface RankingOptions {
-  maxTokens?: number;
   maxChunks?: number;
+  maxTokens?: number;
   diversityWeight?: number;
   recencyWeight?: number;
-  enableAdvancedFiltering?: boolean;
+  sourceAuthorityWeight?: number;
+  relevanceThreshold?: number;
+  preserveOrder?: boolean;
 }
 
-export interface RankedChunk extends SemanticSearchResult {
+export interface RankedChunk {
+  chunkId: string;
+  sourceId: string;
+  content: string;
+  relevanceScore: number;
+  diversityScore: number;
+  recencyScore: number;
+  authorityScore: number;
   finalScore: number;
-  rankingFactors: {
-    similarity: number;
-    recency: number;
-    diversity: number;
-    conversationRelevance: number;
+  metadata: {
+    sourceName: string;
+    sourceType: string;
+    chunkIndex: number;
+    tokenCount: number;
+    [key: string]: any;
   };
 }
 
@@ -26,18 +35,16 @@ export interface RankedContext {
   sources: Array<{
     sourceId: string;
     sourceName: string;
-    sourceType: string;
-    chunksUsed: number;
+    chunkCount: number;
+    averageRelevance: number;
   }>;
   totalTokens: number;
   relevanceScore: number;
   diversityScore: number;
-  metadata: {
-    originalResultsCount: number;
-    finalResultsCount: number;
-    averageConfidence: number;
-    processingTime: number;
-    advancedFilteringUsed: boolean;
+  processingMetrics: {
+    originalChunks: number;
+    filteredChunks: number;
+    rankingTime: number;
   };
 }
 
@@ -50,248 +57,333 @@ export class ContextRanker {
     const startTime = Date.now();
     
     console.log('🎯 Ranking and optimizing context:', {
-      resultsCount: searchResults.length,
-      queryType: queryContext.intent,
-      advancedFiltering: options.enableAdvancedFiltering !== false
+      totalResults: searchResults.length,
+      maxChunks: options.maxChunks || 10,
+      maxTokens: options.maxTokens || 4000
     });
+
+    // Set default options
+    const rankingOptions: Required<RankingOptions> = {
+      maxChunks: options.maxChunks || 10,
+      maxTokens: options.maxTokens || 4000,
+      diversityWeight: options.diversityWeight || 0.3,
+      recencyWeight: options.recencyWeight || 0.2,
+      sourceAuthorityWeight: options.sourceAuthorityWeight || 0.2,
+      relevanceThreshold: options.relevanceThreshold || 0.3,
+      preserveOrder: options.preserveOrder || false
+    };
 
     try {
-      let processedResults = searchResults;
-      let advancedAnalysis: AdvancedQueryAnalysis | undefined;
-      let filteredContext: FilteredContext | undefined;
-
-      // Use advanced filtering if enabled
-      if (options.enableAdvancedFiltering !== false) {
-        // Perform advanced query analysis
-        advancedAnalysis = await AdvancedQueryPreprocessor.analyzeQuery(
-          queryContext.originalQuery,
-          queryContext.agentId,
-          queryContext.conversationId
-        );
-
-        // Apply intelligent context filtering
-        filteredContext = await IntelligentContextFilter.filterAndOptimizeContext(
-          searchResults,
-          queryContext,
-          advancedAnalysis,
-          {
-            maxContextTokens: options.maxTokens,
-            diversityThreshold: options.diversityWeight || 0.3,
-            recencyWeight: options.recencyWeight || 0.2,
-            relevanceThreshold: 0.3
-          }
-        );
-
-        processedResults = filteredContext.chunks;
-      }
-
-      // Apply traditional ranking with enhancements
-      const rankedChunks = this.calculateFinalScores(
-        processedResults,
-        queryContext,
-        advancedAnalysis,
-        options
+      // Step 1: Filter by relevance threshold
+      const relevantResults = searchResults.filter(
+        result => result.similarity >= rankingOptions.relevanceThreshold
       );
 
-      // Apply final limits
-      const finalChunks = this.applyFinalLimits(rankedChunks, options);
+      if (relevantResults.length === 0) {
+        return this.createEmptyContext(searchResults.length, Date.now() - startTime);
+      }
 
-      // Calculate aggregate metrics
-      const sources = this.calculateSourceMetrics(finalChunks);
-      const totalTokens = this.calculateTotalTokens(finalChunks);
-      const relevanceScore = this.calculateRelevanceScore(finalChunks);
-      const diversityScore = filteredContext?.diversityScore || this.calculateDiversityScore(finalChunks);
+      // Step 2: Calculate comprehensive scores for each chunk
+      const scoredChunks = await this.calculateComprehensiveScores(
+        relevantResults,
+        queryContext,
+        rankingOptions
+      );
 
-      const processingTime = Date.now() - startTime;
+      // Step 3: Apply diversity filtering
+      const diversifiedChunks = this.applyDiversityFiltering(
+        scoredChunks,
+        rankingOptions.diversityWeight
+      );
 
-      const result: RankedContext = {
-        chunks: finalChunks,
-        sources,
-        totalTokens,
-        relevanceScore,
-        diversityScore,
-        metadata: {
-          originalResultsCount: searchResults.length,
-          finalResultsCount: finalChunks.length,
-          averageConfidence: advancedAnalysis?.intentConfidence || 0.5,
-          processingTime,
-          advancedFilteringUsed: options.enableAdvancedFiltering !== false
-        }
-      };
+      // Step 4: Optimize for token limits
+      const optimizedChunks = this.optimizeForTokenLimits(
+        diversifiedChunks,
+        rankingOptions.maxChunks,
+        rankingOptions.maxTokens
+      );
+
+      // Step 5: Generate final ranked context
+      const rankedContext = this.generateRankedContext(
+        optimizedChunks,
+        searchResults.length,
+        Date.now() - startTime
+      );
 
       console.log('✅ Context ranking complete:', {
-        finalChunks: finalChunks.length,
-        totalTokens,
-        relevanceScore: Math.round(relevanceScore * 100) / 100,
-        diversityScore: Math.round(diversityScore * 100) / 100,
-        processingTime
+        originalChunks: searchResults.length,
+        finalChunks: rankedContext.chunks.length,
+        totalTokens: rankedContext.totalTokens,
+        avgRelevance: rankedContext.relevanceScore,
+        processingTime: rankedContext.processingMetrics.rankingTime
       });
 
-      return result;
+      return rankedContext;
+
     } catch (error) {
       console.error('❌ Context ranking failed:', error);
-      throw error;
+      return this.createEmptyContext(searchResults.length, Date.now() - startTime);
     }
   }
 
-  private static calculateFinalScores(
+  private static async calculateComprehensiveScores(
     results: SemanticSearchResult[],
     queryContext: QueryContext,
-    advancedAnalysis?: AdvancedQueryAnalysis,
-    options: RankingOptions = {}
-  ): RankedChunk[] {
-    const now = new Date();
-    
-    return results.map(result => {
-      const rankingFactors = {
-        similarity: result.similarity,
-        recency: this.calculateRecencyScore(result.metadata.createdAt, now),
-        diversity: 1.0, // Will be calculated relative to other chunks
-        conversationRelevance: this.calculateConversationRelevance(
-          result,
-          advancedAnalysis?.conversationContext
-        )
-      };
+    options: Required<RankingOptions>
+  ): Promise<RankedChunk[]> {
+    const chunks: RankedChunk[] = [];
+
+    for (const result of results) {
+      // Calculate individual scores
+      const relevanceScore = result.similarity;
+      const diversityScore = this.calculateDiversityScore(result, results);
+      const recencyScore = this.calculateRecencyScore(result);
+      const authorityScore = this.calculateAuthorityScore(result);
 
       // Calculate weighted final score
-      const weights = {
-        similarity: 0.5,
-        recency: options.recencyWeight || 0.2,
-        diversity: options.diversityWeight || 0.2,
-        conversationRelevance: 0.1
-      };
+      const finalScore = this.calculateWeightedScore({
+        relevanceScore,
+        diversityScore,
+        recencyScore,
+        authorityScore
+      }, options);
 
-      const finalScore = 
-        rankingFactors.similarity * weights.similarity +
-        rankingFactors.recency * weights.recency +
-        rankingFactors.diversity * weights.diversity +
-        rankingFactors.conversationRelevance * weights.conversationRelevance;
-
-      return {
-        ...result,
+      chunks.push({
+        chunkId: result.chunkId,
+        sourceId: result.sourceId,
+        content: result.content,
+        relevanceScore,
+        diversityScore,
+        recencyScore,
+        authorityScore,
         finalScore,
-        rankingFactors
-      };
-    }).sort((a, b) => b.finalScore - a.finalScore);
-  }
-
-  private static calculateRecencyScore(createdAt: string, now: Date): number {
-    const chunkDate = new Date(createdAt);
-    const daysDiff = (now.getTime() - chunkDate.getTime()) / (1000 * 60 * 60 * 24);
-    
-    // Exponential decay: newer content gets higher scores
-    return Math.exp(-daysDiff / 30); // 30-day half-life
-  }
-
-  private static calculateConversationRelevance(
-    result: SemanticSearchResult,
-    conversationContext?: AdvancedQueryAnalysis['conversationContext']
-  ): number {
-    if (!conversationContext) return 0;
-
-    let relevance = 0;
-    const contentLower = result.content.toLowerCase();
-
-    // Check topic matches
-    conversationContext.topics.forEach(topic => {
-      if (contentLower.includes(topic.toLowerCase())) {
-        relevance += 0.3;
-      }
-    });
-
-    // Check entity matches
-    conversationContext.entities.forEach(entity => {
-      if (contentLower.includes(entity.toLowerCase())) {
-        relevance += 0.5;
-      }
-    });
-
-    return Math.min(relevance, 1.0);
-  }
-
-  private static applyFinalLimits(
-    rankedChunks: RankedChunk[],
-    options: RankingOptions
-  ): RankedChunk[] {
-    let finalChunks = rankedChunks;
-
-    // Apply chunk count limit
-    if (options.maxChunks && finalChunks.length > options.maxChunks) {
-      finalChunks = finalChunks.slice(0, options.maxChunks);
+        metadata: {
+          ...result.metadata,
+          tokenCount: this.estimateTokenCount(result.content)
+        }
+      });
     }
 
-    // Apply token limit
-    if (options.maxTokens) {
-      let currentTokens = 0;
-      const tokenLimitedChunks: RankedChunk[] = [];
+    return chunks.sort((a, b) => b.finalScore - a.finalScore);
+  }
 
-      for (const chunk of finalChunks) {
-        const chunkTokens = this.estimateTokens(chunk.content);
-        if (currentTokens + chunkTokens <= options.maxTokens) {
-          tokenLimitedChunks.push(chunk);
-          currentTokens += chunkTokens;
-        } else {
-          break;
+  private static calculateDiversityScore(
+    target: SemanticSearchResult,
+    allResults: SemanticSearchResult[]
+  ): number {
+    // Calculate how different this chunk is from others
+    const similarities = allResults
+      .filter(r => r.chunkId !== target.chunkId)
+      .map(r => this.calculateContentSimilarity(target.content, r.content));
+
+    if (similarities.length === 0) return 1.0;
+
+    const avgSimilarity = similarities.reduce((sum, sim) => sum + sim, 0) / similarities.length;
+    return 1.0 - avgSimilarity; // Higher diversity = lower similarity to others
+  }
+
+  private static calculateRecencyScore(result: SemanticSearchResult): number {
+    try {
+      const createdAt = new Date(result.metadata.createdAt);
+      const now = new Date();
+      const daysDiff = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      
+      // More recent content gets higher scores
+      return Math.max(0.1, 1.0 - (daysDiff / 365)); // Decay over a year
+    } catch {
+      return 0.5; // Default score if date parsing fails
+    }
+  }
+
+  private static calculateAuthorityScore(result: SemanticSearchResult): number {
+    // Calculate authority based on source type and metadata
+    const sourceTypeScores: Record<string, number> = {
+      'documentation': 0.9,
+      'official_guide': 0.8,
+      'faq': 0.7,
+      'blog_post': 0.6,
+      'user_content': 0.5,
+      'text': 0.6
+    };
+
+    const baseScore = sourceTypeScores[result.metadata.sourceType] || 0.5;
+    
+    // Boost score for longer, more detailed content
+    const contentLength = result.content.length;
+    const lengthBonus = Math.min(0.3, contentLength / 2000);
+    
+    return Math.min(1.0, baseScore + lengthBonus);
+  }
+
+  private static calculateWeightedScore(
+    scores: {
+      relevanceScore: number;
+      diversityScore: number;
+      recencyScore: number;
+      authorityScore: number;
+    },
+    options: Required<RankingOptions>
+  ): number {
+    const relevanceWeight = 1.0 - options.diversityWeight - options.recencyWeight - options.sourceAuthorityWeight;
+    
+    return (
+      scores.relevanceScore * relevanceWeight +
+      scores.diversityScore * options.diversityWeight +
+      scores.recencyScore * options.recencyWeight +
+      scores.authorityScore * options.sourceAuthorityWeight
+    );
+  }
+
+  private static applyDiversityFiltering(
+    chunks: RankedChunk[],
+    diversityWeight: number
+  ): RankedChunk[] {
+    if (diversityWeight === 0) return chunks;
+
+    const selected: RankedChunk[] = [];
+    const remaining = [...chunks];
+
+    // Always include the highest scoring chunk
+    if (remaining.length > 0) {
+      selected.push(remaining.shift()!);
+    }
+
+    // Select remaining chunks considering diversity
+    while (remaining.length > 0 && selected.length < chunks.length) {
+      let bestChunk = remaining[0];
+      let bestScore = -1;
+
+      for (const chunk of remaining) {
+        // Calculate diversity bonus against already selected chunks
+        const diversityBonus = this.calculateDiversityBonus(chunk, selected);
+        const adjustedScore = chunk.finalScore + (diversityBonus * diversityWeight);
+
+        if (adjustedScore > bestScore) {
+          bestScore = adjustedScore;
+          bestChunk = chunk;
         }
       }
 
-      finalChunks = tokenLimitedChunks;
+      selected.push(bestChunk);
+      remaining.splice(remaining.indexOf(bestChunk), 1);
     }
 
-    return finalChunks;
+    return selected;
   }
 
-  private static calculateSourceMetrics(chunks: RankedChunk[]): RankedContext['sources'] {
-    const sourceMap = new Map<string, { sourceName: string; sourceType: string; count: number }>();
+  private static calculateDiversityBonus(
+    candidate: RankedChunk,
+    selected: RankedChunk[]
+  ): number {
+    if (selected.length === 0) return 0;
 
-    chunks.forEach(chunk => {
-      const existing = sourceMap.get(chunk.sourceId);
-      if (existing) {
-        existing.count++;
-      } else {
-        sourceMap.set(chunk.sourceId, {
-          sourceName: chunk.metadata.sourceName,
-          sourceType: chunk.metadata.sourceType,
-          count: 1
+    const similarities = selected.map(chunk => 
+      this.calculateContentSimilarity(candidate.content, chunk.content)
+    );
+
+    const avgSimilarity = similarities.reduce((sum, sim) => sum + sim, 0) / similarities.length;
+    return 1.0 - avgSimilarity; // Higher bonus for more diverse content
+  }
+
+  private static optimizeForTokenLimits(
+    chunks: RankedChunk[],
+    maxChunks: number,
+    maxTokens: number
+  ): RankedChunk[] {
+    let totalTokens = 0;
+    const optimized: RankedChunk[] = [];
+
+    for (const chunk of chunks) {
+      if (optimized.length >= maxChunks) break;
+      
+      const chunkTokens = chunk.metadata.tokenCount;
+      if (totalTokens + chunkTokens <= maxTokens) {
+        optimized.push(chunk);
+        totalTokens += chunkTokens;
+      } else if (optimized.length === 0) {
+        // If first chunk exceeds limit, truncate it
+        const truncatedContent = this.truncateToTokenLimit(
+          chunk.content,
+          maxTokens
+        );
+        optimized.push({
+          ...chunk,
+          content: truncatedContent,
+          metadata: {
+            ...chunk.metadata,
+            tokenCount: maxTokens,
+            truncated: true
+          }
         });
-      }
-    });
-
-    return Array.from(sourceMap.entries()).map(([sourceId, data]) => ({
-      sourceId,
-      sourceName: data.sourceName,
-      sourceType: data.sourceType,
-      chunksUsed: data.count
-    }));
-  }
-
-  private static calculateTotalTokens(chunks: RankedChunk[]): number {
-    return chunks.reduce((total, chunk) => total + this.estimateTokens(chunk.content), 0);
-  }
-
-  private static calculateRelevanceScore(chunks: RankedChunk[]): number {
-    if (chunks.length === 0) return 0;
-    return chunks.reduce((sum, chunk) => sum + chunk.finalScore, 0) / chunks.length;
-  }
-
-  private static calculateDiversityScore(chunks: RankedChunk[]): number {
-    if (chunks.length <= 1) return 1.0;
-
-    let totalSimilarity = 0;
-    let comparisons = 0;
-
-    for (let i = 0; i < chunks.length; i++) {
-      for (let j = i + 1; j < chunks.length; j++) {
-        totalSimilarity += this.calculateContentSimilarity(chunks[i].content, chunks[j].content);
-        comparisons++;
+        break;
       }
     }
 
-    const averageSimilarity = totalSimilarity / comparisons;
-    return 1.0 - averageSimilarity;
+    return optimized;
+  }
+
+  private static generateRankedContext(
+    chunks: RankedChunk[],
+    originalCount: number,
+    processingTime: number
+  ): RankedContext {
+    // Group chunks by source
+    const sourceMap = new Map<string, RankedChunk[]>();
+    for (const chunk of chunks) {
+      if (!sourceMap.has(chunk.sourceId)) {
+        sourceMap.set(chunk.sourceId, []);
+      }
+      sourceMap.get(chunk.sourceId)!.push(chunk);
+    }
+
+    // Calculate source statistics
+    const sources = Array.from(sourceMap.entries()).map(([sourceId, sourceChunks]) => ({
+      sourceId,
+      sourceName: sourceChunks[0].metadata.sourceName,
+      chunkCount: sourceChunks.length,
+      averageRelevance: sourceChunks.reduce((sum, chunk) => sum + chunk.relevanceScore, 0) / sourceChunks.length
+    }));
+
+    // Calculate overall metrics
+    const totalTokens = chunks.reduce((sum, chunk) => sum + chunk.metadata.tokenCount, 0);
+    const relevanceScore = chunks.length > 0 
+      ? chunks.reduce((sum, chunk) => sum + chunk.relevanceScore, 0) / chunks.length 
+      : 0;
+    const diversityScore = chunks.length > 0
+      ? chunks.reduce((sum, chunk) => sum + chunk.diversityScore, 0) / chunks.length
+      : 0;
+
+    return {
+      chunks,
+      sources,
+      totalTokens,
+      relevanceScore,
+      diversityScore,
+      processingMetrics: {
+        originalChunks: originalCount,
+        filteredChunks: chunks.length,
+        rankingTime: processingTime
+      }
+    };
+  }
+
+  private static createEmptyContext(originalCount: number, processingTime: number): RankedContext {
+    return {
+      chunks: [],
+      sources: [],
+      totalTokens: 0,
+      relevanceScore: 0,
+      diversityScore: 0,
+      processingMetrics: {
+        originalChunks: originalCount,
+        filteredChunks: 0,
+        rankingTime: processingTime
+      }
+    };
   }
 
   private static calculateContentSimilarity(content1: string, content2: string): number {
+    // Simple word-based similarity calculation
     const words1 = new Set(content1.toLowerCase().split(/\s+/));
     const words2 = new Set(content2.toLowerCase().split(/\s+/));
     
@@ -301,7 +393,15 @@ export class ContextRanker {
     return intersection.size / union.size;
   }
 
-  private static estimateTokens(text: string): number {
+  private static estimateTokenCount(text: string): number {
+    // Rough estimation: ~4 characters per token
     return Math.ceil(text.length / 4);
+  }
+
+  private static truncateToTokenLimit(text: string, maxTokens: number): string {
+    const estimatedChars = maxTokens * 4;
+    if (text.length <= estimatedChars) return text;
+    
+    return text.substring(0, estimatedChars - 3) + '...';
   }
 }
