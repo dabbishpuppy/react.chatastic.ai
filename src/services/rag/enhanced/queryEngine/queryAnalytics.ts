@@ -35,6 +35,34 @@ export class QueryAnalytics {
     });
   }
 
+  static recordQueryExecution(queryId: string, metrics: {
+    processingTime: number;
+    optimizationLevel: string;
+    cacheHit: boolean;
+    resultQuality: number;
+    errorCount: number;
+  }): void {
+    const record: QueryAnalytics = {
+      queryId,
+      timestamp: new Date(),
+      ...metrics,
+    };
+
+    this.analytics.push(record);
+
+    // Keep only recent entries
+    if (this.analytics.length > this.MAX_ANALYTICS_ENTRIES) {
+      this.analytics = this.analytics.slice(-this.MAX_ANALYTICS_ENTRIES);
+    }
+
+    console.log('📊 Query execution recorded:', {
+      queryId: record.queryId,
+      processingTime: record.processingTime,
+      optimization: record.optimizationLevel,
+      quality: record.resultQuality
+    });
+  }
+
   static getAnalyticsSummary(timeframeHours: number = 24): {
     totalQueries: number;
     averageProcessingTime: number;

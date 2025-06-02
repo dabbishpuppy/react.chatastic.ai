@@ -26,18 +26,18 @@ export class RequestProcessor {
       agentId: request.agentId,
       conversationId: request.conversationId,
       searchFilters: {
-        maxResults: request.options?.searchOptions?.maxResults || 10,
-        minSimilarity: request.options?.searchOptions?.minSimilarity || 0.5,
-        sourceTypes: request.options?.searchOptions?.sourceTypes,
-        ...request.options?.searchOptions?.filters
+        maxResults: request.options?.searchFilters?.maxResults || 10,
+        minSimilarity: request.options?.searchFilters?.minSimilarity || 0.5,
+        sourceTypes: request.options?.searchFilters?.sourceTypes,
+        ...request.options?.searchFilters
       },
       rankingOptions: {
-        maxChunks: request.options?.contextOptions?.maxChunks || 8,
-        maxTokens: request.options?.contextOptions?.maxTokens || 4000,
-        diversityWeight: request.options?.contextOptions?.diversityWeight || 0.3,
-        recencyWeight: request.options?.contextOptions?.recencyWeight || 0.2,
-        sourceAuthorityWeight: request.options?.contextOptions?.authorityWeight || 0.2,
-        relevanceThreshold: request.options?.contextOptions?.relevanceThreshold || 0.3
+        maxChunks: request.options?.rankingOptions?.maxChunks || 8,
+        maxTokens: request.options?.rankingOptions?.maxTokens || 4000,
+        diversityWeight: request.options?.rankingOptions?.diversityWeight || 0.3,
+        recencyWeight: request.options?.rankingOptions?.recencyWeight || 0.2,
+        sourceAuthorityWeight: request.options?.rankingOptions?.recencyWeight || 0.2,
+        relevanceThreshold: 0.3
       }
     };
 
@@ -141,9 +141,9 @@ export class RequestProcessor {
   }
 
   private static validateRequestOptions(options: any, errors: string[]): void {
-    // Validate search options
-    if (options.searchOptions) {
-      const search = options.searchOptions;
+    // Validate search filters
+    if (options.searchFilters) {
+      const search = options.searchFilters;
       
       if (search.maxResults && (typeof search.maxResults !== 'number' || search.maxResults < 1 || search.maxResults > 50)) {
         errors.push('maxResults must be a number between 1 and 50');
@@ -154,15 +154,15 @@ export class RequestProcessor {
       }
     }
 
-    // Validate context options
-    if (options.contextOptions) {
-      const context = options.contextOptions;
+    // Validate ranking options
+    if (options.rankingOptions) {
+      const ranking = options.rankingOptions;
       
-      if (context.maxChunks && (typeof context.maxChunks !== 'number' || context.maxChunks < 1 || context.maxChunks > 20)) {
+      if (ranking.maxChunks && (typeof ranking.maxChunks !== 'number' || ranking.maxChunks < 1 || ranking.maxChunks > 20)) {
         errors.push('maxChunks must be a number between 1 and 20');
       }
       
-      if (context.maxTokens && (typeof context.maxTokens !== 'number' || context.maxTokens < 100 || context.maxTokens > 8000)) {
+      if (ranking.maxTokens && (typeof ranking.maxTokens !== 'number' || ranking.maxTokens < 100 || ranking.maxTokens > 8000)) {
         errors.push('maxTokens must be a number between 100 and 8000');
       }
     }
@@ -225,48 +225,48 @@ export class RequestProcessor {
       optimized.options = {};
     }
 
-    // Optimize search options based on complexity
-    if (!optimized.options.searchOptions) {
-      optimized.options.searchOptions = {};
+    // Optimize search filters based on complexity
+    if (!optimized.options.searchFilters) {
+      optimized.options.searchFilters = {};
     }
 
     if (complexity < 0.3) {
       // Simple query - reduce search scope for speed
-      optimized.options.searchOptions.maxResults = Math.min(
-        optimized.options.searchOptions.maxResults || 8,
+      optimized.options.searchFilters.maxResults = Math.min(
+        optimized.options.searchFilters.maxResults || 8,
         8
       );
     } else if (complexity > 0.7) {
       // Complex query - increase search scope for accuracy
-      optimized.options.searchOptions.maxResults = Math.max(
-        optimized.options.searchOptions.maxResults || 15,
+      optimized.options.searchFilters.maxResults = Math.max(
+        optimized.options.searchFilters.maxResults || 15,
         15
       );
     }
 
-    // Optimize context options
-    if (!optimized.options.contextOptions) {
-      optimized.options.contextOptions = {};
+    // Optimize ranking options
+    if (!optimized.options.rankingOptions) {
+      optimized.options.rankingOptions = {};
     }
 
     // Adjust token limits based on query length
     const queryLength = optimized.query.length;
     if (queryLength < 50) {
-      optimized.options.contextOptions.maxTokens = Math.min(
-        optimized.options.contextOptions.maxTokens || 3000,
+      optimized.options.rankingOptions.maxTokens = Math.min(
+        optimized.options.rankingOptions.maxTokens || 3000,
         3000
       );
     } else if (queryLength > 200) {
-      optimized.options.contextOptions.maxTokens = Math.max(
-        optimized.options.contextOptions.maxTokens || 4500,
+      optimized.options.rankingOptions.maxTokens = Math.max(
+        optimized.options.rankingOptions.maxTokens || 4500,
         4500
       );
     }
 
     console.log('✅ Request optimization complete:', {
       complexity,
-      maxResults: optimized.options.searchOptions.maxResults,
-      maxTokens: optimized.options.contextOptions.maxTokens
+      maxResults: optimized.options.searchFilters.maxResults,
+      maxTokens: optimized.options.rankingOptions.maxTokens
     });
 
     return optimized;
@@ -292,5 +292,37 @@ export class RequestProcessor {
     }
 
     return Math.min(1.0, complexity);
+  }
+
+  static setDefaultOptions(request: RAGRequest): RAGRequest {
+    const defaultRequest = { ...request };
+    
+    if (!defaultRequest.options) {
+      defaultRequest.options = {};
+    }
+
+    // Set default search filters
+    if (!defaultRequest.options.searchFilters) {
+      defaultRequest.options.searchFilters = {};
+    }
+    if (!defaultRequest.options.searchFilters.maxResults) {
+      defaultRequest.options.searchFilters.maxResults = 10;
+    }
+    if (!defaultRequest.options.searchFilters.minSimilarity) {
+      defaultRequest.options.searchFilters.minSimilarity = 0.5;
+    }
+
+    // Set default ranking options
+    if (!defaultRequest.options.rankingOptions) {
+      defaultRequest.options.rankingOptions = {};
+    }
+    if (!defaultRequest.options.rankingOptions.maxChunks) {
+      defaultRequest.options.rankingOptions.maxChunks = 8;
+    }
+    if (!defaultRequest.options.rankingOptions.maxTokens) {
+      defaultRequest.options.rankingOptions.maxTokens = 4000;
+    }
+
+    return defaultRequest;
   }
 }
