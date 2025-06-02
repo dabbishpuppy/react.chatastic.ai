@@ -16,7 +16,11 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  console.log(`📊 SourcesWidget render: tab=${currentTab}, stats=${JSON.stringify(stats)}`);
+  console.log(`📊 SourcesWidget render: tab=${currentTab}`, {
+    websiteStats: stats.sourcesByType.website,
+    totalBytes: stats.totalBytes,
+    allStats: stats
+  });
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {

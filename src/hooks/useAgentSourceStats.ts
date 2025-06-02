@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -73,11 +72,10 @@ export const useAgentSourceStats = () => {
           qa: { count: 0, size: 0 }
         };
         
-        console.log('📊 Enhanced size tracking:', {
+        console.log('📊 Website stats from RPC:', {
           websiteCount: sourcesByType.website?.count,
           websiteSize: sourcesByType.website?.size,
-          totalBytes: result.total_bytes,
-          allTypes: sourcesByType
+          totalBytes: result.total_bytes
         });
         
         setStats({
@@ -117,11 +115,11 @@ export const useAgentSourceStats = () => {
     fetchStats();
   }, [agentId]);
 
-  // Enhanced real-time subscriptions with immediate refresh and better error handling
+  // Enhanced real-time subscriptions for both agent_sources and source_pages
   useEffect(() => {
     if (!agentId) return;
 
-    console.log(`📡 Setting up comprehensive real-time subscriptions for agent: ${agentId}`);
+    console.log(`📡 Setting up real-time subscriptions for agent: ${agentId}`);
 
     const channel = supabase
       .channel(`agent-source-stats-enhanced-${agentId}`)
@@ -134,18 +132,13 @@ export const useAgentSourceStats = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          // Type-safe property access
-          const newRecord = payload.new as any;
-          const oldRecord = payload.old as any;
-          
           console.log('📡 Agent sources changed:', {
             event: payload.eventType,
-            sourceId: newRecord?.id || oldRecord?.id,
-            sourceType: newRecord?.source_type,
+            sourceId: (payload.new as any)?.id || (payload.old as any)?.id,
+            sourceType: (payload.new as any)?.source_type,
             timestamp: new Date().toISOString()
           });
-          // Immediate refresh for any agent_sources changes
-          setTimeout(fetchStats, 500); // Small delay to allow DB to settle
+          setTimeout(fetchStats, 500);
         }
       )
       .on(
@@ -156,23 +149,18 @@ export const useAgentSourceStats = () => {
           table: 'source_pages'
         },
         (payload) => {
-          // Type-safe property access
-          const newRecord = payload.new as any;
-          const oldRecord = payload.old as any;
-          
           console.log('📡 Source pages changed:', {
             event: payload.eventType,
-            pageId: newRecord?.id || oldRecord?.id,
-            parentSourceId: newRecord?.parent_source_id || oldRecord?.parent_source_id,
-            status: newRecord?.status,
-            contentSize: newRecord?.content_size,
+            pageId: (payload.new as any)?.id || (payload.old as any)?.id,
+            parentSourceId: (payload.new as any)?.parent_source_id || (payload.old as any)?.parent_source_id,
+            status: (payload.new as any)?.status,
+            contentSize: (payload.new as any)?.content_size,
             timestamp: new Date().toISOString()
           });
           
-          // Only refresh if this affects our agent
-          const parentSourceId = newRecord?.parent_source_id || oldRecord?.parent_source_id;
+          // Check if this affects our agent's sources
+          const parentSourceId = (payload.new as any)?.parent_source_id || (payload.old as any)?.parent_source_id;
           if (parentSourceId) {
-            // Check if this page belongs to our agent's sources
             supabase
               .from('agent_sources')
               .select('id')
@@ -188,44 +176,6 @@ export const useAgentSourceStats = () => {
           }
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'source_chunks'
-        },
-        (payload) => {
-          // Type-safe property access
-          const newRecord = payload.new as any;
-          const oldRecord = payload.old as any;
-          
-          console.log('📡 Source chunks changed:', {
-            event: payload.eventType,
-            chunkId: newRecord?.id || oldRecord?.id,
-            sourceId: newRecord?.source_id || oldRecord?.source_id,
-            timestamp: new Date().toISOString()
-          });
-          
-          // Chunks affect compression stats
-          const sourceId = newRecord?.source_id || oldRecord?.source_id;
-          if (sourceId) {
-            // Check if this chunk belongs to our agent's sources
-            supabase
-              .from('agent_sources')
-              .select('id')
-              .eq('id', sourceId)
-              .eq('agent_id', agentId)
-              .single()
-              .then(({ data }) => {
-                if (data) {
-                  console.log('📊 Refreshing stats due to chunk change');
-                  setTimeout(fetchStats, 1000); // Longer delay for chunk processing
-                }
-              });
-          }
-        }
-      )
       .subscribe((status) => {
         console.log('📡 Enhanced subscription status:', status);
         if (status === 'SUBSCRIBED') {
@@ -233,7 +183,6 @@ export const useAgentSourceStats = () => {
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Real-time subscription error, will retry...');
           setError('Real-time updates temporarily unavailable');
-          // Auto-retry after 10 seconds
           setTimeout(() => {
             console.log('🔄 Retrying real-time subscription...');
             setError(null);

@@ -24,7 +24,11 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   sourcesByType,
   currentTab
 }) => {
-  console.log('✅ SourcesWidget rendering with real-time content');
+  console.log('✅ SourcesWidget rendering with updated website stats:', {
+    websiteCount: sourcesByType.website.count,
+    websiteSize: sourcesByType.website.size,
+    totalBytes: Object.values(sourcesByType).reduce((sum, type) => sum + type.size, 0)
+  });
 
   const getSourceLabel = (count: number, type: string) => {
     switch (type) {
@@ -33,6 +37,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
       case 'text':
         return count === 1 ? '1 Text File' : `${count} Text Files`;
       case 'website':
+        // For website sources, show the child page count as "Links"
         return count === 1 ? '1 Link' : `${count} Links`;
       case 'qa':
         return count === 1 ? '1 Q&A' : `${count} Q&A`;
@@ -56,7 +61,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     }
   };
 
-  // Format bytes helper function with priority for compressed sizes
+  // Format bytes helper function
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
     
@@ -76,16 +81,11 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   const calculatedTotal = sourcesByType.text.size + sourcesByType.file.size + sourcesByType.website.size + sourcesByType.qa.size;
   const displayTotalSize = formatBytes(calculatedTotal);
 
-  console.log('📊 DETAILED Size calculation debug:', {
-    rawData: sourcesByType,
-    textSize: sourcesByType.text.size,
-    fileSize: sourcesByType.file.size,
+  console.log('📊 Size calculation:', {
     websiteSize: sourcesByType.website.size,
-    qaSize: sourcesByType.qa.size,
+    websiteSizeFormatted: formatBytes(sourcesByType.website.size),
     calculatedTotal,
-    displayTotalSize,
-    providedTotalSize: totalSize,
-    'PROVIDED_TOTAL_MATCHES_CALCULATED': totalSize === displayTotalSize
+    displayTotalSize
   });
 
   // Check if website sources have compressed data
@@ -118,7 +118,6 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               </div>
               <span className="text-sm font-semibold text-gray-900">
                 {formatBytes(sourcesByType[type].size)}
-                <span className="text-xs text-gray-500 ml-1">({sourcesByType[type].size} bytes)</span>
               </span>
             </div>
           ))}
@@ -138,9 +137,6 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           <div className="text-sm">
             <span className="font-bold text-gray-900">{displayTotalSize}</span>
             <span className="text-gray-600 ml-1">/ 33 MB</span>
-            <div className="text-xs text-gray-500">
-              Raw total: {calculatedTotal} bytes
-            </div>
           </div>
         </div>
 
