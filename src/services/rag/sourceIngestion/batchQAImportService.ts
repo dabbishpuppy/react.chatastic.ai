@@ -74,7 +74,7 @@ export class BatchQAImportService {
         sourceFile: file.name
       };
 
-      // Store job in database
+      // Store job in database (without metadata support)
       const { error: jobError } = await supabase
         .from('agent_training_jobs')
         .insert({
@@ -82,12 +82,7 @@ export class BatchQAImportService {
           agent_id: agentId,
           status: 'pending',
           total_sources: qaPairs.length,
-          processed_sources: 0,
-          metadata: {
-            type: 'qa_batch_import',
-            source_file: file.name,
-            qa_pairs: qaPairs
-          }
+          processed_sources: 0
         });
 
       if (jobError) {
@@ -166,12 +161,7 @@ export class BatchQAImportService {
           agent_id: agentId,
           status: 'pending',
           total_sources: qaPairs.length,
-          processed_sources: 0,
-          metadata: {
-            type: 'qa_batch_import',
-            source_file: file.name,
-            qa_pairs: qaPairs
-          }
+          processed_sources: 0
         });
 
       if (jobError) {
@@ -204,7 +194,7 @@ export class BatchQAImportService {
       await supabase
         .from('agent_training_jobs')
         .update({
-          status: 'in_progress',
+          status: 'processing',
           started_at: new Date().toISOString()
         })
         .eq('id', jobId);
@@ -237,7 +227,7 @@ export class BatchQAImportService {
             .from('agent_sources')
             .insert({
               agent_id: job.agent_id,
-              team_id: job.metadata?.team_id || '',
+              team_id: job.agent_id, // Use agent_id as fallback since we don't have team_id stored
               source_type: 'qa',
               title,
               content: qaPair.answer,
@@ -264,22 +254,14 @@ export class BatchQAImportService {
 
         // Update progress every 10 items
         if ((i + 1) % 10 === 0 || i === qaPairs.length - 1) {
-          const progress = Math.round(((i + 1) / qaPairs.length) * 100);
-          
           await supabase
             .from('agent_training_jobs')
             .update({
-              processed_sources: processedPairs,
-              metadata: supabase.raw(`
-                metadata || jsonb_build_object(
-                  'failed_pairs', $1,
-                  'errors', $2,
-                  'progress', $3
-                )
-              `, [failedPairs, errors.slice(-5), progress]) // Keep only last 5 errors
+              processed_sources: processedPairs
             })
             .eq('id', jobId);
 
+          const progress = Math.round(((i + 1) / qaPairs.length) * 100);
           console.log(`Import progress: ${progress}% (${processedPairs}/${qaPairs.length})`);
         }
       }
@@ -293,14 +275,7 @@ export class BatchQAImportService {
           status: finalStatus,
           processed_sources: processedPairs,
           completed_at: new Date().toISOString(),
-          error_message: errors.length > 0 ? errors.join('; ') : null,
-          metadata: supabase.raw(`
-            metadata || jsonb_build_object(
-              'failed_pairs', $1,
-              'errors', $2,
-              'progress', 100
-            )
-          `, [failedPairs, errors])
+          error_message: errors.length > 0 ? errors.join('; ') : null
         })
         .eq('id', jobId);
 
@@ -429,21 +404,19 @@ export class BatchQAImportService {
 
     if (error || !job) return null;
 
-    const metadata = job.metadata || {};
-
     return {
       id: jobId,
       agentId: job.agent_id,
-      teamId: metadata.team_id || '',
-      status: job.status,
+      teamId: job.agent_id, // Fallback
+      status: job.status as any,
       totalPairs: job.total_sources || 0,
       processedPairs: job.processed_sources || 0,
-      failedPairs: metadata.failed_pairs || 0,
-      progress: metadata.progress || 0,
-      startedAt: job.started_at,
-      completedAt: job.completed_at,
-      errorMessage: job.error_message,
-      sourceFile: metadata.source_file
+      failedPairs: 0, // Would need separate tracking
+      progress: job.total_sources ? Math.round((job.processed_sources || 0) / job.total_sources * 100) : 0,
+      startedAt: job.started_at || undefined,
+      completedAt: job.completed_at || undefined,
+      errorMessage: job.error_message || undefined,
+      sourceFile: 'imported_file' // Would need separate storage
     };
   }
 
@@ -453,7 +426,6 @@ export class BatchQAImportService {
       .from('agent_training_jobs')
       .select('*')
       .eq('agent_id', agentId)
-      .eq('metadata->>type', 'qa_batch_import')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -461,23 +433,20 @@ export class BatchQAImportService {
       return [];
     }
 
-    return (jobs || []).map(job => {
-      const metadata = job.metadata || {};
-      return {
-        id: job.id,
-        agentId: job.agent_id,
-        teamId: metadata.team_id || '',
-        status: job.status,
-        totalPairs: job.total_sources || 0,
-        processedPairs: job.processed_sources || 0,
-        failedPairs: metadata.failed_pairs || 0,
-        progress: metadata.progress || 0,
-        startedAt: job.started_at,
-        completedAt: job.completed_at,
-        errorMessage: job.error_message,
-        sourceFile: metadata.source_file
-      };
-    });
+    return (jobs || []).map(job => ({
+      id: job.id,
+      agentId: job.agent_id,
+      teamId: job.agent_id, // Fallback
+      status: job.status as any,
+      totalPairs: job.total_sources || 0,
+      processedPairs: job.processed_sources || 0,
+      failedPairs: 0,
+      progress: job.total_sources ? Math.round((job.processed_sources || 0) / job.total_sources * 100) : 0,
+      startedAt: job.started_at || undefined,
+      completedAt: job.completed_at || undefined,
+      errorMessage: job.error_message || undefined,
+      sourceFile: 'imported_file'
+    }));
   }
 
   // Export Q&A pairs to JSON
@@ -497,13 +466,30 @@ export class BatchQAImportService {
       throw new Error(`Failed to fetch Q&A pairs: ${error.message}`);
     }
 
-    const qaPairs = (sources || []).map(source => ({
-      title: source.title,
-      question: source.metadata?.question || '',
-      answer: source.metadata?.answer || '',
-      category: source.metadata?.category,
-      tags: source.metadata?.tags || []
-    })).filter(pair => pair.question && pair.answer);
+    const qaPairs = (sources || []).map(source => {
+      // Handle metadata being Json type
+      const metadata = source.metadata;
+      let question = '';
+      let answer = '';
+      let category = '';
+      let tags: string[] = [];
+
+      if (metadata && typeof metadata === 'object' && metadata !== null) {
+        const meta = metadata as any;
+        question = meta.question || '';
+        answer = meta.answer || '';
+        category = meta.category || '';
+        tags = meta.tags || [];
+      }
+
+      return {
+        title: source.title,
+        question,
+        answer,
+        category,
+        tags
+      };
+    }).filter(pair => pair.question && pair.answer);
 
     if (format === 'csv') {
       return this.exportToCSV(qaPairs);

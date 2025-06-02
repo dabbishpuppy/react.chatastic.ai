@@ -204,7 +204,12 @@ export class MultiLLMEmbeddingRouter {
       .eq('id', teamId)
       .single();
 
-    return team?.metadata?.embedding_provider || null;
+    // Handle metadata being Json type from Supabase
+    const metadata = team?.metadata;
+    if (metadata && typeof metadata === 'object' && metadata !== null) {
+      return (metadata as any).embedding_provider || null;
+    }
+    return null;
   }
 
   // Track embedding usage for billing and analytics
@@ -222,7 +227,7 @@ export class MultiLLMEmbeddingRouter {
         .from('crawl_performance_metrics')
         .insert({
           team_id: usage.teamId,
-          agent_id: usage.agentId,
+          agent_id: usage.agentId || '',
           phase: 'embedding_generation',
           start_time: new Date().toISOString(),
           duration_ms: usage.processingTime,
