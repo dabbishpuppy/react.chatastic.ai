@@ -69,14 +69,16 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   const calculatedTotal = sourcesByType.text.size + sourcesByType.file.size + sourcesByType.website.size + sourcesByType.qa.size;
   const displayTotalSize = formatBytes(calculatedTotal);
 
-  console.log('📊 Size calculation debug:', {
-    text: sourcesByType.text.size,
-    file: sourcesByType.file.size,
-    website: sourcesByType.website.size,
-    qa: sourcesByType.qa.size,
+  console.log('📊 DETAILED Size calculation debug:', {
+    rawData: sourcesByType,
+    textSize: sourcesByType.text.size,
+    fileSize: sourcesByType.file.size,
+    websiteSize: sourcesByType.website.size,
+    qaSize: sourcesByType.qa.size,
     calculatedTotal,
     displayTotalSize,
-    providedTotalSize: totalSize
+    providedTotalSize: totalSize,
+    'PROVIDED_TOTAL_MATCHES_CALCULATED': totalSize === displayTotalSize
   });
 
   return (
@@ -101,6 +103,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               </div>
               <span className="text-sm font-semibold text-gray-900">
                 {formatBytes(sourcesByType[type].size)}
+                <span className="text-xs text-gray-500 ml-1">({sourcesByType[type].size} bytes)</span>
               </span>
             </div>
           ))}
@@ -113,6 +116,10 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           <div className="text-sm">
             <span className="font-bold text-gray-900">{displayTotalSize}</span>
             <span className="text-gray-600 ml-1">/ 33 MB</span>
+            <div className="text-xs text-gray-500">
+              Calculated: {calculatedTotal} bytes<br/>
+              Provided: {totalSize}
+            </div>
           </div>
         </div>
 
