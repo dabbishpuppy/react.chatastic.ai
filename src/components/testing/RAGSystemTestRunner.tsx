@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { RAGSystemValidator } from '@/utils/ragSystemValidator';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import { FailedTestsPanel } from './FailedTestsPanel';
 import { TestSummaryCard } from './TestSummaryCard';
-import { TestResultsCard } from './TestResultsCard';
+import { DetailedTestResults } from './DetailedTestResults';
 
 export const RAGSystemTestRunner = () => {
   const {
@@ -168,6 +167,30 @@ export const RAGSystemTestRunner = () => {
 
       {summary && <TestSummaryCard summary={summary} />}
 
+      {/* Show detailed test results with descriptions */}
+      {testResults.length > 0 && (
+        <DetailedTestResults 
+          title="RAG Integration Test Details" 
+          results={testResults} 
+        />
+      )}
+
+      <DetailedTestResults 
+        title="Integration Test Details" 
+        results={integrationTestResults} 
+      />
+
+      <DetailedTestResults 
+        title="Service Orchestration Test Details" 
+        results={serviceOrchestrationTestResults} 
+      />
+
+      <DetailedTestResults 
+        title="Orchestration Test Details" 
+        results={orchestrationTestResults} 
+      />
+
+      {/* Keep the failed tests panel for quick overview */}
       <FailedTestsPanel failedTests={failedTests} />
 
       {validationResults && (
@@ -210,21 +233,6 @@ export const RAGSystemTestRunner = () => {
           </CardContent>
         </Card>
       )}
-
-      <TestResultsCard 
-        title="Integration Test Results" 
-        results={integrationTestResults} 
-      />
-
-      <TestResultsCard 
-        title="Service Orchestration Test Results" 
-        results={serviceOrchestrationTestResults} 
-      />
-
-      <TestResultsCard 
-        title="Orchestration Test Results" 
-        results={orchestrationTestResults} 
-      />
     </div>
   );
 };
