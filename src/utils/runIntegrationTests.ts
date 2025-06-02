@@ -20,18 +20,21 @@ export const runComprehensiveTests = async () => {
     console.log('🔗 Step 2: Integration tests...');
     const integrationResults = await integrationTests.runAllTests();
     const integrationSummary = integrationTests.getTestSummary();
+    const integrationSuccessRate = integrationSummary.totalTests > 0 ? (integrationSummary.passed / integrationSummary.totalTests) * 100 : 0;
     console.log('Integration tests:', { results: integrationResults, summary: integrationSummary });
 
     // 3. Service orchestration tests
     console.log('⚙️ Step 3: Service orchestration tests...');
     const serviceResults = await serviceOrchestrationTests.runAllTests();
     const serviceSummary = serviceOrchestrationTests.getTestSummary();
+    const serviceSuccessRate = serviceSummary.totalTests > 0 ? (serviceSummary.passed / serviceSummary.totalTests) * 100 : 0;
     console.log('Service orchestration tests:', { results: serviceResults, summary: serviceSummary });
 
     // 4. Core orchestration tests
     console.log('🎭 Step 4: Core orchestration tests...');
     const orchestrationResults = await orchestrationTests.runAllTests();
     const orchestrationSummary = orchestrationTests.getTestSummary();
+    const orchestrationSuccessRate = orchestrationSummary.totalTests > 0 ? (orchestrationSummary.passed / orchestrationSummary.totalTests) * 100 : 0;
     console.log('Core orchestration tests:', { results: orchestrationResults, summary: orchestrationSummary });
 
     // 5. RAG integration tests
@@ -51,9 +54,9 @@ export const runComprehensiveTests = async () => {
                        ragResults.summary.passed;
 
     const overallSuccess = systemValidation.success && 
-                          integrationSummary.successRate >= 80 &&
-                          serviceSummary.successRate >= 80 &&
-                          orchestrationSummary.successRate >= 80;
+                          integrationSuccessRate >= 80 &&
+                          serviceSuccessRate >= 80 &&
+                          orchestrationSuccessRate >= 80;
 
     console.log('🎯 FINAL RESULTS:', {
       systemValidation: systemValidation.success,
