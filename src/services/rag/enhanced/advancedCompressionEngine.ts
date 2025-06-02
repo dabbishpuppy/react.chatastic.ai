@@ -1,26 +1,28 @@
 
-import { ContentAnalysisService } from './services/contentAnalysisService';
-import { ContentCleaningService } from './services/contentCleaningService';
-import { CompressionService } from './services/compression/compressionService';
-import { DeduplicationService } from './services/deduplicationService';
-import { CompressionStatsService } from './services/compressionStatsService';
-
+// Re-export the modular compression engine for backward compatibility
+export { CompressionEngine as AdvancedCompressionEngine } from './compression';
 export type { CompressionResult, ContentAnalysis, DeduplicationResult, CompressionStats } from './types/compressionTypes';
 
-export class AdvancedCompressionEngine {
+// Legacy class that delegates to the new modular implementation
+import { CompressionEngine } from './compression';
+
+export class AdvancedCompressionEngineLegacy {
   // Re-export content analysis methods
-  static analyzeContent = ContentAnalysisService.analyzeContent;
-  static selectProcessingMode = ContentAnalysisService.selectProcessingMode;
+  static analyzeContent = CompressionEngine.analyzeContent;
+  static selectProcessingMode = CompressionEngine.selectProcessingMode;
   
   // Re-export content cleaning methods
-  static enhancedContentCleaning = ContentCleaningService.enhancedContentCleaning;
+  static enhancedContentCleaning = CompressionEngine.enhancedContentCleaning;
   
   // Re-export compression methods
-  static compressWithMaximumEfficiency = CompressionService.compressWithMaximumEfficiency;
+  static compressWithMaximumEfficiency = CompressionEngine.compressWithMaximumEfficiency;
   
   // Re-export deduplication methods
-  static performAdvancedDeduplication = DeduplicationService.performAdvancedDeduplication;
+  static performAdvancedDeduplication = CompressionEngine.performAdvancedDeduplication;
   
   // Re-export stats methods
-  static getCompressionStats = CompressionStatsService.getCompressionStats;
+  static getCompressionStats = CompressionEngine.getCompressionStats;
 }
+
+// Default export for backward compatibility
+export default AdvancedCompressionEngineLegacy;

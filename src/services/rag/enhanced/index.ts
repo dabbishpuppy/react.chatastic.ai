@@ -1,3 +1,4 @@
+
 // Enhanced RAG Services Phase 5: Production Completion
 export { SecurityService } from './securityService';
 export { LoadTestingService } from './loadTestingService';
@@ -25,16 +26,21 @@ export { ProductionWorkerQueue } from './productionWorkerQueue';
 // Phase 2: Worker Queue & Rate Limiting
 export { RateLimitingService } from './rateLimiting';
 export { WorkerQueueService } from './workerQueue';
-export { CrawlWorkerService } from './crawlWorker';
+
+// Modular Crawl Worker Services
+export { CrawlWorkerService, WorkerCore, ChunkProcessor } from './crawlWorker';
 
 // Phase 1: Core Enhanced Services
 export { EnhancedCrawlService } from './enhancedCrawlService';
-export { CompressionEngine } from './compressionEngine';
 export { ChunkPruningService } from './chunkPruning';
 export { AdvancedChunkPruningService } from './advancedChunkPruning';
 export { GlobalDeduplicationService } from './globalDeduplication';
 export { ContentProcessingPipeline } from './contentProcessingPipeline';
 export { EnhancedContentProcessor } from './enhancedContentProcessor';
+
+// Modular Compression Services
+export { CompressionEngine } from './compression';
+export { CompressionEngine as AdvancedCompressionEngine } from './advancedCompressionEngine';
 
 // API and Subscriptions
 export { CrawlApiService } from './crawlApi';
