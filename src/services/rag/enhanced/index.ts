@@ -1,4 +1,3 @@
-
 // Enhanced RAG Services Phase 5: Production Completion
 export { SecurityService } from './securityService';
 export { LoadTestingService } from './loadTestingService';
@@ -43,3 +42,9 @@ export { CrawlSubscriptionService } from './crawlSubscriptions';
 
 // Types
 export type { EnhancedCrawlRequest, CrawlStatus } from './crawlTypes';
+
+// Export orchestration components
+export * from './orchestration';
+
+// Export service orchestrator
+export { ServiceOrchestrator } from './serviceOrchestrator';

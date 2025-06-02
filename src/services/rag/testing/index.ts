@@ -7,3 +7,7 @@ export type { AdvancedRAGTestResult } from './advancedRAGTests';
 // Export orchestration tests
 export { OrchestrationTests, orchestrationTests } from './orchestrationTests';
 export type { OrchestrationTestResult } from './orchestrationTests';
+
+// Export service orchestration tests
+export { ServiceOrchestrationTests, serviceOrchestrationTests } from './serviceOrchestrationTests';
+export type { ServiceOrchestrationTestResult } from './serviceOrchestrationTests';

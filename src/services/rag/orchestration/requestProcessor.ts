@@ -1,5 +1,5 @@
 
-import { RAGRequest, RAGQueryRequest } from '../ragOrchestrator';
+import { RAGRequest } from '../ragOrchestrator';
 
 export class RequestProcessor {
   static validateRequest(request: RAGRequest): void {
@@ -38,7 +38,7 @@ export class RequestProcessor {
     }
   }
 
-  static prepareQueryRequest(request: RAGRequest): RAGQueryRequest {
+  static prepareQueryRequest(request: RAGRequest): any {
     return {
       query: request.query,
       agentId: request.agentId,
