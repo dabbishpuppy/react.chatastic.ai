@@ -125,7 +125,7 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             />
           </div>
           
-          {/* Show status and progress with real-time updates */}
+          {/* Show status and progress with real-time updates - always show progress bar for parent sources */}
           <div className="ml-4 flex-shrink-0">
             <WebsiteSourceStatus
               sourceId={source.id}

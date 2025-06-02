@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Loader2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -121,20 +122,40 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
     }
   };
 
+  const getProgressValue = () => {
+    const progressValue = realtimeData.progress || 0;
+    return Math.min(100, Math.max(0, progressValue));
+  };
+
+  const getProgressBarColor = () => {
+    const status = realtimeData.status;
+    switch (status) {
+      case 'in_progress':
+        return 'bg-blue-600';
+      case 'completed':
+        return 'bg-green-600';
+      case 'failed':
+        return 'bg-red-600';
+      default:
+        return 'bg-gray-300';
+    }
+  };
+
   const statusConfig = getStatusConfig(realtimeData.status);
 
   return (
-    <div className="flex items-center gap-2">
-      <Badge className={`${statusConfig.className} border`}>
+    <div className="flex items-center gap-3">
+      <Badge className={`${statusConfig.className} border flex-shrink-0`}>
         {statusConfig.icon}
         {statusConfig.text}
       </Badge>
       
-      {showProgressBar && realtimeData.status === 'in_progress' && realtimeData.progress && (
-        <div className="w-20 bg-gray-200 rounded-full h-2">
+      {/* Always show progress bar for parent sources */}
+      {!isChild && (
+        <div className="w-20 bg-gray-200 rounded-full h-2 flex-shrink-0">
           <div 
-            className="h-2 rounded-full transition-all duration-300 bg-blue-600"
-            style={{ width: `${Math.min(100, Math.max(0, realtimeData.progress))}%` }}
+            className={`h-2 rounded-full transition-all duration-300 ${getProgressBarColor()}`}
+            style={{ width: `${getProgressValue()}%` }}
           />
         </div>
       )}
