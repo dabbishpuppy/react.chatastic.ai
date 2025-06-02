@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { WorkerQueueService } from "./workerQueue";
 import { RateLimitingService } from "./rateLimiting";
@@ -32,6 +33,27 @@ export interface CrawlStatus {
 }
 
 export class EnhancedCrawlService {
+  // Start background processing of source pages
+  static async startSourcePageProcessing(): Promise<void> {
+    try {
+      console.log('🚀 Starting background source page processing...');
+      
+      const { data, error } = await supabase.functions.invoke('process-source-pages', {
+        body: {}
+      });
+
+      if (error) {
+        console.error('❌ Failed to start source page processing:', error);
+        throw new Error(`Processing failed: ${error.message}`);
+      }
+
+      console.log('✅ Source page processing started:', data);
+    } catch (error) {
+      console.error('❌ Error starting source page processing:', error);
+      throw error;
+    }
+  }
+
   // Initialize worker if not running
   static async ensureWorkerRunning(): Promise<void> {
     const status = CrawlWorkerService.getWorkerStatus();
@@ -210,10 +232,13 @@ export class EnhancedCrawlService {
         })
         .eq('id', parentSource.id);
 
-      // Ensure worker is running
-      await this.ensureWorkerRunning();
+      // Start background processing immediately after creating source pages
+      console.log('🚀 Starting immediate source page processing...');
+      this.startSourcePageProcessing().catch(error => {
+        console.error('Failed to start background processing:', error);
+      });
 
-      console.log(`✅ Enhanced crawl initiated: ${insertedCount} source pages created`);
+      console.log(`✅ Enhanced crawl initiated: ${insertedCount} source pages created and processing started`);
 
       return {
         parentSourceId: parentSource.id,

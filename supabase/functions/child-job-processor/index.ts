@@ -156,6 +156,9 @@ async function processPageWithRealPipeline(
     throw new Error('Content too short after cleaning');
   }
 
+  // Apply compression using the enhanced compression engine
+  const compressionResult = await compressWithZstd(cleanContent);
+  
   // Create semantic chunks with proper token counting
   const chunks = createSemanticChunks(cleanContent);
   console.log(`📝 Created ${chunks.length} semantic chunks from ${url}`);
@@ -171,16 +174,11 @@ async function processPageWithRealPipeline(
   // Calculate overall content hash
   const contentHash = await generateContentHash(cleanContent);
 
-  // Calculate compression ratio
-  const compressionRatio = result.totalCompressedSize > 0 
-    ? result.totalCompressedSize / originalSize 
-    : 0;
-
-  console.log(`✅ Real pipeline complete for ${url}: ${result.uniqueChunks + result.duplicateChunks} chunks, ${(compressionRatio * 100).toFixed(1)}% compression`);
+  console.log(`✅ Real pipeline complete for ${url}: ${result.uniqueChunks + result.duplicateChunks} chunks, ${(compressionResult.compressionRatio * 100).toFixed(1)}% compression`);
 
   return {
     contentSize: originalSize,
-    compressionRatio,
+    compressionRatio: compressionResult.compressionRatio,
     chunksCreated: result.uniqueChunks,
     duplicatesFound: result.duplicateChunks,
     contentHash

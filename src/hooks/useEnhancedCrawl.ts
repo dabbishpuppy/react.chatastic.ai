@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { EnhancedCrawlService } from '@/services/rag/enhanced/enhancedCrawlService';
 
 export interface EnhancedCrawlRequest {
   url: string;
@@ -31,49 +32,32 @@ export const useEnhancedCrawl = () => {
         throw new Error('Missing required fields: agentId and url are required');
       }
 
-      // Call the enhanced crawl edge function with better error handling
-      const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
-        body: {
-          agentId: request.agentId,
-          url: request.url,
-          crawlMode: request.crawlMode || 'full-website',
-          maxPages: request.maxPages || 50,
-          maxDepth: request.maxDepth || 3,
-          excludePaths: request.excludePaths || [],
-          includePaths: request.includePaths || [],
-          respectRobots: request.respectRobots !== false,
-          enableCompression: request.enableCompression !== false,
-          enableDeduplication: request.enableDeduplication !== false,
-          priority: request.priority || 'normal'
-        }
+      // Use the enhanced crawl service instead of direct edge function call
+      const result = await EnhancedCrawlService.initiateCrawl({
+        url: request.url,
+        agentId: request.agentId,
+        crawlMode: request.crawlMode || 'full-website',
+        maxPages: request.maxPages || 50,
+        excludePaths: request.excludePaths || [],
+        includePaths: request.includePaths || [],
+        respectRobots: request.respectRobots !== false,
+        enableCompression: request.enableCompression !== false,
+        enableDeduplication: request.enableDeduplication !== false,
+        priority: request.priority || 'normal'
       });
 
-      if (error) {
-        console.error('❌ Enhanced crawl API error:', error);
-        
-        // Handle specific error types
-        if (error.message?.includes('rate limit')) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else if (error.message?.includes('authentication')) {
-          throw new Error('Authentication failed. Please refresh the page and try again.');
-        } else if (error.message?.includes('No API key')) {
-          throw new Error('API authentication error. Please contact support if this persists.');
-        }
-        
-        throw new Error(`Crawl API error: ${error.message || 'Unknown error'}`);
-      }
-
-      if (!data || !data.success) {
-        console.error('❌ Enhanced crawl failed:', data);
-        throw new Error(data?.error || 'Enhanced crawl failed');
-      }
-
-      console.log('✅ Enhanced crawl initiated successfully:', data);
+      console.log('✅ Enhanced crawl initiated successfully:', result);
+      
+      // Show success message with compression info
+      toast({
+        title: "Crawl Started",
+        description: `Started processing ${result.totalJobs} pages with compression enabled. Content will be fetched and compressed automatically.`,
+      });
       
       return {
-        parentSourceId: data.parentSourceId,
-        totalJobs: data.totalJobs,
-        message: data.message
+        parentSourceId: result.parentSourceId,
+        totalJobs: result.totalJobs,
+        message: `Enhanced crawl with compression initiated for ${result.totalJobs} pages`
       };
 
     } catch (error: any) {
@@ -107,6 +91,27 @@ export const useEnhancedCrawl = () => {
     }
   };
 
+  // Add manual trigger for processing existing source pages
+  const triggerProcessing = async () => {
+    try {
+      console.log('🔄 Manually triggering source page processing...');
+      
+      await EnhancedCrawlService.startSourcePageProcessing();
+      
+      toast({
+        title: "Processing Started",
+        description: "Background processing of pending source pages has been triggered.",
+      });
+    } catch (error) {
+      console.error('❌ Failed to trigger processing:', error);
+      toast({
+        title: "Processing Failed",
+        description: "Failed to start background processing. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Add the missing properties that other components expect
   const isLoading = loading;
   
@@ -114,30 +119,23 @@ export const useEnhancedCrawl = () => {
     try {
       console.log('🔄 Retrying failed jobs for:', parentSourceId);
       
-      // Call edge function to retry failed jobs
-      const { data, error } = await supabase.functions.invoke('retry-failed-jobs', {
-        body: { parentSourceId }
-      });
+      // Use the enhanced service for retry
+      const retriedCount = await EnhancedCrawlService.retryFailedJobs(parentSourceId);
 
-      if (error) {
-        console.error('Failed to retry jobs:', error);
-        toast({
-          title: "Retry Failed",
-          description: "Failed to retry failed jobs. Please try again.",
-          variant: "destructive"
-        });
-        throw error;
-      }
-
-      console.log('✅ Successfully retried failed jobs:', data);
+      console.log('✅ Successfully retried failed jobs:', retriedCount);
       toast({
         title: "Jobs Retried",
-        description: `Successfully retried ${data?.retriedCount || 0} failed jobs.`,
+        description: `Successfully retried ${retriedCount} failed jobs.`,
       });
 
-      return data?.retriedCount || 0;
+      return retriedCount;
     } catch (error) {
       console.error('Error retrying failed jobs:', error);
+      toast({
+        title: "Retry Failed",
+        description: "Failed to retry failed jobs. Please try again.",
+        variant: "destructive"
+      });
       throw error;
     }
   };
@@ -173,6 +171,7 @@ export const useEnhancedCrawl = () => {
 
   return {
     initiateCrawl,
+    triggerProcessing,
     loading,
     isLoading,
     retryFailedJobs,

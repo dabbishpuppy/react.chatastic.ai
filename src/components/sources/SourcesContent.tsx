@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { File, FileText, Globe, HelpCircle } from 'lucide-react';
+import ProcessingTrigger from './ProcessingTrigger';
 
 interface SourcesContentProps {
   totalSources: number;
@@ -84,7 +84,10 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Sources</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Sources</CardTitle>
+          <ProcessingTrigger />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div role="list" className="space-y-3">
