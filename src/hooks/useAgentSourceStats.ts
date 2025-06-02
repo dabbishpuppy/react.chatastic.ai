@@ -52,10 +52,12 @@ export const useAgentSourceStats = () => {
 
       if (rpcError) throw rpcError;
 
-      console.log('📊 RPC response:', data);
+      console.log('📊 RPC RAW response:', data);
 
       if (data && data.length > 0) {
         const result = data[0] as RpcStatsResponse;
+        
+        console.log('📊 RPC processed result:', result);
         
         // Safely extract and validate the sources_by_type data
         const sourcesByType = result.sources_by_type || {
@@ -64,6 +66,12 @@ export const useAgentSourceStats = () => {
           website: { count: 0, size: 0 },
           qa: { count: 0, size: 0 }
         };
+        
+        console.log('📊 Website sources data from RPC:', {
+          websiteCount: sourcesByType.website?.count,
+          websiteSize: sourcesByType.website?.size,
+          totalBytes: result.total_bytes
+        });
         
         setStats({
           totalSources: result.total_sources || 0,
@@ -76,6 +84,7 @@ export const useAgentSourceStats = () => {
           }
         });
       } else {
+        console.log('📊 No data returned from RPC');
         // Fallback to empty stats
         setStats({
           totalSources: 0,

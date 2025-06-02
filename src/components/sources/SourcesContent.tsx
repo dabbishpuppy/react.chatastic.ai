@@ -57,12 +57,18 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     }
   };
 
-  // Format bytes helper function
+  // Format bytes helper function with priority for compressed sizes
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-    return `${Math.round(bytes / (1024 * 1024))} MB`;
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    const size = bytes / Math.pow(k, i);
+    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
+    
+    return `${formattedSize} ${sizes[i]}`;
   };
 
   const sourceTypes = ['file', 'text', 'website', 'qa'] as const;
@@ -82,6 +88,9 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     providedTotalSize: totalSize,
     'PROVIDED_TOTAL_MATCHES_CALCULATED': totalSize === displayTotalSize
   });
+
+  // Check if website sources have compressed data
+  const websiteHasCompressedData = sourcesByType.website.size > 0;
 
   return (
     <Card>
@@ -124,7 +133,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-gray-900">Total size:</span>
-            {sourcesByType.website.size > 0 && (
+            {websiteHasCompressedData && (
               <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
                 Optimized
               </Badge>
@@ -134,8 +143,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
             <span className="font-bold text-gray-900">{displayTotalSize}</span>
             <span className="text-gray-600 ml-1">/ 33 MB</span>
             <div className="text-xs text-gray-500">
-              Calculated: {calculatedTotal} bytes<br/>
-              Provided: {totalSize}
+              Raw total: {calculatedTotal} bytes
             </div>
           </div>
         </div>
