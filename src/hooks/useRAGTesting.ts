@@ -5,12 +5,14 @@ import {
   orchestrationTests,
   serviceOrchestrationTests,
   integrationTests,
+  enhancedQueryEngineTests,
   type TestResult, 
   type PerformanceBenchmark,
   type AdvancedRAGTestResult,
   type OrchestrationTestResult,
   type ServiceOrchestrationTestResult,
-  type IntegrationTestResult
+  type IntegrationTestResult,
+  type EnhancedQueryEngineTestResult
 } from '@/services/rag/testing';
 
 export const useRAGTesting = () => {
@@ -20,6 +22,7 @@ export const useRAGTesting = () => {
   const [orchestrationTestResults, setOrchestrationTestResults] = useState<OrchestrationTestResult[]>([]);
   const [serviceOrchestrationTestResults, setServiceOrchestrationTestResults] = useState<ServiceOrchestrationTestResult[]>([]);
   const [integrationTestResults, setIntegrationTestResults] = useState<IntegrationTestResult[]>([]);
+  const [enhancedQueryEngineTestResults, setEnhancedQueryEngineTestResults] = useState<EnhancedQueryEngineTestResult[]>([]);
   const [benchmarks, setBenchmarks] = useState<PerformanceBenchmark[]>([]);
   const [summary, setSummary] = useState<{
     totalTests: number;
@@ -121,7 +124,26 @@ export const useRAGTesting = () => {
     }
   }, []);
 
-  // Run all tests (integration + advanced + orchestration + service orchestration + integration)
+  // Run enhanced query engine tests
+  const runEnhancedQueryEngineTests = useCallback(async () => {
+    setIsRunning(true);
+    try {
+      const results = await enhancedQueryEngineTests.runAllTests();
+      setEnhancedQueryEngineTestResults(results);
+      
+      const summary = enhancedQueryEngineTests.getTestSummary();
+      setSummary(summary);
+      
+      return results;
+    } catch (error) {
+      console.error('Failed to run enhanced query engine tests:', error);
+      throw error;
+    } finally {
+      setIsRunning(false);
+    }
+  }, []);
+
+  // Run all tests (updated to include enhanced query engine tests)
   const runAllTests = useCallback(async () => {
     setIsRunning(true);
     try {
@@ -130,46 +152,47 @@ export const useRAGTesting = () => {
         advancedResults, 
         orchestrationResults, 
         serviceOrchestrationResults,
-        fullIntegrationResults
+        fullIntegrationResults,
+        enhancedQueryEngineResults
       ] = await Promise.all([
         ragIntegrationTests.runAllTests(),
         advancedRAGTests.runAllTests(),
         orchestrationTests.runAllTests(),
         serviceOrchestrationTests.runAllTests(),
-        integrationTests.runAllTests()
+        integrationTests.runAllTests(),
+        enhancedQueryEngineTests.runAllTests()
       ]);
 
-      setTestResults(integrationResults.results);
-      setBenchmarks(integrationResults.benchmarks);
-      setAdvancedTestResults(advancedResults);
-      setOrchestrationTestResults(orchestrationResults);
-      setServiceOrchestrationTestResults(serviceOrchestrationResults);
-      setIntegrationTestResults(fullIntegrationResults);
+      setEnhancedQueryEngineTestResults(enhancedQueryEngineResults);
 
-      // Combine summaries
+      // Combine summaries (updated)
       const combinedSummary = {
         totalTests: integrationResults.summary.totalTests + 
                    advancedResults.length + 
                    orchestrationResults.length + 
                    serviceOrchestrationResults.length +
-                   fullIntegrationResults.length,
+                   fullIntegrationResults.length +
+                   enhancedQueryEngineResults.length,
         passed: integrationResults.summary.passed + 
                advancedResults.filter(r => r.passed).length + 
                orchestrationResults.filter(r => r.passed).length + 
                serviceOrchestrationResults.filter(r => r.passed).length +
-               fullIntegrationResults.filter(r => r.passed).length,
+               fullIntegrationResults.filter(r => r.passed).length +
+               enhancedQueryEngineResults.filter(r => r.passed).length,
         failed: integrationResults.summary.failed + 
                advancedResults.filter(r => !r.passed).length + 
                orchestrationResults.filter(r => !r.passed).length + 
                serviceOrchestrationResults.filter(r => !r.passed).length +
-               fullIntegrationResults.filter(r => !r.passed).length,
+               fullIntegrationResults.filter(r => !r.passed).length +
+               enhancedQueryEngineResults.filter(r => !r.passed).length,
         averageDuration: [
           integrationResults.summary.averageDuration,
           advancedResults.reduce((sum, r) => sum + r.duration, 0) / (advancedResults.length || 1),
           orchestrationResults.reduce((sum, r) => sum + r.duration, 0) / (orchestrationResults.length || 1),
           serviceOrchestrationResults.reduce((sum, r) => sum + r.duration, 0) / (serviceOrchestrationResults.length || 1),
-          fullIntegrationResults.reduce((sum, r) => sum + r.duration, 0) / (fullIntegrationResults.length || 1)
-        ].reduce((sum, avg) => sum + avg, 0) / 5
+          fullIntegrationResults.reduce((sum, r) => sum + r.duration, 0) / (fullIntegrationResults.length || 1),
+          enhancedQueryEngineResults.reduce((sum, r) => sum + r.duration, 0) / (enhancedQueryEngineResults.length || 1)
+        ].reduce((sum, avg) => sum + avg, 0) / 6
       };
       
       setSummary(combinedSummary);
@@ -180,6 +203,7 @@ export const useRAGTesting = () => {
         orchestration: orchestrationResults,
         serviceOrchestration: serviceOrchestrationResults,
         fullIntegration: fullIntegrationResults,
+        enhancedQueryEngine: enhancedQueryEngineResults,
         summary: combinedSummary
       };
     } catch (error) {
@@ -190,13 +214,14 @@ export const useRAGTesting = () => {
     }
   }, []);
 
-  // Get detailed report
+  // Get detailed report (updated)
   const getDetailedReport = useCallback(() => {
     const integrationReport = ragIntegrationTests.generateDetailedReport();
     const advancedSummary = advancedRAGTests.getTestSummary();
     const orchestrationSummary = orchestrationTests.getTestSummary();
     const serviceOrchestrationSummary = serviceOrchestrationTests.getTestSummary();
     const integrationSummary = integrationTests.getTestSummary();
+    const enhancedQueryEngineSummary = enhancedQueryEngineTests.getTestSummary();
     
     return {
       ...integrationReport,
@@ -204,41 +229,46 @@ export const useRAGTesting = () => {
       orchestrationTestResults,
       serviceOrchestrationTestResults,
       integrationTestResults,
+      enhancedQueryEngineTestResults,
       advancedSummary,
       orchestrationSummary,
       serviceOrchestrationSummary,
-      integrationSummary
+      integrationSummary,
+      enhancedQueryEngineSummary
     };
-  }, [advancedTestResults, orchestrationTestResults, serviceOrchestrationTestResults, integrationTestResults]);
+  }, [advancedTestResults, orchestrationTestResults, serviceOrchestrationTestResults, integrationTestResults, enhancedQueryEngineTestResults]);
 
-  // Clear test results
+  // Clear test results (updated)
   const clearResults = useCallback(() => {
     setTestResults([]);
     setAdvancedTestResults([]);
     setOrchestrationTestResults([]);
     setServiceOrchestrationTestResults([]);
     setIntegrationTestResults([]);
+    setEnhancedQueryEngineTestResults([]);
     setBenchmarks([]);
     setSummary(null);
   }, []);
 
   return {
-    // State
+    // State (updated)
     isRunning,
     testResults,
     advancedTestResults,
     orchestrationTestResults,
     serviceOrchestrationTestResults,
     integrationTestResults,
+    enhancedQueryEngineTestResults,
     benchmarks,
     summary,
 
-    // Actions
+    // Actions (updated)
     runTests: runTests,
     runAdvancedTests: runAdvancedTests,
     runOrchestrationTests: runOrchestrationTests,
     runServiceOrchestrationTests: runServiceOrchestrationTests,
     runIntegrationTests,
+    runEnhancedQueryEngineTests,
     runAllTests,
     getDetailedReport,
     clearResults

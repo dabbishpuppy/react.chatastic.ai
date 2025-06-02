@@ -1,4 +1,3 @@
-
 // Export testing utilities
 export { RAGIntegrationTests, ragIntegrationTests } from './ragIntegrationTests';
 export { AdvancedRAGTests, advancedRAGTests } from './advancedRAGTests';
@@ -16,3 +15,7 @@ export type { ServiceOrchestrationTestResult } from './serviceOrchestrationTests
 // Export integration tests
 export { IntegrationTests, integrationTests } from './integrationTests';
 export type { IntegrationTestResult } from './integrationTests';
+
+// Enhanced Query Engine Tests
+export { EnhancedQueryEngineTests, enhancedQueryEngineTests } from './enhancedQueryEngineTests';
+export type { EnhancedQueryEngineTestResult } from './enhancedQueryEngineTests';

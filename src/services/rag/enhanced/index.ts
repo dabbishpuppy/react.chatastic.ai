@@ -48,3 +48,25 @@ export * from './orchestration';
 
 // Export service orchestrator
 export { ServiceOrchestrator } from './serviceOrchestrator';
+
+// Enhanced Query Engine exports
+export {
+  EnhancedQueryProcessor,
+  StreamingProcessor,
+  OptimizationEngine,
+  QueryAnalytics,
+  RAGQueryEngineEnhanced,
+  type EnhancedQueryRequest,
+  type EnhancedQueryResult,
+  type StreamingProgressCallback
+} from './ragQueryEngineEnhanced';
+
+// Enhanced Orchestration exports
+export {
+  ServiceLifecycle,
+  HealthMonitor,
+  ConfigurationManager,
+  StatusTracker,
+  type ServiceStatus,
+  type OrchestrationConfig
+} from './orchestration';
