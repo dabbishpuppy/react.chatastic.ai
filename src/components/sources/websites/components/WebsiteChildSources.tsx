@@ -170,6 +170,31 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     return `${baseClasses} ${colorClasses[status as keyof typeof colorClasses] || 'bg-gray-100 text-gray-800'}`;
   };
 
+  const handleDelete = async (page: SourcePage) => {
+    try {
+      // Delete from source_pages table directly
+      const { error } = await supabase
+        .from('source_pages')
+        .delete()
+        .eq('id', page.id);
+
+      if (error) {
+        console.error('Error deleting source page:', error);
+        throw error;
+      }
+
+      // Remove from local state immediately for better UX
+      setChildPages(prev => prev.filter(p => p.id !== page.id));
+      
+      console.log(`Successfully deleted source page: ${page.id}`);
+    } catch (error) {
+      console.error('Failed to delete source page:', error);
+      // Re-fetch to ensure state consistency on error
+      fetchChildPages();
+      throw error;
+    }
+  };
+
   const renderChildPage = (page: SourcePage) => {
     const sizeInfo = formatSize(page.content_size, page.compression_ratio);
     
@@ -249,7 +274,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             } as any}
             onEdit={onEdit}
             onExclude={onExclude}
-            onDelete={onDelete}
+            onDelete={() => handleDelete(page)}
             onRecrawl={onRecrawl}
             showRecrawl={false}
             isChild={true}
