@@ -83,7 +83,7 @@ const SourceTableRow: React.FC<SourceTableRowProps> = ({
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center space-x-3">
-          <SourceIcon sourceType={source.source_type} />
+          <SourceIcon type={source.source_type} />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium text-gray-900 truncate">
               {source.title}
@@ -97,7 +97,7 @@ const SourceTableRow: React.FC<SourceTableRowProps> = ({
         </div>
       </td>
       <td className="px-4 py-3">
-        <SourceTypeLabel sourceType={source.source_type} />
+        <SourceTypeLabel type={source.source_type} />
       </td>
       <td className="px-4 py-3 text-sm text-gray-500">
         {formatFileSize(source)}

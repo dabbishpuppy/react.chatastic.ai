@@ -81,9 +81,10 @@ const SourcesList: React.FC<SourcesListProps> = ({
               <SourceTableRow
                 key={source.id}
                 source={source}
-                onRowClick={handleRowClick}
-                onDeleteClick={handleDeleteClick}
-                onNavigateClick={handleNavigateClick}
+                isSelected={false}
+                onSelect={() => {}}
+                onDelete={handleDeleteClick}
+                onView={() => handleRowClick(source)}
               />
             ))}
           </TableBody>

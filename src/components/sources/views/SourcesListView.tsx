@@ -110,26 +110,14 @@ const SourcesListView: React.FC<SourcesListViewProps> = ({
           </TableHeader>
           <TableBody>
             {sources.map((source) => (
-              <TableRow key={source.id} className="hover:bg-gray-50">
-                <TableCell>
-                  <Checkbox
-                    checked={selectedItems.includes(source.id)}
-                    onCheckedChange={() => onToggleSelection(source.id)}
-                    aria-label={`Select ${source.title}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  <SourceTableRow
-                    source={source}
-                    onRowClick={() => {}}
-                    onDeleteClick={onDelete ? (source, e) => {
-                      e.stopPropagation();
-                      onDelete(source);
-                    } : (source, e) => {}}
-                    onNavigateClick={() => {}}
-                  />
-                </TableCell>
-              </TableRow>
+              <SourceTableRow
+                key={source.id}
+                source={source}
+                isSelected={selectedItems.includes(source.id)}
+                onSelect={() => onToggleSelection(source.id)}
+                onDelete={onDelete || (() => {})}
+                onView={() => {}}
+              />
             ))}
           </TableBody>
         </Table>
