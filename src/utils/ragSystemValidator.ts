@@ -1,5 +1,5 @@
 
-import { integrationTests } from '@/services/rag/testing';
+import { IntegrationTests } from '@/services/rag/testing';
 
 export class RAGSystemValidator {
   static async validateRefactoredSystem(): Promise<{
@@ -17,8 +17,8 @@ export class RAGSystemValidator {
     
     try {
       // Run comprehensive integration tests
-      const testResults = await integrationTests.runAllTests();
-      const summary = integrationTests.getTestSummary();
+      const testResults = await IntegrationTests.runAllTests();
+      const summary = IntegrationTests.getTestSummary();
       
       const importExportsWorking = testResults.some(r => 
         r.testName === 'Import/Export Chains Validation' && r.passed

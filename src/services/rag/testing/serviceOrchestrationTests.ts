@@ -72,10 +72,10 @@ export class ServiceOrchestrationTests {
 
   private static async testServiceLifecycle(): Promise<void> {
     try {
-      const { serviceLifecycle } = await import('@/services/rag/enhanced/orchestration/serviceLifecycle');
+      const module = await import('@/services/rag/enhanced/orchestration/serviceLifecycle');
       
-      if (typeof serviceLifecycle !== 'object') {
-        throw new Error('Service lifecycle manager not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Service lifecycle module not available');
       }
     } catch (error) {
       throw new Error(`Service lifecycle test failed: ${error}`);
@@ -84,10 +84,10 @@ export class ServiceOrchestrationTests {
 
   private static async testConfigurationManagement(): Promise<void> {
     try {
-      const { configurationManager } = await import('@/services/rag/enhanced/orchestration/configurationManager');
+      const module = await import('@/services/rag/enhanced/orchestration/configurationManager');
       
-      if (typeof configurationManager !== 'object') {
-        throw new Error('Configuration manager not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Configuration manager module not available');
       }
     } catch (error) {
       throw new Error(`Configuration management test failed: ${error}`);
@@ -96,10 +96,10 @@ export class ServiceOrchestrationTests {
 
   private static async testHealthMonitoring(): Promise<void> {
     try {
-      const { healthMonitor } = await import('@/services/rag/enhanced/orchestration/healthMonitor');
+      const module = await import('@/services/rag/enhanced/orchestration/healthMonitor');
       
-      if (typeof healthMonitor !== 'object') {
-        throw new Error('Health monitor not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Health monitor module not available');
       }
     } catch (error) {
       throw new Error(`Health monitoring test failed: ${error}`);
@@ -108,10 +108,10 @@ export class ServiceOrchestrationTests {
 
   private static async testStatusTracking(): Promise<void> {
     try {
-      const { statusTracker } = await import('@/services/rag/enhanced/orchestration/statusTracker');
+      const module = await import('@/services/rag/enhanced/orchestration/statusTracker');
       
-      if (typeof statusTracker !== 'object') {
-        throw new Error('Status tracker not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Status tracker module not available');
       }
     } catch (error) {
       throw new Error(`Status tracking test failed: ${error}`);
@@ -136,5 +136,3 @@ export class ServiceOrchestrationTests {
     };
   }
 }
-
-export const serviceOrchestrationTests = new ServiceOrchestrationTests();

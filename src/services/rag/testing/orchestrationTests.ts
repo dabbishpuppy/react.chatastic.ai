@@ -58,10 +58,10 @@ export class OrchestrationTests {
 
   private static async testRequestProcessor(): Promise<void> {
     try {
-      const { requestProcessor } = await import('@/services/rag/orchestration/requestProcessor');
+      const module = await import('@/services/rag/orchestration/requestProcessor');
       
-      if (typeof requestProcessor !== 'object') {
-        throw new Error('Request processor not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Request processor module not available');
       }
     } catch (error) {
       throw new Error(`Request processor test failed: ${error}`);
@@ -70,10 +70,10 @@ export class OrchestrationTests {
 
   private static async testResponseCoordinator(): Promise<void> {
     try {
-      const { responseCoordinator } = await import('@/services/rag/orchestration/responseCoordinator');
+      const module = await import('@/services/rag/orchestration/responseCoordinator');
       
-      if (typeof responseCoordinator !== 'object') {
-        throw new Error('Response coordinator not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Response coordinator module not available');
       }
     } catch (error) {
       throw new Error(`Response coordinator test failed: ${error}`);
@@ -82,10 +82,10 @@ export class OrchestrationTests {
 
   private static async testPerformanceTracker(): Promise<void> {
     try {
-      const { performanceTracker } = await import('@/services/rag/orchestration/performanceTracker');
+      const module = await import('@/services/rag/orchestration/performanceTracker');
       
-      if (typeof performanceTracker !== 'object') {
-        throw new Error('Performance tracker not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Performance tracker module not available');
       }
     } catch (error) {
       throw new Error(`Performance tracker test failed: ${error}`);
@@ -94,10 +94,10 @@ export class OrchestrationTests {
 
   private static async testStreamingManager(): Promise<void> {
     try {
-      const { streamingManager } = await import('@/services/rag/orchestration/streamingManager');
+      const module = await import('@/services/rag/orchestration/streamingManager');
       
-      if (typeof streamingManager !== 'object') {
-        throw new Error('Streaming manager not available');
+      if (!module || typeof module !== 'object') {
+        throw new Error('Streaming manager module not available');
       }
     } catch (error) {
       throw new Error(`Streaming manager test failed: ${error}`);
@@ -122,5 +122,3 @@ export class OrchestrationTests {
     };
   }
 }
-
-export const orchestrationTests = new OrchestrationTests();

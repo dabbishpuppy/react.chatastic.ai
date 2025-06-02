@@ -7,10 +7,10 @@ export type { ServiceOrchestrationTestResult } from './serviceOrchestrationTests
 export type { IntegrationTestResult } from './integrationTests';
 export type { EnhancedQueryEngineTestResult } from './enhancedQueryEngineTests';
 
-// Export test instances
+// Export test instances and classes
 export { ragIntegrationTests } from './ragIntegrationTests';
 export { advancedRAGTests } from './advancedRAGTests';
-export { orchestrationTests } from './orchestrationTests';
-export { serviceOrchestrationTests } from './serviceOrchestrationTests';
-export { integrationTests } from './integrationTests';
+export { OrchestrationTests } from './orchestrationTests';
+export { ServiceOrchestrationTests } from './serviceOrchestrationTests';
+export { IntegrationTests } from './integrationTests';
 export { enhancedQueryEngineTests } from './enhancedQueryEngineTests';

@@ -157,5 +157,3 @@ export class IntegrationTests {
     };
   }
 }
-
-export const integrationTests = new IntegrationTests();

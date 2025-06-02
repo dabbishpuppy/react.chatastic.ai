@@ -1,10 +1,11 @@
+
 import { useState, useCallback } from 'react';
 import { 
   ragIntegrationTests, 
   advancedRAGTests,
-  orchestrationTests,
-  serviceOrchestrationTests,
-  integrationTests,
+  OrchestrationTests,
+  ServiceOrchestrationTests,
+  IntegrationTests,
   enhancedQueryEngineTests,
   type TestResult, 
   type PerformanceBenchmark,
@@ -71,10 +72,10 @@ export const useRAGTesting = () => {
   const runOrchestrationTests = useCallback(async () => {
     setIsRunning(true);
     try {
-      const results = await orchestrationTests.runAllTests();
+      const results = await OrchestrationTests.runAllTests();
       setOrchestrationTestResults(results);
       
-      const summary = orchestrationTests.getTestSummary();
+      const summary = OrchestrationTests.getTestSummary();
       setSummary(summary);
       
       return results;
@@ -90,10 +91,10 @@ export const useRAGTesting = () => {
   const runServiceOrchestrationTests = useCallback(async () => {
     setIsRunning(true);
     try {
-      const results = await serviceOrchestrationTests.runAllTests();
+      const results = await ServiceOrchestrationTests.runAllTests();
       setServiceOrchestrationTestResults(results);
       
-      const summary = serviceOrchestrationTests.getTestSummary();
+      const summary = ServiceOrchestrationTests.getTestSummary();
       setSummary(summary);
       
       return results;
@@ -109,10 +110,10 @@ export const useRAGTesting = () => {
   const runIntegrationTests = useCallback(async () => {
     setIsRunning(true);
     try {
-      const results = await integrationTests.runAllTests();
+      const results = await IntegrationTests.runAllTests();
       setIntegrationTestResults(results);
       
-      const summary = integrationTests.getTestSummary();
+      const summary = IntegrationTests.getTestSummary();
       setSummary(summary);
       
       return results;
@@ -157,9 +158,9 @@ export const useRAGTesting = () => {
       ] = await Promise.all([
         ragIntegrationTests.runAllTests(),
         advancedRAGTests.runAllTests(),
-        orchestrationTests.runAllTests(),
-        serviceOrchestrationTests.runAllTests(),
-        integrationTests.runAllTests(),
+        OrchestrationTests.runAllTests(),
+        ServiceOrchestrationTests.runAllTests(),
+        IntegrationTests.runAllTests(),
         enhancedQueryEngineTests.runAllTests()
       ]);
 
@@ -218,9 +219,9 @@ export const useRAGTesting = () => {
   const getDetailedReport = useCallback(() => {
     const integrationReport = ragIntegrationTests.generateDetailedReport();
     const advancedSummary = advancedRAGTests.getTestSummary();
-    const orchestrationSummary = orchestrationTests.getTestSummary();
-    const serviceOrchestrationSummary = serviceOrchestrationTests.getTestSummary();
-    const integrationSummary = integrationTests.getTestSummary();
+    const orchestrationSummary = OrchestrationTests.getTestSummary();
+    const serviceOrchestrationSummary = ServiceOrchestrationTests.getTestSummary();
+    const integrationSummary = IntegrationTests.getTestSummary();
     const enhancedQueryEngineSummary = enhancedQueryEngineTests.getTestSummary();
     
     return {
