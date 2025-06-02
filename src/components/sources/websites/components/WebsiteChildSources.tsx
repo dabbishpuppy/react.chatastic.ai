@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
 import WebsiteSourceActions from './WebsiteSourceActions';
 
 interface SourcePage {
@@ -154,14 +155,13 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0"></div>
             <p className="text-sm font-medium text-gray-900 truncate" title={page.url}>
               {page.url}
             </p>
           </div>
           
           <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span>Added {new Date(page.created_at).toLocaleDateString()}</span>
+            <span>Added {formatDistanceToNow(new Date(page.created_at), { addSuffix: true })}</span>
             {page.content_size && (
               <span>{Math.round(page.content_size / 1024)} KB</span>
             )}
