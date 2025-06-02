@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Loader2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -122,29 +121,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
     }
   };
 
-  const getProgressValue = () => {
-    const progressValue = realtimeData.progress || 0;
-    return Math.min(100, Math.max(0, progressValue));
-  };
-
-  const getProgressBarColor = () => {
-    const status = realtimeData.status;
-    switch (status) {
-      case 'in_progress':
-        return 'bg-blue-600';
-      case 'completed':
-        return 'bg-green-600';
-      case 'failed':
-        return 'bg-red-600';
-      default:
-        return 'bg-gray-300';
-    }
-  };
-
   const statusConfig = getStatusConfig(realtimeData.status);
-
-  // Show progress bar only for parent sources and only when not completed
-  const shouldShowProgressBar = !isChild && realtimeData.status !== 'completed';
 
   return (
     <div className="flex items-center gap-3">
@@ -152,16 +129,6 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
         {statusConfig.icon}
         {statusConfig.text}
       </Badge>
-      
-      {/* Show progress bar for parent sources only when not completed */}
-      {shouldShowProgressBar && (
-        <div className="w-20 bg-gray-200 rounded-full h-2 flex-shrink-0">
-          <div 
-            className={`h-2 rounded-full transition-all duration-300 ${getProgressBarColor()}`}
-            style={{ width: `${getProgressValue()}%` }}
-          />
-        </div>
-      )}
     </div>
   );
 };
