@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { CompressionEngine } from "../enhanced/compressionEngine";
+import { CompressionService } from "../enhanced/services/compression/compressionService";
 
 export class EnhancedPageProcessor {
   // Enhanced page processing with maximum compression and proper chunking
@@ -18,11 +18,11 @@ export class EnhancedPageProcessor {
       const startTime = Date.now();
       
       // Phase 1: Maximum efficiency content cleaning
-      const cleanedContent = CompressionEngine.cleanContentForCompression(htmlContent);
+      const cleanedContent = this.cleanContentForCompression(htmlContent);
       console.log(`🧹 Cleaned content: ${htmlContent.length} → ${cleanedContent.length} bytes`);
       
-      // Phase 2: Maximum efficiency compression
-      const compressionResult = await CompressionEngine.compressWithMaximumEfficiency(cleanedContent);
+      // Phase 2: Maximum efficiency compression using CompressionService
+      const compressionResult = await CompressionService.compressWithMaximumEfficiency(cleanedContent);
       console.log(`🗜️ Compression result:`, {
         originalSize: compressionResult.originalSize,
         compressedSize: compressionResult.compressedSize,
@@ -32,7 +32,7 @@ export class EnhancedPageProcessor {
       });
       
       // Phase 3: Generate content hash for deduplication
-      const contentHash = await CompressionEngine.generateContentHash(cleanedContent);
+      const contentHash = await this.generateContentHash(cleanedContent);
       
       // Phase 4: Create semantic chunks with maximum efficiency
       const chunks = this.createMaximumEfficiencyChunks(cleanedContent);
@@ -57,7 +57,7 @@ export class EnhancedPageProcessor {
             content_hash: contentHash,
             chunk_count: chunks.length,
             processing_mode: 'maximum_efficiency',
-            target_compression: '85-90%'
+            target_compression: '10-15%'
           }
         })
         .eq('id', sourceId);
@@ -72,7 +72,7 @@ export class EnhancedPageProcessor {
       let duplicateChunks = 0;
       
       for (const chunk of chunks) {
-        const chunkHash = await CompressionEngine.generateContentHash(chunk.content);
+        const chunkHash = await this.generateContentHash(chunk.content);
         
         // Check for existing chunk
         const { data: existingChunk } = await supabase
@@ -86,7 +86,7 @@ export class EnhancedPageProcessor {
           console.log(`♻️ Reused existing chunk: ${existingChunk.id}`);
         } else {
           // Compress chunk content
-          const chunkCompressionResult = await CompressionEngine.compressForStorage(chunk.content);
+          const chunkCompressionResult = await CompressionService.compressWithMaximumEfficiency(chunk.content);
           
           const { error: chunkError } = await supabase
             .from('source_chunks')
@@ -98,14 +98,12 @@ export class EnhancedPageProcessor {
               content_hash: chunkHash,
               token_count: Math.ceil(chunk.content.length / 4),
               chunk_index: chunk.index,
-              compressed_content: chunkCompressionResult.compressedData,
-              original_size: chunkCompressionResult.originalSize,
-              compressed_size: chunkCompressionResult.compressedSize,
-              compression_ratio: chunkCompressionResult.compressionRatio,
               metadata: {
                 compression_method: 'maximum_efficiency',
                 chunk_type: chunk.type,
-                importance_score: chunk.importance
+                importance_score: chunk.importance,
+                compressed_size: chunkCompressionResult.compressedSize,
+                compression_ratio: chunkCompressionResult.ratio
               }
             });
           
@@ -158,6 +156,42 @@ export class EnhancedPageProcessor {
       
       throw error;
     }
+  }
+
+  // Clean content for maximum compression efficiency
+  private static cleanContentForCompression(htmlContent: string): string {
+    let cleaned = htmlContent;
+
+    // Remove all HTML comments
+    cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+    
+    // Remove script and style tags completely
+    cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    cleaned = cleaned.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+    
+    // Remove navigation and footer elements
+    cleaned = cleaned.replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '');
+    cleaned = cleaned.replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '');
+    cleaned = cleaned.replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '');
+    
+    // Remove ads and promotional content
+    cleaned = cleaned.replace(/<div[^>]*class="[^"]*(?:ad|advertisement|promo|banner)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+    
+    // Convert to plain text and clean whitespace
+    cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  }
+
+  // Generate content hash for deduplication
+  private static async generateContentHash(content: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
   
   // Create maximum efficiency semantic chunks

@@ -113,9 +113,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         .update({
           metadata: {
             advanced_compression_enabled: true,
-            compression_target: '15-20%',
+            compression_target: '10-15%',
             ultra_aggressive_mode: true,
             max_efficiency_pipeline: true,
+            target_compression_ratio: 0.15,
             last_compression_update: new Date().toISOString()
           }
         })
@@ -139,7 +140,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     }
   }, [parentSourceId]);
 
-  // Enhanced real-time subscription with better error handling
+  // Enhanced real-time subscription with better error handling and type safety
   useEffect(() => {
     if (!parentSourceId) return;
 
@@ -156,17 +157,21 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           filter: `parent_source_id=eq.${parentSourceId}`
         },
         (payload) => {
+          // Type-safe property access
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
+          
           console.log('📡 Source page update received:', {
             event: payload.eventType,
-            url: payload.new?.url || payload.old?.url,
-            status: payload.new?.status,
-            contentSize: payload.new?.content_size,
-            compressionRatio: payload.new?.compression_ratio,
+            url: newRecord?.url || oldRecord?.url,
+            status: newRecord?.status,
+            contentSize: newRecord?.content_size,
+            compressionRatio: newRecord?.compression_ratio,
             timestamp: new Date().toISOString()
           });
           
           if (payload.eventType === 'INSERT') {
-            const newPage = payload.new as SourcePage;
+            const newPage = newRecord as SourcePage;
             setChildPages(prev => {
               const exists = prev.some(page => page.id === newPage.id);
               if (!exists) {
@@ -175,14 +180,14 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
               return prev;
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updatedPage = payload.new as SourcePage;
+            const updatedPage = newRecord as SourcePage;
             setChildPages(prev => 
               prev.map(page => 
                 page.id === updatedPage.id ? updatedPage : page
               )
             );
           } else if (payload.eventType === 'DELETE') {
-            const deletedPage = payload.old as SourcePage;
+            const deletedPage = oldRecord as SourcePage;
             setChildPages(prev => 
               prev.filter(page => page.id !== deletedPage.id)
             );

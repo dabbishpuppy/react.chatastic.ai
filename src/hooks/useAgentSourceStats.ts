@@ -134,10 +134,14 @@ export const useAgentSourceStats = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
+          // Type-safe property access
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
+          
           console.log('📡 Agent sources changed:', {
             event: payload.eventType,
-            sourceId: payload.new?.id || payload.old?.id,
-            sourceType: payload.new?.source_type,
+            sourceId: newRecord?.id || oldRecord?.id,
+            sourceType: newRecord?.source_type,
             timestamp: new Date().toISOString()
           });
           // Immediate refresh for any agent_sources changes
@@ -152,17 +156,21 @@ export const useAgentSourceStats = () => {
           table: 'source_pages'
         },
         (payload) => {
+          // Type-safe property access
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
+          
           console.log('📡 Source pages changed:', {
             event: payload.eventType,
-            pageId: payload.new?.id || payload.old?.id,
-            parentSourceId: payload.new?.parent_source_id || payload.old?.parent_source_id,
-            status: payload.new?.status,
-            contentSize: payload.new?.content_size,
+            pageId: newRecord?.id || oldRecord?.id,
+            parentSourceId: newRecord?.parent_source_id || oldRecord?.parent_source_id,
+            status: newRecord?.status,
+            contentSize: newRecord?.content_size,
             timestamp: new Date().toISOString()
           });
           
           // Only refresh if this affects our agent
-          const parentSourceId = payload.new?.parent_source_id || payload.old?.parent_source_id;
+          const parentSourceId = newRecord?.parent_source_id || oldRecord?.parent_source_id;
           if (parentSourceId) {
             // Check if this page belongs to our agent's sources
             supabase
@@ -188,15 +196,19 @@ export const useAgentSourceStats = () => {
           table: 'source_chunks'
         },
         (payload) => {
+          // Type-safe property access
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
+          
           console.log('📡 Source chunks changed:', {
             event: payload.eventType,
-            chunkId: payload.new?.id || payload.old?.id,
-            sourceId: payload.new?.source_id || payload.old?.source_id,
+            chunkId: newRecord?.id || oldRecord?.id,
+            sourceId: newRecord?.source_id || oldRecord?.source_id,
             timestamp: new Date().toISOString()
           });
           
           // Chunks affect compression stats
-          const sourceId = payload.new?.source_id || payload.old?.source_id;
+          const sourceId = newRecord?.source_id || oldRecord?.source_id;
           if (sourceId) {
             // Check if this chunk belongs to our agent's sources
             supabase
