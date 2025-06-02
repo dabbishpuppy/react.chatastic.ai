@@ -1,277 +1,227 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { SemanticChunkingService } from "../semanticChunkingService";
-import { PerformanceMetricsService } from "../performanceMetricsService";
-import { SourceChunkService } from "../sourceChunkService";
-import { AdvancedCompressionEngine } from "../enhanced/advancedCompressionEngine";
-import { ProcessingResult } from "./types";
+import { CompressionEngine } from "../enhanced/compressionEngine";
 
 export class EnhancedPageProcessor {
+  // Enhanced page processing with maximum compression and proper chunking
   static async processPageContentAdvanced(
     sourceId: string,
     agentId: string,
     teamId: string,
     url: string,
     htmlContent: string
-  ): Promise<ProcessingResult> {
-    let extractionMetricId = '';
-    let cleaningMetricId = '';
+  ) {
+    console.log(`🚀 Starting enhanced page processing for: ${url}`);
+    console.log(`📊 Original content size: ${htmlContent.length} bytes`);
     
     try {
-      console.log(`📄 Processing page with advanced compression: ${url}`);
+      const startTime = Date.now();
       
-      // Phase 1: Enhanced Content Analysis and Extraction
-      extractionMetricId = await PerformanceMetricsService.startMetric({
-        sourceId,
-        agentId,
-        teamId,
-        phase: 'extraction',
-        inputSize: htmlContent.length
+      // Phase 1: Maximum efficiency content cleaning
+      const cleanedContent = CompressionEngine.cleanContentForCompression(htmlContent);
+      console.log(`🧹 Cleaned content: ${htmlContent.length} → ${cleanedContent.length} bytes`);
+      
+      // Phase 2: Maximum efficiency compression
+      const compressionResult = await CompressionEngine.compressWithMaximumEfficiency(cleanedContent);
+      console.log(`🗜️ Compression result:`, {
+        originalSize: compressionResult.originalSize,
+        compressedSize: compressionResult.compressedSize,
+        ratio: compressionResult.ratio,
+        savings: compressionResult.savings,
+        method: compressionResult.method
       });
-
-      const extractionStart = Date.now();
       
-      // Use advanced content cleaning
-      const cleanedHtml = AdvancedCompressionEngine.enhancedContentCleaning(htmlContent);
+      // Phase 3: Generate content hash for deduplication
+      const contentHash = await CompressionEngine.generateContentHash(cleanedContent);
       
-      // Analyze content for smart processing mode selection
-      const contentAnalysis = AdvancedCompressionEngine.analyzeContent(cleanedHtml);
-      const processingMode = AdvancedCompressionEngine.selectProcessingMode(contentAnalysis, cleanedHtml.length);
+      // Phase 4: Create semantic chunks with maximum efficiency
+      const chunks = this.createMaximumEfficiencyChunks(cleanedContent);
+      console.log(`📝 Created ${chunks.length} semantic chunks`);
       
-      console.log(`📊 Content analysis: ${contentAnalysis.contentType}, density: ${contentAnalysis.density.toFixed(2)}, mode: ${processingMode}`);
+      // Phase 5: Store compressed content and chunks
+      const processingTimeMs = Date.now() - startTime;
       
-      // Extract title
-      const titleMatch = htmlContent.match(/<title[^>]*>([^<]+)<\/title>/i);
-      const title = titleMatch ? titleMatch[1].trim() : new URL(url).hostname;
-      
-      const extractionTime = Date.now() - extractionStart;
+      // Update source page with compression results
+      const { error: updateError } = await supabase
+        .from('source_pages')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          content_size: compressionResult.originalSize,
+          compression_ratio: compressionResult.ratio,
+          chunks_created: chunks.length,
+          processing_time_ms: processingTimeMs,
+          metadata: {
+            compression_method: compressionResult.method,
+            compression_savings: compressionResult.savings,
+            content_hash: contentHash,
+            chunk_count: chunks.length,
+            processing_mode: 'maximum_efficiency',
+            target_compression: '85-90%'
+          }
+        })
+        .eq('id', sourceId);
 
-      // Phase 2: Advanced Compression
-      const compressionStart = Date.now();
-      const compressionResult = await AdvancedCompressionEngine.compressWithMaximumEfficiency(cleanedHtml);
-      const compressionTime = Date.now() - compressionStart;
-      
-      console.log(`🗜️ Advanced compression: ${compressionResult.originalSize} → ${compressionResult.compressedSize} bytes (${compressionResult.savings}% saved, method: ${compressionResult.method})`);
-      
-      // Generate summary and keywords
-      const { summary, keywords } = await this.generateContentSummary(cleanedHtml);
-
-      // Convert compressed data to string for storage
-      const compressedDataString = Array.from(compressionResult.compressed).join(',');
-
-      // Convert ContentAnalysis to plain object for JSON storage
-      const contentAnalysisPlain = {
-        contentType: contentAnalysis.contentType,
-        density: contentAnalysis.density,
-        uniqueWords: contentAnalysis.uniqueWords,
-        repeatedPhrases: contentAnalysis.repeatedPhrases,
-        boilerplateRatio: contentAnalysis.boilerplateRatio
-      };
-
-      await PerformanceMetricsService.endMetric(extractionMetricId, agentId, 'extraction', {
-        outputSize: compressionResult.compressedSize,
-        itemsProcessed: 1,
-        successRate: 1.0,
-        metadata: {
-          compressionRatio: compressionResult.ratio,
-          originalSize: compressionResult.originalSize,
-          compressionMethod: compressionResult.method,
-          contentType: contentAnalysis.contentType,
-          processingMode,
-          title
-        }
-      });
-
-      // Phase 3: Smart Processing Based on Mode
-      cleaningMetricId = await PerformanceMetricsService.startMetric({
-        sourceId,
-        agentId,
-        teamId,
-        phase: 'cleaning',
-        inputSize: cleanedHtml.length
-      });
-
-      let chunksCreated = 0;
-      let duplicatesFound = 0;
-      const processingStart = Date.now();
-
-      if (processingMode === 'summary') {
-        // Use summary mode - no chunking needed
-        await supabase
-          .from('agent_sources')
-          .update({
-            title,
-            raw_text: compressedDataString,
-            content_summary: summary,
-            keywords: keywords,
-            extraction_method: 'advanced_summary',
-            compression_ratio: compressionResult.ratio,
-            original_size: compressionResult.originalSize,
-            compressed_size: compressionResult.compressedSize,
-            metadata: {
-              processing_mode: processingMode,
-              compression_method: compressionResult.method,
-              content_analysis: contentAnalysisPlain,
-              file_size: compressionResult.compressedSize
-            }
-          })
-          .eq('id', sourceId);
-          
-        console.log(`✅ Summary mode processing complete for ${url}`);
-        
-      } else {
-        // Use chunking mode with advanced deduplication
-        const chunks = SemanticChunkingService.createSemanticChunks(cleanedHtml);
-        
-        // Advanced deduplication
-        const deduplicationResult = await AdvancedCompressionEngine.performAdvancedDeduplication(
-          chunks.map(c => c.content),
-          agentId
-        );
-        
-        duplicatesFound = deduplicationResult.duplicatesRemoved + deduplicationResult.sentenceDeduplication;
-        
-        // Create chunks from deduplicated content
-        if (deduplicationResult.uniqueChunks.length > 0) {
-          const chunksForInsert = deduplicationResult.uniqueChunks.map((content, index) => ({
-            source_id: sourceId,
-            chunk_index: index,
-            content: content,
-            token_count: Math.ceil(content.length / 4), // Estimate token count
-            metadata: {
-              processing_mode: processingMode,
-              compression_method: compressionResult.method,
-              deduplication_applied: true
-            }
-          }));
-
-          const createdChunks = await SourceChunkService.createChunks(chunksForInsert);
-          chunksCreated = createdChunks.length;
-        }
-
-        // Update source with content and compression info
-        await supabase
-          .from('agent_sources')
-          .update({
-            title,
-            content: cleanedHtml,
-            raw_text: compressedDataString,
-            content_summary: summary,
-            keywords: keywords,
-            extraction_method: 'advanced_chunking',
-            compression_ratio: compressionResult.ratio,
-            original_size: compressionResult.originalSize,
-            compressed_size: compressionResult.compressedSize,
-            unique_chunks: chunksCreated,
-            duplicate_chunks: duplicatesFound,
-            metadata: {
-              processing_mode: processingMode,
-              compression_method: compressionResult.method,
-              content_analysis: contentAnalysisPlain,
-              file_size: compressionResult.compressedSize,
-              advanced_deduplication: true
-            }
-          })
-          .eq('id', sourceId);
-          
-        console.log(`✅ Advanced chunking complete: ${chunksCreated} chunks, ${duplicatesFound} duplicates removed`);
+      if (updateError) {
+        console.error('Failed to update source page:', updateError);
+        throw updateError;
       }
-
-      const processingTime = Date.now() - processingStart;
-
-      await PerformanceMetricsService.endMetric(cleaningMetricId, agentId, 'cleaning', {
-        outputSize: compressionResult.compressedSize,
-        itemsProcessed: chunksCreated || 1,
-        successRate: 1.0,
-        metadata: {
-          processingMode,
-          chunksCreated,
-          duplicatesFound,
-          compressionMethod: compressionResult.method,
-          spaceSaved: compressionResult.originalSize - compressionResult.compressedSize
+      
+      // Phase 6: Store chunks with deduplication
+      let uniqueChunks = 0;
+      let duplicateChunks = 0;
+      
+      for (const chunk of chunks) {
+        const chunkHash = await CompressionEngine.generateContentHash(chunk.content);
+        
+        // Check for existing chunk
+        const { data: existingChunk } = await supabase
+          .from('source_chunks')
+          .select('id')
+          .eq('content_hash', chunkHash)
+          .single();
+        
+        if (existingChunk) {
+          duplicateChunks++;
+          console.log(`♻️ Reused existing chunk: ${existingChunk.id}`);
+        } else {
+          // Compress chunk content
+          const chunkCompressionResult = await CompressionEngine.compressForStorage(chunk.content);
+          
+          const { error: chunkError } = await supabase
+            .from('source_chunks')
+            .insert({
+              source_id: sourceId,
+              agent_id: agentId,
+              team_id: teamId,
+              content: chunk.content,
+              content_hash: chunkHash,
+              token_count: Math.ceil(chunk.content.length / 4),
+              chunk_index: chunk.index,
+              compressed_content: chunkCompressionResult.compressedData,
+              original_size: chunkCompressionResult.originalSize,
+              compressed_size: chunkCompressionResult.compressedSize,
+              compression_ratio: chunkCompressionResult.compressionRatio,
+              metadata: {
+                compression_method: 'maximum_efficiency',
+                chunk_type: chunk.type,
+                importance_score: chunk.importance
+              }
+            });
+          
+          if (chunkError) {
+            console.error('Failed to store chunk:', chunkError);
+          } else {
+            uniqueChunks++;
+            console.log(`✅ Stored new chunk ${chunk.index} (${chunk.content.length} bytes)`);
+          }
         }
+      }
+      
+      console.log(`📊 Enhanced processing complete:`, {
+        url,
+        originalSize: compressionResult.originalSize,
+        compressedSize: compressionResult.compressedSize,
+        compressionRatio: compressionResult.ratio,
+        compressionSavings: compressionResult.savings,
+        uniqueChunks,
+        duplicateChunks,
+        totalChunks: chunks.length,
+        processingTimeMs
       });
-
+      
       return {
         success: true,
-        metrics: {
-          extractionTime,
-          cleaningTime: compressionTime,
-          chunkingTime: processingTime,
-          compressionRatio: compressionResult.ratio,
-          chunksCreated,
-          duplicatesFound,
-          processingMode,
-          compressionMethod: compressionResult.method,
-          spaceSaved: compressionResult.savings
-        }
+        originalSize: compressionResult.originalSize,
+        compressedSize: compressionResult.compressedSize,
+        compressionRatio: compressionResult.ratio,
+        compressionSavings: compressionResult.savings,
+        uniqueChunks,
+        duplicateChunks,
+        totalChunks: chunks.length,
+        processingTimeMs,
+        contentHash
       };
-
+      
     } catch (error) {
-      console.error('Error in advanced page processing:', error);
-
-      // End any active metrics with error
-      if (extractionMetricId) {
-        await PerformanceMetricsService.endMetric(extractionMetricId, agentId, 'extraction', {
-          successRate: 0.0,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-      if (cleaningMetricId) {
-        await PerformanceMetricsService.endMetric(cleaningMetricId, agentId, 'cleaning', {
-          successRate: 0.0,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
-
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      };
+      console.error('Enhanced page processing failed:', error);
+      
+      // Update status to failed
+      await supabase
+        .from('source_pages')
+        .update({
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', sourceId);
+      
+      throw error;
     }
   }
-
-  private static async generateContentSummary(content: string): Promise<{
-    summary: string;
-    keywords: string[];
-  }> {
-    // Extract meaningful sentences for summary
-    const sentences = content
-      .split(/[.!?]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 20)
-      .slice(0, 3);
+  
+  // Create maximum efficiency semantic chunks
+  private static createMaximumEfficiencyChunks(content: string) {
+    const chunks = [];
+    const maxChunkSize = 800; // Smaller chunks for better compression
+    const overlapSize = 100;
     
-    let summary = sentences.join('. ');
-    if (summary.length > 200) {
-      summary = summary.substring(0, 200 - 3) + '...';
+    // Split content into paragraphs
+    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 20);
+    
+    let currentChunk = '';
+    let chunkIndex = 0;
+    
+    for (const paragraph of paragraphs) {
+      if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
+        // Finalize current chunk
+        chunks.push({
+          content: currentChunk.trim(),
+          index: chunkIndex++,
+          type: 'semantic',
+          importance: this.calculateImportanceScore(currentChunk)
+        });
+        
+        // Start new chunk with overlap
+        const words = currentChunk.split(' ');
+        const overlapWords = words.slice(-Math.floor(overlapSize / 5));
+        currentChunk = overlapWords.join(' ') + ' ' + paragraph;
+      } else {
+        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+      }
     }
     
-    // Enhanced keyword extraction with TF-IDF-like scoring
-    const words = content.toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(word => word.length > 3);
-
-    const wordFreq: Record<string, number> = {};
-    const totalWords = words.length;
+    // Add final chunk
+    if (currentChunk.trim().length > 0) {
+      chunks.push({
+        content: currentChunk.trim(),
+        index: chunkIndex,
+        type: 'semantic',
+        importance: this.calculateImportanceScore(currentChunk)
+      });
+    }
     
-    words.forEach(word => {
-      wordFreq[word] = (wordFreq[word] || 0) + 1;
-    });
-
-    // Calculate TF-IDF-like scores (simplified)
-    const wordScores = Object.entries(wordFreq).map(([word, freq]) => {
-      const tf = freq / totalWords;
-      const score = tf * Math.log(totalWords / freq); // Simple TF-IDF approximation
-      return { word, score };
-    });
-
-    const keywords = wordScores
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10)
-      .map(item => item.word);
-
-    return { summary, keywords };
+    return chunks;
+  }
+  
+  // Calculate importance score for chunk prioritization
+  private static calculateImportanceScore(content: string): number {
+    let score = 0;
+    
+    // Length factor
+    score += Math.min(content.length / 100, 5);
+    
+    // Keyword density
+    const keywords = ['service', 'product', 'solution', 'technology', 'business', 'professional'];
+    const keywordCount = keywords.reduce((count, keyword) => {
+      return count + (content.toLowerCase().match(new RegExp(keyword, 'g')) || []).length;
+    }, 0);
+    score += keywordCount * 0.5;
+    
+    // Sentence structure
+    const sentences = content.split(/[.!?]+/).length;
+    score += Math.min(sentences / 5, 3);
+    
+    return Math.round(score * 10) / 10;
   }
 }

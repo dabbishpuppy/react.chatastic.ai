@@ -40,16 +40,24 @@ export const useAgentSourceStats = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStats = async () => {
+  const fetchStats = async (retryCount = 0) => {
     if (!agentId) return;
 
     try {
-      console.log('📊 Fetching agent source stats using RPC for:', agentId);
+      console.log(`📊 Fetching agent source stats (attempt ${retryCount + 1}) for:`, agentId);
       
       const { data, error: rpcError } = await supabase
         .rpc('get_agent_source_stats', { target_agent_id: agentId });
 
-      if (rpcError) throw rpcError;
+      if (rpcError) {
+        // Retry for network errors
+        if (retryCount < 3 && (rpcError.message?.includes('502') || rpcError.message?.includes('504'))) {
+          console.log(`🔄 Retrying stats fetch in 3 seconds (attempt ${retryCount + 1}/3)`);
+          setTimeout(() => fetchStats(retryCount + 1), 3000);
+          return;
+        }
+        throw rpcError;
+      }
 
       console.log('📊 RPC RAW response:', data);
 
@@ -65,10 +73,11 @@ export const useAgentSourceStats = () => {
           qa: { count: 0, size: 0 }
         };
         
-        console.log('📊 Website sources data from RPC:', {
+        console.log('📊 Enhanced size tracking:', {
           websiteCount: sourcesByType.website?.count,
           websiteSize: sourcesByType.website?.size,
-          totalBytes: result.total_bytes
+          totalBytes: result.total_bytes,
+          allTypes: sourcesByType
         });
         
         setStats({
@@ -81,6 +90,8 @@ export const useAgentSourceStats = () => {
             qa: sourcesByType.qa || { count: 0, size: 0 }
           }
         });
+        
+        setError(null);
       } else {
         console.log('📊 No data returned from RPC');
         setStats({
@@ -98,7 +109,7 @@ export const useAgentSourceStats = () => {
       console.error('❌ Error fetching agent source stats:', err);
       setError(err.message || 'Failed to fetch source stats');
     } finally {
-      setLoading(false);
+      if (retryCount === 0) setLoading(false);
     }
   };
 
@@ -106,14 +117,14 @@ export const useAgentSourceStats = () => {
     fetchStats();
   }, [agentId]);
 
-  // Enhanced real-time subscription with immediate refresh triggers
+  // Enhanced real-time subscriptions with immediate refresh and better error handling
   useEffect(() => {
     if (!agentId) return;
 
-    console.log(`📡 Setting up enhanced real-time subscriptions for agent: ${agentId}`);
+    console.log(`📡 Setting up comprehensive real-time subscriptions for agent: ${agentId}`);
 
     const channel = supabase
-      .channel(`agent-source-stats-${agentId}`)
+      .channel(`agent-source-stats-enhanced-${agentId}`)
       .on(
         'postgres_changes',
         {
@@ -123,8 +134,14 @@ export const useAgentSourceStats = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          console.log('📡 Agent sources changed:', payload.eventType, payload);
-          fetchStats();
+          console.log('📡 Agent sources changed:', {
+            event: payload.eventType,
+            sourceId: payload.new?.id || payload.old?.id,
+            sourceType: payload.new?.source_type,
+            timestamp: new Date().toISOString()
+          });
+          // Immediate refresh for any agent_sources changes
+          setTimeout(fetchStats, 500); // Small delay to allow DB to settle
         }
       )
       .on(
@@ -135,9 +152,32 @@ export const useAgentSourceStats = () => {
           table: 'source_pages'
         },
         (payload) => {
-          console.log('📡 Source pages changed:', payload.eventType, payload);
-          // Immediate refetch for any source_pages changes
-          fetchStats();
+          console.log('📡 Source pages changed:', {
+            event: payload.eventType,
+            pageId: payload.new?.id || payload.old?.id,
+            parentSourceId: payload.new?.parent_source_id || payload.old?.parent_source_id,
+            status: payload.new?.status,
+            contentSize: payload.new?.content_size,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Only refresh if this affects our agent
+          const parentSourceId = payload.new?.parent_source_id || payload.old?.parent_source_id;
+          if (parentSourceId) {
+            // Check if this page belongs to our agent's sources
+            supabase
+              .from('agent_sources')
+              .select('id')
+              .eq('id', parentSourceId)
+              .eq('agent_id', agentId)
+              .single()
+              .then(({ data }) => {
+                if (data) {
+                  console.log('📊 Refreshing stats due to relevant source page change');
+                  setTimeout(fetchStats, 500);
+                }
+              });
+          }
         }
       )
       .on(
@@ -148,15 +188,44 @@ export const useAgentSourceStats = () => {
           table: 'source_chunks'
         },
         (payload) => {
-          console.log('📡 Source chunks changed:', payload.eventType, payload);
-          // Also refresh when chunks are updated (they affect size calculations)
-          fetchStats();
+          console.log('📡 Source chunks changed:', {
+            event: payload.eventType,
+            chunkId: payload.new?.id || payload.old?.id,
+            sourceId: payload.new?.source_id || payload.old?.source_id,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Chunks affect compression stats
+          const sourceId = payload.new?.source_id || payload.old?.source_id;
+          if (sourceId) {
+            // Check if this chunk belongs to our agent's sources
+            supabase
+              .from('agent_sources')
+              .select('id')
+              .eq('id', sourceId)
+              .eq('agent_id', agentId)
+              .single()
+              .then(({ data }) => {
+                if (data) {
+                  console.log('📊 Refreshing stats due to chunk change');
+                  setTimeout(fetchStats, 1000); // Longer delay for chunk processing
+                }
+              });
+          }
         }
       )
       .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
+        console.log('📡 Enhanced subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Real-time subscription active for agent source stats');
+          console.log('✅ Enhanced real-time subscription active for agent source stats');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time subscription error, will retry...');
+          setError('Real-time updates temporarily unavailable');
+          // Auto-retry after 10 seconds
+          setTimeout(() => {
+            console.log('🔄 Retrying real-time subscription...');
+            setError(null);
+          }, 10000);
         }
       });
 

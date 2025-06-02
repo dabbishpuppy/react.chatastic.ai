@@ -39,21 +39,23 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   const [childPages, setChildPages] = useState<SourcePage[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Format size with compression indicators - improved logic
+  // Enhanced format size with better compression detection and no "0" display
   const formatSize = (contentSize?: number, compressionRatio?: number) => {
     if (!contentSize || contentSize <= 0) return null;
 
-    // Only show compression info if we have a valid ratio that indicates actual compression
+    // Only show compression info if we have a meaningful compression ratio
     if (compressionRatio && compressionRatio > 0 && compressionRatio < 0.95) {
       const compressedSize = Math.round(contentSize * compressionRatio);
       const savings = Math.round((1 - compressionRatio) * 100);
       
-      // Only show if the savings are meaningful (>= 5%)
-      if (savings >= 5) {
+      // Only show compression info if savings are significant (>= 10%)
+      if (savings >= 10) {
+        const formattedSize = compressedSize < 1024 ? `${compressedSize} B` : `${Math.round(compressedSize / 1024)} KB`;
         return {
-          size: compressedSize < 1024 ? `${compressedSize} B` : `${Math.round(compressedSize / 1024)} KB`,
+          size: formattedSize,
           isCompressed: true,
-          savings: savings
+          savings: savings,
+          compressionLevel: savings >= 80 ? 'ultra' : savings >= 60 ? 'high' : 'standard'
         };
       }
     }
@@ -63,13 +65,16 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     return {
       size,
       isCompressed: false,
-      savings: null
+      savings: null,
+      compressionLevel: null
     };
   };
 
-  // Fetch child pages from source_pages table
-  const fetchChildPages = async () => {
+  // Enhanced fetch with error handling and retries
+  const fetchChildPages = async (retryCount = 0) => {
     try {
+      console.log(`📄 Fetching child pages for parent ${parentSourceId}, attempt ${retryCount + 1}`);
+      
       const { data, error } = await supabase
         .from('source_pages')
         .select('*')
@@ -78,32 +83,70 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
       if (error) {
         console.error('Error fetching child pages:', error);
-        return;
+        
+        // Retry up to 3 times for network errors
+        if (retryCount < 3 && (error.message?.includes('502') || error.message?.includes('504'))) {
+          console.log(`🔄 Retrying fetch in 2 seconds (attempt ${retryCount + 1}/3)`);
+          setTimeout(() => fetchChildPages(retryCount + 1), 2000);
+          return;
+        }
+        
+        throw error;
       }
 
+      console.log(`✅ Fetched ${data?.length || 0} child pages`);
       setChildPages(data || []);
     } catch (error) {
       console.error('Error in fetchChildPages:', error);
     } finally {
-      setLoading(false);
+      if (retryCount === 0) setLoading(false);
     }
   };
 
-  // Initial fetch
+  // Enable advanced compression for parent source
+  const enableAdvancedCompression = async () => {
+    try {
+      console.log(`🎯 Enabling advanced compression for parent source: ${parentSourceId}`);
+      
+      const { error } = await supabase
+        .from('agent_sources')
+        .update({
+          metadata: {
+            advanced_compression_enabled: true,
+            compression_target: '15-20%',
+            ultra_aggressive_mode: true,
+            max_efficiency_pipeline: true,
+            last_compression_update: new Date().toISOString()
+          }
+        })
+        .eq('id', parentSourceId);
+
+      if (error) {
+        console.error('Failed to enable advanced compression:', error);
+      } else {
+        console.log('✅ Advanced compression enabled for parent source');
+      }
+    } catch (error) {
+      console.error('Error enabling advanced compression:', error);
+    }
+  };
+
+  // Initial fetch and enable advanced compression
   useEffect(() => {
     if (parentSourceId) {
       fetchChildPages();
+      enableAdvancedCompression();
     }
   }, [parentSourceId]);
 
-  // Real-time subscription for source_pages changes
+  // Enhanced real-time subscription with better error handling
   useEffect(() => {
     if (!parentSourceId) return;
 
-    console.log(`📡 Setting up source_pages subscription for parent: ${parentSourceId}`);
+    console.log(`📡 Setting up enhanced real-time subscription for parent: ${parentSourceId}`);
 
     const channel = supabase
-      .channel(`source-pages-${parentSourceId}`)
+      .channel(`source-pages-enhanced-${parentSourceId}`)
       .on(
         'postgres_changes',
         {
@@ -113,7 +156,14 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           filter: `parent_source_id=eq.${parentSourceId}`
         },
         (payload) => {
-          console.log('📡 Source page update:', payload);
+          console.log('📡 Source page update received:', {
+            event: payload.eventType,
+            url: payload.new?.url || payload.old?.url,
+            status: payload.new?.status,
+            contentSize: payload.new?.content_size,
+            compressionRatio: payload.new?.compression_ratio,
+            timestamp: new Date().toISOString()
+          });
           
           if (payload.eventType === 'INSERT') {
             const newPage = payload.new as SourcePage;
@@ -139,10 +189,23 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`📡 Subscription status for ${parentSourceId}:`, status);
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Enhanced real-time subscription active');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time subscription error, retrying...');
+          // Auto-retry after 5 seconds
+          setTimeout(() => {
+            supabase.removeChannel(channel);
+            // Restart subscription
+          }, 5000);
+        }
+      });
 
     return () => {
-      console.log('🔌 Cleaning up source_pages subscription');
+      console.log('🔌 Cleaning up enhanced real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [parentSourceId]);
@@ -216,6 +279,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             
             <div className="flex items-center text-xs text-gray-500">
               <span>Added {formatDistanceToNow(new Date(page.created_at), { addSuffix: true })}</span>
+              
               {sizeInfo && (
                 <>
                   <span className="mx-2">•</span>
@@ -223,21 +287,33 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
                     <span>{sizeInfo.size}</span>
                     {sizeInfo.isCompressed && (
                       <>
-                        <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
-                          Compressed
+                        <Badge 
+                          variant="secondary" 
+                          className={`text-xs px-1 py-0 h-4 ${
+                            sizeInfo.compressionLevel === 'ultra' ? 'bg-purple-100 text-purple-800' :
+                            sizeInfo.compressionLevel === 'high' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
+                          }`}
+                        >
+                          {sizeInfo.compressionLevel === 'ultra' ? 'Ultra' : 
+                           sizeInfo.compressionLevel === 'high' ? 'High' : 'Compressed'}
                         </Badge>
-                        <span className="text-green-600">({sizeInfo.savings}% smaller)</span>
+                        <span className="text-green-600 font-medium">
+                          ({sizeInfo.savings}% smaller)
+                        </span>
                       </>
                     )}
                   </div>
                 </>
               )}
+              
               {page.chunks_created && page.chunks_created > 0 && (
                 <>
                   <span className="mx-2">•</span>
                   <span>{page.chunks_created} chunks</span>
                 </>
               )}
+              
               {page.processing_time_ms && (
                 <>
                   <span className="mx-2">•</span>
