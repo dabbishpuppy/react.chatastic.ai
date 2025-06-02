@@ -83,14 +83,35 @@ export const useSourceDetail = () => {
   const handleDelete = async () => {
     if (!source || !agentId) return;
 
+    console.log('🗑️ Starting source deletion:', {
+      sourceId: source.id,
+      sourceType: source.source_type,
+      agentId
+    });
+
     setIsDeleting(true);
     try {
       await sources.deleteSource(source.id);
       
-      // Invalidate all relevant queries to ensure data consistency
-      queryClient.invalidateQueries({ queryKey: ['sources'] });
-      queryClient.invalidateQueries({ queryKey: ['sources', agentId] });
-      queryClient.invalidateQueries({ queryKey: ['sources', agentId, source.source_type] });
+      // Comprehensive query invalidation for all source types
+      const queryKeysToInvalidate = [
+        ['sources'],
+        ['sources', agentId],
+        ['sources', agentId, source.source_type],
+        ['sources', agentId, 'qa'],
+        ['sources', agentId, 'file'],
+        ['sources', agentId, 'text'],
+        ['sources', agentId, 'website']
+      ];
+
+      queryKeysToInvalidate.forEach(queryKey => {
+        queryClient.invalidateQueries({ queryKey });
+      });
+      
+      // Also remove the specific source from cache
+      queryClient.removeQueries({ queryKey: ['source', source.id] });
+      
+      console.log('✅ Source deleted and queries invalidated');
       
       toast({
         title: 'Success',
@@ -108,7 +129,7 @@ export const useSourceDetail = () => {
       const tab = tabMap[source.source_type] || 'files';
       navigate(`/agent/${agentId}/sources?tab=${tab}`);
     } catch (error) {
-      console.error('Error deleting source:', error);
+      console.error('❌ Error deleting source:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete source',

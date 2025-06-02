@@ -6,8 +6,13 @@ import FileUploadArea from "./files/FileUploadArea";
 import FileUploadProgress from "./files/FileUploadProgress";
 import SourcesListPaginated from "./SourcesListPaginated";
 import ErrorBoundary from "./ErrorBoundary";
+import { useQueryClient } from "@tanstack/react-query";
+import { useParams } from "react-router-dom";
 
 const FilesTab: React.FC = () => {
+  const { agentId } = useParams();
+  const queryClient = useQueryClient();
+  
   const {
     data: paginatedData,
     isLoading,
@@ -29,6 +34,31 @@ const FilesTab: React.FC = () => {
   } = useFileUpload(refetch);
 
   const sources = paginatedData?.sources || [];
+
+  // Enhanced source deletion handler
+  const handleSourceDeleted = (sourceId: string) => {
+    console.log('🗑️ Source deleted in FilesTab:', sourceId);
+    
+    // Invalidate all relevant queries to ensure data consistency
+    queryClient.invalidateQueries({ queryKey: ['sources'] });
+    queryClient.invalidateQueries({ queryKey: ['sources', agentId] });
+    queryClient.invalidateQueries({ queryKey: ['sources', agentId, 'file'] });
+    
+    // Force refetch the current data
+    refetch();
+  };
+
+  // Set up real-time subscription for source changes
+  React.useEffect(() => {
+    if (!agentId) return;
+
+    const intervalId = setInterval(() => {
+      // Refetch data every 2 seconds to catch any changes
+      refetch();
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [agentId, refetch]);
 
   return (
     <ErrorBoundary tabName="Files">
@@ -62,10 +92,7 @@ const FilesTab: React.FC = () => {
             sources={sources}
             loading={isLoading}
             error={error?.message || null}
-            onSourceDeleted={(sourceId) => {
-              // Refetch the sources list after deletion
-              refetch();
-            }}
+            onSourceDeleted={handleSourceDeleted}
           />
         </div>
       </div>
