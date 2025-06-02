@@ -38,7 +38,7 @@ export const useAgentSourceStats = () => {
       // Get basic source stats
       const { data: sources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('source_type, content')
+        .select('source_type, content, parent_source_id')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 

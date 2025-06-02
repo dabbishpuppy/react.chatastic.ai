@@ -25,18 +25,18 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   const [respectRobots, setRespectRobots] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const { submitEnhancedCrawl } = useEnhancedCrawl();
+  const { initiateCrawl } = useEnhancedCrawl();
   const { 
-    healthStatus, 
-    queueMetrics, 
-    connectionPoolStatus,
-    initializeInfrastructure 
+    infrastructureHealth, 
+    systemHealth, 
+    loading: infrastructureLoading,
+    loadInfrastructureHealth 
   } = useProductionInfrastructure();
 
   // Initialize infrastructure on mount
   useEffect(() => {
-    initializeInfrastructure();
-  }, [initializeInfrastructure]);
+    loadInfrastructureHealth();
+  }, [loadInfrastructureHealth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,16 +53,15 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         agentId
       });
 
-      const result = await submitEnhancedCrawl({
+      const result = await initiateCrawl({
         url: url.trim(),
         agentId,
-        crawlMode,
+        crawlMode: crawlMode === 'single' ? 'single-page' : crawlMode === 'sitemap' ? 'sitemap-only' : 'full-website',
         maxPages,
-        maxDepth,
         respectRobots
       });
 
-      if (result.success && result.parentSourceId) {
+      if (result.parentSourceId) {
         toast({
           title: "Enhanced Crawl Started Successfully",
           description: `Your ${crawlMode} crawl has been initiated with production infrastructure. Monitoring ${result.parentSourceId}`,
@@ -71,7 +70,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         onCrawlStarted?.(result.parentSourceId);
         setUrl('');
       } else {
-        throw new Error(result.error || 'Failed to start crawl');
+        throw new Error('Failed to start crawl');
       }
     } catch (error: any) {
       console.error('❌ Enhanced crawl submission failed:', error);
@@ -86,15 +85,15 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   };
 
   const getInfrastructureStatus = () => {
-    if (!healthStatus) return '🔄 Initializing...';
+    if (!infrastructureHealth) return '🔄 Initializing...';
     
-    const isHealthy = healthStatus.database && healthStatus.queue && healthStatus.workers;
+    const isHealthy = infrastructureHealth.overall?.status === 'healthy';
     return isHealthy ? '✅ Operational' : '⚠️ Degraded';
   };
 
   const getQueueInfo = () => {
-    if (!queueMetrics) return 'Queue: Loading...';
-    return `Queue: ${queueMetrics.pending || 0} pending, ${queueMetrics.active || 0} active`;
+    if (!infrastructureHealth?.connectionPools) return 'Queue: Loading...';
+    return `Queue: ${infrastructureHealth.connectionPools.queuedRequests || 0} queued, ${infrastructureHealth.connectionPools.activeConnections || 0} active`;
   };
 
   return (
