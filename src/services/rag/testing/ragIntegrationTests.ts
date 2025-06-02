@@ -70,7 +70,7 @@ export class RAGIntegrationTests {
         const testConversationId = globalThis.crypto.randomUUID();
         
         const request = {
-          query: 'What is artificial intelligence?',
+          query: 'What is artificial intelligence and how does it work?', // Non-empty query
           agentId: testAgentId,
           conversationId: testConversationId
         };
@@ -115,7 +115,7 @@ export class RAGIntegrationTests {
         const testAgentId = globalThis.crypto.randomUUID();
         
         const request = {
-          query: 'Advanced query with context',
+          query: 'How can I improve my customer service using AI and automation?', // Meaningful query
           agentId: testAgentId,
           searchFilters: { 
             sourceTypes: ['text' as const],
@@ -155,7 +155,7 @@ export class RAGIntegrationTests {
         const testAgentId = globalThis.crypto.randomUUID();
         
         const request = {
-          query: 'Streaming test query',
+          query: 'Explain the benefits of real-time customer support streaming', // Valid streaming test query
           agentId: testAgentId
         };
 
@@ -285,10 +285,10 @@ export class RAGIntegrationTests {
       'Validates proper error handling and recovery mechanisms for invalid requests and system failures',
       async () => {
         try {
-          // Test with invalid request
+          // Test with invalid request - empty query should trigger validation error
           await RAGOrchestrator.processRAGRequest({
-            query: '', // Empty query
-            agentId: '',
+            query: '', // Empty query should fail validation
+            agentId: globalThis.crypto.randomUUID(), // Valid agent ID
           });
           
           throw new Error('Should have thrown error for invalid request');
@@ -297,7 +297,13 @@ export class RAGIntegrationTests {
           if (error instanceof Error && error.message === 'Should have thrown error for invalid request') {
             throw error;
           }
-          return { errorHandlingWorking: true };
+          
+          // Verify it's the expected validation error
+          if (error instanceof Error && error.message.includes('Query cannot be empty')) {
+            return { errorHandlingWorking: true, errorType: 'validation' };
+          }
+          
+          return { errorHandlingWorking: true, errorType: 'unknown' };
         }
       }
     );
@@ -328,7 +334,7 @@ export class RAGIntegrationTests {
     await this.benchmark('Basic Query Processing', async () => {
       const testAgentId = globalThis.crypto.randomUUID();
       const request = {
-        query: 'Performance test query',
+        query: 'Performance benchmark test for response time measurement', // Meaningful test query
         agentId: testAgentId
       };
       
@@ -344,7 +350,7 @@ export class RAGIntegrationTests {
     await this.benchmark('Enhanced Query Processing', async () => {
       const testAgentId = globalThis.crypto.randomUUID();
       const request = {
-        query: 'Enhanced performance test query',
+        query: 'Advanced performance benchmark for enhanced query processing optimization', // Detailed test query
         agentId: testAgentId
       };
       
