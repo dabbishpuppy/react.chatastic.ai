@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -24,6 +23,7 @@ import Settings from '@/pages/Settings';
 import EmbeddedChat from '@/pages/EmbeddedChat';
 import NotFound from '@/pages/NotFound';
 import AcceptInvitation from '@/pages/AcceptInvitation';
+import SystemTestingPage from '@/pages/SystemTestingPage';
 
 // Settings Pages
 import GeneralSettings from '@/pages/settings/General';
@@ -50,6 +50,12 @@ function App() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/system-testing" element={
+                <ProtectedRoute>
+                  <SystemTestingPage />
                 </ProtectedRoute>
               } />
               
