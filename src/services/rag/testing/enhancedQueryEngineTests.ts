@@ -1,4 +1,3 @@
-
 import {
   EnhancedQueryProcessor,
   StreamingProcessor,
@@ -37,7 +36,7 @@ export class EnhancedQueryEngineTests {
       const request: EnhancedQueryRequest = {
         query: 'Test enhanced query processing',
         agentId: 'test-agent-enhanced',
-        optimizationStrategy: 'standard',
+        optimizationStrategy: 'balanced',
         searchFilters: {
           maxResults: 5
         }

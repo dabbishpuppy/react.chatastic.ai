@@ -52,8 +52,8 @@ export class RAGChatIntegration {
 
       const startTime = Date.now();
 
-      // Perform advanced query analysis
-      const advancedAnalysis = await AdvancedQueryPreprocessor.analyzeQuery(
+      // Perform advanced query analysis using preprocessQueryWithContext
+      const advancedAnalysis = await AdvancedQueryPreprocessor.preprocessQueryWithContext(
         message,
         agentId,
         conversationId
@@ -68,16 +68,16 @@ export class RAGChatIntegration {
           searchFilters: {
             maxResults: options.maxSources || 5,
             minSimilarity: 0.3,
-            sourceTypes: advancedAnalysis.suggestedFilters.sourceTypes as any
+            sourceTypes: advancedAnalysis.analysis.suggestedFilters.sourceTypes as any
           },
           rankingOptions: {
-            maxChunks: this.getMaxChunksForComplexity(advancedAnalysis.complexity),
-            maxTokens: this.getMaxTokensForComplexity(advancedAnalysis.complexity),
+            maxChunks: this.getMaxChunksForComplexity(advancedAnalysis.analysis.complexityScore),
+            maxTokens: this.getMaxTokensForComplexity(advancedAnalysis.analysis.complexityScore),
             diversityWeight: 0.3,
             recencyWeight: 0.2
           },
           llmOptions: {
-            temperature: this.getTemperatureForIntent(advancedAnalysis.intentConfidence),
+            temperature: this.getTemperatureForIntent(advancedAnalysis.analysis.intentConfidence),
             systemPrompt: options.customSystemPrompt
           },
           streaming: options.enableStreaming || false,
@@ -183,22 +183,16 @@ export class RAGChatIntegration {
     }
   }
 
-  private static getMaxChunksForComplexity(complexity: string): number {
-    switch (complexity) {
-      case 'simple': return 3;
-      case 'moderate': return 5;
-      case 'complex': return 8;
-      default: return 5;
-    }
+  private static getMaxChunksForComplexity(complexityScore: number): number {
+    if (complexityScore < 0.4) return 3;
+    if (complexityScore < 0.7) return 5;
+    return 8;
   }
 
-  private static getMaxTokensForComplexity(complexity: string): number {
-    switch (complexity) {
-      case 'simple': return 1000;
-      case 'moderate': return 2000;
-      case 'complex': return 4000;
-      default: return 2000;
-    }
+  private static getMaxTokensForComplexity(complexityScore: number): number {
+    if (complexityScore < 0.4) return 1000;
+    if (complexityScore < 0.7) return 2000;
+    return 4000;
   }
 
   private static getTemperatureForIntent(intentConfidence: number): number {

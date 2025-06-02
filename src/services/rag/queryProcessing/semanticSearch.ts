@@ -108,6 +108,8 @@ export class SemanticSearchService {
       // Calculate similarity scores and build results
       const results: SemanticSearchResult[] = chunks.map((chunk, index) => {
         const source = sourceMap.get(chunk.source_id);
+        const chunkMetadata = chunk.metadata && typeof chunk.metadata === 'object' ? chunk.metadata : {};
+        
         return {
           chunkId: chunk.id,
           sourceId: chunk.source_id,
@@ -118,7 +120,7 @@ export class SemanticSearchService {
             sourceType: source?.source_type || 'text',
             chunkIndex: chunk.chunk_index,
             createdAt: chunk.created_at || new Date().toISOString(),
-            ...chunk.metadata
+            ...(chunkMetadata as Record<string, any>)
           }
         };
       });
@@ -216,6 +218,8 @@ export class SemanticSearchService {
       // Calculate keyword-based similarity
       const results: SemanticSearchResult[] = chunks.map((chunk) => {
         const source = sourceMap.get(chunk.source_id);
+        const chunkMetadata = chunk.metadata && typeof chunk.metadata === 'object' ? chunk.metadata : {};
+        
         return {
           chunkId: chunk.id,
           sourceId: chunk.source_id,
@@ -226,7 +230,7 @@ export class SemanticSearchService {
             sourceType: source?.source_type || 'text',
             chunkIndex: chunk.chunk_index,
             createdAt: chunk.created_at || new Date().toISOString(),
-            ...chunk.metadata
+            ...(chunkMetadata as Record<string, any>)
           }
         };
       });
@@ -285,7 +289,6 @@ export class SemanticSearchService {
 
   private static async generateQueryEmbedding(query: string): Promise<number[]> {
     // Placeholder for actual embedding generation
-    // In real implementation, this would call an embedding service
     console.log('📊 Generating query embedding (placeholder)');
     return new Array(1536).fill(0).map(() => Math.random());
   }
