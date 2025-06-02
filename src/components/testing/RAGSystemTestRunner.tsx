@@ -2,12 +2,13 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useRAGTesting } from '@/hooks/useRAGTesting';
 import { RAGSystemValidator } from '@/utils/ragSystemValidator';
-import { CheckCircle, XCircle, Clock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { FailedTestsPanel } from './FailedTestsPanel';
+import { TestSummaryCard } from './TestSummaryCard';
+import { TestResultsCard } from './TestResultsCard';
 
 export const RAGSystemTestRunner = () => {
   const {
@@ -26,7 +27,6 @@ export const RAGSystemTestRunner = () => {
 
   const [validationResults, setValidationResults] = useState<any>(null);
   const [isValidating, setIsValidating] = useState(false);
-  const [expandedFailures, setExpandedFailures] = useState<string[]>([]);
 
   const handleRunAllTests = async () => {
     try {
@@ -93,14 +93,6 @@ export const RAGSystemTestRunner = () => {
     );
 
     return failedTests;
-  };
-
-  const toggleFailureExpansion = (testId: string) => {
-    setExpandedFailures(prev => 
-      prev.includes(testId) 
-        ? prev.filter(id => id !== testId)
-        : [...prev, testId]
-    );
   };
 
   const failedTests = getAllFailedTests();
@@ -174,106 +166,9 @@ export const RAGSystemTestRunner = () => {
         </CardContent>
       </Card>
 
-      {summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Test Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{summary.totalTests}</div>
-                <div className="text-sm text-gray-600">Total Tests</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{summary.passed}</div>
-                <div className="text-sm text-gray-600">Passed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{summary.failed}</div>
-                <div className="text-sm text-gray-600">Failed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  {summary.averageDuration.toFixed(1)}ms
-                </div>
-                <div className="text-sm text-gray-600">Avg Duration</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {summary && <TestSummaryCard summary={summary} />}
 
-      {failedTests.length > 0 && (
-        <Card className="border-red-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-700">
-              <AlertTriangle className="h-5 w-5" />
-              Failed Tests ({failedTests.length})
-            </CardTitle>
-            <CardDescription>
-              Click on any failed test to see detailed error information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {failedTests.map((test, index) => {
-                const testId = `${test.suite}-${test.testName}-${index}`;
-                const isExpanded = expandedFailures.includes(testId);
-                
-                return (
-                  <Collapsible key={testId}>
-                    <CollapsibleTrigger 
-                      className="w-full"
-                      onClick={() => toggleFailureExpansion(testId)}
-                    >
-                      <div className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-red-50 hover:bg-red-100 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <XCircle className="h-4 w-4 text-red-500" />
-                          <span className="font-medium text-left">
-                            {test.testName}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {test.suite}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-500">
-                            {test.duration.toFixed(2)}ms
-                          </span>
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </div>
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="mt-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <div className="space-y-2">
-                          <div>
-                            <span className="font-semibold text-red-700">Error Details:</span>
-                            <pre className="mt-1 text-sm text-red-600 whitespace-pre-wrap bg-white p-2 rounded border">
-                              {test.error || 'No error message available'}
-                            </pre>
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-semibold">Test Suite:</span> {test.suite}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-semibold">Duration:</span> {test.duration.toFixed(2)}ms
-                          </div>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <FailedTestsPanel failedTests={failedTests} />
 
       {validationResults && (
         <Card>
@@ -316,89 +211,20 @@ export const RAGSystemTestRunner = () => {
         </Card>
       )}
 
-      {integrationTestResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Integration Test Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {integrationTestResults.map((test, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {getTestStatusIcon(test.passed)}
-                    <span className="font-medium">{test.testName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={test.passed ? "default" : "destructive"}>
-                      {test.passed ? "PASS" : "FAIL"}
-                    </Badge>
-                    <span className="text-sm text-gray-500">
-                      {test.duration.toFixed(2)}ms
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <TestResultsCard 
+        title="Integration Test Results" 
+        results={integrationTestResults} 
+      />
 
-      {serviceOrchestrationTestResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Service Orchestration Test Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {serviceOrchestrationTestResults.map((test, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {getTestStatusIcon(test.passed)}
-                    <span className="font-medium">{test.testName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={test.passed ? "default" : "destructive"}>
-                      {test.passed ? "PASS" : "FAIL"}
-                    </Badge>
-                    <span className="text-sm text-gray-500">
-                      {test.duration.toFixed(2)}ms
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <TestResultsCard 
+        title="Service Orchestration Test Results" 
+        results={serviceOrchestrationTestResults} 
+      />
 
-      {orchestrationTestResults.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Orchestration Test Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {orchestrationTestResults.map((test, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {getTestStatusIcon(test.passed)}
-                    <span className="font-medium">{test.testName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={test.passed ? "default" : "destructive"}>
-                      {test.passed ? "PASS" : "FAIL"}
-                    </Badge>
-                    <span className="text-sm text-gray-500">
-                      {test.duration.toFixed(2)}ms
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <TestResultsCard 
+        title="Orchestration Test Results" 
+        results={orchestrationTestResults} 
+      />
     </div>
   );
 };
