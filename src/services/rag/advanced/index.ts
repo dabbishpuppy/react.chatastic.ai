@@ -3,6 +3,8 @@
 export { ConversationContextManager } from './conversationContextManager';
 export { QueryExpansionService } from './queryExpansionService';
 export { IntelligentRoutingService } from './intelligentRoutingService';
+export { IntentAnalyzer } from './intentAnalyzer';
+export { RoutingDecisionMaker } from './routingDecisionMaker';
 
 // Export types
 export type { 
@@ -11,12 +13,12 @@ export type {
 } from './conversationContextManager';
 
 export type { 
-  QueryExpansion, 
   ExpansionStrategy 
 } from './queryExpansionService';
 
 export type { 
   QueryIntent, 
   RoutingDecision, 
-  QueryAnalysis 
-} from './intelligentRoutingService';
+  QueryAnalysis,
+  QueryExpansion
+} from './types';

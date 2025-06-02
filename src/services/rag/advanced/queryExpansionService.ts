@@ -1,14 +1,5 @@
-
 import { ConversationContextManager, ContextualQuery } from './conversationContextManager';
-
-export interface QueryExpansion {
-  originalQuery: string;
-  expandedQueries: string[];
-  synonyms: Record<string, string[]>;
-  relatedConcepts: string[];
-  negativeTerms: string[];
-  confidence: number;
-}
+import { QueryExpansion } from './types';
 
 export interface ExpansionStrategy {
   name: string;
