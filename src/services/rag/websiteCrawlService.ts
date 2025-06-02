@@ -44,18 +44,20 @@ export class WebsiteCrawlService {
           max_depth: options.maxDepth,
           concurrency: options.concurrency,
           enable_content_pipeline: true,
-          enable_advanced_compression: true // New flag for advanced compression
+          enable_advanced_compression: true, // Critical flag for advanced compression
+          include_paths: typeof options.includePaths === 'string' ? options.includePaths.split(',') : options.includePaths,
+          exclude_paths: typeof options.excludePaths === 'string' ? options.excludePaths.split(',') : options.excludePaths
         }
       });
 
       if (error) {
-        console.error('Error calling crawl function:', error);
+        console.error('Error calling enhanced crawl function:', error);
         throw error;
       }
 
-      console.log('Advanced crawl function response:', data);
+      console.log('Enhanced crawl function response:', data);
     } catch (error) {
-      console.error('Failed to start advanced crawl:', error);
+      console.error('Failed to start enhanced crawl:', error);
       
       // Update source status to failed
       await CrawlMetadataManager.updateSourceStatus(sourceId, 'failed', 0);

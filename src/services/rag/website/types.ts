@@ -2,8 +2,8 @@
 export interface CrawlOptions {
   maxDepth?: number;
   maxPages?: number;
-  includePaths?: string;
-  excludePaths?: string;
+  includePaths?: string | string[];
+  excludePaths?: string | string[];
   respectRobots?: boolean;
   concurrency?: number;
   enableAdvancedCompression?: boolean;

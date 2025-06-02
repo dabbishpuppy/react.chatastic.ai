@@ -5,6 +5,7 @@ import { useRAGServices } from '@/hooks/useRAGServices';
 import { AgentSource } from '@/types/rag';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { WebsiteCrawlService } from '@/services/rag/websiteCrawlService';
 
 export interface WebsiteSubmissionData {
   url: string;
@@ -33,7 +34,7 @@ export const useWebsiteSubmission = () => {
     }
 
     const submissionStartTime = new Date().toISOString();
-    console.log('🚀 Starting website source submission:', {
+    console.log('🚀 Starting website source submission with advanced compression:', {
       agentId,
       url: data.url,
       crawlType: data.crawlType,
@@ -60,10 +61,10 @@ export const useWebsiteSubmission = () => {
         source_type: 'website' as const,
         title: data.url,
         url: data.url,
-        crawl_status: 'pending', // Immediate pending status
+        crawl_status: 'pending',
         progress: 0,
         links_count: 0,
-        is_active: true, // Ensure it appears in the list immediately
+        is_active: true,
         metadata: {
           crawlType: data.crawlType,
           includePaths: data.includePaths || [],
@@ -72,11 +73,13 @@ export const useWebsiteSubmission = () => {
           maxDepth: data.maxDepth || 3,
           concurrency: data.concurrency || 2,
           last_progress_update: submissionStartTime,
-          submission_time: submissionStartTime
+          submission_time: submissionStartTime,
+          advanced_compression_enabled: true, // Mark for advanced compression
+          content_pipeline_enabled: true
         }
       };
 
-      console.log('📝 Creating source with data:', sourceData);
+      console.log('📝 Creating source with advanced compression data:', sourceData);
 
       const result = await sources.createSource(sourceData);
 
@@ -86,56 +89,38 @@ export const useWebsiteSubmission = () => {
         timestamp: new Date().toISOString()
       });
 
-      // Now trigger the actual crawl via edge function
+      // Now trigger the enhanced crawl with advanced compression
       try {
-        console.log('🔄 Initiating crawl via edge function:', {
+        console.log('🔄 Initiating enhanced crawl with advanced compression:', {
           sourceId: result.id,
           url: data.url,
           crawlType: data.crawlType
         });
 
-        const { data: crawlResult, error: crawlError } = await supabase.functions.invoke('crawl-website', {
-          body: {
-            source_id: result.id,
-            url: data.url,
-            crawl_type: data.crawlType,
-            max_pages: data.maxPages,
-            max_depth: data.maxDepth,
-            concurrency: data.concurrency,
-            include_paths: data.includePaths,
-            exclude_paths: data.excludePaths,
-            enable_content_pipeline: true
+        // Use the enhanced crawl service instead of the standard one
+        await WebsiteCrawlService.startEnhancedCrawl(
+          agentId,
+          result.id,
+          data.url,
+          {
+            maxPages: data.maxPages || 100,
+            maxDepth: data.maxDepth || 3,
+            concurrency: data.concurrency || 2,
+            includePaths: data.includePaths?.join(','),
+            excludePaths: data.excludePaths?.join(','),
+            enableAdvancedCompression: true // Enable advanced compression
           }
+        );
+
+        console.log('✅ Enhanced crawl with advanced compression initiated successfully');
+        
+        toast({
+          title: "Success",
+          description: "Website source created with advanced compression enabled",
         });
 
-        if (crawlError) {
-          console.error('❌ Crawl initiation failed:', crawlError);
-          
-          // Update the source status to failed
-          await sources.updateSource(result.id, { 
-            crawl_status: 'failed',
-            metadata: {
-              ...result.metadata,
-              error_message: crawlError.message || 'Failed to start crawl',
-              last_error_at: new Date().toISOString()
-            }
-          });
-          
-          toast({
-            title: "Warning",
-            description: "Source created but crawl failed to start. You can try to recrawl it later.",
-            variant: "destructive"
-          });
-        } else {
-          console.log('✅ Crawl initiated successfully:', crawlResult);
-          
-          toast({
-            title: "Success",
-            description: "Website source created and crawl started",
-          });
-        }
       } catch (crawlError) {
-        console.error('❌ Error initiating crawl:', crawlError);
+        console.error('❌ Error initiating enhanced crawl:', crawlError);
         
         // Update the source status to failed but don't prevent the UI from showing it
         await sources.updateSource(result.id, { 
@@ -149,7 +134,7 @@ export const useWebsiteSubmission = () => {
         
         toast({
           title: "Warning", 
-          description: "Source created but crawl failed to start. You can try to recrawl it later.",
+          description: "Source created but enhanced crawl failed to start. You can try to recrawl it later.",
           variant: "destructive"
         });
       }
@@ -173,7 +158,6 @@ export const useWebsiteSubmission = () => {
   };
 
   const refetch = async () => {
-    // This will be used by components that need to refresh data
     console.log('🔄 Refetch requested for website sources');
   };
 
