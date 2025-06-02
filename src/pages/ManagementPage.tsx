@@ -12,7 +12,10 @@ const ManagementPage: React.FC = () => {
   }
 
   return (
-    <AgentPageLayout>
+    <AgentPageLayout
+      defaultActiveTab="management"
+      defaultPageTitle="Management"
+    >
       <RAGManagementDashboard agentId={agentId} />
     </AgentPageLayout>
   );
