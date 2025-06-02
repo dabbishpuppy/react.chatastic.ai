@@ -33,86 +33,41 @@ export const useAgentSourceStats = () => {
     if (!agentId) return;
 
     try {
-      console.log('📊 Fetching agent source stats for:', agentId);
+      console.log('📊 Fetching agent source stats using RPC for:', agentId);
       
-      // Get basic source stats
-      const { data: sources, error: sourcesError } = await supabase
-        .from('agent_sources')
-        .select('source_type, content, parent_source_id')
-        .eq('agent_id', agentId)
-        .eq('is_active', true);
+      // Use the RPC function for accurate stats calculation
+      const { data, error: rpcError } = await supabase
+        .rpc('get_agent_source_stats', { target_agent_id: agentId });
 
-      if (sourcesError) throw sourcesError;
+      if (rpcError) throw rpcError;
 
-      // Get website source pages total size
-      const { data: websiteSourcesWithPages, error: websiteError } = await supabase
-        .from('agent_sources')
-        .select(`
-          id,
-          source_type,
-          content,
-          source_pages!inner(content_size)
-        `)
-        .eq('agent_id', agentId)
-        .eq('source_type', 'website')
-        .eq('is_active', true)
-        .is('parent_source_id', null);
+      console.log('📊 RPC response:', data);
 
-      if (websiteError) {
-        console.error('Error fetching website source pages:', websiteError);
+      if (data && data.length > 0) {
+        const result = data[0];
+        setStats({
+          totalSources: result.total_sources || 0,
+          totalBytes: result.total_bytes || 0,
+          sourcesByType: result.sources_by_type || {
+            text: { count: 0, size: 0 },
+            file: { count: 0, size: 0 },
+            website: { count: 0, size: 0 },
+            qa: { count: 0, size: 0 }
+          }
+        });
+      } else {
+        // Fallback to empty stats
+        setStats({
+          totalSources: 0,
+          totalBytes: 0,
+          sourcesByType: {
+            text: { count: 0, size: 0 },
+            file: { count: 0, size: 0 },
+            website: { count: 0, size: 0 },
+            qa: { count: 0, size: 0 }
+          }
+        });
       }
-
-      console.log('📊 Raw sources data:', sources);
-      console.log('📊 Website sources with pages:', websiteSourcesWithPages);
-
-      // Calculate stats
-      const statsByType = {
-        text: { count: 0, size: 0 },
-        file: { count: 0, size: 0 },
-        website: { count: 0, size: 0 },
-        qa: { count: 0, size: 0 }
-      };
-
-      let totalBytes = 0;
-      let totalSources = 0;
-
-      // Process regular sources (text, file, qa)
-      sources?.forEach(source => {
-        if (source.source_type === 'website' && !source.parent_source_id) {
-          // Skip website parent sources, we'll handle them separately
-          return;
-        }
-        
-        if (source.source_type !== 'website') {
-          const contentSize = source.content ? new Blob([source.content]).size : 0;
-          statsByType[source.source_type as keyof typeof statsByType].count++;
-          statsByType[source.source_type as keyof typeof statsByType].size += contentSize;
-          totalBytes += contentSize;
-          totalSources++;
-        }
-      });
-
-      // Process website sources with their crawled pages
-      websiteSourcesWithPages?.forEach(websiteSource => {
-        statsByType.website.count++;
-        totalSources++;
-        
-        // Calculate total size from all source pages
-        const websiteSize = websiteSource.source_pages?.reduce((sum: number, page: any) => {
-          return sum + (page.content_size || 0);
-        }, 0) || 0;
-        
-        statsByType.website.size += websiteSize;
-        totalBytes += websiteSize;
-      });
-
-      console.log('📊 Calculated stats:', { totalSources, totalBytes, statsByType });
-
-      setStats({
-        totalSources,
-        totalBytes,
-        sourcesByType: statsByType
-      });
     } catch (err: any) {
       console.error('❌ Error fetching agent source stats:', err);
       setError(err.message || 'Failed to fetch source stats');

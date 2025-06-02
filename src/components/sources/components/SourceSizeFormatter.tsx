@@ -6,20 +6,20 @@ export const formatFileSize = (source: AgentSource): string => {
 
   // Handle different source types with priority for aggregated data
   if (source.source_type === 'website') {
-    // For website sources, prioritize aggregated compressed size
-    if (source.compressed_content_size && source.compressed_content_size > 0) {
+    // For website sources, prioritize aggregated database fields
+    if (source.total_content_size && source.total_content_size > 0) {
+      sizeInBytes = source.total_content_size;
+    } else if (source.compressed_content_size && source.compressed_content_size > 0) {
       sizeInBytes = source.compressed_content_size;
     } else if (source.compressed_size && source.compressed_size > 0) {
       sizeInBytes = source.compressed_size;
-    } else if (source.total_content_size && source.total_content_size > 0) {
-      sizeInBytes = source.total_content_size;
     } else if (source.original_size && source.original_size > 0) {
       sizeInBytes = source.original_size;
     } else if (source.content) {
       sizeInBytes = source.content.length;
     }
   } else {
-    // For non-website sources, use file_size from metadata first
+    // For non-website sources, use metadata file_size first, then other fields
     if (source.metadata?.file_size && source.metadata.file_size > 0) {
       sizeInBytes = source.metadata.file_size;
     } else if (source.original_size && source.original_size > 0) {
@@ -52,21 +52,21 @@ export const getCompressionInfo = (source: AgentSource): { ratio: number; origin
   let compressedSize = 0;
   let ratio = 0;
 
-  // Get original size (uncompressed)
+  // Get original size (prioritize aggregated fields)
   if (source.total_content_size && source.total_content_size > 0) {
     originalSize = source.total_content_size;
   } else if (source.original_size && source.original_size > 0) {
     originalSize = source.original_size;
   }
 
-  // Get compressed size
+  // Get compressed size (prioritize aggregated fields)
   if (source.compressed_content_size && source.compressed_content_size > 0) {
     compressedSize = source.compressed_content_size;
   } else if (source.compressed_size && source.compressed_size > 0) {
     compressedSize = source.compressed_size;
   }
 
-  // Calculate ratio
+  // Calculate ratio (prioritize aggregated fields)
   if (source.global_compression_ratio && source.global_compression_ratio > 0) {
     ratio = source.global_compression_ratio;
   } else if (source.compression_ratio && source.compression_ratio > 0) {

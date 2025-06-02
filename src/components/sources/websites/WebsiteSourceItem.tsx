@@ -122,6 +122,10 @@ const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               content={source.content}
               childSources={childSources}
               sourcePages={sourcePages}
+              totalContentSize={source.total_content_size}
+              compressedContentSize={source.compressed_content_size}
+              originalSize={source.original_size}
+              compressedSize={source.compressed_size}
             />
           </div>
           

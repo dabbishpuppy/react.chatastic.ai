@@ -14,6 +14,11 @@ interface WebsiteSourceInfoProps {
   childSources?: any[];
   isChild?: boolean;
   sourcePages?: { id: string; status: string; content_size?: number }[];
+  // Add database aggregated fields
+  totalContentSize?: number;
+  compressedContentSize?: number;
+  originalSize?: number;
+  compressedSize?: number;
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -27,14 +32,14 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   content,
   childSources = [],
   isChild = false,
-  sourcePages = []
+  sourcePages = [],
+  totalContentSize,
+  compressedContentSize,
+  originalSize,
+  compressedSize
 }) => {
   // For parent sources, show count from sourcePages if available, otherwise use linksCount
   const displayLinksCount = !isChild ? (sourcePages?.length || linksCount || 0) : undefined;
-  
-  // Calculate total compressed size from sourcePages for parent sources
-  const totalCompressedSize = !isChild && sourcePages?.length ? 
-    sourcePages.reduce((sum, page) => sum + (page.content_size || 0), 0) : 0;
   
   // Calculate status counts from sourcePages for parent sources
   const statusCounts = !isChild && sourcePages?.length ? {
@@ -71,24 +76,23 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     return null;
   };
 
-  // Create a mock source object for the formatter to handle size calculation properly
+  // Create a mock source object for the formatter using database aggregated fields
   const sourceForSizeCalculation = {
     source_type: 'website',
-    metadata: {
-      ...metadata,
-      // Use aggregated size from parent source metadata if available, otherwise calculate from sourcePages
-      total_content_size: metadata?.total_content_size || totalCompressedSize || undefined,
-      compressed_size: metadata?.compressed_size,
-      file_size: metadata?.file_size
-    },
+    total_content_size: totalContentSize,
+    compressed_content_size: compressedContentSize,
+    original_size: originalSize,
+    compressed_size: compressedSize,
+    metadata: metadata,
     content: content
   };
 
   const shouldShowSize = () => {
-    // For parent sources, show size if we have meaningful compressed content
+    // For parent sources, show size if we have aggregated database fields
     if (!isChild) {
-      return (metadata?.total_content_size && metadata.total_content_size > 0) || 
-             (totalCompressedSize > 0);
+      return (totalContentSize && totalContentSize > 0) || 
+             (compressedContentSize && compressedContentSize > 0) ||
+             (originalSize && originalSize > 0);
     }
     // For child sources, show size if we have content
     return content && content.length > 0;

@@ -36,6 +36,10 @@ const FixSourcesButton: React.FC = () => {
       });
       
       console.log('✅ Fix completed:', result);
+      
+      // Trigger a page refresh or emit a custom event to refresh stats
+      window.dispatchEvent(new CustomEvent('sourcesFixed'));
+      
     } catch (error) {
       console.error('❌ Failed to fix sources:', error);
       toast({
