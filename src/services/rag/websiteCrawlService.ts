@@ -101,7 +101,6 @@ export class WebsiteCrawlService {
   ): Promise<ProcessingResult> {
     let extractionMetricId = '';
     let cleaningMetricId = '';
-    let chunkingMetricId = '';
     
     try {
       console.log(`📄 Processing page with advanced compression: ${url}`);
@@ -145,6 +144,15 @@ export class WebsiteCrawlService {
       // Convert compressed data to string for storage
       const compressedDataString = Array.from(compressionResult.compressed).join(',');
 
+      // Convert ContentAnalysis to plain object for JSON storage
+      const contentAnalysisPlain = {
+        contentType: contentAnalysis.contentType,
+        density: contentAnalysis.density,
+        uniqueWords: contentAnalysis.uniqueWords,
+        repeatedPhrases: contentAnalysis.repeatedPhrases,
+        boilerplateRatio: contentAnalysis.boilerplateRatio
+      };
+
       await PerformanceMetricsService.endMetric(extractionMetricId, agentId, 'extraction', {
         outputSize: compressionResult.compressedSize,
         itemsProcessed: 1,
@@ -164,7 +172,7 @@ export class WebsiteCrawlService {
         sourceId,
         agentId,
         teamId,
-        phase: 'processing',
+        phase: 'cleaning',
         inputSize: cleanedHtml.length
       });
 
@@ -188,7 +196,7 @@ export class WebsiteCrawlService {
             metadata: {
               processing_mode: processingMode,
               compression_method: compressionResult.method,
-              content_analysis: contentAnalysis,
+              content_analysis: contentAnalysisPlain,
               file_size: compressionResult.compressedSize
             }
           })
@@ -244,7 +252,7 @@ export class WebsiteCrawlService {
             metadata: {
               processing_mode: processingMode,
               compression_method: compressionResult.method,
-              content_analysis: contentAnalysis,
+              content_analysis: contentAnalysisPlain,
               file_size: compressionResult.compressedSize,
               advanced_deduplication: true
             }
@@ -256,7 +264,7 @@ export class WebsiteCrawlService {
 
       const processingTime = Date.now() - processingStart;
 
-      await PerformanceMetricsService.endMetric(cleaningMetricId, agentId, 'processing', {
+      await PerformanceMetricsService.endMetric(cleaningMetricId, agentId, 'cleaning', {
         outputSize: compressionResult.compressedSize,
         itemsProcessed: chunksCreated || 1,
         successRate: 1.0,
@@ -295,7 +303,7 @@ export class WebsiteCrawlService {
         });
       }
       if (cleaningMetricId) {
-        await PerformanceMetricsService.endMetric(cleaningMetricId, agentId, 'processing', {
+        await PerformanceMetricsService.endMetric(cleaningMetricId, agentId, 'cleaning', {
           successRate: 0.0,
           errorMessage: error instanceof Error ? error.message : 'Unknown error'
         });
@@ -513,7 +521,10 @@ export class WebsiteCrawlService {
           chunkingTime,
           compressionRatio: compressionResult.ratio,
           chunksCreated: createdChunks.length,
-          duplicatesFound: deduplicationResult.duplicateChunks.length
+          duplicatesFound: deduplicationResult.duplicateChunks.length,
+          processingMode: 'standard',
+          compressionMethod: 'standard',
+          spaceSaved: compressionResult.originalSize - compressionResult.compressedSize
         }
       };
 
