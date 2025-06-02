@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface SearchFilters {
@@ -45,7 +44,7 @@ export class SemanticSearchService {
       // Generate query embedding (placeholder - would use actual embedding service)
       const queryEmbedding = await this.generateQueryEmbedding(query);
 
-      // Build search query with filters
+      // Build search query with correct joins
       let searchQuery = supabase
         .from('source_chunks')
         .select(`
@@ -54,20 +53,24 @@ export class SemanticSearchService {
           content,
           chunk_index,
           metadata,
-          agent_sources!inner(
-            id,
-            name,
-            source_type,
-            agent_id
-          )
-        `)
-        .eq('agent_sources.agent_id', agentId);
+          created_at
+        `);
 
-      // Apply filters
-      if (filters?.sourceTypes?.length) {
-        searchQuery = searchQuery.in('agent_sources.source_type', filters.sourceTypes);
+      // Join with agent_sources to filter by agent_id
+      const { data: agentSources } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId);
+
+      if (!agentSources || agentSources.length === 0) {
+        console.log('No sources found for agent');
+        return [];
       }
 
+      const sourceIds = agentSources.map(source => source.id);
+      searchQuery = searchQuery.in('source_id', sourceIds);
+
+      // Apply additional filters
       if (filters?.excludeSources?.length) {
         searchQuery = searchQuery.not('source_id', 'in', `(${filters.excludeSources.join(',')})`);
       }
@@ -93,20 +96,32 @@ export class SemanticSearchService {
         return [];
       }
 
-      // Calculate similarity scores (placeholder - would use vector similarity)
-      const results: SemanticSearchResult[] = chunks.map((chunk, index) => ({
-        chunkId: chunk.id,
-        sourceId: chunk.source_id,
-        content: chunk.content,
-        similarity: this.calculateMockSimilarity(query, chunk.content, index),
-        metadata: {
-          sourceName: chunk.agent_sources.name,
-          sourceType: chunk.agent_sources.source_type,
-          chunkIndex: chunk.chunk_index,
-          createdAt: chunk.created_at || new Date().toISOString(),
-          ...chunk.metadata
-        }
-      }));
+      // Get source metadata for each chunk
+      const uniqueSourceIds = [...new Set(chunks.map(chunk => chunk.source_id))];
+      const { data: sources } = await supabase
+        .from('agent_sources')
+        .select('id, title, source_type')
+        .in('id', uniqueSourceIds);
+
+      const sourceMap = new Map(sources?.map(s => [s.id, s]) || []);
+
+      // Calculate similarity scores and build results
+      const results: SemanticSearchResult[] = chunks.map((chunk, index) => {
+        const source = sourceMap.get(chunk.source_id);
+        return {
+          chunkId: chunk.id,
+          sourceId: chunk.source_id,
+          content: chunk.content,
+          similarity: this.calculateMockSimilarity(query, chunk.content, index),
+          metadata: {
+            sourceName: source?.title || 'Unknown Source',
+            sourceType: source?.source_type || 'text',
+            chunkIndex: chunk.chunk_index,
+            createdAt: chunk.created_at || new Date().toISOString(),
+            ...chunk.metadata
+          }
+        };
+      });
 
       // Filter by minimum similarity
       const filteredResults = results.filter(
@@ -145,6 +160,18 @@ export class SemanticSearchService {
       // Create text search query
       const searchTerm = keywords.join(' | ');
       
+      // Get agent sources first
+      const { data: agentSources } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId);
+
+      if (!agentSources || agentSources.length === 0) {
+        return [];
+      }
+
+      const sourceIds = agentSources.map(source => source.id);
+
       let searchQuery = supabase
         .from('source_chunks')
         .select(`
@@ -153,19 +180,14 @@ export class SemanticSearchService {
           content,
           chunk_index,
           metadata,
-          agent_sources!inner(
-            id,
-            name,
-            source_type,
-            agent_id
-          )
+          created_at
         `)
-        .eq('agent_sources.agent_id', agentId)
+        .in('source_id', sourceIds)
         .textSearch('content', searchTerm);
 
       // Apply same filters as semantic search
-      if (filters?.sourceTypes?.length) {
-        searchQuery = searchQuery.in('agent_sources.source_type', filters.sourceTypes);
+      if (filters?.excludeSources?.length) {
+        searchQuery = searchQuery.not('source_id', 'in', `(${filters.excludeSources.join(',')})`);
       }
 
       const limit = Math.min(filters?.maxResults || 10, 30);
@@ -182,20 +204,32 @@ export class SemanticSearchService {
         return [];
       }
 
+      // Get source metadata
+      const uniqueSourceIds = [...new Set(chunks.map(chunk => chunk.source_id))];
+      const { data: sources } = await supabase
+        .from('agent_sources')
+        .select('id, title, source_type')
+        .in('id', uniqueSourceIds);
+
+      const sourceMap = new Map(sources?.map(s => [s.id, s]) || []);
+
       // Calculate keyword-based similarity
-      const results: SemanticSearchResult[] = chunks.map((chunk, index) => ({
-        chunkId: chunk.id,
-        sourceId: chunk.source_id,
-        content: chunk.content,
-        similarity: this.calculateKeywordSimilarity(keywords, chunk.content),
-        metadata: {
-          sourceName: chunk.agent_sources.name,
-          sourceType: chunk.agent_sources.source_type,
-          chunkIndex: chunk.chunk_index,
-          createdAt: chunk.created_at || new Date().toISOString(),
-          ...chunk.metadata
-        }
-      }));
+      const results: SemanticSearchResult[] = chunks.map((chunk) => {
+        const source = sourceMap.get(chunk.source_id);
+        return {
+          chunkId: chunk.id,
+          sourceId: chunk.source_id,
+          content: chunk.content,
+          similarity: this.calculateKeywordSimilarity(keywords, chunk.content),
+          metadata: {
+            sourceName: source?.title || 'Unknown Source',
+            sourceType: source?.source_type || 'text',
+            chunkIndex: chunk.chunk_index,
+            createdAt: chunk.created_at || new Date().toISOString(),
+            ...chunk.metadata
+          }
+        };
+      });
 
       const filteredResults = results.filter(
         result => result.similarity >= (filters?.minSimilarity || 0.2)
@@ -318,11 +352,11 @@ export class SemanticSearchService {
     console.log('💡 Getting search suggestions:', { partialQuery });
 
     try {
-      // Get recent successful queries for this agent
+      // Get recent successful queries for this agent from messages table
       const { data: recentQueries } = await supabase
-        .from('conversation_messages')
-        .select('content')
-        .eq('agent_id', agentId)
+        .from('messages')
+        .select('content, conversations!inner(agent_id)')
+        .eq('conversations.agent_id', agentId)
         .eq('is_agent', false)
         .ilike('content', `%${partialQuery}%`)
         .limit(limit * 2);

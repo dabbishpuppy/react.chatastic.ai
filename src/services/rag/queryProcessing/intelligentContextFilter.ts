@@ -35,7 +35,7 @@ export class IntelligentContextFilter {
     
     console.log('🎯 Filtering and optimizing context:', {
       originalResults: searchResults.length,
-      queryComplexity: advancedAnalysis.complexity,
+      queryComplexity: advancedAnalysis.complexityScore,
       intentConfidence: advancedAnalysis.intentConfidence
     });
 
@@ -57,25 +57,25 @@ export class IntelligentContextFilter {
       );
       filteringReasons.push('Diversity filtering applied');
 
-      // Step 3: Apply recency weighting if suggested
-      if (advancedAnalysis.suggestedFilters.timeRange) {
+      // Step 3: Apply recency weighting if date range is available
+      if (advancedAnalysis.suggestedFilters.dateRange) {
         filteredChunks = this.applyRecencyWeighting(
           filteredChunks,
-          advancedAnalysis.suggestedFilters.timeRange,
+          advancedAnalysis.suggestedFilters.dateRange,
           options.recencyWeight || 0.2
         );
         filteringReasons.push('Recency weighting applied');
       }
 
       // Step 4: Apply token limit optimization
-      const maxTokens = options.maxContextTokens || this.getMaxTokensForComplexity(advancedAnalysis.complexity);
+      const maxTokens = options.maxContextTokens || this.getMaxTokensForComplexity(advancedAnalysis.complexityScore);
       const tokenOptimizedResult = this.optimizeForTokenLimit(filteredChunks, maxTokens);
       filteredChunks = tokenOptimizedResult.chunks;
       if (tokenOptimizedResult.wasOptimized) {
         filteringReasons.push(`Token limit optimization: ${maxTokens} tokens`);
       }
 
-      // Step 5: Apply conversation context filtering
+      // Step 5: Apply conversation context filtering if available
       if (advancedAnalysis.conversationContext) {
         filteredChunks = this.applyConversationContextFiltering(
           filteredChunks,
@@ -124,8 +124,8 @@ export class IntelligentContextFilter {
     // Adjust threshold based on query complexity and intent confidence
     let threshold = 0.3; // Base threshold
 
-    if (analysis.complexity === 'simple') threshold = 0.4;
-    else if (analysis.complexity === 'complex') threshold = 0.25;
+    if (analysis.complexityScore < 0.4) threshold = 0.4;
+    else if (analysis.complexityScore > 0.7) threshold = 0.25;
 
     if (analysis.intentConfidence > 0.8) threshold += 0.1;
     else if (analysis.intentConfidence < 0.5) threshold -= 0.05;
@@ -133,13 +133,10 @@ export class IntelligentContextFilter {
     return Math.max(0.1, Math.min(0.7, threshold));
   }
 
-  private static getMaxTokensForComplexity(complexity: 'simple' | 'moderate' | 'complex'): number {
-    switch (complexity) {
-      case 'simple': return 1000;
-      case 'moderate': return 2000;
-      case 'complex': return 4000;
-      default: return 2000;
-    }
+  private static getMaxTokensForComplexity(complexityScore: number): number {
+    if (complexityScore < 0.4) return 1000;
+    else if (complexityScore < 0.7) return 2000;
+    else return 4000;
   }
 
   private static applyDiversityFiltering(
@@ -173,12 +170,12 @@ export class IntelligentContextFilter {
 
   private static applyRecencyWeighting(
     chunks: SemanticSearchResult[],
-    timeRange: { start: Date; end: Date },
+    dateRange: { start: Date; end: Date },
     recencyWeight: number
   ): SemanticSearchResult[] {
     return chunks.map(chunk => {
       const chunkDate = new Date(chunk.metadata.createdAt);
-      const isRecent = chunkDate >= timeRange.start && chunkDate <= timeRange.end;
+      const isRecent = chunkDate >= dateRange.start && chunkDate <= dateRange.end;
       
       if (isRecent) {
         // Boost similarity score for recent content
@@ -227,18 +224,22 @@ export class IntelligentContextFilter {
       const chunkContent = chunk.content.toLowerCase();
 
       // Check for topic matches
-      conversationContext.topics.forEach(topic => {
-        if (chunkContent.includes(topic.toLowerCase())) {
-          boost += 0.05;
-        }
-      });
+      if (conversationContext.topics) {
+        conversationContext.topics.forEach(topic => {
+          if (chunkContent.includes(topic.toLowerCase())) {
+            boost += 0.05;
+          }
+        });
+      }
 
       // Check for entity matches
-      conversationContext.entities.forEach(entity => {
-        if (chunkContent.includes(entity.toLowerCase())) {
-          boost += 0.1;
-        }
-      });
+      if (conversationContext.entities) {
+        conversationContext.entities.forEach(entity => {
+          if (chunkContent.includes(entity.toLowerCase())) {
+            boost += 0.1;
+          }
+        });
+      }
 
       return {
         ...chunk,

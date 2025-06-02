@@ -37,7 +37,7 @@ export class EnhancedQueryEngineTests {
       const request: EnhancedQueryRequest = {
         query: 'Test enhanced query processing',
         agentId: 'test-agent-enhanced',
-        optimizationLevel: 'standard',
+        optimizationStrategy: 'standard',
         searchFilters: {
           maxResults: 5
         }
@@ -47,9 +47,9 @@ export class EnhancedQueryEngineTests {
 
       return {
         resultGenerated: !!result.rankedContext,
-        optimizationsApplied: result.optimizationsApplied.length > 0,
-        processingTimeRecorded: typeof result.processingTime === 'number',
-        cacheStatusTracked: typeof result.cacheHit === 'boolean'
+        optimizationsApplied: result.optimizations.appliedOptimizations.length > 0,
+        processingTimeRecorded: typeof result.processingTimeMs === 'number',
+        cacheStatusTracked: typeof result.optimizations.cacheHit === 'boolean'
       };
     });
   }

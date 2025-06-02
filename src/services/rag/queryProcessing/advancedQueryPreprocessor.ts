@@ -1,4 +1,3 @@
-
 import { QueryPreprocessor, QueryContext, QueryPreprocessingResult } from './queryPreprocessor';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,6 +14,8 @@ export interface ConversationContext {
     preferredSources: string[];
     excludedTopics: string[];
   };
+  topics: string[];
+  entities: string[];
 }
 
 export interface AdvancedQueryAnalysis {
@@ -27,6 +28,22 @@ export interface AdvancedQueryAnalysis {
     sourceTypes: string[];
     dateRange?: { start: Date; end: Date };
     relevanceThreshold: number;
+  };
+  conversationContext?: ConversationContext;
+}
+
+// Extend QueryContext to include conversation data
+export interface ExtendedQueryContext extends QueryContext {
+  conversationHistory?: Array<{
+    query: string;
+    response: string;
+    timestamp: string;
+    topics: string[];
+  }>;
+  userPreferences?: {
+    responseStyle: 'concise' | 'detailed' | 'technical';
+    preferredSources: string[];
+    excludedTopics: string[];
   };
 }
 
@@ -128,7 +145,8 @@ export class AdvancedQueryPreprocessor extends QueryPreprocessor {
       urgencyLevel,
       complexityScore,
       requiredContext,
-      suggestedFilters
+      suggestedFilters,
+      conversationContext
     };
   }
 
@@ -201,12 +219,12 @@ export class AdvancedQueryPreprocessor extends QueryPreprocessor {
     context: QueryContext,
     conversationContext?: ConversationContext,
     conversationId?: string
-  ): Promise<QueryContext> {
+  ): Promise<ExtendedQueryContext> {
     if (!conversationContext && conversationId) {
-      // Fetch conversation context from database
+      // Fetch conversation context from messages table instead of non-existent conversation_messages
       try {
         const { data: messages } = await supabase
-          .from('conversation_messages')
+          .from('messages')
           .select('content, is_agent, created_at')
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })
@@ -245,7 +263,9 @@ export class AdvancedQueryPreprocessor extends QueryPreprocessor {
         responseStyle: 'detailed',
         preferredSources: [],
         excludedTopics: []
-      }
+      },
+      topics: [],
+      entities: []
     };
   }
 

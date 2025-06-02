@@ -1,4 +1,3 @@
-
 import { RAGQueryEngine, RAGQueryRequest, RAGQueryResult } from '../../queryProcessing/ragQueryEngine';
 import { AdvancedQueryPreprocessor } from '../../queryProcessing/advancedQueryPreprocessor';
 import { SemanticSearchService } from '../../queryProcessing/semanticSearch';
@@ -166,10 +165,12 @@ export class EnhancedQueryProcessor {
 
       // Stage 7: Analytics Tracking
       if (request.trackAnalytics !== false) {
-        QueryAnalytics.recordQueryExecution(request, finalResult, {
-          appliedOptimizations,
-          fallbacksUsed,
-          processingStages
+        QueryAnalytics.recordQueryExecution(`q_${Date.now()}`, {
+          processingTime: Date.now() - startTime,
+          optimizationLevel: request.optimizationStrategy || 'balanced',
+          cacheHit,
+          resultQuality: rankedContext.relevanceScore || 0,
+          errorCount: 0
         });
         appliedOptimizations.push('analytics_tracking');
       }
