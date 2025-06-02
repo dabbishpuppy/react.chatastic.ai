@@ -3,7 +3,6 @@ import { RAGQueryEngineEnhanced } from '../enhanced/ragQueryEngineEnhanced';
 import { globalPerformanceMonitor } from '../performance/performanceMonitor';
 import { globalCache } from '../performance/cacheService';
 import { globalOptimizationService } from '../performance/optimizationService';
-import { crypto } from 'crypto';
 
 export interface TestResult {
   testName: string;
