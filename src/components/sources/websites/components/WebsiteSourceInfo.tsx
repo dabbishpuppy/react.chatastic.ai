@@ -88,27 +88,37 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           </p>
         </div>
         
-        <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
           <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
           
           {!isChild && displayLinksCount > 0 && (
-            <span>{displayLinksCount} links</span>
+            <>
+              <span>•</span>
+              <span>{displayLinksCount} links</span>
+            </>
+          )}
+          
+          {!isChild && totalSize > 0 && (
+            <>
+              <span>•</span>
+              <span>{formatBytes(totalSize)}</span>
+            </>
           )}
           
           {lastCrawledAt && (
-            <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
+            <>
+              <span>•</span>
+              <span>Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}</span>
+            </>
           )}
           
           {content && (
-            <span>{Math.round(content.length / 1024)} KB</span>
+            <>
+              <span>•</span>
+              <span>{Math.round(content.length / 1024)} KB</span>
+            </>
           )}
         </div>
-        
-        {!isChild && totalSize > 0 && (
-          <div className="text-xs text-gray-600 mt-1">
-            Total size: {formatBytes(totalSize)}
-          </div>
-        )}
         
         {getStatusText() && (
           <div className="text-xs text-gray-600 mt-1">

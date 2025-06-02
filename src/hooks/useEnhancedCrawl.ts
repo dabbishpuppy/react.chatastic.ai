@@ -100,8 +100,8 @@ export const useEnhancedCrawl = () => {
     return [];
   };
 
-  const getActiveCrawlStatus = async (parentSourceId: string) => {
-    // Placeholder implementation
+  const getActiveCrawlStatus = (parentSourceId: string) => {
+    // Return null for now - this should be implemented to return actual crawl status
     console.log('Get active crawl status for:', parentSourceId);
     return null;
   };
