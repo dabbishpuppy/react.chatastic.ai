@@ -2,6 +2,25 @@
 import { AgentSource } from '@/types/rag';
 
 export const formatFileSize = (source: AgentSource) => {
+  // For Q&A sources, calculate size from content or metadata
+  if (source.source_type === 'qa') {
+    // First check if metadata has file_size
+    if (source.metadata) {
+      const metadata = source.metadata as any;
+      if (metadata.file_size && typeof metadata.file_size === 'number' && metadata.file_size > 0) {
+        return formatBytes(metadata.file_size);
+      }
+    }
+    
+    // Calculate from content if available
+    if (source.content && source.content.length > 0) {
+      const bytes = new TextEncoder().encode(source.content).length;
+      return formatBytes(bytes);
+    }
+    
+    return '0 B';
+  }
+
   // For website sources, prioritize aggregated and compressed content sizes
   if (source.source_type === 'website') {
     const metadata = source.metadata as any;

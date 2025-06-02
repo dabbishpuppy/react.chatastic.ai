@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from 'date-fns';
 import DeleteSourceDialog from "../DeleteSourceDialog";
 import { useSourcesListLogic } from "../hooks/useSourcesListLogic";
+import { formatFileSize } from "../components/SourceSizeFormatter";
 
 const QATab: React.FC = () => {
   const { agentId } = useParams();
@@ -163,7 +164,7 @@ const QATab: React.FC = () => {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
-                            {source.content ? `${Math.round(source.content.length / 1024 * 100) / 100} KB` : '0 KB'}
+                            {formatFileSize(source)}
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
                             {formatDistanceToNow(new Date(source.created_at), { addSuffix: true })}
