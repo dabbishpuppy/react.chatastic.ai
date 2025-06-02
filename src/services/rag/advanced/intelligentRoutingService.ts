@@ -1,4 +1,3 @@
-
 import { QueryExpansionService, QueryExpansion } from './queryExpansionService';
 import { ConversationContextManager } from './conversationContextManager';
 
@@ -28,7 +27,7 @@ export interface QueryAnalysis {
 }
 
 export class IntelligentRoutingService {
-  private static readonly INTENT_PATTERNS = {
+  private static readonly INTENT_PATTERNS: Record<QueryIntent['type'], RegExp[]> = {
     question: [
       /\b(what|how|why|when|where|who|which|can you|could you|do you know)\b/i,
       /\?$/,
@@ -158,13 +157,14 @@ export class IntelligentRoutingService {
 
   private static analyzeIntent(query: string): QueryIntent {
     const lowerQuery = query.toLowerCase();
-    let bestMatch: { type: keyof typeof this.INTENT_PATTERNS; confidence: number } = {
+    let bestMatch: { type: QueryIntent['type']; confidence: number } = {
       type: 'question',
       confidence: 0
     };
 
-    // Check each intent pattern
-    for (const [intentType, patterns] of Object.entries(this.INTENT_PATTERNS)) {
+    // Check each intent pattern with proper typing
+    for (const intentType of Object.keys(this.INTENT_PATTERNS) as Array<keyof typeof this.INTENT_PATTERNS>) {
+      const patterns = this.INTENT_PATTERNS[intentType];
       let matches = 0;
       let totalPatterns = patterns.length;
 
@@ -177,7 +177,7 @@ export class IntelligentRoutingService {
       const confidence = matches / totalPatterns;
       if (confidence > bestMatch.confidence) {
         bestMatch = {
-          type: intentType as keyof typeof this.INTENT_PATTERNS,
+          type: intentType,
           confidence
         };
       }
