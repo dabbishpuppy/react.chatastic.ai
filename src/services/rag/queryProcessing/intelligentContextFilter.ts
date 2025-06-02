@@ -2,6 +2,7 @@
 import { SemanticSearchResult } from './semanticSearch';
 import { QueryContext } from './queryPreprocessor';
 import { AdvancedQueryAnalysis } from './advancedQueryPreprocessor';
+import { ContextAnalyzer } from './context/contextAnalyzer';
 
 export interface FilteringOptions {
   maxContextTokens?: number;
@@ -44,7 +45,7 @@ export class IntelligentContextFilter {
       const filteringReasons: string[] = [];
 
       // Step 1: Apply relevance threshold
-      const relevanceThreshold = options.relevanceThreshold || this.getRelevanceThreshold(advancedAnalysis);
+      const relevanceThreshold = options.relevanceThreshold || ContextAnalyzer.getRelevanceThreshold(advancedAnalysis);
       filteredChunks = filteredChunks.filter(chunk => chunk.similarity >= relevanceThreshold);
       if (filteredChunks.length < searchResults.length) {
         filteringReasons.push(`Relevance threshold: ${relevanceThreshold}`);
@@ -68,7 +69,7 @@ export class IntelligentContextFilter {
       }
 
       // Step 4: Apply token limit optimization
-      const maxTokens = options.maxContextTokens || this.getMaxTokensForComplexity(advancedAnalysis.complexityScore);
+      const maxTokens = options.maxContextTokens || ContextAnalyzer.getMaxTokensForComplexity(advancedAnalysis.complexityScore);
       const tokenOptimizedResult = this.optimizeForTokenLimit(filteredChunks, maxTokens);
       filteredChunks = tokenOptimizedResult.chunks;
       if (tokenOptimizedResult.wasOptimized) {
@@ -120,25 +121,6 @@ export class IntelligentContextFilter {
     }
   }
 
-  private static getRelevanceThreshold(analysis: AdvancedQueryAnalysis): number {
-    // Adjust threshold based on query complexity and intent confidence
-    let threshold = 0.3; // Base threshold
-
-    if (analysis.complexityScore < 0.4) threshold = 0.4;
-    else if (analysis.complexityScore > 0.7) threshold = 0.25;
-
-    if (analysis.intentConfidence > 0.8) threshold += 0.1;
-    else if (analysis.intentConfidence < 0.5) threshold -= 0.05;
-
-    return Math.max(0.1, Math.min(0.7, threshold));
-  }
-
-  private static getMaxTokensForComplexity(complexityScore: number): number {
-    if (complexityScore < 0.4) return 1000;
-    else if (complexityScore < 0.7) return 2000;
-    else return 4000;
-  }
-
   private static applyDiversityFiltering(
     chunks: SemanticSearchResult[],
     diversityThreshold: number
@@ -153,7 +135,7 @@ export class IntelligentContextFilter {
 
       // Check diversity against already selected chunks
       for (const selected of filtered) {
-        const similarity = this.calculateContentSimilarity(candidate.content, selected.content);
+        const similarity = ContextAnalyzer.calculateContentSimilarity(candidate.content, selected.content);
         if (similarity > diversityThreshold) {
           isDiverse = false;
           break;
@@ -198,7 +180,7 @@ export class IntelligentContextFilter {
     let wasOptimized = false;
 
     for (const chunk of chunks) {
-      const chunkTokens = this.estimateTokens(chunk.content);
+      const chunkTokens = ContextAnalyzer.estimateTokens(chunk.content);
       
       if (currentTokens + chunkTokens <= maxTokens) {
         optimized.push(chunk);
@@ -248,19 +230,8 @@ export class IntelligentContextFilter {
     }).sort((a, b) => b.similarity - a.similarity);
   }
 
-  private static calculateContentSimilarity(content1: string, content2: string): number {
-    // Simple Jaccard similarity for content diversity checking
-    const words1 = new Set(content1.toLowerCase().split(/\s+/));
-    const words2 = new Set(content2.toLowerCase().split(/\s+/));
-    
-    const intersection = new Set([...words1].filter(word => words2.has(word)));
-    const union = new Set([...words1, ...words2]);
-    
-    return intersection.size / union.size;
-  }
-
   private static calculateTotalTokens(chunks: SemanticSearchResult[]): number {
-    return chunks.reduce((total, chunk) => total + this.estimateTokens(chunk.content), 0);
+    return chunks.reduce((total, chunk) => total + ContextAnalyzer.estimateTokens(chunk.content), 0);
   }
 
   private static calculateDiversityScore(chunks: SemanticSearchResult[]): number {
@@ -271,17 +242,12 @@ export class IntelligentContextFilter {
 
     for (let i = 0; i < chunks.length; i++) {
       for (let j = i + 1; j < chunks.length; j++) {
-        totalSimilarity += this.calculateContentSimilarity(chunks[i].content, chunks[j].content);
+        totalSimilarity += ContextAnalyzer.calculateContentSimilarity(chunks[i].content, chunks[j].content);
         comparisons++;
       }
     }
 
     const averageSimilarity = totalSimilarity / comparisons;
     return 1.0 - averageSimilarity; // Higher diversity = lower average similarity
-  }
-
-  private static estimateTokens(text: string): number {
-    // Rough estimation: ~4 characters per token
-    return Math.ceil(text.length / 4);
   }
 }

@@ -1,4 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
+import { HybridSearchEngine } from './search/hybridSearchEngine';
+import { SearchSuggestions } from './search/searchSuggestions';
 
 export interface SearchFilters {
   sourceTypes?: string[];
@@ -120,7 +123,7 @@ export class SemanticSearchService {
             sourceType: source?.source_type || 'text',
             chunkIndex: chunk.chunk_index,
             createdAt: chunk.created_at || new Date().toISOString(),
-            ...(chunkMetadata as Record<string, any>)
+            ...(typeof chunkMetadata === 'object' ? chunkMetadata : {})
           }
         };
       });
@@ -230,7 +233,7 @@ export class SemanticSearchService {
             sourceType: source?.source_type || 'text',
             chunkIndex: chunk.chunk_index,
             createdAt: chunk.created_at || new Date().toISOString(),
-            ...(chunkMetadata as Record<string, any>)
+            ...(typeof chunkMetadata === 'object' ? chunkMetadata : {})
           }
         };
       });
@@ -253,38 +256,15 @@ export class SemanticSearchService {
     agentId: string,
     filters?: SearchFilters
   ): Promise<SemanticSearchResult[]> {
-    console.log('🔀 Hybrid search:', { query: query.substring(0, 50) + '...' });
+    return HybridSearchEngine.hybridSearch(query, agentId, filters);
+  }
 
-    try {
-      // Extract keywords from query
-      const keywords = query
-        .toLowerCase()
-        .replace(/[^\w\s]/g, ' ')
-        .split(' ')
-        .filter(word => word.length > 2)
-        .slice(0, 10);
-
-      // Perform both searches in parallel
-      const [semanticResults, keywordResults] = await Promise.all([
-        this.searchSimilarChunks(query, agentId, filters),
-        this.searchByKeywords(keywords, agentId, filters)
-      ]);
-
-      // Combine and deduplicate results
-      const combinedResults = this.combineSearchResults(semanticResults, keywordResults);
-
-      console.log('✅ Hybrid search complete:', {
-        semantic: semanticResults.length,
-        keyword: keywordResults.length,
-        combined: combinedResults.length
-      });
-
-      return combinedResults;
-
-    } catch (error) {
-      console.error('❌ Hybrid search failed:', error);
-      return [];
-    }
+  static async getSearchSuggestions(
+    partialQuery: string,
+    agentId: string,
+    limit: number = 5
+  ): Promise<string[]> {
+    return SearchSuggestions.getSearchSuggestions(partialQuery, agentId, limit);
   }
 
   private static async generateQueryEmbedding(query: string): Promise<number[]> {
@@ -315,72 +295,5 @@ export class SemanticSearchService {
     );
     
     return matchingKeywords.length / keywords.length;
-  }
-
-  private static combineSearchResults(
-    semanticResults: SemanticSearchResult[],
-    keywordResults: SemanticSearchResult[]
-  ): SemanticSearchResult[] {
-    const seenChunks = new Set<string>();
-    const combined: SemanticSearchResult[] = [];
-
-    // Add semantic results first (higher priority)
-    for (const result of semanticResults) {
-      if (!seenChunks.has(result.chunkId)) {
-        seenChunks.add(result.chunkId);
-        combined.push({
-          ...result,
-          similarity: result.similarity * 1.1 // Boost semantic results slightly
-        });
-      }
-    }
-
-    // Add keyword results that aren't already included
-    for (const result of keywordResults) {
-      if (!seenChunks.has(result.chunkId)) {
-        seenChunks.add(result.chunkId);
-        combined.push(result);
-      }
-    }
-
-    // Sort by similarity
-    return combined.sort((a, b) => b.similarity - a.similarity);
-  }
-
-  static async getSearchSuggestions(
-    partialQuery: string,
-    agentId: string,
-    limit: number = 5
-  ): Promise<string[]> {
-    console.log('💡 Getting search suggestions:', { partialQuery });
-
-    try {
-      // Get recent successful queries for this agent from messages table
-      const { data: recentQueries } = await supabase
-        .from('messages')
-        .select('content, conversations!inner(agent_id)')
-        .eq('conversations.agent_id', agentId)
-        .eq('is_agent', false)
-        .ilike('content', `%${partialQuery}%`)
-        .limit(limit * 2);
-
-      if (!recentQueries) return [];
-
-      // Filter and format suggestions
-      const suggestions = recentQueries
-        .map(q => q.content)
-        .filter(content => 
-          content.length > partialQuery.length && 
-          content.length < 100 &&
-          content.toLowerCase().includes(partialQuery.toLowerCase())
-        )
-        .slice(0, limit);
-
-      return [...new Set(suggestions)]; // Remove duplicates
-
-    } catch (error) {
-      console.error('❌ Failed to get search suggestions:', error);
-      return [];
-    }
   }
 }
