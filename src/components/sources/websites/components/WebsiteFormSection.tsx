@@ -2,7 +2,7 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import WebsiteCrawlForm from "./WebsiteCrawlForm";
+import EnhancedWebsiteCrawlFormV3 from "./EnhancedWebsiteCrawlFormV3";
 
 interface WebsiteFormSectionProps {
   activeSubTab: string;
@@ -22,17 +22,13 @@ interface WebsiteFormSectionProps {
 const WebsiteFormSection: React.FC<WebsiteFormSectionProps> = ({
   activeSubTab,
   setActiveSubTab,
-  url,
-  setUrl,
-  protocol,
-  setProtocol,
-  includePaths,
-  setIncludePaths,
-  excludePaths,
-  setExcludePaths,
   onSubmit,
   isSubmitting
 }) => {
+  const handleCrawlStarted = (parentSourceId: string) => {
+    console.log('Crawl started with parent source ID:', parentSourceId);
+  };
+
   return (
     <Card className="border border-gray-200">
       <CardContent className="p-6">
@@ -52,20 +48,7 @@ const WebsiteFormSection: React.FC<WebsiteFormSectionProps> = ({
           </TabsList>
 
           <TabsContent value="crawl-links" className="mt-4">
-            <WebsiteCrawlForm
-              url={url}
-              setUrl={setUrl}
-              protocol={protocol}
-              setProtocol={setProtocol}
-              includePaths={includePaths}
-              setIncludePaths={setIncludePaths}
-              excludePaths={excludePaths}
-              setExcludePaths={setExcludePaths}
-              onSubmit={(options) => onSubmit('crawl-links', options)}
-              isSubmitting={isSubmitting}
-              buttonText="Fetch links"
-              showFilters={true}
-            />
+            <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />
           </TabsContent>
 
           <TabsContent value="sitemap" className="mt-4">
@@ -73,20 +56,7 @@ const WebsiteFormSection: React.FC<WebsiteFormSectionProps> = ({
               <p className="text-gray-600">
                 Upload your sitemap XML file or provide a URL to your sitemap.
               </p>
-              <WebsiteCrawlForm
-                url={url}
-                setUrl={setUrl}
-                protocol={protocol}
-                setProtocol={setProtocol}
-                includePaths={includePaths}
-                setIncludePaths={setIncludePaths}
-                excludePaths={excludePaths}
-                setExcludePaths={setExcludePaths}
-                onSubmit={(options) => onSubmit('sitemap', options)}
-                isSubmitting={isSubmitting}
-                buttonText="Upload sitemap"
-                showFilters={false}
-              />
+              <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />
             </div>
           </TabsContent>
 
@@ -95,20 +65,7 @@ const WebsiteFormSection: React.FC<WebsiteFormSectionProps> = ({
               <p className="text-gray-600">
                 Add specific links manually.
               </p>
-              <WebsiteCrawlForm
-                url={url}
-                setUrl={setUrl}
-                protocol={protocol}
-                setProtocol={setProtocol}
-                includePaths={includePaths}
-                setIncludePaths={setIncludePaths}
-                excludePaths={excludePaths}
-                setExcludePaths={setExcludePaths}
-                onSubmit={(options) => onSubmit('individual-link', options)}
-                isSubmitting={isSubmitting}
-                buttonText="Add link"
-                showFilters={false}
-              />
+              <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />
             </div>
           </TabsContent>
         </Tabs>
