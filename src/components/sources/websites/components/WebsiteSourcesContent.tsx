@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { AgentSource } from '@/types/rag';
-import WebsiteSourceItem from '../WebsiteSourceItem';
+import { WebsiteSourceItem } from '../WebsiteSourceItem';
 
 interface WebsiteSourcesContentProps {
   sources: AgentSource[];

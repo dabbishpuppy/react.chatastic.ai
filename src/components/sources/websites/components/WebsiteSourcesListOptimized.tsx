@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { useRAGServices } from '@/hooks/useRAGServices';
 import { useSelectionState } from '@/hooks/useSelectionState';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { useSourcesPaginated } from '@/hooks/useSourcesPaginated';
-import WebsiteSourceItem from '../WebsiteSourceItem';
+import { WebsiteSourceItem } from '../WebsiteSourceItem';
 import BulkActionBar from '../../BulkActionBar';
 import PaginationControls from '../../PaginationControls';
 
