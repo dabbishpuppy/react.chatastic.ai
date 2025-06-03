@@ -378,13 +378,11 @@ export class RetrainingService {
           };
         }
 
-        // Verify embeddings exist
+        // Verify embeddings exist - simplified approach
         const { data: embeddings, error: embeddingsError } = await supabase
           .from('source_embeddings')
-          .select('se.id')
-          .from('source_embeddings se')
-          .innerJoin('source_chunks sc', 'se.chunk_id', 'sc.id')
-          .eq('sc.source_id', source.id)
+          .select('id')
+          .in('chunk_id', chunks.map(chunk => chunk.id))
           .limit(1);
 
         if (embeddingsError) {
