@@ -1,4 +1,3 @@
-
 import { useParams } from "react-router-dom";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
@@ -121,10 +120,9 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     await submitMessage(text, agentIdParam || agentId);
   };
 
-  // Create regenerate handler that matches the expected signature
-  const handleRegenerate = async (messageIndex: number, agentIdParam?: string) => {
-    // We'll regenerate based on the chat history length and allow regenerate setting
-    await regenerateResponse(true); // Always allow regenerate when explicitly called
+  // Create regenerate handler that matches the useChatHandlers expected signature
+  const regenerateResponseWrapper = async (allowRegenerate: boolean) => {
+    await regenerateResponse(allowRegenerate);
   };
 
   // Cleanup function
@@ -135,7 +133,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   };
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
-  const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, handleRegenerate);
+  const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponseWrapper);
 
   // Enhanced getConversationMessages that uses the agentId
   const getConversationMessagesWithAgent = async (conversationId: string) => {
@@ -146,6 +144,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   // Wrap startNewConversation to match expected return type
   const wrappedStartNewConversation = async () => {
     await startNewConversation();
+  };
+
+  // Create a proper handleRegenerate function that matches the expected signature for the state
+  const handleRegenerate = async (messageIndex: number, agentIdParam?: string) => {
+    // Call the regenerateResponse with allowRegenerate=true
+    await regenerateResponse(true);
   };
 
   return {
@@ -186,6 +190,6 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     scrollToBottom,
     handleSubmitWithAgentId,
     handleSuggestedMessageClickWithAgentId,
-    handleRegenerateWithAgentId
+    handleRegenerateWithAgentId: handleRegenerate
   };
 };
