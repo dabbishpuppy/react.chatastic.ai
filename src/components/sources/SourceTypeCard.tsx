@@ -20,15 +20,15 @@ const SourceTypeCard: React.FC<SourceTypeCardProps> = ({
   const getIcon = () => {
     switch (type) {
       case 'text':
-        return <FileText className="h-5 w-5" />;
+        return <FileText className="h-5 w-5 text-gray-600" />;
       case 'website':
-        return <Globe className="h-5 w-5" />;
+        return <Globe className="h-5 w-5 text-gray-600" />;
       case 'file':
-        return <Upload className="h-5 w-5" />;
+        return <Upload className="h-5 w-5 text-gray-600" />;
       case 'qa':
-        return <MessageSquare className="h-5 w-5" />;
+        return <MessageSquare className="h-5 w-5 text-gray-600" />;
       default:
-        return <FileText className="h-5 w-5" />;
+        return <FileText className="h-5 w-5 text-gray-600" />;
     }
   };
 
@@ -54,19 +54,15 @@ const SourceTypeCard: React.FC<SourceTypeCardProps> = ({
   };
 
   return (
-    <Card className={`transition-colors ${isActive ? 'border-primary' : ''}`}>
+    <Card className={`border border-gray-200 hover:border-gray-300 transition-colors ${isActive ? 'border-blue-500 bg-blue-50' : 'bg-white'}`}>
       <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            {getIcon()}
-            <span className="font-medium text-sm">{getTypeLabel()}</span>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            {count}
-          </Badge>
+        <div className="flex items-center gap-3 mb-3">
+          {getIcon()}
+          <span className="font-medium text-gray-900">{getTypeLabel()}</span>
         </div>
-        <div className="text-xs text-muted-foreground">
-          {formatSize(size)}
+        <div className="space-y-1">
+          <div className="text-2xl font-bold text-gray-900">{count}</div>
+          <div className="text-sm text-gray-500">{formatSize(size)}</div>
         </div>
       </CardContent>
     </Card>
