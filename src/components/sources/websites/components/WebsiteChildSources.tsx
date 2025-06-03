@@ -71,6 +71,56 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     };
   };
 
+  // Update parent metadata after deletion
+  const updateParentMetadata = async () => {
+    try {
+      // Get current child pages count and stats
+      const { data: currentPages, error } = await supabase
+        .from('source_pages')
+        .select('status')
+        .eq('parent_source_id', parentSourceId);
+
+      if (error) {
+        console.error('Error fetching child pages for metadata update:', error);
+        return;
+      }
+
+      const totalPages = currentPages?.length || 0;
+      const completedPages = currentPages?.filter(p => p.status === 'completed').length || 0;
+      const failedPages = currentPages?.filter(p => p.status === 'failed').length || 0;
+      const pendingPages = currentPages?.filter(p => p.status === 'pending').length || 0;
+      const inProgressPages = currentPages?.filter(p => p.status === 'in_progress').length || 0;
+
+      // Calculate progress
+      const progress = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
+
+      // Update parent source
+      const { error: updateError } = await supabase
+        .from('agent_sources')
+        .update({
+          links_count: totalPages,
+          progress: progress,
+          metadata: {
+            total_children: totalPages,
+            children_completed: completedPages,
+            children_failed: failedPages,
+            children_pending: pendingPages,
+            children_in_progress: inProgressPages,
+            last_metadata_update: new Date().toISOString()
+          }
+        })
+        .eq('id', parentSourceId);
+
+      if (updateError) {
+        console.error('Error updating parent metadata:', updateError);
+      } else {
+        console.log('✅ Parent metadata updated after child deletion');
+      }
+    } catch (error) {
+      console.error('Error in updateParentMetadata:', error);
+    }
+  };
+
   // Enhanced fetch with error handling and retries
   const fetchChildPages = async (retryCount = 0) => {
     try {
@@ -192,6 +242,8 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             setChildPages(prev => 
               prev.filter(page => page.id !== deletedPage.id)
             );
+            // Update parent metadata when a child is deleted
+            setTimeout(() => updateParentMetadata(), 100);
           }
         }
       )
@@ -258,6 +310,9 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       setChildPages(prev => prev.filter(p => p.id !== page.id));
       
       console.log(`Successfully deleted source page: ${page.id}`);
+      
+      // Update parent metadata after successful deletion
+      await updateParentMetadata();
     } catch (error) {
       console.error('Failed to delete source page:', error);
       fetchChildPages();

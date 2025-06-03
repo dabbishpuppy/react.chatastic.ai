@@ -37,6 +37,8 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
     }
   };
 
+  const progressValue = progress || 0;
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
@@ -53,18 +55,12 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
             Excluded
           </Badge>
         )}
-        
-        {linksCount > 0 && (
-          <Badge variant="outline">
-            {linksCount} links
-          </Badge>
-        )}
       </div>
       
-      {progress && progress > 0 && progress < 100 && (
+      {(crawlStatus === 'in_progress' || progressValue > 0) && (
         <div>
-          <Progress value={progress} className="w-full h-2" />
-          <p className="text-xs text-muted-foreground mt-1">{progress}% complete</p>
+          <Progress value={progressValue} className="w-full h-2" />
+          <p className="text-xs text-muted-foreground mt-1">{progressValue}% complete</p>
         </div>
       )}
     </div>
