@@ -37,6 +37,9 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
     state.isSubmitting
   );
 
+  // Resolve 'system' theme to 'light' or 'dark' for components that don't support 'system'
+  const resolvedTheme: 'light' | 'dark' = props.theme === 'system' ? 'light' : (props.theme || 'light');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handlers.handleSendMessage();
@@ -82,7 +85,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
           leadSettings={state.effectiveLeadSettings}
           agentId={state.agentId}
           conversationId={state.currentConversation?.id}
-          theme={props.theme || 'light'}
+          theme={resolvedTheme}
         />
 
         {/* Chat input area */}
