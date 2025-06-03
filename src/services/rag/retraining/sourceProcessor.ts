@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { SemanticChunkingService } from "../semanticChunkingService";
 import { EmbeddingGenerator } from "./embeddingGenerator";
@@ -14,6 +13,7 @@ export class SourceProcessor {
       const metadata = source.metadata as any;
       if (metadata?.question && metadata?.answer) {
         contentToProcess = `Q: ${metadata.question}\nA: ${metadata.answer}`;
+        console.log(`🧩 Q&A content prepared: "${contentToProcess}" (${contentToProcess.length} chars)`);
       }
     }
 
@@ -47,9 +47,36 @@ export class SourceProcessor {
 
       // Create semantic chunks with appropriate settings for each source type
       const chunkingOptions = this.getChunkingOptionsForSourceType(source.source_type);
+      console.log(`🔧 Using chunking options for ${source.source_type}:`, chunkingOptions);
+      
       const chunks = SemanticChunkingService.createSemanticChunks(contentToProcess, chunkingOptions);
 
       console.log(`🧩 Created ${chunks.length} chunks for source ${source.id} (${source.source_type})`);
+      
+      // For Q&A sources with very short content, ensure at least one chunk is created
+      if (source.source_type === 'qa' && chunks.length === 0 && contentToProcess.trim().length > 0) {
+        console.log(`🔧 Creating forced chunk for short Q&A content: "${contentToProcess}"`);
+        
+        // Create a minimal chunk manually for very short Q&A content
+        const forcedChunk = {
+          content: contentToProcess.trim(),
+          tokenCount: Math.max(1, Math.ceil(contentToProcess.length / 4)), // Rough token estimate
+          chunkIndex: 0,
+          metadata: {
+            startPosition: 0,
+            endPosition: contentToProcess.length,
+            sentences: 1,
+            semanticBoundary: true,
+            contentType: 'qa' as const,
+            qualityScore: 0.5,
+            complexity: 'simple' as const,
+            forceCreated: true // Mark as force-created for debugging
+          }
+        };
+        
+        chunks.push(forcedChunk);
+        console.log(`✅ Force-created chunk for Q&A: ${chunks.length} total chunks`);
+      }
 
       // Store chunks in database
       if (chunks.length > 0) {
@@ -69,6 +96,8 @@ export class SourceProcessor {
           throw new Error(`Failed to insert chunks: ${insertError.message}`);
         }
 
+        console.log(`💾 Stored ${chunks.length} chunks in database`);
+
         // Generate embeddings for chunks
         await EmbeddingGenerator.generateEmbeddings(source.id);
       }
@@ -82,7 +111,9 @@ export class SourceProcessor {
         processing_status: 'completed',
         source_type_processed: source.source_type,
         embeddings_generated: chunks.length > 0,
-        processing_note: chunks.length > 0 ? 'Successfully processed with chunks and embeddings' : 'Processed but no chunks created'
+        processing_note: chunks.length > 0 ? 'Successfully processed with chunks and embeddings' : 'Processed but no chunks created',
+        content_length: contentToProcess.length,
+        chunking_strategy: source.source_type === 'qa' && chunks.some(c => c.metadata?.forceCreated) ? 'force_created' : 'standard'
       };
 
       await supabase
@@ -122,9 +153,9 @@ export class SourceProcessor {
     switch (sourceType) {
       case 'qa':
         return {
-          targetChunkSize: 300,
-          maxChunkSize: 600,
-          minChunkSize: 50,
+          targetChunkSize: 200,
+          maxChunkSize: 400,
+          minChunkSize: 10, // Lowered from 50 to handle very short Q&A pairs
           contentType: sourceType
         };
       case 'text':
