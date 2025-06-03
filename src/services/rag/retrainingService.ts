@@ -1,6 +1,5 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { AgentSource, SourceChunk } from "@/types/rag";
 import { SemanticChunkingService } from "./semanticChunkingService";
 
 export interface RetrainingProgress {
@@ -11,6 +10,15 @@ export interface RetrainingProgress {
   currentSource?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   error?: string;
+}
+
+// Define the source type we expect from the database
+interface DatabaseSource {
+  id: string;
+  title: string;
+  content: string | null;
+  source_type: string;
+  metadata: any; // This will be Json from Supabase
 }
 
 export class RetrainingService {
@@ -31,7 +39,7 @@ export class RetrainingService {
       // Get all sources for the agent
       const { data: sources, error } = await supabase
         .from('agent_sources')
-        .select('*')
+        .select('id, title, content, source_type, metadata')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -53,7 +61,7 @@ export class RetrainingService {
           progress.currentSource = source.title;
           this.updateProgress(agentId, progress);
 
-          await this.processSource(source);
+          await this.processSource(source as DatabaseSource);
           
           progress.processedSources++;
           this.updateProgress(agentId, progress);
@@ -90,7 +98,7 @@ export class RetrainingService {
   }
 
   // Process a single source
-  private static async processSource(source: AgentSource): Promise<void> {
+  private static async processSource(source: DatabaseSource): Promise<void> {
     console.log(`📄 Processing source: ${source.title}`);
 
     // Skip if no content
@@ -134,16 +142,19 @@ export class RetrainingService {
     // Generate embeddings for chunks
     await this.generateEmbeddings(source.id);
 
-    // Update source status
+    // Update source status - properly handle metadata type
+    const currentMetadata = source.metadata || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      chunks_count: chunks.length,
+      last_processed_at: new Date().toISOString(),
+      processing_status: 'completed'
+    };
+
     await supabase
       .from('agent_sources')
       .update({
-        metadata: {
-          ...source.metadata,
-          chunks_count: chunks.length,
-          last_processed_at: new Date().toISOString(),
-          processing_status: 'completed'
-        }
+        metadata: updatedMetadata
       })
       .eq('id', source.id);
 
@@ -230,7 +241,7 @@ export class RetrainingService {
   }> {
     const { data: sources, error } = await supabase
       .from('agent_sources')
-      .select('*')
+      .select('id, content, metadata')
       .eq('agent_id', agentId)
       .eq('is_active', true);
 
@@ -238,7 +249,14 @@ export class RetrainingService {
 
     const unprocessedSources = (sources || []).filter(source => {
       const hasContent = source.content && source.content.trim().length > 0;
-      const isProcessed = source.metadata?.processing_status === 'completed';
+      
+      // Safely check metadata for processing status
+      let isProcessed = false;
+      if (source.metadata && typeof source.metadata === 'object') {
+        const metadata = source.metadata as Record<string, any>;
+        isProcessed = metadata.processing_status === 'completed';
+      }
+      
       return hasContent && !isProcessed;
     });
 
