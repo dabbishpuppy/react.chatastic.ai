@@ -1,4 +1,3 @@
-
 import React from "react";
 import ChatContainer from "./ChatContainer";
 import ChatMainContent from "./ChatMainContent";
@@ -59,6 +58,11 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
     handlers.handleRegenerate(lastMessageIndex);
   };
 
+  const handleTypingComplete = (messageId: string) => {
+    // Clear the typing message ID when typing is complete
+    state.setTypingMessageId(null);
+  };
+
   return (
     <ChatContainer
       isEmbedded={props.isEmbedded || false}
@@ -87,6 +91,8 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
         <ChatMainContent
           chatHistory={state.chatHistory}
           isTyping={state.isTyping}
+          isThinking={state.isThinking}
+          typingMessageId={state.typingMessageId}
           agentName={props.agentName || "AI Assistant"}
           profilePicture={props.profilePicture}
           showFeedback={props.showFeedback || true}
@@ -106,6 +112,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
           agentId={state.agentId}
           conversationId={state.currentConversation?.id}
           theme={resolvedTheme}
+          onTypingComplete={handleTypingComplete}
         />
 
         {/* Chat input area */}

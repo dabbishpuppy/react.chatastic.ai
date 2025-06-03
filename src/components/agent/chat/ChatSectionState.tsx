@@ -1,31 +1,36 @@
 
+import React from "react";
 import { ChatMessage } from "@/types/chatInterface";
 
 export interface ChatSectionState {
-  agentId: string | undefined;
+  agentId?: string;
   displayMessages: ChatMessage[];
-  setDisplayMessages: (messages: ChatMessage[]) => void;
+  setDisplayMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   hasShownLeadForm: boolean;
-  setHasShownLeadForm: (value: boolean) => void;
+  setHasShownLeadForm: React.Dispatch<React.SetStateAction<boolean>>;
   effectiveLeadSettings: any;
-  refreshSettings: () => void;
+  refreshSettings: () => Promise<void>;
   currentConversation: any;
   conversationEnded: boolean;
   startNewConversation: () => Promise<void>;
   endCurrentConversation: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
-  getConversationMessages: (conversationId: string) => Promise<ChatMessage[]>;
+  getConversationMessages: (conversationId: string) => Promise<any[]>;
   message: string;
-  setMessage: (message: string) => void;
+  setMessage: React.Dispatch<React.SetStateAction<string>>;
   chatHistory: ChatMessage[];
-  setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void;
+  setChatHistory: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   isTyping: boolean;
+  isThinking: boolean;
+  setIsThinking: React.Dispatch<React.SetStateAction<boolean>>;
+  typingMessageId: string | null;
+  setTypingMessageId: React.Dispatch<React.SetStateAction<string | null>>;
   rateLimitError: string | null;
   timeUntilReset: number | null;
   userHasMessaged: boolean;
   inputRef: React.RefObject<HTMLInputElement>;
-  copyMessageToClipboard: (content: string) => void;
-  handleFeedback: (timestamp: string, type: "like" | "dislike") => void;
+  copyMessageToClipboard: () => void;
+  handleFeedback: (messageId: string, isPositive: boolean) => void;
   insertEmoji: (emoji: string) => void;
   handleCountdownFinished: () => void;
   cleanup: () => void;
@@ -33,7 +38,7 @@ export interface ChatSectionState {
   messagesEndRef: React.RefObject<HTMLDivElement>;
   chatContainerRef: React.RefObject<HTMLDivElement>;
   scrollToBottom: () => void;
-  handleSubmitWithAgentId: (e: React.FormEvent) => Promise<void>;
-  handleSuggestedMessageClickWithAgentId: (text: string) => Promise<void>;
-  handleRegenerateWithAgentId: (allowRegenerate: boolean) => Promise<void>;
+  handleSubmitWithAgentId: (e: React.FormEvent, agentId?: string) => Promise<void>;
+  handleSuggestedMessageClickWithAgentId: (text: string, agentId?: string) => Promise<void>;
+  handleRegenerateWithAgentId: (messageIndex: number, agentId?: string) => Promise<void>;
 }

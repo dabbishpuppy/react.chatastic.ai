@@ -6,6 +6,8 @@ import { ChatMessage } from "@/types/chatInterface";
 interface ChatMainContentProps {
   chatHistory: ChatMessage[];
   isTyping: boolean;
+  isThinking?: boolean;
+  typingMessageId?: string | null;
   agentName: string;
   profilePicture?: string;
   showFeedback: boolean;
@@ -22,6 +24,7 @@ interface ChatMainContentProps {
   conversationId?: string;
   theme?: 'light' | 'dark';
   onLeadFormSubmit?: () => void;
+  onTypingComplete?: (messageId: string) => void;
 }
 
 const ChatMainContent: React.FC<ChatMainContentProps> = (props) => {

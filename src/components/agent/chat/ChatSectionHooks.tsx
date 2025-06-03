@@ -1,4 +1,3 @@
-
 import { useParams } from "react-router-dom";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
@@ -36,6 +35,10 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     setChatHistory,
     isTyping,
     setIsTyping,
+    isThinking,
+    setIsThinking,
+    typingMessageId,
+    setTypingMessageId,
     rateLimitError,
     setRateLimitError,
     timeUntilReset,
@@ -147,6 +150,10 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     chatHistory,
     setChatHistory,
     isTyping,
+    isThinking,
+    setIsThinking,
+    typingMessageId,
+    setTypingMessageId,
     rateLimitError,
     timeUntilReset,
     userHasMessaged,

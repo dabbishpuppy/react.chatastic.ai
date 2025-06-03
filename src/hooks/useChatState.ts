@@ -26,6 +26,8 @@ export const useChatState = (
     ];
   });
   const [isTyping, setIsTyping] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null);
   const [isWaitingForRateLimit, setIsWaitingForRateLimit] = useState(false);
@@ -40,6 +42,10 @@ export const useChatState = (
     setChatHistory,
     isTyping,
     setIsTyping,
+    isThinking,
+    setIsThinking,
+    typingMessageId,
+    setTypingMessageId,
     rateLimitError,
     setRateLimitError,
     timeUntilReset,
