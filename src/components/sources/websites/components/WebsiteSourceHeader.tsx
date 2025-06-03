@@ -3,6 +3,7 @@ import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceInfo from './WebsiteSourceInfo';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
@@ -32,6 +33,7 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
 }) => {
   const progress = source.progress || 0;
   const linksCount = source.links_count || 0;
+  const isCrawling = source.crawl_status === 'in_progress';
 
   return (
     <div className="flex items-center gap-3 flex-1">
@@ -39,6 +41,11 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
         checked={isSelected}
         onCheckedChange={onSelectionChange}
       />
+      
+      {/* Show loader when crawling is in progress */}
+      {isCrawling && (
+        <Loader2 className="w-4 h-4 animate-spin text-blue-500 flex-shrink-0" />
+      )}
       
       <div className="flex-1 min-w-0">
         <WebsiteSourceStatusBadges
