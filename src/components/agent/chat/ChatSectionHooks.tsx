@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
@@ -152,6 +153,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     await regenerateResponse(true);
   };
 
+  // Create typing complete handler
+  const handleTypingComplete = (messageId: string) => {
+    console.log('🎯 Typing complete for message:', messageId);
+    setTypingMessageId(null);
+  };
+
   return {
     agentId,
     displayMessages: chatHistory,
@@ -190,6 +197,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     scrollToBottom,
     handleSubmitWithAgentId,
     handleSuggestedMessageClickWithAgentId,
-    handleRegenerateWithAgentId: handleRegenerate
+    handleRegenerateWithAgentId: handleRegenerate,
+    handleTypingComplete
   };
 };

@@ -1,8 +1,10 @@
 
 import React from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ChatMessage } from "@/types/chatInterface";
 import ChatMessageComponent from "../ChatMessage";
 import InlineLeadForm from "../InlineLeadForm";
+import TypingChatMessageBubble from "./TypingChatMessageBubble";
 
 interface ChatMessageListProps {
   chatHistory: ChatMessage[];
@@ -22,6 +24,10 @@ interface ChatMessageListProps {
   conversationId?: string;
   theme?: 'light' | 'dark';
   onLeadFormSubmit?: () => void;
+  isTyping?: boolean;
+  isThinking?: boolean;
+  typingMessageId?: string | null;
+  onTypingComplete?: (messageId: string) => void;
 }
 
 const ChatMessageList: React.FC<ChatMessageListProps> = ({
@@ -41,7 +47,11 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
   agentId,
   conversationId,
   theme = 'light',
-  onLeadFormSubmit
+  onLeadFormSubmit,
+  isTyping,
+  isThinking,
+  typingMessageId,
+  onTypingComplete
 }) => {
   return (
     <div className="space-y-4">
@@ -68,6 +78,35 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             );
           }
           return null;
+        }
+        
+        // Check if this message is currently typing
+        const isMessageTyping = msg.id === typingMessageId;
+        
+        if (isMessageTyping) {
+          // Render message with typing effect
+          return (
+            <div key={`typing-${index}`} className="flex mb-4">
+              <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
+                {profilePicture ? (
+                  <AvatarImage src={profilePicture} alt={agentName} />
+                ) : (
+                  <AvatarFallback className="bg-gray-100" />
+                )}
+              </Avatar>
+              <div className="flex flex-col max-w-[80%]">
+                <TypingChatMessageBubble
+                  content={msg.content}
+                  isAgent={msg.isAgent}
+                  agentBubbleClass={themeClasses.agentMessage}
+                  userBubbleClass={themeClasses.userMessage}
+                  userMessageStyle={userMessageStyle}
+                  isTyping={true}
+                  onTypingComplete={() => onTypingComplete?.(msg.id || '')}
+                />
+              </div>
+            </div>
+          );
         }
         
         // Detect if this is the initial message - use same logic as other components

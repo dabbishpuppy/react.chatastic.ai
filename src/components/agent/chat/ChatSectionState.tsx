@@ -41,4 +41,5 @@ export interface ChatSectionState {
   handleSubmitWithAgentId: (e: React.FormEvent, agentId?: string) => Promise<void>;
   handleSuggestedMessageClickWithAgentId: (text: string, agentId?: string) => Promise<void>;
   handleRegenerateWithAgentId: (messageIndex: number, agentId?: string) => Promise<void>;
+  handleTypingComplete: (messageId: string) => void;
 }

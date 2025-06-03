@@ -1,3 +1,4 @@
+
 import React from "react";
 import ChatContainer from "./ChatContainer";
 import ChatMainContent from "./ChatMainContent";
@@ -58,11 +59,6 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
     handlers.handleRegenerate(lastMessageIndex);
   };
 
-  const handleTypingComplete = (messageId: string) => {
-    // Clear the typing message ID when typing is complete
-    state.setTypingMessageId(null);
-  };
-
   return (
     <ChatContainer
       isEmbedded={props.isEmbedded || false}
@@ -112,7 +108,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
           agentId={state.agentId}
           conversationId={state.currentConversation?.id}
           theme={resolvedTheme}
-          onTypingComplete={handleTypingComplete}
+          onTypingComplete={state.handleTypingComplete}
         />
 
         {/* Chat input area */}

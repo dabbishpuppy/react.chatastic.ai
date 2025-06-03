@@ -30,7 +30,12 @@ interface ChatMainContentProps {
 const ChatMainContent: React.FC<ChatMainContentProps> = (props) => {
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <ChatScrollArea {...props} />
+      <ChatScrollArea 
+        {...props}
+        isThinking={props.isThinking}
+        typingMessageId={props.typingMessageId}
+        onTypingComplete={props.onTypingComplete}
+      />
     </div>
   );
 };
