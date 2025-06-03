@@ -1,9 +1,20 @@
+
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ChatSectionState } from "./ChatSectionState";
 
 interface MessageHandling {
-  sendMessage: (content: string, messages: any[], onNewMessage: (message: any) => void) => Promise<void>;
+  sendMessage: (
+    content: string, 
+    messages: any[], 
+    onNewMessage: (message: any) => void,
+    options?: {
+      onThinkingStart?: () => void;
+      onThinkingEnd?: () => void;
+      onTypingStart?: (messageId: string) => void;
+      onTypingComplete?: (messageId: string) => void;
+    }
+  ) => Promise<void>;
   isLoading: boolean;
 }
 
