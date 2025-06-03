@@ -9,15 +9,15 @@ export const handleFeedback = async (
   messageId?: string
 ) => {
   console.log('🎯 messageFeedbackUtils - handleFeedback called:', { timestamp, type, messageId });
-  console.log('🔍 messageFeedbackUtils - This should NOT be called from embedded chat when messageId exists');
   
   // Update local state immediately for responsiveness
   setChatHistory(prev => 
     prev.map(msg => {
       if (msg.timestamp === timestamp) {
+        // Toggle logic: if same feedback type, remove it; otherwise set it
         const newFeedback = msg.feedback === type ? undefined : type;
         
-        console.log('📝 messageFeedbackUtils - Updating message locally:', { 
+        console.log('📝 messageFeedbackUtils - Updating message feedback locally:', { 
           messageId: msg.id, 
           timestamp, 
           oldFeedback: msg.feedback, 
@@ -28,8 +28,8 @@ export const handleFeedback = async (
         // Use the provided messageId if available, otherwise fall back to msg.id
         const dbMessageId = messageId || msg.id;
         
-        // Update database if we have a message ID
-        if (dbMessageId && dbMessageId !== 'initial-message') {
+        // Update database if we have a message ID and it's not the initial message
+        if (dbMessageId && dbMessageId !== 'initial-message' && isValidUUID(dbMessageId)) {
           console.log('💾 messageFeedbackUtils - Calling analyticsService to update feedback in database with ID:', dbMessageId);
           analyticsService.updateMessageFeedback(dbMessageId, newFeedback || null)
             .then(success => {
@@ -55,5 +55,11 @@ export const handleFeedback = async (
     })
   );
   
-  console.log(`messageFeedbackUtils - Feedback ${type} for message at ${timestamp}`);
+  console.log(`✅ messageFeedbackUtils - Feedback ${type} processed for message at ${timestamp}`);
 };
+
+// Helper function to validate UUID format
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}

@@ -62,23 +62,24 @@ export const useChatMessageHandlers = (
   const handleFeedback = useCallback(async (type: "like" | "dislike") => {
     if (isUpdatingFeedback || !messageTimestamp || readOnly) return;
 
-    // 🎯 IMMEDIATE UI FEEDBACK - Update local state first for instant visual response
-    const newFeedback = localFeedback === type ? undefined : type;
-    console.log('🚀 Immediate UI Update - Setting local feedback to:', newFeedback);
-    setLocalFeedback(newFeedback);
+    console.log('🎯 useChatMessageHandlers - Handling feedback:', { 
+      messageId, 
+      messageTimestamp, 
+      type, 
+      currentLocalFeedback: localFeedback,
+      hasMessageId: !!messageId,
+      messageIdType: typeof messageId
+    });
 
     setIsUpdatingFeedback(true);
     
+    // Calculate new feedback value
+    const newFeedback = localFeedback === type ? undefined : type;
+    console.log('🔄 useChatMessageHandlers - New feedback value:', newFeedback);
+    
     try {
-      console.log('🔥 useChatMessageHandlers - Handling feedback:', { 
-        messageId, 
-        messageTimestamp, 
-        type, 
-        currentLocalFeedback: localFeedback,
-        newFeedback,
-        hasMessageId: !!messageId,
-        messageIdType: typeof messageId
-      });
+      // Update local state for immediate UI response (optimistic update)
+      setLocalFeedback(newFeedback);
       
       // Only try to save to database if we have a valid UUID messageId
       if (messageId && messageId !== 'initial-message' && isValidUUID(messageId)) {
@@ -106,15 +107,16 @@ export const useChatMessageHandlers = (
           });
         }
       } else {
-        // No valid messageId available, use local state only via onFeedback callback
-        console.log('⚠️ useChatMessageHandlers - No valid messageId provided, updating local state only. MessageId:', messageId);
+        // No valid messageId available, use callback to update parent state
+        console.log('⚠️ useChatMessageHandlers - No valid messageId provided, using callback for local state update. MessageId:', messageId);
         
         if (onFeedback) {
+          // Pass the feedback type to the callback - parent will handle toggle logic
           onFeedback(messageTimestamp, type);
         }
         
         toast({
-          description: `Feedback ${type === 'like' ? 'liked' : 'disliked'} (local only)`,
+          description: `Feedback ${newFeedback ? (type === 'like' ? 'liked' : 'disliked') : 'removed'}`,
           duration: 2000,
         });
       }
