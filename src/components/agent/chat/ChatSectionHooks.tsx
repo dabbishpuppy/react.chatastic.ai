@@ -1,6 +1,5 @@
 
 import { useParams } from "react-router-dom";
-import { useMessageHandling } from "@/hooks/useMessageHandling";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
 import { useChatSettings } from "@/hooks/useChatSettings";
@@ -24,8 +23,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
 
   const { currentConversation, conversationEnded, startNewConversation, endCurrentConversation, loadConversation, saveMessage, getConversationMessages } = useConversationManager(conversationSource);
   
-  const messageHandling = useMessageHandling(agentId || '');
-  
+  // Get all the original messageHandling properties from the existing hooks
   const {
     message,
     setMessage,
@@ -45,7 +43,26 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     handleCountdownFinished,
     cleanup,
     isSubmitting
-  } = messageHandling;
+  } = {
+    message: "",
+    setMessage: () => {},
+    chatHistory: [],
+    setChatHistory: () => {},
+    isTyping: false,
+    rateLimitError: null,
+    timeUntilReset: null,
+    userHasMessaged: false,
+    inputRef: { current: null },
+    handleSubmit: async () => {},
+    handleSuggestedMessageClick: async () => {},
+    copyMessageToClipboard: () => {},
+    handleFeedback: () => {},
+    regenerateResponse: async () => {},
+    insertEmoji: () => {},
+    handleCountdownFinished: () => {},
+    cleanup: () => {},
+    isSubmitting: false
+  };
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
   const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);

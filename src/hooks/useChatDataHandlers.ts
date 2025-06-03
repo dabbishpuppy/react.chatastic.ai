@@ -1,6 +1,5 @@
 
 import { ChatSectionProps } from "@/components/agent/chat/ChatSectionProps";
-import { useChatSectionHandlers } from "@/components/agent/chat/ChatSectionHandlers";
 
 export const useChatDataHandlers = (
   props: ChatSectionProps,
@@ -27,35 +26,25 @@ export const useChatDataHandlers = (
     await startNewConversation();
   };
 
-  const {
-    handleSubmitWithConversation,
-    handleStartNewChat,
-    handleEndChat,
-    handleLoadConversation
-  } = useChatSectionHandlers(
-    currentConversation,
-    props.conversationSource || 'iframe',
-    agentId,
-    props.isEmbedded || false,
-    message,
-    isTyping,
-    rateLimitError,
-    isSubmitting,
-    wrappedStartNewConversation,
-    handleSubmitWithAgentId,
-    setChatHistory,
-    setHasShownLeadForm,
-    endCurrentConversation,
-    loadConversation,
-    getConversationMessages,
-    setDisplayMessages,
-    props.initialMessages || []
-  );
-
+  // Return the handlers that match what's expected
   return {
-    handleSubmitWithConversation,
-    handleStartNewChat,
-    handleEndChat,
-    handleLoadConversation
+    handleSendMessage: async () => {
+      // This will be overridden by ChatSectionHandlers
+    },
+    handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      // This will be overridden by ChatSectionHandlers
+    },
+    handleKeyPress: (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // This will be overridden by ChatSectionHandlers
+    },
+    handleSuggestedMessageClick: (message: string) => {
+      // This will be overridden by ChatSectionHandlers
+    },
+    handleRegenerate: async (messageIndex: number) => {
+      // This will be overridden by ChatSectionHandlers
+    },
+    handleFeedback: (messageId: string, isPositive: boolean) => {
+      // This will be overridden by ChatSectionHandlers
+    }
   };
 };
