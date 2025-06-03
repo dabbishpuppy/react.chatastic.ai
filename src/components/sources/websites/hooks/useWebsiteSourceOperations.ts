@@ -53,16 +53,23 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
 
   const handleDelete = useCallback(async (source: AgentSource) => {
     try {
+      // Show initial deletion toast
+      toast({
+        title: "Deleting source...",
+        description: "Removing source and all related data"
+      });
+
       await sourceService.deleteSource(source.id);
       removeSourceFromState(source.id);
       
       toast({
         title: "Success",
-        description: "Source deleted successfully"
+        description: "Source and all related data deleted successfully"
       });
       
       refetch();
     } catch (error) {
+      console.error('Delete error:', error);
       toast({
         title: "Error",
         description: "Failed to delete source",
