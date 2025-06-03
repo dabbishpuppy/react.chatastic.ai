@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +10,7 @@ import { useAISettings } from "@/hooks/useAISettings";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Clock, CheckCircle, AlertTriangle, Calendar } from "lucide-react";
 
 const AI_MODELS = [
   { 
@@ -205,7 +204,7 @@ Primary Function: You are an AI chatbot who helps users with their inquiries, is
         <CardContent className="space-y-6">
           {/* Model Selection and Prompt Template - Same Line */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Model Selection */}
+            {/* AI Model Selection */}
             <div className="space-y-2">
               <Label htmlFor="model" className="block text-sm font-medium">
                 AI Model
@@ -364,26 +363,63 @@ Primary Function: You are an AI chatbot who helps users with their inquiries, is
             </div>
           </div>
 
-          {/* Training Status */}
+          {/* Enhanced Training Status */}
           <div className="pt-4">
-            <Card className="bg-gray-50 border-gray-200">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Training Status</CardTitle>
+            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-blue-900">Training Status</CardTitle>
+                    <CardDescription className="text-blue-700">
+                      Monitor your agent's training progress and last update
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="font-medium">Last trained at:</span>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-blue-100">
+                    <Calendar className="h-5 w-5 text-blue-500" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900">Last Training Session</div>
+                      <div className="text-gray-600">
+                        {settings?.last_trained_at 
+                          ? new Date(settings.last_trained_at).toLocaleString('en-US', {
+                              weekday: 'short',
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : "No training sessions yet"
+                        }
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      {settings?.last_trained_at ? (
+                        <div className="flex items-center space-x-1 text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs">
+                          <CheckCircle className="h-3 w-3" />
+                          <span>Trained</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-1 text-orange-600 bg-orange-50 px-2 py-1 rounded-full text-xs">
+                          <Clock className="h-3 w-3" />
+                          <span>Pending</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-gray-700">
-                    {settings?.last_trained_at 
-                      ? new Date(settings.last_trained_at).toLocaleString()
-                      : "Never trained"
-                    }
+                  
+                  <div className="flex items-start space-x-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <div className="text-xs text-amber-800">
+                      <strong>Auto-training:</strong> Training is automatically triggered when you save significant changes to AI settings. This ensures your agent uses the latest configuration.
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Training is automatically triggered when you save significant changes to AI settings.
-                  </p>
                 </div>
               </CardContent>
             </Card>
