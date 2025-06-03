@@ -22,7 +22,6 @@ export interface RAGRequest {
       model?: string;
       temperature?: number;
       systemPrompt?: string;
-      maxTokens?: number;
     };
     streaming: boolean;
     streamingOptions?: {
@@ -34,7 +33,6 @@ export interface RAGRequest {
       addSourceCitations: boolean;
       formatMarkdown: boolean;
       enforceContentSafety: boolean;
-      addTimestamp?: boolean;
     };
   };
 }
@@ -95,11 +93,7 @@ export class RAGOrchestrator {
         request.agentId,
         request.query,
         contextChunks,
-        {
-          model: request.options.llmOptions.model,
-          temperature: request.options.llmOptions.temperature,
-          systemPrompt: request.options.llmOptions.systemPrompt
-        }
+        request.options.llmOptions
       );
       const llmResponseTime = Date.now() - llmStartTime;
 

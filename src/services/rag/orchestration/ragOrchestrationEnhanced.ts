@@ -1,3 +1,4 @@
+
 import { RAGOrchestrator, RAGRequest, RAGResponse } from '../ragOrchestrator';
 import { RAGLLMIntegration, RAGLLMRequest } from '../llm/ragLLMIntegration';
 import { RAGStreamingProcessor, RAGStreamingOptions } from '../streaming/ragStreamingProcessor';
@@ -66,9 +67,6 @@ export class RAGOrchestrationEnhanced {
           cacheAge = Date.now() - cachedEntry.metadata.timestamp;
           
           const cachedResponse: EnhancedRAGResponse = {
-            query: request.query,
-            agentId: request.agentId,
-            conversationId: request.conversationId,
             queryResult: {
               query: request.query,
               preprocessingResult: {
@@ -102,28 +100,12 @@ export class RAGOrchestrationEnhanced {
               },
               processingTimeMs: 0
             },
-            llmResponse: {
-              content: cachedEntry.response,
-              provider: agentConfig.llmSettings.preferredProvider,
-              model: agentConfig.llmSettings.model,
-              tokensUsed: cachedEntry.response.split(' ').length,
-              cost: 0,
-              responseTime: 0,
-              sources: cachedEntry.sources.map(s => ({
-                sourceId: s.id,
-                sourceName: s.name,
-                chunkIndex: 0
-              }))
-            },
             processedResponse: {
               content: cachedEntry.response,
-              citations: [],
-              safetyFlags: [],
               metadata: {
-                originalLength: cachedEntry.response.length,
-                processedLength: cachedEntry.response.length,
-                processingTime: 0,
-                citationsAdded: 0
+                model: agentConfig.llmSettings.preferredProvider,
+                temperature: agentConfig.llmSettings.temperature,
+                processingTime: 0
               }
             },
             performance: {
@@ -155,6 +137,7 @@ export class RAGOrchestrationEnhanced {
           searchFilters: {
             maxResults: agentConfig.ragSettings.maxSources,
             minSimilarity: agentConfig.ragSettings.minRelevanceScore,
+            sourceTypes: [],
             ...request.options?.searchFilters
           },
           rankingOptions: {
@@ -166,14 +149,13 @@ export class RAGOrchestrationEnhanced {
           },
           llmOptions: {
             temperature: agentConfig.llmSettings.temperature,
-            maxTokens: agentConfig.llmSettings.maxTokens,
             systemPrompt: agentConfig.llmSettings.systemPrompt,
             ...request.options?.llmOptions
           },
+          streaming: request.options?.streaming || false,
           postProcessing: {
             addSourceCitations: agentConfig.responseSettings.includeCitations,
             formatMarkdown: agentConfig.responseSettings.formatMarkdown,
-            addTimestamp: agentConfig.responseSettings.addTimestamp,
             enforceContentSafety: agentConfig.responseSettings.enforceContentSafety,
             ...request.options?.postProcessing
           }

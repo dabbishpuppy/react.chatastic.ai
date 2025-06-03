@@ -1,3 +1,4 @@
+
 import { RAGOrchestrator, RAGRequest } from '../ragOrchestrator';
 import { StreamingHandler, StreamingChunk, StreamingOptions } from '../llm/streamingHandler';
 
@@ -69,7 +70,7 @@ export class RAGStreamingProcessor {
           streaming: true,
           streamingOptions,
           searchFilters: {
-            maxResults: options.maxSources || 5,
+            maxResults: 5,
             minSimilarity: 0.3,
             sourceTypes: []
           },
@@ -80,8 +81,7 @@ export class RAGStreamingProcessor {
             recencyWeight: 0.2
           },
           llmOptions: {
-            temperature: 0.7,
-            maxTokens: options.maxTokens || 1000
+            temperature: 0.7
           },
           postProcessing: {
             addSourceCitations: options.enableSourceCitations ?? true,
