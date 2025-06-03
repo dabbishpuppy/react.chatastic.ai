@@ -20,7 +20,7 @@ export class RetrainingService {
         RetrainingProgressTracker.setProgressCallback(agentId, onProgress);
       }
 
-      // Get all sources for this agent
+      // Get all active sources for this agent across all types
       const { data: sources, error } = await supabase
         .from('agent_sources')
         .select('id, title, content, metadata, source_type')
@@ -29,10 +29,23 @@ export class RetrainingService {
 
       if (error) throw error;
 
-      // Filter sources that have content
-      const sourcesWithContent = (sources || []).filter(source => 
-        source.content && source.content.trim().length > 0
-      );
+      console.log(`📊 Found ${sources?.length || 0} total sources for agent ${agentId}`);
+
+      // Filter sources that have content (including Q&A which might have structured content)
+      const sourcesWithContent = (sources || []).filter(source => {
+        // For Q&A sources, check if there's question/answer content
+        if (source.source_type === 'qa') {
+          const metadata = source.metadata as any;
+          return (source.content && source.content.trim().length > 0) || 
+                 (metadata?.question && metadata?.answer);
+        }
+        
+        // For other sources, check content field
+        return source.content && source.content.trim().length > 0;
+      });
+
+      console.log(`📋 Processing ${sourcesWithContent.length} sources with content:`, 
+        sourcesWithContent.map(s => `${s.source_type}: ${s.title}`));
 
       if (sourcesWithContent.length === 0) {
         console.log('⚠️ No sources with content found for agent:', agentId);
@@ -44,6 +57,7 @@ export class RetrainingService {
       RetrainingProgressTracker.updateProgress(agentId, initialProgress);
 
       let processedCount = 0;
+      let errorCount = 0;
 
       // Process each source
       for (const source of sourcesWithContent) {
@@ -56,13 +70,15 @@ export class RetrainingService {
           };
           RetrainingProgressTracker.updateProgress(agentId, currentProgress);
 
+          console.log(`🔄 Processing source: ${source.title} (${source.source_type})`);
           await SourceProcessor.processSource(source as DatabaseSource);
           processedCount++;
 
           console.log(`✅ Processed source: ${source.title} (${processedCount}/${sourcesWithContent.length})`);
         } catch (error) {
           console.error(`❌ Failed to process source ${source.title}:`, error);
-          // Continue processing other sources
+          errorCount++;
+          // Continue processing other sources instead of stopping
         }
       }
 
@@ -73,8 +89,13 @@ export class RetrainingService {
       );
       RetrainingProgressTracker.updateProgress(agentId, completedProgress);
 
-      console.log(`✅ Retraining completed. Processed ${processedCount}/${sourcesWithContent.length} sources`);
-      return true;
+      if (errorCount > 0) {
+        console.log(`⚠️ Retraining completed with errors. Processed ${processedCount}/${sourcesWithContent.length} sources, ${errorCount} errors`);
+      } else {
+        console.log(`✅ Retraining completed successfully. Processed ${processedCount}/${sourcesWithContent.length} sources`);
+      }
+
+      return processedCount > 0; // Return true if at least one source was processed
 
     } catch (error) {
       console.error('❌ Retraining failed:', error);
