@@ -3,6 +3,7 @@ import { useCallback, useRef } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { useRAGServices } from "@/hooks/useRAGServices";
 import { AgentSource } from "@/types/rag";
+import { MissingChunksService } from "@/services/rag/embedding/missingChunksService";
 
 export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFromState: (sourceId: string) => void) => {
   const { sources: sourceService } = useRAGServices();
@@ -101,7 +102,7 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
       
       toast({
         title: "Recrawl initiated",
-        description: "The website will be recrawled shortly"
+        description: "The website will be recrawled and embeddings will be generated automatically"
       });
       
       refetch();
@@ -119,10 +120,38 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
     }
   }, [sourceService, refetch]);
 
+  const handleGenerateMissingEmbeddings = useCallback(async () => {
+    try {
+      toast({
+        title: "Generating Missing Embeddings",
+        description: "Processing chunks without embeddings..."
+      });
+
+      const result = await MissingChunksService.generateMissingChunks();
+      
+      if (result.success) {
+        toast({
+          title: "Embeddings Generated",
+          description: `Generated ${result.chunksCreated} chunks and ${result.embeddingsGenerated} embeddings. AI can now access this content.`
+        });
+        
+        refetch();
+      }
+    } catch (error) {
+      console.error('Generate embeddings error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate missing embeddings",
+        variant: "destructive"
+      });
+    }
+  }, [refetch]);
+
   return {
     handleEdit,
     handleExclude,
     handleDelete,
-    handleRecrawl
+    handleRecrawl,
+    handleGenerateMissingEmbeddings
   };
 };

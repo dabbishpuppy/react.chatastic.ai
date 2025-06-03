@@ -1,127 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getSupabaseClient, insertChunks } from '../_shared/database-helpers.ts';
-import { extractTextContent, createSemanticChunks, generateContentHash } from '../_shared/content-processing.ts';
+import { getSupabaseClient } from '../_shared/database-helpers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-async function findPagesWithoutChunks(supabaseClient: any) {
-  // Find completed pages that don't have chunks yet
-  const { data: pagesWithoutChunks, error: searchError } = await supabaseClient
-    .from('source_pages')
-    .select('id, url, parent_source_id, content_size')
-    .eq('status', 'completed')
-    .gt('content_size', 100)
-    .limit(50);
-
-  if (searchError) {
-    throw new Error(`Failed to search for pages: ${searchError.message}`);
-  }
-
-  if (!pagesWithoutChunks || pagesWithoutChunks.length === 0) {
-    return [];
-  }
-
-  // Filter pages that actually don't have chunks by checking if their parent source has chunks for this specific page
-  const pagesNeedingChunks = [];
-  for (const page of pagesWithoutChunks) {
-    const { data: existingChunks } = await supabaseClient
-      .from('source_chunks')
-      .select('id')
-      .eq('source_id', page.parent_source_id)
-      .contains('metadata', { page_id: page.id })
-      .limit(1);
-
-    if (!existingChunks || existingChunks.length === 0) {
-      pagesNeedingChunks.push(page);
-    }
-  }
-
-  return pagesNeedingChunks;
-}
-
-async function processPageForChunks(supabaseClient: any, page: any) {
-  console.log(`🔄 Generating chunks for page: ${page.url} (ID: ${page.id})`);
-
-  // Verify parent source exists
-  const { data: parentSource, error: parentError } = await supabaseClient
-    .from('agent_sources')
-    .select('id, agent_id')
-    .eq('id', page.parent_source_id)
-    .single();
-
-  if (parentError || !parentSource) {
-    throw new Error(`Parent source not found for page ${page.id}: ${parentError?.message}`);
-  }
-
-  // Re-fetch the page content
-  const response = await fetch(page.url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; Wonderwave-Bot/1.0)'
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to re-fetch ${page.url}: HTTP ${response.status}`);
-  }
-
-  const htmlContent = await response.text();
-  const textContent = extractTextContent(htmlContent);
-
-  if (textContent.length < 100) {
-    throw new Error(`Content too short for ${page.url}`);
-  }
-
-  // Create semantic chunks
-  const chunks = createSemanticChunks(textContent);
-  
-  if (chunks.length === 0) {
-    throw new Error(`No valid chunks created for ${page.url}`);
-  }
-
-  // Generate content hash
-  const contentHash = await generateContentHash(textContent);
-
-  // Store chunks in database - Link to parent source, not the individual page
-  const chunksToInsert = chunks.map((chunk, index) => ({
-    source_id: page.parent_source_id, // Use parent source ID
-    chunk_index: index,
-    content: chunk,
-    token_count: Math.ceil(chunk.length / 4),
-    metadata: {
-      url: page.url,
-      page_id: page.id, // Store page ID in metadata
-      content_hash: contentHash,
-      extraction_method: 'missing_chunks_recovery',
-      generated_at: new Date().toISOString(),
-      recovery_process: true
-    }
-  }));
-
-  await insertChunks(supabaseClient, chunksToInsert);
-
-  // Update the page to indicate chunks were generated
-  await supabaseClient
-    .from('source_pages')
-    .update({
-      chunks_created: chunks.length,
-      processing_time_ms: Date.now() // Simple timestamp for processing
-    })
-    .eq('id', page.id);
-
-  console.log(`✅ Generated ${chunks.length} chunks for page ${page.id} linked to parent ${page.parent_source_id}`);
-  
-  return {
-    pageId: page.id,
-    parentSourceId: page.parent_source_id,
-    url: page.url,
-    success: true,
-    chunksCreated: chunks.length
-  };
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -130,61 +14,136 @@ serve(async (req) => {
 
   try {
     const supabaseClient = getSupabaseClient();
+    
+    console.log('🔍 Starting missing chunks and embeddings generation...');
 
-    console.log('🔍 Finding completed pages without chunks...');
+    // Find completed source pages that don't have chunks yet
+    const { data: pagesWithoutChunks, error: pagesError } = await supabaseClient
+      .from('source_pages')
+      .select(`
+        id,
+        url,
+        parent_source_id,
+        content_size,
+        status
+      `)
+      .eq('status', 'completed')
+      .gt('content_size', 0);
 
-    const pagesNeedingChunks = await findPagesWithoutChunks(supabaseClient);
-
-    if (pagesNeedingChunks.length === 0) {
-      console.log('✅ All completed pages already have chunks');
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No missing chunks found',
-          processedCount: 0
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      );
+    if (pagesError) {
+      throw new Error(`Failed to fetch pages: ${pagesError.message}`);
     }
 
-    console.log(`📋 Found ${pagesNeedingChunks.length} pages that need chunks generated`);
+    console.log(`📊 Found ${pagesWithoutChunks?.length || 0} completed pages`);
 
-    const results = [];
-    
-    for (const page of pagesNeedingChunks) {
-      try {
-        const result = await processPageForChunks(supabaseClient, page);
-        results.push(result);
-      } catch (error) {
-        console.error(`❌ Error processing page ${page.id}:`, error);
-        results.push({
-          pageId: page.id,
-          parentSourceId: page.parent_source_id,
-          url: page.url,
-          success: false,
-          error: error.message
-        });
+    // Filter pages that don't have chunks
+    let pagesNeedingChunks = [];
+    if (pagesWithoutChunks && pagesWithoutChunks.length > 0) {
+      for (const page of pagesWithoutChunks) {
+        const { data: existingChunks } = await supabaseClient
+          .from('source_chunks')
+          .select('id')
+          .eq('source_id', page.parent_source_id)
+          .contains('metadata', { page_id: page.id })
+          .limit(1);
+
+        if (!existingChunks || existingChunks.length === 0) {
+          pagesNeedingChunks.push(page);
+        }
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
-    const failedCount = results.filter(r => !r.success).length;
-    const totalChunks = results.reduce((sum, r) => sum + (r.chunksCreated || 0), 0);
+    console.log(`📝 Found ${pagesNeedingChunks.length} pages without chunks`);
 
-    console.log(`📊 Chunk generation complete: ${successCount} successful, ${failedCount} failed, ${totalChunks} total chunks created`);
+    // Process pages without chunks
+    let chunksCreated = 0;
+    for (const page of pagesNeedingChunks) {
+      try {
+        console.log(`🔄 Processing page ${page.id}: ${page.url}`);
+        
+        const { data: result, error: processError } = await supabaseClient
+          .functions.invoke('child-job-processor', {
+            body: { childJobId: page.id }
+          });
+
+        if (processError) {
+          console.error(`❌ Failed to process page ${page.id}:`, processError);
+          continue;
+        }
+
+        if (result?.success) {
+          chunksCreated += result.chunksCreated || 0;
+          console.log(`✅ Created ${result.chunksCreated || 0} chunks for page ${page.id}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error processing page ${page.id}:`, error);
+      }
+    }
+
+    // Find chunks without embeddings
+    const { data: chunksWithoutEmbeddings, error: chunksError } = await supabaseClient
+      .from('source_chunks')
+      .select(`
+        id,
+        source_id,
+        content,
+        agent_sources!inner(agent_id)
+      `)
+      .is('source_embeddings.id', null)
+      .limit(100);
+
+    if (chunksError) {
+      console.warn('Could not fetch chunks without embeddings:', chunksError);
+    }
+
+    console.log(`🤖 Found ${chunksWithoutEmbeddings?.length || 0} chunks without embeddings`);
+
+    // Generate embeddings for chunks without them
+    let embeddingsGenerated = 0;
+    const processedSources = new Set();
+    
+    if (chunksWithoutEmbeddings && chunksWithoutEmbeddings.length > 0) {
+      for (const chunk of chunksWithoutEmbeddings) {
+        const sourceId = chunk.source_id;
+        
+        // Only process each source once
+        if (!processedSources.has(sourceId)) {
+          processedSources.add(sourceId);
+          
+          try {
+            console.log(`🤖 Generating embeddings for source ${sourceId}`);
+            
+            const { data: embeddingResult, error: embeddingError } = await supabaseClient
+              .functions.invoke('generate-embeddings', {
+                body: { sourceId }
+              });
+
+            if (embeddingError) {
+              console.error(`❌ Failed to generate embeddings for source ${sourceId}:`, embeddingError);
+              continue;
+            }
+
+            if (embeddingResult?.success) {
+              embeddingsGenerated += embeddingResult.processedCount || 0;
+              console.log(`✅ Generated ${embeddingResult.processedCount || 0} embeddings for source ${sourceId}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error generating embeddings for source ${sourceId}:`, error);
+          }
+        }
+      }
+    }
+
+    console.log(`✅ Completed missing chunks generation: ${chunksCreated} chunks created, ${embeddingsGenerated} embeddings generated`);
 
     return new Response(
       JSON.stringify({
         success: true,
         processedCount: pagesNeedingChunks.length,
-        successCount,
-        failedCount,
-        totalChunksCreated: totalChunks,
-        results,
-        message: `Generated chunks for ${successCount} pages, linked to their parent sources`
+        chunksCreated,
+        embeddingsGenerated,
+        sourcesProcessed: processedSources.size,
+        message: `Generated ${chunksCreated} chunks and ${embeddingsGenerated} embeddings`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -193,7 +152,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Chunk generation error:', error);
+    console.error('❌ Missing chunks generation error:', error);
     return new Response(
       JSON.stringify({
         success: false,

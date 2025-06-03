@@ -67,9 +67,9 @@ serve(async (req) => {
 
     console.log(`📏 Content extracted: ${contentSize} characters from ${job.url}`);
 
-    // Relaxed content length check - allow shorter content but ensure it's not empty
-    if (contentSize < 20) {
-      console.warn(`⚠️ Very short content (${contentSize} chars) for ${job.url}, but processing anyway`);
+    // Enhanced content length check - allow shorter content but ensure it's not empty
+    if (contentSize < 10) {
+      console.warn(`⚠️ Very short content (${contentSize} chars) for ${job.url}, trying title fallback`);
       
       // Try to get at least the page title if content is extremely short
       const title = extractTitle(htmlContent);
@@ -96,12 +96,31 @@ serve(async (req) => {
 
         await insertChunks(supabaseClient, fallbackChunks);
         
+        // Mark job as completed
         await updateJobStatus(supabaseClient, childJobId, 'completed', {
           content_size: fallbackContent.length,
           chunks_created: 1,
           processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime(),
           content_hash: await generateContentHash(fallbackContent)
         });
+
+        // Generate embeddings for the new chunks
+        try {
+          console.log(`🤖 Auto-generating embeddings for source ${job.parent_source_id}`);
+          supabaseClient.functions.invoke('generate-embeddings', {
+            body: { sourceId: job.parent_source_id }
+          }).then((embeddingResult) => {
+            if (embeddingResult.error) {
+              console.error('❌ Auto-embedding generation failed:', embeddingResult.error);
+            } else {
+              console.log('✅ Auto-embedding generation completed');
+            }
+          }).catch((error) => {
+            console.error('❌ Auto-embedding generation error:', error);
+          });
+        } catch (error) {
+          console.warn('⚠️ Could not trigger auto-embedding generation:', error);
+        }
 
         console.log(`✅ Processed minimal content page ${childJobId} with title fallback`);
 
@@ -160,6 +179,26 @@ serve(async (req) => {
       processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime(),
       content_hash: contentHash
     });
+
+    // Auto-generate embeddings for new chunks (non-blocking)
+    if (chunks.length > 0) {
+      try {
+        console.log(`🤖 Auto-generating embeddings for source ${job.parent_source_id}`);
+        supabaseClient.functions.invoke('generate-embeddings', {
+          body: { sourceId: job.parent_source_id }
+        }).then((embeddingResult) => {
+          if (embeddingResult.error) {
+            console.error('❌ Auto-embedding generation failed:', embeddingResult.error);
+          } else {
+            console.log('✅ Auto-embedding generation completed');
+          }
+        }).catch((error) => {
+          console.error('❌ Auto-embedding generation error:', error);
+        });
+      } catch (error) {
+        console.warn('⚠️ Could not trigger auto-embedding generation:', error);
+      }
+    }
 
     console.log(`✅ Successfully completed job ${childJobId} with ${chunks.length} chunks linked to parent ${job.parent_source_id}`);
 

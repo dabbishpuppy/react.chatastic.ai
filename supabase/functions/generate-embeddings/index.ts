@@ -34,11 +34,16 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Get chunks for this source
+    // Get chunks for this source that don't have embeddings
     const { data: chunks, error: chunksError } = await supabase
       .from('source_chunks')
-      .select('*')
-      .eq('source_id', sourceId);
+      .select(`
+        id,
+        content,
+        source_embeddings!left(id)
+      `)
+      .eq('source_id', sourceId)
+      .is('source_embeddings.id', null);
 
     if (chunksError) {
       console.error('❌ Error fetching chunks:', chunksError);
@@ -46,14 +51,20 @@ serve(async (req) => {
     }
 
     if (!chunks || chunks.length === 0) {
-      console.log('⚠️ No chunks found for source:', sourceId);
+      console.log('⚠️ No chunks without embeddings found for source:', sourceId);
       return new Response(
-        JSON.stringify({ success: true, message: 'No chunks to process' }),
+        JSON.stringify({ 
+          success: true, 
+          message: 'No chunks without embeddings to process',
+          processedCount: 0,
+          errorCount: 0,
+          totalChunks: 0
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`📄 Processing ${chunks.length} chunks for source ${sourceId}`);
+    console.log(`📄 Processing ${chunks.length} chunks without embeddings for source ${sourceId}`);
 
     let processedCount = 0;
     let errorCount = 0;
@@ -62,6 +73,12 @@ serve(async (req) => {
     for (const chunk of chunks) {
       try {
         console.log(`🔄 Processing chunk ${chunk.id}`);
+
+        // Skip if content is too short or empty
+        if (!chunk.content || chunk.content.trim().length < 10) {
+          console.log(`⚠️ Skipping chunk ${chunk.id} - content too short`);
+          continue;
+        }
 
         const response = await fetch('https://api.openai.com/v1/embeddings', {
           method: 'POST',
@@ -90,7 +107,7 @@ serve(async (req) => {
           .from('source_embeddings')
           .upsert({
             chunk_id: chunk.id,
-            embedding: JSON.stringify(embedding),
+            embedding: `[${embedding.join(',')}]`,
             model_name: 'text-embedding-3-small'
           });
 
