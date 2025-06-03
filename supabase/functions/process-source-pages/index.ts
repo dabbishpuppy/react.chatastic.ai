@@ -18,7 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🔄 Starting source pages processing batch...');
+    console.log('🔄 Starting automatic source pages processing...');
 
     // Get pending source pages to process (prioritize older ones)
     const { data: pendingPages, error: fetchError } = await supabaseClient
@@ -26,49 +26,49 @@ serve(async (req) => {
       .select('*')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
-      .limit(10); // Process in small batches
+      .limit(15); // Process more pages at once for better efficiency
 
     if (fetchError) {
       console.error('❌ Failed to fetch pending pages:', fetchError);
       throw new Error(`Failed to fetch pending pages: ${fetchError.message}`);
     }
 
+    // Auto-recovery: Check for stuck pages and reset them
+    const { data: stuckPages, error: stuckError } = await supabaseClient
+      .from('source_pages')
+      .select('id, url, status, started_at, retry_count')
+      .eq('status', 'in_progress')
+      .lt('started_at', new Date(Date.now() - 8 * 60 * 1000).toISOString()); // 8 minutes ago
+
+    if (!stuckError && stuckPages && stuckPages.length > 0) {
+      console.log(`🔄 Auto-recovering ${stuckPages.length} stuck pages...`);
+      
+      // Reset stuck pages back to pending automatically
+      const { error: resetError } = await supabaseClient
+        .from('source_pages')
+        .update({ 
+          status: 'pending',
+          started_at: null,
+          retry_count: 0
+        })
+        .in('id', stuckPages.map(p => p.id));
+      
+      if (resetError) {
+        console.error('❌ Failed to auto-recover stuck pages:', resetError);
+      } else {
+        console.log(`✅ Auto-recovered ${stuckPages.length} stuck pages`);
+      }
+    }
+
     if (!pendingPages || pendingPages.length === 0) {
       console.log('📭 No pending source pages to process');
-      
-      // Check for stuck pages that might need attention
-      const { data: stuckPages, error: stuckError } = await supabaseClient
-        .from('source_pages')
-        .select('id, url, status, started_at, retry_count')
-        .eq('status', 'in_progress')
-        .lt('started_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()); // 10 minutes ago
-      
-      if (!stuckError && stuckPages && stuckPages.length > 0) {
-        console.log(`🚨 Found ${stuckPages.length} stuck pages, resetting to pending...`);
-        
-        // Reset stuck pages back to pending
-        const { error: resetError } = await supabaseClient
-          .from('source_pages')
-          .update({ 
-            status: 'pending',
-            started_at: null,
-            retry_count: 0
-          })
-          .in('id', stuckPages.map(p => p.id));
-        
-        if (resetError) {
-          console.error('❌ Failed to reset stuck pages:', resetError);
-        } else {
-          console.log(`✅ Reset ${stuckPages.length} stuck pages to pending`);
-        }
-      }
       
       return new Response(
         JSON.stringify({
           success: true,
           message: 'No pending pages to process',
           processedCount: 0,
-          resetStuckCount: stuckPages?.length || 0
+          autoRecoveredCount: stuckPages?.length || 0
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -77,14 +77,14 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📋 Found ${pendingPages.length} pending pages to process`);
+    console.log(`📋 Auto-processing ${pendingPages.length} pending pages...`);
 
-    // Process each page by calling the child-job-processor
+    // Process each page automatically
     const results = [];
     
     for (const page of pendingPages) {
       try {
-        console.log(`🚀 Processing page: ${page.url} (ID: ${page.id})`);
+        console.log(`🚀 Auto-processing page: ${page.url} (ID: ${page.id})`);
         
         // Mark as in_progress first
         await supabaseClient
@@ -102,16 +102,19 @@ serve(async (req) => {
           });
 
         if (processingError) {
-          console.error(`❌ Failed to process page ${page.id}:`, processingError);
+          console.error(`❌ Failed to auto-process page ${page.id}:`, processingError);
           
-          // Mark as failed with error details
+          // Auto-retry logic: mark as failed but increment retry count
+          const newRetryCount = (page.retry_count || 0) + 1;
+          const shouldRetry = newRetryCount < 3;
+          
           await supabaseClient
             .from('source_pages')
             .update({
-              status: 'failed',
+              status: shouldRetry ? 'pending' : 'failed',
               error_message: processingError.message,
-              completed_at: new Date().toISOString(),
-              retry_count: (page.retry_count || 0) + 1
+              completed_at: shouldRetry ? null : new Date().toISOString(),
+              retry_count: newRetryCount
             })
             .eq('id', page.id);
           
@@ -119,10 +122,11 @@ serve(async (req) => {
             pageId: page.id,
             url: page.url,
             success: false,
-            error: processingError.message
+            error: processingError.message,
+            autoRetried: shouldRetry
           });
         } else {
-          console.log(`✅ Successfully processed page ${page.id}`);
+          console.log(`✅ Successfully auto-processed page ${page.id}`);
           results.push({
             pageId: page.id,
             url: page.url,
@@ -131,16 +135,19 @@ serve(async (req) => {
           });
         }
       } catch (error) {
-        console.error(`❌ Error processing page ${page.id}:`, error);
+        console.error(`❌ Error auto-processing page ${page.id}:`, error);
         
-        // Mark as failed
+        // Auto-retry logic for exceptions too
+        const newRetryCount = (page.retry_count || 0) + 1;
+        const shouldRetry = newRetryCount < 3;
+        
         await supabaseClient
           .from('source_pages')
           .update({
-            status: 'failed',
+            status: shouldRetry ? 'pending' : 'failed',
             error_message: error.message,
-            completed_at: new Date().toISOString(),
-            retry_count: (page.retry_count || 0) + 1
+            completed_at: shouldRetry ? null : new Date().toISOString(),
+            retry_count: newRetryCount
           })
           .eq('id', page.id);
         
@@ -148,24 +155,26 @@ serve(async (req) => {
           pageId: page.id,
           url: page.url,
           success: false,
-          error: error.message
+          error: error.message,
+          autoRetried: shouldRetry
         });
       }
     }
 
     const successCount = results.filter(r => r.success).length;
     const failedCount = results.filter(r => !r.success).length;
+    const autoRetriedCount = results.filter(r => r.autoRetried).length;
 
-    console.log(`📊 Batch processing complete: ${successCount} successful, ${failedCount} failed`);
+    console.log(`📊 Auto-processing complete: ${successCount} successful, ${failedCount} failed, ${autoRetriedCount} auto-retried`);
 
-    // Trigger parent status aggregation for affected parents
+    // Auto-trigger parent status aggregation for affected parents
     const parentIds = [...new Set(pendingPages.map(p => p.parent_source_id).filter(Boolean))];
     for (const parentId of parentIds) {
       try {
         await supabaseClient.rpc('aggregate_parent_status', { parent_id: parentId });
-        console.log(`🔄 Aggregated status for parent: ${parentId}`);
+        console.log(`🔄 Auto-aggregated status for parent: ${parentId}`);
       } catch (error) {
-        console.error(`❌ Failed to aggregate parent ${parentId}:`, error);
+        console.error(`❌ Failed to auto-aggregate parent ${parentId}:`, error);
       }
     }
 
@@ -175,6 +184,8 @@ serve(async (req) => {
         processedCount: pendingPages.length,
         successCount,
         failedCount,
+        autoRetriedCount,
+        autoRecoveredCount: stuckPages?.length || 0,
         results,
         affectedParents: parentIds.length
       }),
@@ -185,7 +196,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Source pages processor error:', error);
+    console.error('❌ Auto-processing error:', error);
     return new Response(
       JSON.stringify({
         success: false,

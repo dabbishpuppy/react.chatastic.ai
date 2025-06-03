@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CrawlRecoveryService } from '@/services/rag/crawlRecoveryService';
 
 export interface EnhancedCrawlRequest {
   url: string;
@@ -58,16 +59,21 @@ export const useEnhancedCrawl = () => {
 
       console.log('✅ Enhanced crawl initiated successfully:', data);
       
+      // Automatically start monitoring and recovery for this crawl
+      setTimeout(() => {
+        CrawlRecoveryService.autoRecoverStuckCrawls(request.agentId);
+      }, 30000); // Check for issues after 30 seconds
+      
       // Show success message with compression info
       toast({
         title: "Crawl Started",
-        description: `Started processing ${data.totalJobs} pages with compression enabled. Content will be fetched and compressed automatically.`,
+        description: `Started processing ${data.totalJobs} pages with automatic monitoring enabled. Content will be processed automatically.`,
       });
       
       return {
         parentSourceId: data.parentSourceId,
         totalJobs: data.totalJobs,
-        message: `Enhanced crawl with compression initiated for ${data.totalJobs} pages`
+        message: `Enhanced crawl with auto-monitoring initiated for ${data.totalJobs} pages`
       };
 
     } catch (error: any) {
@@ -101,84 +107,31 @@ export const useEnhancedCrawl = () => {
     }
   };
 
-  // Add manual trigger for processing existing source pages
-  const triggerProcessing = async () => {
-    try {
-      console.log('🔄 Manually triggering source page processing...');
-      
-      const { data, error } = await supabase.functions.invoke('process-source-pages');
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Processing Started",
-        description: "Background processing of pending source pages has been triggered.",
-      });
-    } catch (error) {
-      console.error('❌ Failed to trigger processing:', error);
-      toast({
-        title: "Processing Failed",
-        description: "Failed to start background processing. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Add the missing properties that other components expect
-  const isLoading = loading;
-  
   const retryFailedJobs = async (parentSourceId: string) => {
     try {
-      console.log('🔄 Retrying failed jobs for:', parentSourceId);
+      console.log('🔄 Auto-retrying failed jobs for:', parentSourceId);
       
-      // Get failed jobs and mark them for retry
-      const { data: failedJobs, error: fetchError } = await supabase
-        .from('source_pages')
-        .select('id')
-        .eq('parent_source_id', parentSourceId)
-        .eq('status', 'failed');
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      if (!failedJobs || failedJobs.length === 0) {
+      const result = await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
+      
+      if (result.success) {
         toast({
-          title: "No Failed Jobs",
-          description: "No failed jobs found to retry.",
+          title: "Auto-Retry Successful",
+          description: result.message,
         });
-        return 0;
+      } else {
+        toast({
+          title: "Auto-Retry Issue",
+          description: result.message,
+          variant: "destructive"
+        });
       }
 
-      // Reset failed jobs to pending for reprocessing
-      const { error: updateError } = await supabase
-        .from('source_pages')
-        .update({ 
-          status: 'pending',
-          retry_count: 0,
-          error_message: null
-        })
-        .eq('parent_source_id', parentSourceId)
-        .eq('status', 'failed');
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      console.log('✅ Successfully retried failed jobs:', failedJobs.length);
-      toast({
-        title: "Jobs Retried",
-        description: `Successfully retried ${failedJobs.length} failed jobs.`,
-      });
-
-      return failedJobs.length;
+      return result.retriedCount || 0;
     } catch (error) {
-      console.error('Error retrying failed jobs:', error);
+      console.error('Error auto-retrying failed jobs:', error);
       toast({
-        title: "Retry Failed",
-        description: "Failed to retry failed jobs. Please try again.",
+        title: "Auto-Retry Failed",
+        description: "Automatic retry encountered an issue. The system will try again later.",
         variant: "destructive"
       });
       throw error;
@@ -214,9 +167,11 @@ export const useEnhancedCrawl = () => {
     return null;
   };
 
+  // Add the missing properties that other components expect
+  const isLoading = loading;
+
   return {
     initiateCrawl,
-    triggerProcessing,
     loading,
     isLoading,
     retryFailedJobs,

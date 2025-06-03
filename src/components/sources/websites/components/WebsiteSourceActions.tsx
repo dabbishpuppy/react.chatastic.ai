@@ -14,8 +14,7 @@ import {
   RotateCcw, 
   EyeOff, 
   Eye,
-  RefreshCw,
-  Wrench
+  RefreshCw
 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import { CrawlRecoveryService } from '@/services/rag/crawlRecoveryService';
@@ -40,7 +39,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   showRecrawl = true,
   isChild = false
 }) => {
-  const [isRecovering, setIsRecovering] = useState(false);
+  const [isAutoRecovering, setIsAutoRecovering] = useState(false);
   
   const isParentSource = !source.parent_source_id;
   const isStuck = isParentSource && 
@@ -55,21 +54,21 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
     }
   };
 
-  const handleRecoverStuck = async () => {
+  const handleAutoRecover = async () => {
     if (!isParentSource) return;
     
-    setIsRecovering(true);
+    setIsAutoRecovering(true);
     try {
-      const result = await CrawlRecoveryService.performCompleteRecovery(source.id);
+      const result = await CrawlRecoveryService.performAutoRecovery(source.id);
       
       if (result.success) {
         toast({
-          title: "Recovery Successful",
+          title: "Auto-Recovery Successful",
           description: result.message,
         });
       } else {
         toast({
-          title: "Recovery Failed",
+          title: "Auto-Recovery Issue",
           description: result.message,
           variant: "destructive"
         });
@@ -77,11 +76,11 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to recover stuck crawl",
+        description: "Automatic recovery encountered an issue",
         variant: "destructive"
       });
     } finally {
-      setIsRecovering(false);
+      setIsAutoRecovering(false);
     }
   };
 
@@ -121,16 +120,16 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         
         {isStuck && (
           <DropdownMenuItem 
-            onClick={handleRecoverStuck}
-            disabled={isRecovering}
-            className="text-orange-600"
+            onClick={handleAutoRecover}
+            disabled={isAutoRecovering}
+            className="text-blue-600"
           >
-            {isRecovering ? (
+            {isAutoRecovering ? (
               <RefreshCw size={14} className="mr-2 animate-spin" />
             ) : (
-              <Wrench size={14} className="mr-2" />
+              <RefreshCw size={14} className="mr-2" />
             )}
-            Recover Stuck
+            Auto-Fix
           </DropdownMenuItem>
         )}
         
