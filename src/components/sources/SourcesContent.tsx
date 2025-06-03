@@ -40,7 +40,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
       return {
         variant: "default" as const,
         disabled: false,
-        icon: <AlertCircle className="h-4 w-4" />,
+        icon: <RefreshCw className="h-4 w-4" />,
         text: "Retrain Agent",
         className: "bg-orange-600 hover:bg-orange-700 text-white"
       };
@@ -82,7 +82,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="space-y-1">
               <p className="text-2xl font-bold">{totalSources}</p>
               <p className="text-sm text-muted-foreground">Total Sources</p>
@@ -94,7 +94,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           </div>
           
           {retrainingNeeded && (
-            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
