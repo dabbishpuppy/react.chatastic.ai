@@ -135,14 +135,14 @@ export const proceedWithMessage = async (
       return [...prev, aiMessage];
     });
 
-    // Simulate typing completion based on content length
+    // Simulate typing completion based on content length (faster speed: 15ms per character)
     setTimeout(() => {
       console.log('✅ Typing animation complete for message:', aiMessage.id);
       if (setTypingMessageId) {
         setTypingMessageId(null);
       }
       setIsTyping(false);
-    }, ragResult.response.length * 30 + 1000); // ~30ms per character + 1s buffer
+    }, ragResult.response.length * 15 + 500); // Faster: 15ms per character + 500ms buffer
 
     // Focus input field after response
     setTimeout(() => {
@@ -187,13 +187,13 @@ export const proceedWithMessage = async (
 
     setChatHistory(prev => [...prev, errorMessage]);
 
-    // Simulate typing for error message
+    // Simulate typing for error message (faster)
     setTimeout(() => {
       if (setTypingMessageId) {
         setTypingMessageId(null);
       }
       setIsTyping(false);
-    }, 2000);
+    }, 1500); // Faster typing for error message
 
     // Focus input field after error response
     setTimeout(() => {

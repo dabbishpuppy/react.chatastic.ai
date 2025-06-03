@@ -10,7 +10,7 @@ interface TypingMessageProps {
 const TypingMessage: React.FC<TypingMessageProps> = ({
   content,
   onComplete,
-  typingSpeed = 30
+  typingSpeed = 15
 }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);

@@ -73,11 +73,11 @@ export const useMessageHandling = (agentId: string) => {
       // Add message to chat
       onNewMessage(responseMessage);
 
-      // Simulate typing completion after a delay
+      // Simulate typing completion after a delay (faster speed: 15ms per character)
       setTimeout(() => {
         console.log('✅ Typing complete for message:', messageId);
         options?.onTypingComplete?.(messageId);
-      }, ragResult.response.length * 30 + 1000); // Approximate typing duration
+      }, ragResult.response.length * 15 + 500); // Faster typing: 15ms per character + 500ms buffer
 
     } catch (error) {
       console.error('❌ RAG processing failed:', error);
@@ -100,7 +100,7 @@ export const useMessageHandling = (agentId: string) => {
 
       setTimeout(() => {
         options?.onTypingComplete?.(errorMessageId);
-      }, 2000);
+      }, 1500); // Faster typing for error message too
     } finally {
       setIsLoading(false);
     }
