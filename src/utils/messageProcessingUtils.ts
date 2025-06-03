@@ -68,8 +68,8 @@ export const proceedWithMessage = async (
 
     console.log('🧠 Processing message with RAG system for agent:', agentId);
     
-    // Thinking delay (1.5 seconds to show thinking dots)
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Thinking delay (1 second to show thinking dots)
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Hide thinking bubble before processing
     if (setIsThinking) {
@@ -135,14 +135,14 @@ export const proceedWithMessage = async (
       return [...prev, aiMessage];
     });
 
-    // Simulate typing completion based on content length (faster speed: 15ms per character)
+    // Simulate typing completion based on content length (very fast speed: 5ms per character)
     setTimeout(() => {
       console.log('✅ Typing animation complete for message:', aiMessage.id);
       if (setTypingMessageId) {
         setTypingMessageId(null);
       }
       setIsTyping(false);
-    }, ragResult.response.length * 15 + 500); // Faster: 15ms per character + 500ms buffer
+    }, ragResult.response.length * 5 + 200); // Very fast: 5ms per character + 200ms buffer
 
     // Focus input field after response
     setTimeout(() => {
@@ -187,13 +187,13 @@ export const proceedWithMessage = async (
 
     setChatHistory(prev => [...prev, errorMessage]);
 
-    // Simulate typing for error message (faster)
+    // Simulate typing for error message (very fast)
     setTimeout(() => {
       if (setTypingMessageId) {
         setTypingMessageId(null);
       }
       setIsTyping(false);
-    }, 1500); // Faster typing for error message
+    }, 800); // Very fast typing for error message
 
     // Focus input field after error response
     setTimeout(() => {

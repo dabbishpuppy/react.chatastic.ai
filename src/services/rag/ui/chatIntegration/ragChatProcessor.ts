@@ -73,8 +73,8 @@ export class RAGChatProcessor {
         conversationId
       );
 
-      // Thinking delay to show thinking dots
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Thinking delay to show thinking dots (1 second)
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // End thinking callback
       callbacks?.onThinkingEnd?.();
