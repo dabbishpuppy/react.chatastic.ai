@@ -2,6 +2,7 @@
 import { ChatMessage } from "@/types/chatInterface";
 import { messageService } from "@/services/messageService";
 import { isDuplicateMessage, isDuplicateAIResponse } from "./duplicateMessageUtils";
+import { RAGChatIntegration } from "@/services/rag/ui/ragChatIntegration";
 
 export const proceedWithMessage = async (
   text: string,
@@ -16,7 +17,7 @@ export const proceedWithMessage = async (
 ) => {
   const trimmedText = text.trim();
   
-  console.log('📤 Processing user message with conversation ID:', {
+  console.log('📤 Processing user message with RAG integration:', {
     content: trimmedText.substring(0, 50) + '...',
     conversationId,
     isEmbedded
@@ -57,16 +58,40 @@ export const proceedWithMessage = async (
     setIsThinking(true);
   }
 
-  // Simulate AI response after a delay
-  setTimeout(async () => {
-    const aiResponseText = "Thank you for your message! This is a simulated response.";
+  try {
+    // Extract agent ID from conversation or URL
+    const agentId = await getAgentIdFromConversation(conversationId);
     
-    // Check for duplicate AI response with expanded window
-    if (isDuplicateAIResponse(aiResponseText, conversationId)) {
-      setIsTyping(false);
+    if (!agentId) {
+      throw new Error('Agent ID not found for conversation');
+    }
+
+    console.log('🧠 Processing message with RAG system for agent:', agentId);
+    
+    // Process with RAG integration
+    const ragResult = await RAGChatIntegration.processMessageWithRAG(
+      trimmedText,
+      agentId,
+      conversationId,
+      {
+        enableRAG: true,
+        maxSources: 5,
+        enableStreaming: false
+      }
+    );
+
+    console.log('🎯 RAG processing complete:', {
+      responseLength: ragResult.response.length,
+      sourcesUsed: ragResult.processingMetadata?.sourcesUsed || 0,
+      processingTime: ragResult.processingMetadata?.totalTime || 0
+    });
+
+    // Check for duplicate AI response
+    if (isDuplicateAIResponse(ragResult.response, conversationId)) {
       if (setIsThinking) {
         setIsThinking(false);
       }
+      setIsTyping(false);
       return;
     }
     
@@ -75,14 +100,14 @@ export const proceedWithMessage = async (
     
     const aiMessage: ChatMessage = {
       id: aiMessageId,
-      content: aiResponseText,
+      content: ragResult.response,
       isAgent: true,
       timestamp: new Date().toISOString(),
     };
 
     // Save AI message to database
     console.log('💾 Saving AI response to conversation:', conversationId);
-    const savedAiMessage = await messageService.saveMessage(conversationId, aiResponseText, true);
+    const savedAiMessage = await messageService.saveMessage(conversationId, ragResult.response, true);
     if (savedAiMessage) {
       aiMessage.id = savedAiMessage.id;
       console.log('✅ AI response saved successfully with ID:', savedAiMessage.id);
@@ -102,7 +127,7 @@ export const proceedWithMessage = async (
     }
 
     setChatHistory(prev => {
-      console.log('🤖 Adding AI response to chat history UI with typing animation');
+      console.log('🤖 Adding RAG-powered AI response to chat history UI with typing animation');
       return [...prev, aiMessage];
     });
     setIsTyping(false);
@@ -111,5 +136,89 @@ export const proceedWithMessage = async (
     setTimeout(() => {
       inputRef.current?.focus();
     }, 10);
-  }, 1000 + Math.random() * 1000);
+
+  } catch (error) {
+    console.error('❌ RAG processing failed, falling back to error message:', error);
+    
+    // Hide thinking bubble on error
+    if (setIsThinking) {
+      setIsThinking(false);
+    }
+    
+    // Check for duplicate AI response even for error message
+    const errorResponseText = "I apologize, but I encountered an issue processing your request. Please try again or contact support if the problem persists.";
+    
+    if (isDuplicateAIResponse(errorResponseText, conversationId)) {
+      setIsTyping(false);
+      return;
+    }
+    
+    // Generate unique ID for the error message
+    const errorMessageId = `ai-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    const errorMessage: ChatMessage = {
+      id: errorMessageId,
+      content: errorResponseText,
+      isAgent: true,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Save error message to database
+    const savedErrorMessage = await messageService.saveMessage(conversationId, errorResponseText, true);
+    if (savedErrorMessage) {
+      errorMessage.id = savedErrorMessage.id;
+    }
+
+    if (setTypingMessageId) {
+      setTypingMessageId(errorMessage.id);
+    }
+
+    setChatHistory(prev => [...prev, errorMessage]);
+    setIsTyping(false);
+
+    // Focus input field after error response
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 10);
+  }
 };
+
+// Helper function to extract agent ID from conversation
+async function getAgentIdFromConversation(conversationId: string): Promise<string | null> {
+  try {
+    // First try to get agent ID from URL params
+    const urlPath = window.location.pathname;
+    const agentIdMatch = urlPath.match(/\/agent\/([^\/]+)/);
+    
+    if (agentIdMatch && agentIdMatch[1]) {
+      console.log('🎯 Agent ID found from URL:', agentIdMatch[1]);
+      return agentIdMatch[1];
+    }
+
+    // If not found in URL, try to get from conversation data
+    // This would require querying the conversations table
+    const { supabase } = await import("@/integrations/supabase/client");
+    
+    const { data: conversation, error } = await supabase
+      .from('conversations')
+      .select('agent_id')
+      .eq('id', conversationId)
+      .single();
+
+    if (error) {
+      console.error('❌ Error fetching conversation agent ID:', error);
+      return null;
+    }
+
+    if (conversation?.agent_id) {
+      console.log('🎯 Agent ID found from conversation:', conversation.agent_id);
+      return conversation.agent_id;
+    }
+
+    console.error('❌ Agent ID not found');
+    return null;
+  } catch (error) {
+    console.error('❌ Error extracting agent ID:', error);
+    return null;
+  }
+}

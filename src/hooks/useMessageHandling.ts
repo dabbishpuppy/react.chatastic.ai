@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { MultiProviderLLMService, LLMRequest } from '@/services/rag/llm/multiProviderLLMService';
+import { RAGChatIntegration } from '@/services/rag/ui/ragChatIntegration';
 
 export interface Message {
   id: string;
@@ -21,61 +20,37 @@ export const useMessageHandling = (agentId: string) => {
     setIsLoading(true);
 
     try {
-      // Get agent's AI configuration
-      const { data: agent, error: agentError } = await supabase
-        .from('agents')
-        .select('ai_model, ai_instructions, ai_temperature')
-        .eq('id', agentId)
-        .single();
+      console.log('🧠 Processing message with RAG system for agent:', agentId);
 
-      if (agentError || !agent) {
-        console.error('Error fetching agent configuration:', agentError);
-        throw new Error('Failed to load agent configuration');
-      }
-
-      // Build conversation history for context
-      const conversationMessages = messages
-        .slice(-5) // Keep last 5 messages for context
-        .map(msg => ({
-          role: msg.isAgent ? 'assistant' as const : 'user' as const,
-          content: msg.content
-        }));
-
-      // Add system message with agent instructions
-      const llmMessages = [
+      // Process with RAG integration
+      const ragResult = await RAGChatIntegration.processMessageWithRAG(
+        content,
+        agentId,
+        undefined, // No conversation ID in this context
         {
-          role: 'system' as const,
-          content: agent.ai_instructions || 'You are a helpful AI assistant.'
-        },
-        ...conversationMessages,
-        {
-          role: 'user' as const,
-          content: content
+          enableRAG: true,
+          maxSources: 5,
+          enableStreaming: false
         }
-      ];
+      );
 
-      // Create LLM request
-      const request: LLMRequest = {
-        model: agent.ai_model || 'gpt-4o-mini',
-        messages: llmMessages,
-        temperature: agent.ai_temperature || 0.7,
-        max_tokens: 1000
-      };
-
-      // Call the LLM service
-      const response = await MultiProviderLLMService.callLLM(request);
+      console.log('🎯 RAG processing complete:', {
+        responseLength: ragResult.response.length,
+        sourcesUsed: ragResult.processingMetadata?.sourcesUsed || 0,
+        processingTime: ragResult.processingMetadata?.totalTime || 0
+      });
 
       // Create response message
       const responseMessage: Message = {
         id: Date.now().toString() + '_response',
-        content: response.content,
+        content: ragResult.response,
         isAgent: true,
         timestamp: new Date().toISOString()
       };
 
       onNewMessage(responseMessage);
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ RAG processing failed:', error);
       
       // Fallback error message
       const errorMessage: Message = {
