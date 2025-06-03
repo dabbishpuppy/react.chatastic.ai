@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { useConversationManager } from "@/hooks/useConversationManager";
 import { useLeadSettings } from "@/hooks/useLeadSettings";
@@ -81,7 +82,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
 
   // Set up message handlers
   const {
-    handleFeedback,
+    handleFeedback: handleFeedbackOriginal,
     regenerateResponse,
     insertEmoji,
     handleCountdownFinished
@@ -98,6 +99,16 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     rateLimitError
   });
 
+  // Create wrapper for handleFeedback to match expected signature
+  const handleFeedback = (messageId: string, isPositive: boolean) => {
+    // Find the message by ID to get its timestamp
+    const message = chatHistory.find(msg => msg.id === messageId);
+    if (message) {
+      const feedbackType = isPositive ? "like" : "dislike";
+      handleFeedbackOriginal(message.timestamp, feedbackType);
+    }
+  };
+
   // Create submit handler
   const handleSubmit = async (e: React.FormEvent, agentIdParam?: string) => {
     e.preventDefault();
@@ -110,6 +121,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     await submitMessage(text, agentIdParam || agentId);
   };
 
+  // Create regenerate handler that matches the expected signature
+  const handleRegenerate = async (messageIndex: number, agentIdParam?: string) => {
+    // We'll regenerate based on the chat history length and allow regenerate setting
+    await regenerateResponse(true); // Always allow regenerate when explicitly called
+  };
+
   // Cleanup function
   const cleanup = () => {
     if (countdownIntervalRef.current) {
@@ -118,7 +135,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   };
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
-  const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
+  const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, handleRegenerate);
 
   // Enhanced getConversationMessages that uses the agentId
   const getConversationMessagesWithAgent = async (conversationId: string) => {
