@@ -90,34 +90,51 @@ export class MissingChunksService {
     missingPercentage: number;
   }> {
     try {
-      // Get total chunks for the agent using a proper join
+      // First get all source IDs for this agent
+      const { data: agentSources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId);
+
+      if (sourcesError) {
+        console.error('Error fetching agent sources:', sourcesError);
+        return { chunksWithoutEmbeddings: 0, totalChunks: 0, missingPercentage: 0 };
+      }
+
+      if (!agentSources || agentSources.length === 0) {
+        return { chunksWithoutEmbeddings: 0, totalChunks: 0, missingPercentage: 0 };
+      }
+
+      const sourceIds = agentSources.map(source => source.id);
+
+      // Get total chunks for these sources
       const { data: totalChunksData, error: totalError } = await supabase
         .from('source_chunks')
         .select('id')
-        .innerJoin('agent_sources', 'source_chunks.source_id', 'agent_sources.id')
-        .eq('agent_sources.agent_id', agentId);
+        .in('source_id', sourceIds);
 
       if (totalError) {
         console.error('Error fetching total chunks:', totalError);
         return { chunksWithoutEmbeddings: 0, totalChunks: 0, missingPercentage: 0 };
       }
 
-      // Get chunks without embeddings using a proper join
-      const { data: chunksWithoutEmbeddingsData, error: missingError } = await supabase
+      // Get chunks with embeddings
+      const { data: chunksWithEmbeddingsData, error: embeddingsError } = await supabase
         .from('source_chunks')
-        .select('source_chunks.id')
-        .innerJoin('agent_sources', 'source_chunks.source_id', 'agent_sources.id')
-        .leftJoin('source_embeddings', 'source_chunks.id', 'source_embeddings.chunk_id')
-        .eq('agent_sources.agent_id', agentId)
-        .is('source_embeddings.id', null);
+        .select(`
+          id,
+          source_embeddings!inner(id)
+        `)
+        .in('source_id', sourceIds);
 
-      if (missingError) {
-        console.error('Error fetching chunks without embeddings:', missingError);
+      if (embeddingsError) {
+        console.error('Error fetching chunks with embeddings:', embeddingsError);
         return { chunksWithoutEmbeddings: 0, totalChunks: totalChunksData?.length || 0, missingPercentage: 0 };
       }
 
       const totalCount = totalChunksData?.length || 0;
-      const missingCount = chunksWithoutEmbeddingsData?.length || 0;
+      const withEmbeddingsCount = chunksWithEmbeddingsData?.length || 0;
+      const missingCount = totalCount - withEmbeddingsCount;
       const missingPercentage = totalCount > 0 ? (missingCount / totalCount) * 100 : 0;
 
       return {
