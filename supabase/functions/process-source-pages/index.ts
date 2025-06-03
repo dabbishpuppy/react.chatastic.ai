@@ -20,7 +20,7 @@ serve(async (req) => {
 
     console.log('🔄 Starting source pages processing batch...');
 
-    // Get pending source pages to process
+    // Get pending source pages to process (prioritize older ones)
     const { data: pendingPages, error: fetchError } = await supabaseClient
       .from('source_pages')
       .select('*')
@@ -29,16 +29,46 @@ serve(async (req) => {
       .limit(10); // Process in small batches
 
     if (fetchError) {
+      console.error('❌ Failed to fetch pending pages:', fetchError);
       throw new Error(`Failed to fetch pending pages: ${fetchError.message}`);
     }
 
     if (!pendingPages || pendingPages.length === 0) {
       console.log('📭 No pending source pages to process');
+      
+      // Check for stuck pages that might need attention
+      const { data: stuckPages, error: stuckError } = await supabaseClient
+        .from('source_pages')
+        .select('id, url, status, started_at, retry_count')
+        .eq('status', 'in_progress')
+        .lt('started_at', new Date(Date.now() - 10 * 60 * 1000).toISOString()); // 10 minutes ago
+      
+      if (!stuckError && stuckPages && stuckPages.length > 0) {
+        console.log(`🚨 Found ${stuckPages.length} stuck pages, resetting to pending...`);
+        
+        // Reset stuck pages back to pending
+        const { error: resetError } = await supabaseClient
+          .from('source_pages')
+          .update({ 
+            status: 'pending',
+            started_at: null,
+            retry_count: 0
+          })
+          .in('id', stuckPages.map(p => p.id));
+        
+        if (resetError) {
+          console.error('❌ Failed to reset stuck pages:', resetError);
+        } else {
+          console.log(`✅ Reset ${stuckPages.length} stuck pages to pending`);
+        }
+      }
+      
       return new Response(
         JSON.stringify({
           success: true,
           message: 'No pending pages to process',
-          processedCount: 0
+          processedCount: 0,
+          resetStuckCount: stuckPages?.length || 0
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -54,7 +84,16 @@ serve(async (req) => {
     
     for (const page of pendingPages) {
       try {
-        console.log(`🚀 Processing page: ${page.url}`);
+        console.log(`🚀 Processing page: ${page.url} (ID: ${page.id})`);
+        
+        // Mark as in_progress first
+        await supabaseClient
+          .from('source_pages')
+          .update({ 
+            status: 'in_progress',
+            started_at: new Date().toISOString()
+          })
+          .eq('id', page.id);
         
         // Call the child-job-processor function
         const { data: processingResult, error: processingError } = await supabaseClient
@@ -64,6 +103,18 @@ serve(async (req) => {
 
         if (processingError) {
           console.error(`❌ Failed to process page ${page.id}:`, processingError);
+          
+          // Mark as failed with error details
+          await supabaseClient
+            .from('source_pages')
+            .update({
+              status: 'failed',
+              error_message: processingError.message,
+              completed_at: new Date().toISOString(),
+              retry_count: (page.retry_count || 0) + 1
+            })
+            .eq('id', page.id);
+          
           results.push({
             pageId: page.id,
             url: page.url,
@@ -81,6 +132,18 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error(`❌ Error processing page ${page.id}:`, error);
+        
+        // Mark as failed
+        await supabaseClient
+          .from('source_pages')
+          .update({
+            status: 'failed',
+            error_message: error.message,
+            completed_at: new Date().toISOString(),
+            retry_count: (page.retry_count || 0) + 1
+          })
+          .eq('id', page.id);
+        
         results.push({
           pageId: page.id,
           url: page.url,
@@ -95,13 +158,25 @@ serve(async (req) => {
 
     console.log(`📊 Batch processing complete: ${successCount} successful, ${failedCount} failed`);
 
+    // Trigger parent status aggregation for affected parents
+    const parentIds = [...new Set(pendingPages.map(p => p.parent_source_id).filter(Boolean))];
+    for (const parentId of parentIds) {
+      try {
+        await supabaseClient.rpc('aggregate_parent_status', { parent_id: parentId });
+        console.log(`🔄 Aggregated status for parent: ${parentId}`);
+      } catch (error) {
+        console.error(`❌ Failed to aggregate parent ${parentId}:`, error);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         processedCount: pendingPages.length,
         successCount,
         failedCount,
-        results
+        results,
+        affectedParents: parentIds.length
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
