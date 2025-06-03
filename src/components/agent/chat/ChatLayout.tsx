@@ -3,6 +3,7 @@ import React from "react";
 import ChatContainer from "./ChatContainer";
 import ChatMainContent from "./ChatMainContent";
 import ChatInput from "./ChatInput";
+import ChatHeader from "./ChatHeader";
 import { ChatSectionProps } from "./ChatSectionProps";
 import { ChatSectionState } from "./ChatSectionState";
 import { getChatSectionHelpers } from "./ChatSectionHelpers";
@@ -53,6 +54,11 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
     handlers.handleKeyPress(e);
   };
 
+  const handleRegenerate = () => {
+    const lastMessageIndex = state.chatHistory.length - 1;
+    handlers.handleRegenerate(lastMessageIndex);
+  };
+
   return (
     <ChatContainer
       isEmbedded={props.isEmbedded || false}
@@ -60,6 +66,23 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
       chatContainerRef={state.chatContainerRef}
     >
       <div className="flex flex-col h-full">
+        {/* Chat header */}
+        <ChatHeader
+          agentName={props.agentName || "AI Assistant"}
+          profilePicture={props.profilePicture}
+          allowRegenerate={props.allowRegenerate || false}
+          onRegenerate={handleRegenerate}
+          headerColor={props.headerColor || null}
+          backgroundColor={themeClasses.background}
+          iconButtonClass={themeClasses.iconButton}
+          onStartNewChat={state.startNewConversation}
+          onEndChat={state.endCurrentConversation}
+          onLoadConversation={state.loadConversation}
+          agentId={state.agentId || ''}
+          isConversationEnded={state.conversationEnded}
+          isEmbedded={props.isEmbedded || false}
+        />
+
         {/* Main chat content area */}
         <ChatMainContent
           chatHistory={state.chatHistory}
@@ -74,10 +97,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({ state, handlers, ...prop
           onCopy={(content: string) => {
             navigator.clipboard.writeText(content);
           }}
-          onRegenerate={() => {
-            const lastMessageIndex = state.chatHistory.length - 1;
-            handlers.handleRegenerate(lastMessageIndex);
-          }}
+          onRegenerate={handleRegenerate}
           allowRegenerate={props.allowRegenerate || false}
           themeClasses={themeClasses}
           userMessageStyle={userMessageStyle}
