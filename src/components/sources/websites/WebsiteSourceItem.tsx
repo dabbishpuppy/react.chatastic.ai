@@ -70,6 +70,15 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   const linksCount = source.links_count || 0;
   const hasChildSources = childSources && childSources.length > 0;
 
+  const formatUrl = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname + urlObj.pathname;
+    } catch {
+      return url;
+    }
+  };
+
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
@@ -149,31 +158,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           </div>
           
           <div className="flex items-center gap-1 ml-4">
-            {/* Dropdown arrow - moved to the right side */}
-            {hasChildSources && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsExpanded(!isExpanded)}
-                      className="p-1 h-8 w-8"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{isExpanded ? 'Collapse' : 'Expand'} child sources</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -277,45 +261,59 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+
+            {/* Dropdown arrow - always visible on the right side */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => hasChildSources && setIsExpanded(!isExpanded)}
+                    className={`p-1 h-8 w-8 ${!hasChildSources ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                    disabled={!hasChildSources}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{hasChildSources ? (isExpanded ? 'Collapse' : 'Expand') + ' child sources' : 'No child sources'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
-        {/* Child Sources Section */}
+        {/* Child Sources Section - Simplified design matching reference */}
         {hasChildSources && isExpanded && (
-          <div className="mt-4 pl-8 border-l-2 border-gray-200">
-            <div className="space-y-2">
+          <div className="mt-4 pl-6 border-l-2 border-gray-200">
+            <div className="space-y-3">
               {childSources.map((childSource) => (
-                <div key={childSource.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div key={childSource.id} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-md border">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <Badge 
                       variant="outline" 
-                      className={`${getStatusColor(childSource.crawl_status)} text-white text-xs`}
+                      className={`${getStatusColor(childSource.crawl_status)} text-white text-xs px-2 py-0`}
                     >
                       {getStatusText(childSource.crawl_status)}
                     </Badge>
                     
                     {childSource.is_excluded && (
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs px-2 py-0">
                         <EyeOff className="w-2 h-2 mr-1" />
                         Excluded
                       </Badge>
                     )}
                     
                     <div className="flex-1 min-w-0">
-                      <WebsiteSourceInfo
-                        title={childSource.title}
-                        url={childSource.url}
-                        createdAt={childSource.created_at}
-                        lastCrawledAt={childSource.last_crawled_at}
-                        crawlStatus={childSource.crawl_status}
-                        metadata={childSource.metadata}
-                        content={childSource.content}
-                        isChild={true}
-                        totalContentSize={childSource.total_content_size}
-                        compressedContentSize={childSource.compressed_content_size}
-                        originalSize={childSource.original_size}
-                        compressedSize={childSource.compressed_size}
-                      />
+                      <p className="text-sm font-medium text-gray-900 truncate" title={childSource.url}>
+                        {childSource.title || formatUrl(childSource.url)}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{childSource.url}</p>
                     </div>
                   </div>
                   
