@@ -19,8 +19,18 @@ export async function updateJobStatus(
     ...(status === 'in_progress' && { started_at: new Date().toISOString() }),
     ...(status === 'completed' && { completed_at: new Date().toISOString() }),
     ...(status === 'failed' && { completed_at: new Date().toISOString() }),
-    ...metadata
   };
+
+  // Only add metadata fields that exist in the source_pages table
+  if (metadata) {
+    if (metadata.content_size) updateData.content_size = metadata.content_size;
+    if (metadata.compression_ratio) updateData.compression_ratio = metadata.compression_ratio;
+    if (metadata.chunks_created) updateData.chunks_created = metadata.chunks_created;
+    if (metadata.duplicates_found) updateData.duplicates_found = metadata.duplicates_found;
+    if (metadata.processing_time_ms) updateData.processing_time_ms = metadata.processing_time_ms;
+    if (metadata.error_message) updateData.error_message = metadata.error_message;
+    if (metadata.content_hash) updateData.content_hash = metadata.content_hash;
+  }
 
   const { error } = await client
     .from('source_pages')

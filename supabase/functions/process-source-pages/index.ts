@@ -22,7 +22,8 @@ async function autoRecoverStuckPages(supabaseClient: any) {
       .update({ 
         status: 'pending',
         started_at: null,
-        retry_count: 0
+        retry_count: 0,
+        error_message: null
       })
       .in('id', stuckPages.map(p => p.id));
     
@@ -32,6 +33,38 @@ async function autoRecoverStuckPages(supabaseClient: any) {
     } else {
       console.log(`✅ Auto-recovered ${stuckPages.length} stuck pages`);
       return stuckPages.length;
+    }
+  }
+
+  return 0;
+}
+
+async function resetFailedPages(supabaseClient: any) {
+  // Reset failed pages back to pending so they can be reprocessed
+  const { data: failedPages, error: failedError } = await supabaseClient
+    .from('source_pages')
+    .select('id, url, retry_count')
+    .eq('status', 'failed')
+    .lt('retry_count', 3);
+
+  if (!failedError && failedPages && failedPages.length > 0) {
+    console.log(`🔄 Resetting ${failedPages.length} failed pages for retry...`);
+    
+    const { error: resetError } = await supabaseClient
+      .from('source_pages')
+      .update({ 
+        status: 'pending',
+        started_at: null,
+        error_message: null
+      })
+      .in('id', failedPages.map(p => p.id));
+    
+    if (resetError) {
+      console.error('❌ Failed to reset failed pages:', resetError);
+      return 0;
+    } else {
+      console.log(`✅ Reset ${failedPages.length} failed pages for retry`);
+      return failedPages.length;
     }
   }
 
@@ -162,11 +195,14 @@ serve(async (req) => {
 
     // Auto-recovery first
     const autoRecoveredCount = await autoRecoverStuckPages(supabaseClient);
+    
+    // Reset failed pages for retry
+    const resetFailedCount = await resetFailedPages(supabaseClient);
 
     // Process pending pages
     const processingResults = await processPendingPages(supabaseClient);
 
-    if (processingResults.processedCount === 0) {
+    if (processingResults.processedCount === 0 && autoRecoveredCount === 0 && resetFailedCount === 0) {
       console.log('📭 No pending source pages to process');
       
       // Check for missing chunks even if no pending pages
@@ -186,7 +222,8 @@ serve(async (req) => {
           success: true,
           message: 'No pending pages to process',
           processedCount: 0,
-          autoRecoveredCount
+          autoRecoveredCount,
+          resetFailedCount
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -225,6 +262,7 @@ serve(async (req) => {
         failedCount,
         autoRetriedCount,
         autoRecoveredCount,
+        resetFailedCount,
         totalChunksCreated,
         results: processingResults.results,
         affectedParents: processingResults.affectedParents

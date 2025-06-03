@@ -78,7 +78,6 @@ serve(async (req) => {
 
     // Calculate compression ratio (simple estimation)
     const compressionRatio = Math.min(0.7, Math.max(0.3, 1000 / contentSize));
-    const compressedSize = Math.round(contentSize * compressionRatio);
 
     // Store chunks in database - IMPORTANT: Link to parent source, not the individual page
     if (chunks.length > 0) {
@@ -101,22 +100,14 @@ serve(async (req) => {
       console.log(`✅ Stored ${chunks.length} chunks for parent source ${job.parent_source_id} from page ${job.id}`);
     }
 
-    // Mark job as completed with comprehensive metadata
+    // Mark job as completed with comprehensive metadata (only valid fields)
     await updateJobStatus(supabaseClient, childJobId, 'completed', {
       content_size: contentSize,
-      compressed_size: compressedSize,
       compression_ratio: compressionRatio,
       chunks_created: chunks.length,
       duplicates_found: 0,
       content_hash: contentHash,
-      metadata: {
-        url: job.url,
-        title: extractTitle(htmlContent),
-        processing_method: 'automatic',
-        chunks_generated: true,
-        processing_timestamp: new Date().toISOString(),
-        linked_to_parent: job.parent_source_id
-      }
+      processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime()
     });
 
     console.log(`✅ Successfully completed job ${childJobId} with ${chunks.length} chunks linked to parent ${job.parent_source_id}`);
@@ -127,7 +118,6 @@ serve(async (req) => {
         jobId: childJobId,
         parentSourceId: job.parent_source_id,
         contentSize,
-        compressedSize,
         compressionRatio,
         chunksCreated: chunks.length,
         message: 'Job processed successfully with chunks linked to parent source'
