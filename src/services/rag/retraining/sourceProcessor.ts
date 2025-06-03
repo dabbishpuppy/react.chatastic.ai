@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { SemanticChunkingService } from "../semanticChunkingService";
 import { EmbeddingGenerator } from "./embeddingGenerator";
@@ -115,7 +114,7 @@ export class SourceProcessor {
         embeddings_generated: chunks.length > 0,
         processing_note: chunks.length > 0 ? 'Successfully processed with chunks and embeddings' : 'Processed but no chunks created',
         content_length: contentToProcess.length,
-        chunking_strategy: source.source_type === 'qa' && chunks.some(c => c.metadata?.isForceCreated) ? 'force_created' : 'standard'
+        chunking_strategy: source.source_type === 'qa' && chunks.some(c => (c.metadata as any)?.isForceCreated) ? 'force_created' : 'standard'
       };
 
       await supabase
