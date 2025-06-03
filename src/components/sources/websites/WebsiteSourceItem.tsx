@@ -80,21 +80,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               onCheckedChange={onSelectionChange}
             />
             
-            {/* Dropdown arrow - always visible but only functional when hasChildSources */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => hasChildSources && setIsExpanded(!isExpanded)}
-              className={`p-1 h-6 w-6 ${!hasChildSources ? 'opacity-30 cursor-not-allowed' : ''}`}
-              disabled={!hasChildSources}
-            >
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </Button>
-            
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Badge 
@@ -164,6 +149,31 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           </div>
           
           <div className="flex items-center gap-1 ml-4">
+            {/* Dropdown arrow - moved to the right side */}
+            {hasChildSources && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsExpanded(!isExpanded)}
+                      className="p-1 h-8 w-8"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronRight className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isExpanded ? 'Collapse' : 'Expand'} child sources</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
