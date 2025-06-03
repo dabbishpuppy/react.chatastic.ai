@@ -38,7 +38,7 @@ export class CrawlRecoveryService {
       // Get current status
       const { data: currentSource, error: fetchError } = await supabase
         .from('agent_sources')
-        .select('crawl_status, progress, total_jobs, completed_jobs')
+        .select('crawl_status, progress, total_jobs, completed_jobs, metadata')
         .eq('id', parentSourceId)
         .single();
 
@@ -47,15 +47,17 @@ export class CrawlRecoveryService {
       }
 
       // Reset to in_progress if stuck in crawling state
+      const updatedMetadata = {
+        ...(currentSource.metadata || {}),
+        reset_at: new Date().toISOString(),
+        reset_reason: 'Manual recovery from stuck state'
+      };
+
       const { error: updateError } = await supabase
         .from('agent_sources')
         .update({
           crawl_status: 'in_progress',
-          metadata: {
-            ...currentSource.metadata,
-            reset_at: new Date().toISOString(),
-            reset_reason: 'Manual recovery from stuck state'
-          }
+          metadata: updatedMetadata
         })
         .eq('id', parentSourceId);
 
@@ -102,22 +104,24 @@ export class CrawlRecoveryService {
         };
       }
 
-      // Reset failed pages to pending
-      const { error: updateError } = await supabase
-        .from('source_pages')
-        .update({
-          status: 'pending',
-          retry_count: supabase.sql`retry_count + 1`,
-          error_message: null,
-          started_at: null,
-          completed_at: null
-        })
-        .eq('parent_source_id', parentSourceId)
-        .eq('status', 'failed')
-        .lt('retry_count', 3);
+      // Reset failed pages to pending with incremented retry count
+      const pageIds = failedPages.map(p => p.id);
+      
+      for (const page of failedPages) {
+        const { error: updateError } = await supabase
+          .from('source_pages')
+          .update({
+            status: 'pending',
+            retry_count: page.retry_count + 1,
+            error_message: null,
+            started_at: null,
+            completed_at: null
+          })
+          .eq('id', page.id);
 
-      if (updateError) {
-        throw updateError;
+        if (updateError) {
+          console.error(`Error updating page ${page.id}:`, updateError);
+        }
       }
 
       console.log(`✅ Successfully retried ${failedPages.length} failed pages`);

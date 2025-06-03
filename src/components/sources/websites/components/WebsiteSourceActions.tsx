@@ -27,6 +27,8 @@ interface WebsiteSourceActionsProps {
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
   onRecrawl: (source: AgentSource) => void;
+  showRecrawl?: boolean;
+  isChild?: boolean;
 }
 
 const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
@@ -34,7 +36,9 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   onEdit,
   onExclude,
   onDelete,
-  onRecrawl
+  onRecrawl,
+  showRecrawl = true,
+  isChild = false
 }) => {
   const [isRecovering, setIsRecovering] = useState(false);
   
@@ -108,7 +112,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
           )}
         </DropdownMenuItem>
         
-        {isParentSource && (
+        {showRecrawl && isParentSource && (
           <DropdownMenuItem onClick={() => onRecrawl(source)}>
             <RotateCcw size={14} className="mr-2" />
             Recrawl
