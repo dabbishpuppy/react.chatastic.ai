@@ -1,15 +1,15 @@
 
 import React, { useCallback, useState, useMemo } from 'react';
 import { AgentSource } from '@/types/rag';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { useSelectionState } from '@/hooks/useSelectionState';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { useSourcesPaginated } from '@/hooks/useSourcesPaginated';
-import WebsiteSourceItem from '../WebsiteSourceItem';
+import WebsiteSourcesHeader from './WebsiteSourcesHeader';
+import WebsiteSourcesContent from './WebsiteSourcesContent';
+import WebsiteSourcesLoading from './WebsiteSourcesLoading';
 import BulkActionBar from '../../BulkActionBar';
 import PaginationControls from '../../PaginationControls';
 
@@ -34,7 +34,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
-  // Selection state
   const {
     selectedArray,
     selectedCount,
@@ -45,7 +44,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     toggleItem
   } = useSelectionState();
 
-  // Pagination state
   const {
     page,
     pageSize,
@@ -60,7 +58,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     onPageSizeChange: () => clearSelection()
   });
 
-  // Get paginated data
   const { data: paginatedData, refetch } = useSourcesPaginated({
     sourceType: 'website',
     page,
@@ -68,10 +65,8 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     enabled: !loading
   });
 
-  // Get parent sources and child sources logic - show all website sources including those in progress
   const parentSources = useMemo(() => {
     const allSources = paginatedData?.sources || [];
-    // Include all parent sources (those without parent_source_id) regardless of status
     return allSources.filter(source => 
       !source.parent_source_id && 
       source.source_type === 'website'
@@ -85,7 +80,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   const currentPageSourceIds = parentSources.map(s => s.id);
   const allCurrentPageSelected = currentPageSourceIds.length > 0 && 
     currentPageSourceIds.every(id => isSelected(id));
-  const someCurrentPageSelected = currentPageSourceIds.some(id => isSelected(id));
 
   const handleSelectAll = useCallback(() => {
     if (allCurrentPageSelected) {
@@ -150,30 +144,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   }, [selectedArray, sourceService, clearSelection, refetch]);
 
   if (loading && !paginatedData) {
-    return (
-      <Card className="border border-gray-200">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Website Sources</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center flex-1">
-                  <Skeleton className="h-4 w-4 mr-4" />
-                  <div className="flex-1">
-                    <Skeleton className="h-4 w-48 mb-2" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                  <Skeleton className="h-6 w-20 ml-4" />
-                </div>
-                <Skeleton className="h-8 w-8" />
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    );
+    return <WebsiteSourcesLoading />;
   }
 
   if (error) {
@@ -194,55 +165,22 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   return (
     <div className="relative">
       <Card className="border border-gray-200">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Website Sources</CardTitle>
-            {parentSources.length > 0 && (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={allCurrentPageSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-controls="website-sources-list"
-                  />
-                  <label className="text-sm text-gray-600">
-                    Select all
-                  </label>
-                </div>
-                {allCurrentPageSelected && parentSources.length > 0 && (
-                  <span className="text-sm text-blue-600">
-                    All {parentSources.length} items on this page are selected
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        </CardHeader>
+        <WebsiteSourcesHeader
+          sourcesCount={parentSources.length}
+          allCurrentPageSelected={allCurrentPageSelected}
+          onSelectAll={handleSelectAll}
+        />
         <CardContent className="space-y-4">
-          <div id="website-sources-list" role="list">
-            {parentSources.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No website sources found</p>
-                <p className="text-sm">Add a website URL above to get started</p>
-              </div>
-            ) : (
-              parentSources.map((source) => (
-                <WebsiteSourceItem
-                  key={source.id}
-                  source={source}
-                  childSources={getChildSources(source.id)}
-                  onEdit={onEdit}
-                  onExclude={onExclude}
-                  onDelete={onDelete}
-                  onRecrawl={onRecrawl}
-                  isSelected={isSelected(source.id)}
-                  onSelectionChange={(selected) => {
-                    toggleItem(source.id);
-                  }}
-                />
-              ))
-            )}
-          </div>
+          <WebsiteSourcesContent
+            sources={parentSources}
+            getChildSources={getChildSources}
+            onEdit={onEdit}
+            onExclude={onExclude}
+            onDelete={onDelete}
+            onRecrawl={onRecrawl}
+            isSelected={isSelected}
+            toggleItem={toggleItem}
+          />
 
           {paginatedData && totalCount > 0 && (
             <PaginationControls
