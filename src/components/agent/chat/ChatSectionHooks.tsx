@@ -5,6 +5,11 @@ import { useLeadSettings } from "@/hooks/useLeadSettings";
 import { useChatSettings } from "@/hooks/useChatSettings";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { useChatHandlers } from "@/hooks/useChatHandlers";
+import { useChatState } from "@/hooks/useChatState";
+import { useMessageHandlers } from "@/hooks/useMessageHandlers";
+import { useMessageSubmission } from "@/hooks/useMessageSubmission";
+import { useMessageOperations } from "@/hooks/useMessageOperations";
+import { useSubmissionState } from "@/hooks/useSubmissionState";
 import { ChatSectionProps } from "./ChatSectionProps";
 import { ChatSectionState } from "./ChatSectionState";
 import { useState } from "react";
@@ -23,45 +28,90 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
 
   const { currentConversation, conversationEnded, startNewConversation, endCurrentConversation, loadConversation, saveMessage, getConversationMessages } = useConversationManager(conversationSource);
   
-  // Get all the original messageHandling properties from the existing hooks
+  // Use actual chat state instead of dummy values
   const {
     message,
     setMessage,
     chatHistory,
     setChatHistory,
     isTyping,
+    setIsTyping,
     rateLimitError,
+    setRateLimitError,
     timeUntilReset,
+    setTimeUntilReset,
+    isWaitingForRateLimit,
+    setIsWaitingForRateLimit,
     userHasMessaged,
+    setUserHasMessaged,
     inputRef,
-    handleSubmit,
-    handleSuggestedMessageClick,
-    copyMessageToClipboard,
+    countdownIntervalRef
+  } = useChatState(initialMessages, isEmbedded);
+
+  // Set up submission state
+  const submissionState = useSubmissionState();
+
+  // Set up message operations
+  const { proceedWithMessage } = useMessageOperations({
+    setChatHistory,
+    setUserHasMessaged,
+    setIsTyping,
+    inputRef,
+    isEmbedded: isEmbedded || false,
+    conversationId: currentConversation?.id,
+    createConversationCallback: async () => {
+      await startNewConversation();
+      return currentConversation?.id || null;
+    }
+  });
+
+  // Set up message submission
+  const { submitMessage } = useMessageSubmission({
+    proceedWithMessage,
+    setMessage,
+    setRateLimitError,
+    setTimeUntilReset,
+    isSubmissionBlocked: submissionState.isSubmissionBlocked,
+    recordSubmission: submissionState.recordSubmission,
+    resetSubmission: submissionState.resetSubmission
+  });
+
+  // Set up message handlers
+  const {
     handleFeedback,
     regenerateResponse,
     insertEmoji,
-    handleCountdownFinished,
-    cleanup,
-    isSubmitting
-  } = {
-    message: "",
-    setMessage: () => {},
-    chatHistory: [],
-    setChatHistory: () => {},
-    isTyping: false,
-    rateLimitError: null,
-    timeUntilReset: null,
-    userHasMessaged: false,
-    inputRef: { current: null },
-    handleSubmit: async () => {},
-    handleSuggestedMessageClick: async () => {},
-    copyMessageToClipboard: () => {},
-    handleFeedback: () => {},
-    regenerateResponse: async () => {},
-    insertEmoji: () => {},
-    handleCountdownFinished: () => {},
-    cleanup: () => {},
-    isSubmitting: false
+    handleCountdownFinished
+  } = useMessageHandlers({
+    chatHistory,
+    isTyping,
+    setChatHistory,
+    setIsTyping,
+    setMessage,
+    inputRef,
+    conversationId: currentConversation?.id,
+    setRateLimitError,
+    setTimeUntilReset,
+    rateLimitError
+  });
+
+  // Create submit handler
+  const handleSubmit = async (e: React.FormEvent, agentIdParam?: string) => {
+    e.preventDefault();
+    await submitMessage(message.trim(), agentIdParam || agentId);
+  };
+
+  // Create suggested message click handler
+  const handleSuggestedMessageClick = async (text: string, agentIdParam?: string) => {
+    setMessage(text);
+    await submitMessage(text, agentIdParam || agentId);
+  };
+
+  // Cleanup function
+  const cleanup = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
   };
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
@@ -101,12 +151,12 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     timeUntilReset,
     userHasMessaged,
     inputRef,
-    copyMessageToClipboard,
+    copyMessageToClipboard: () => {}, // Implement if needed
     handleFeedback,
     insertEmoji,
     handleCountdownFinished,
     cleanup,
-    isSubmitting,
+    isSubmitting: submissionState.isSubmitting,
     messagesEndRef,
     chatContainerRef,
     scrollToBottom,
