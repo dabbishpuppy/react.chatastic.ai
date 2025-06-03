@@ -4,37 +4,39 @@ import { Trash2, ExternalLink, RefreshCw, Eye, EyeOff, Edit2, Zap } from 'lucide
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
-import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
-  onRefetch: () => void;
-  onRemove: (sourceId: string) => void;
+  childSources?: AgentSource[];
+  onEdit: (sourceId: string, newUrl: string) => void;
+  onExclude: (source: AgentSource) => void;
+  onDelete: (source: AgentSource) => void;
+  onRecrawl: (source: AgentSource) => void;
+  isSelected: boolean;
+  onSelectionChange: (selected?: boolean) => void;
 }
 
 export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({ 
   source, 
-  onRefetch, 
-  onRemove 
+  childSources = [],
+  onEdit,
+  onExclude,
+  onDelete,
+  onRecrawl,
+  isSelected,
+  onSelectionChange
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url);
-  
-  const { 
-    handleEdit, 
-    handleExclude, 
-    handleDelete, 
-    handleRecrawl,
-    handleEnhancedRecrawl
-  } = useWebsiteSourceOperations(onRefetch, onRemove);
 
   const handleSaveEdit = async () => {
-    await handleEdit(source.id, editUrl);
+    await onEdit(source.id, editUrl);
     setIsEditing(false);
   };
 
@@ -65,56 +67,63 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     <Card className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <Badge 
-                variant="outline" 
-                className={`${getStatusColor(source.crawl_status)} text-white`}
-              >
-                {getStatusText(source.crawl_status)}
-              </Badge>
-              
-              {source.is_excluded && (
-                <Badge variant="secondary">
-                  <EyeOff className="w-3 h-3 mr-1" />
-                  Excluded
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={onSelectionChange}
+            />
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <Badge 
+                  variant="outline" 
+                  className={`${getStatusColor(source.crawl_status)} text-white`}
+                >
+                  {getStatusText(source.crawl_status)}
                 </Badge>
+                
+                {source.is_excluded && (
+                  <Badge variant="secondary">
+                    <EyeOff className="w-3 h-3 mr-1" />
+                    Excluded
+                  </Badge>
+                )}
+                
+                {linksCount > 0 && (
+                  <Badge variant="outline">
+                    {linksCount} links
+                  </Badge>
+                )}
+              </div>
+              
+              {isEditing ? (
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={editUrl}
+                    onChange={(e) => setEditUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button size="sm" onClick={handleSaveEdit}>
+                    Save
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <div className="mb-2">
+                  <p className="text-sm font-medium truncate">{source.title || source.url}</p>
+                  <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+                </div>
               )}
               
-              {linksCount > 0 && (
-                <Badge variant="outline">
-                  {linksCount} links
-                </Badge>
+              {progress > 0 && progress < 100 && (
+                <div className="mb-2">
+                  <Progress value={progress} className="w-full h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">{progress}% complete</p>
+                </div>
               )}
             </div>
-            
-            {isEditing ? (
-              <div className="flex gap-2 mb-2">
-                <Input
-                  value={editUrl}
-                  onChange={(e) => setEditUrl(e.target.value)}
-                  className="flex-1"
-                />
-                <Button size="sm" onClick={handleSaveEdit}>
-                  Save
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <div className="mb-2">
-                <p className="text-sm font-medium truncate">{source.title || source.url}</p>
-                <p className="text-xs text-muted-foreground truncate">{source.url}</p>
-              </div>
-            )}
-            
-            {progress > 0 && progress < 100 && (
-              <div className="mb-2">
-                <Progress value={progress} className="w-full h-2" />
-                <p className="text-xs text-muted-foreground mt-1">{progress}% complete</p>
-              </div>
-            )}
           </div>
           
           <div className="flex items-center gap-1 ml-4">
@@ -158,7 +167,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleExclude(source)}
+                    onClick={() => onExclude(source)}
                   >
                     {source.is_excluded ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </Button>
@@ -175,7 +184,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleRecrawl(source)}
+                    onClick={() => onRecrawl(source)}
                   >
                     <RefreshCw className="w-4 h-4" />
                   </Button>
@@ -192,7 +201,12 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleEnhancedRecrawl(source)}
+                    onClick={() => {
+                      // Call the enhanced recrawl from the operations hook
+                      const { useWebsiteSourceOperations } = require('./hooks/useWebsiteSourceOperations');
+                      const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
+                      handleEnhancedRecrawl(source);
+                    }}
                     className="text-blue-600"
                   >
                     <Zap className="w-4 h-4" />
@@ -210,7 +224,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDelete(source)}
+                    onClick={() => onDelete(source)}
                     className="text-red-600"
                   >
                     <Trash2 className="w-4 h-4" />
