@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Trash2, ExternalLink, RefreshCw, Eye, EyeOff, Edit2, Zap } from 'lucide-react';
+import { Trash2, ExternalLink, RefreshCw, Eye, EyeOff, Edit2, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
@@ -34,6 +34,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleSaveEdit = async () => {
     await onEdit(source.id, editUrl);
@@ -62,6 +63,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   const progress = source.progress || 0;
   const linksCount = source.links_count || 0;
+  const hasChildSources = childSources && childSources.length > 0;
 
   return (
     <Card className="mb-4">
@@ -72,6 +74,21 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               checked={isSelected}
               onCheckedChange={onSelectionChange}
             />
+            
+            {hasChildSources && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-1 h-6 w-6"
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </Button>
+            )}
             
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
@@ -237,6 +254,94 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             </TooltipProvider>
           </div>
         </div>
+
+        {/* Child Sources Section */}
+        {hasChildSources && isExpanded && (
+          <div className="mt-4 pl-8 border-l-2 border-gray-200">
+            <div className="space-y-2">
+              {childSources.map((childSource) => (
+                <div key={childSource.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <Badge 
+                      variant="outline" 
+                      className={`${getStatusColor(childSource.crawl_status)} text-white text-xs`}
+                    >
+                      {getStatusText(childSource.crawl_status)}
+                    </Badge>
+                    
+                    {childSource.is_excluded && (
+                      <Badge variant="secondary" className="text-xs">
+                        <EyeOff className="w-2 h-2 mr-1" />
+                        Excluded
+                      </Badge>
+                    )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{childSource.title || childSource.url}</p>
+                      <p className="text-xs text-muted-foreground truncate">{childSource.url}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(childSource.url, '_blank')}
+                            className="h-6 w-6 p-0"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Open URL</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onExclude(childSource)}
+                            className="h-6 w-6 p-0"
+                          >
+                            {childSource.is_excluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{childSource.is_excluded ? 'Include' : 'Exclude'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(childSource)}
+                            className="h-6 w-6 p-0 text-red-600"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
