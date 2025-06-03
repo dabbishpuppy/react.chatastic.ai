@@ -55,7 +55,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   // Set up submission state
   const submissionState = useSubmissionState();
 
-  // Set up message operations
+  // Set up message operations with thinking and typing state setters
   const { proceedWithMessage } = useMessageOperations({
     setChatHistory,
     setUserHasMessaged,
@@ -66,7 +66,9 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     createConversationCallback: async () => {
       await startNewConversation();
       return currentConversation?.id || null;
-    }
+    },
+    setIsThinking,
+    setTypingMessageId
   });
 
   // Set up message submission

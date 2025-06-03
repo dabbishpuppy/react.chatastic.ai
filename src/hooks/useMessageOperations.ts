@@ -10,6 +10,8 @@ interface UseMessageOperationsProps {
   isEmbedded: boolean;
   conversationId?: string;
   createConversationCallback?: () => Promise<string | null>;
+  setIsThinking?: (value: boolean) => void;
+  setTypingMessageId?: (id: string | null) => void;
 }
 
 export const useMessageOperations = ({
@@ -19,7 +21,9 @@ export const useMessageOperations = ({
   inputRef,
   isEmbedded,
   conversationId,
-  createConversationCallback
+  createConversationCallback,
+  setIsThinking,
+  setTypingMessageId
 }: UseMessageOperationsProps) => {
   
   const proceedWithMessageWrapper = async (text: string) => {
@@ -68,7 +72,9 @@ export const useMessageOperations = ({
       setIsTyping,
       inputRef,
       isEmbedded,
-      activeConversationId
+      activeConversationId,
+      setIsThinking,
+      setTypingMessageId
     );
   };
 

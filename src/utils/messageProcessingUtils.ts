@@ -10,7 +10,9 @@ export const proceedWithMessage = async (
   setIsTyping: (value: boolean) => void,
   inputRef: React.RefObject<HTMLInputElement>,
   isEmbedded: boolean = false,
-  conversationId: string // Now required, no longer optional
+  conversationId: string, // Now required, no longer optional
+  setIsThinking?: (value: boolean) => void,
+  setTypingMessageId?: (id: string | null) => void
 ) => {
   const trimmedText = text.trim();
   
@@ -48,7 +50,12 @@ export const proceedWithMessage = async (
     return [...prev, userMessage];
   });
   setUserHasMessaged(true);
-  setIsTyping(true);
+  
+  // Show thinking bubble immediately after user message
+  if (setIsThinking) {
+    console.log('🤔 Setting thinking state to true');
+    setIsThinking(true);
+  }
 
   // Simulate AI response after a delay
   setTimeout(async () => {
@@ -57,10 +64,17 @@ export const proceedWithMessage = async (
     // Check for duplicate AI response with expanded window
     if (isDuplicateAIResponse(aiResponseText, conversationId)) {
       setIsTyping(false);
+      if (setIsThinking) {
+        setIsThinking(false);
+      }
       return;
     }
     
+    // Generate unique ID for the AI message
+    const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const aiMessage: ChatMessage = {
+      id: aiMessageId,
       content: aiResponseText,
       isAgent: true,
       timestamp: new Date().toISOString(),
@@ -76,8 +90,19 @@ export const proceedWithMessage = async (
       console.error('❌ Failed to save AI response to database');
     }
 
+    // Hide thinking bubble and start typing animation
+    if (setIsThinking) {
+      console.log('🤔 Setting thinking state to false');
+      setIsThinking(false);
+    }
+    
+    if (setTypingMessageId) {
+      console.log('⌨️ Setting typing message ID:', aiMessage.id);
+      setTypingMessageId(aiMessage.id);
+    }
+
     setChatHistory(prev => {
-      console.log('🤖 Adding AI response to chat history UI');
+      console.log('🤖 Adding AI response to chat history UI with typing animation');
       return [...prev, aiMessage];
     });
     setIsTyping(false);
