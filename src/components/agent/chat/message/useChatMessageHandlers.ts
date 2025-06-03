@@ -80,8 +80,8 @@ export const useChatMessageHandlers = (
         messageIdType: typeof messageId
       });
       
-      // If we have a messageId, save to database
-      if (messageId && messageId !== 'initial-message') {
+      // Only try to save to database if we have a valid UUID messageId
+      if (messageId && messageId !== 'initial-message' && isValidUUID(messageId)) {
         console.log('💾 useChatMessageHandlers - Saving feedback to database for message:', messageId, 'New feedback:', newFeedback);
         
         const success = await analyticsService.updateMessageFeedback(messageId, newFeedback || null);
@@ -106,8 +106,8 @@ export const useChatMessageHandlers = (
           });
         }
       } else {
-        // No messageId available, use local state only via onFeedback callback
-        console.log('⚠️ useChatMessageHandlers - No messageId provided, updating local state only. MessageId:', messageId);
+        // No valid messageId available, use local state only via onFeedback callback
+        console.log('⚠️ useChatMessageHandlers - No valid messageId provided, updating local state only. MessageId:', messageId);
         
         if (onFeedback) {
           onFeedback(messageTimestamp, type);
@@ -142,3 +142,9 @@ export const useChatMessageHandlers = (
     currentFeedback: localFeedback // Return the local feedback state for immediate UI updates
   };
 };
+
+// Helper function to validate UUID format
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}

@@ -57,8 +57,8 @@ export const useMessageHandling = (agentId: string) => {
       console.log('🤔 Ending thinking phase');
       options?.onThinkingEnd?.();
 
-      // Create response message with unique ID
-      const messageId = `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Create response message with crypto-generated UUID
+      const messageId = crypto.randomUUID();
       const responseMessage: Message = {
         id: messageId,
         content: ragResult.response,
@@ -86,7 +86,7 @@ export const useMessageHandling = (agentId: string) => {
       options?.onThinkingEnd?.();
       
       // Fallback error message
-      const errorMessageId = `error-${Date.now()}`;
+      const errorMessageId = crypto.randomUUID();
       const errorMessage: Message = {
         id: errorMessageId,
         content: 'I apologize, but I encountered an error while processing your message. Please try again.',

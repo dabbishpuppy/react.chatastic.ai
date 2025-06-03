@@ -1,4 +1,3 @@
-
 import { ChatMessage } from "@/types/chatInterface";
 import { messageService } from "@/services/messageService";
 import { isDuplicateMessage, isDuplicateAIResponse } from "./duplicateMessageUtils";
@@ -104,11 +103,8 @@ export const proceedWithMessage = async (
       return;
     }
     
-    // Generate unique ID for the AI message
-    const aiMessageId = `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+    // Create AI message without an ID first (will be set by database)
     const aiMessage: ChatMessage = {
-      id: aiMessageId,
       content: ragResult.response,
       isAgent: true,
       timestamp: new Date().toISOString(),
@@ -122,6 +118,8 @@ export const proceedWithMessage = async (
       console.log('✅ AI response saved successfully with ID:', savedAiMessage.id);
     } else {
       console.error('❌ Failed to save AI response to database');
+      // Generate a fallback UUID if database save fails
+      aiMessage.id = crypto.randomUUID();
     }
 
     // Start typing animation
@@ -165,11 +163,7 @@ export const proceedWithMessage = async (
       return;
     }
     
-    // Generate unique ID for the error message
-    const errorMessageId = `ai-error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
     const errorMessage: ChatMessage = {
-      id: errorMessageId,
       content: errorResponseText,
       isAgent: true,
       timestamp: new Date().toISOString(),
@@ -179,6 +173,9 @@ export const proceedWithMessage = async (
     const savedErrorMessage = await messageService.saveMessage(conversationId, errorResponseText, true);
     if (savedErrorMessage) {
       errorMessage.id = savedErrorMessage.id;
+    } else {
+      // Generate a fallback UUID if database save fails
+      errorMessage.id = crypto.randomUUID();
     }
 
     if (setTypingMessageId) {

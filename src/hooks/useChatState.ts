@@ -33,7 +33,7 @@ export const useChatState = (
 
   // Helper function to add a message with typing effect
   const addMessageWithTyping = (content: string, isAgent: boolean = true) => {
-    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const messageId = crypto.randomUUID();
     
     if (isAgent) {
       // Start thinking state
@@ -54,7 +54,7 @@ export const useChatState = (
         setIsThinking(false);
         setIsTyping(true);
         setTypingMessageId(messageId);
-      }, 1500); // 1.5 second thinking period
+      }, 1000); // 1 second thinking period
     } else {
       // User messages don't need typing effect
       const newMessage: ChatMessage = {
