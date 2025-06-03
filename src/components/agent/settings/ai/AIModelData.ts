@@ -1,4 +1,5 @@
 
+
 export interface AIModel {
   value: string;
   label: string;
@@ -68,7 +69,7 @@ export const AI_MODELS: AIModel[] = [
     value: "claude-opus-4-20250514",
     label: "Claude 4 Opus",
     provider: "Anthropic",
-    logo: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/6036ebfc-4089-4cd9-b8a1-84d0d4fcdf81.png",
     description: "Anthropic's most capable and intelligent model with superior reasoning capabilities and advanced analysis.",
     cost: "Very High",
     speed: "Medium",
@@ -80,7 +81,7 @@ export const AI_MODELS: AIModel[] = [
     value: "claude-sonnet-4-20250514",
     label: "Claude 4 Sonnet",
     provider: "Anthropic",
-    logo: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/6036ebfc-4089-4cd9-b8a1-84d0d4fcdf81.png",
     description: "A high-performance model with exceptional reasoning and efficiency, balancing capability with speed.",
     cost: "High",
     speed: "Fast",
@@ -92,7 +93,7 @@ export const AI_MODELS: AIModel[] = [
     value: "claude-3-5-haiku-20241022",
     label: "Claude 3.5 Haiku",
     provider: "Anthropic",
-    logo: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/6036ebfc-4089-4cd9-b8a1-84d0d4fcdf81.png",
     description: "The fastest Claude model optimized for quick responses while maintaining quality output.",
     cost: "Low",
     speed: "Very Fast",
@@ -106,7 +107,7 @@ export const AI_MODELS: AIModel[] = [
     value: "claude-3-5-sonnet",
     label: "Claude 3.5 Sonnet",
     provider: "Anthropic",
-    logo: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/6036ebfc-4089-4cd9-b8a1-84d0d4fcdf81.png",
     description: "Anthropic's most capable Claude 3 model with excellent reasoning, coding, and creative writing abilities.",
     cost: "Medium",
     speed: "Fast",
@@ -118,7 +119,7 @@ export const AI_MODELS: AIModel[] = [
     value: "claude-3-opus-20240229",
     label: "Claude 3 Opus",
     provider: "Anthropic",
-    logo: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/6036ebfc-4089-4cd9-b8a1-84d0d4fcdf81.png",
     description: "The most powerful Claude 3 model with exceptional performance on complex tasks requiring deep understanding.",
     cost: "High",
     speed: "Medium",
@@ -130,7 +131,7 @@ export const AI_MODELS: AIModel[] = [
     value: "claude-3-haiku-20240307",
     label: "Claude 3 Haiku",
     provider: "Anthropic",
-    logo: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/6036ebfc-4089-4cd9-b8a1-84d0d4fcdf81.png",
     description: "The fastest and most cost-effective Claude 3 model, ideal for simple tasks and quick responses.",
     cost: "Very Low",
     speed: "Very Fast",
@@ -144,7 +145,7 @@ export const AI_MODELS: AIModel[] = [
     value: "gemini-2.0-flash",
     label: "Gemini 2.0 Flash",
     provider: "Google",
-    logo: "https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/84abd4e9-7771-4977-beab-8fa623f45f67.png",
     description: "Google's latest and most advanced Gemini model with multimodal capabilities and improved reasoning.",
     cost: "Medium",
     speed: "Very Fast",
@@ -156,7 +157,7 @@ export const AI_MODELS: AIModel[] = [
     value: "gemini-1.5-pro",
     label: "Gemini 1.5 Pro",
     provider: "Google",
-    logo: "https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/84abd4e9-7771-4977-beab-8fa623f45f67.png",
     description: "Google's most capable Gemini model with advanced reasoning and massive context window support.",
     cost: "High",
     speed: "Medium",
@@ -168,7 +169,7 @@ export const AI_MODELS: AIModel[] = [
     value: "gemini-1.5-flash",
     label: "Gemini 1.5 Flash",
     provider: "Google",
-    logo: "https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=100&h=100&fit=crop&crop=center",
+    logo: "/lovable-uploads/84abd4e9-7771-4977-beab-8fa623f45f67.png",
     description: "A fast and efficient Gemini model optimized for speed while maintaining good performance across tasks.",
     cost: "Low",
     speed: "Very Fast",
@@ -177,3 +178,4 @@ export const AI_MODELS: AIModel[] = [
     creditsPerMessage: "2-8 credits"
   }
 ];
+
