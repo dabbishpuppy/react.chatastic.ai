@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { SemanticChunkingService } from "../semanticChunkingService";
 import { EmbeddingGenerator } from "./embeddingGenerator";
@@ -67,10 +68,11 @@ export class SourceProcessor {
             endPosition: contentToProcess.length,
             sentences: 1,
             semanticBoundary: true,
-            contentType: 'qa' as const,
+            contentType: 'paragraph' as const, // Use 'paragraph' instead of 'qa' to match allowed types
             qualityScore: 0.5,
             complexity: 'simple' as const,
-            forceCreated: true // Mark as force-created for debugging
+            // Add forceCreated as a custom property in metadata
+            isForceCreated: true
           }
         };
         
@@ -113,7 +115,7 @@ export class SourceProcessor {
         embeddings_generated: chunks.length > 0,
         processing_note: chunks.length > 0 ? 'Successfully processed with chunks and embeddings' : 'Processed but no chunks created',
         content_length: contentToProcess.length,
-        chunking_strategy: source.source_type === 'qa' && chunks.some(c => c.metadata?.forceCreated) ? 'force_created' : 'standard'
+        chunking_strategy: source.source_type === 'qa' && chunks.some(c => c.metadata?.isForceCreated) ? 'force_created' : 'standard'
       };
 
       await supabase
