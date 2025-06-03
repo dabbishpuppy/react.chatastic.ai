@@ -59,21 +59,38 @@ export const useEnhancedCrawl = () => {
 
       console.log('✅ Enhanced crawl initiated successfully:', data);
       
-      // Automatically start monitoring and recovery for this crawl
+      // Automatically start monitoring and processing
       setTimeout(() => {
+        // Trigger automatic processing of pending pages
+        supabase.functions.invoke('process-source-pages').then(() => {
+          console.log('🔄 Auto-triggered page processing');
+        }).catch(err => {
+          console.warn('⚠️ Auto-processing trigger failed:', err);
+        });
+        
+        // Start recovery monitoring
         CrawlRecoveryService.autoRecoverStuckCrawls(request.agentId);
       }, 30000); // Check for issues after 30 seconds
+
+      // Schedule periodic chunk generation checks
+      setTimeout(() => {
+        supabase.functions.invoke('generate-missing-chunks').then(() => {
+          console.log('🔄 Auto-triggered missing chunks generation');
+        }).catch(err => {
+          console.warn('⚠️ Auto-chunk generation failed:', err);
+        });
+      }, 60000); // Check for missing chunks after 1 minute
       
-      // Show success message with compression info
+      // Show success message with automatic processing info
       toast({
         title: "Crawl Started",
-        description: `Started processing ${data.totalJobs} pages with automatic monitoring enabled. Content will be processed automatically.`,
+        description: `Started processing ${data.totalJobs} pages with automatic chunk generation enabled. Content will be processed and made available to the AI automatically.`,
       });
       
       return {
         parentSourceId: data.parentSourceId,
         totalJobs: data.totalJobs,
-        message: `Enhanced crawl with auto-monitoring initiated for ${data.totalJobs} pages`
+        message: `Enhanced crawl with automatic chunk generation initiated for ${data.totalJobs} pages`
       };
 
     } catch (error: any) {
@@ -114,6 +131,15 @@ export const useEnhancedCrawl = () => {
       const result = await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
       
       if (result.success) {
+        // Also trigger chunk generation for any completed pages without chunks
+        setTimeout(() => {
+          supabase.functions.invoke('generate-missing-chunks').then(() => {
+            console.log('🔄 Auto-triggered chunk generation after retry');
+          }).catch(err => {
+            console.warn('⚠️ Auto-chunk generation failed after retry:', err);
+          });
+        }, 5000);
+        
         toast({
           title: "Auto-Retry Successful",
           description: result.message,

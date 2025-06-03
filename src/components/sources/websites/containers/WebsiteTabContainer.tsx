@@ -3,7 +3,6 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import WebsiteSourcesList from "../components/WebsiteSourcesList";
 import WebsiteCrawlForm from "../components/WebsiteCrawlForm";
-import CrawlRecoveryPanel from "../components/CrawlRecoveryPanel";
 import { useWebsiteSourceOperations } from "../hooks/useWebsiteSourceOperations";
 
 const WebsiteTabContainer: React.FC = () => {
@@ -24,21 +23,9 @@ const WebsiteTabContainer: React.FC = () => {
     handleRecrawl
   } = useWebsiteSourceOperations(handleRefetch, handleRemoveFromState);
 
-  const handleRecoveryComplete = () => {
-    // Trigger a refetch of the sources list
-    handleRefetch();
-  };
-
   return (
     <div className="space-y-6 mt-4">
       <WebsiteCrawlForm />
-      
-      {agentId && (
-        <CrawlRecoveryPanel 
-          agentId={agentId} 
-          onRecoveryComplete={handleRecoveryComplete}
-        />
-      )}
       
       <WebsiteSourcesList
         onEdit={handleEdit}

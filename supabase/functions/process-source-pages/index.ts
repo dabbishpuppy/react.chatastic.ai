@@ -63,6 +63,19 @@ serve(async (req) => {
     if (!pendingPages || pendingPages.length === 0) {
       console.log('📭 No pending source pages to process');
       
+      // Even if no pending pages, check for missing chunks
+      console.log('🔍 Checking for completed pages without chunks...');
+      try {
+        const { data: missingChunksResult } = await supabaseClient
+          .functions.invoke('generate-missing-chunks');
+        
+        if (missingChunksResult?.processedCount > 0) {
+          console.log(`✅ Generated chunks for ${missingChunksResult.processedCount} completed pages`);
+        }
+      } catch (chunksError) {
+        console.error('❌ Failed to generate missing chunks:', chunksError);
+      }
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -95,7 +108,7 @@ serve(async (req) => {
           })
           .eq('id', page.id);
         
-        // Call the child-job-processor function
+        // Call the child-job-processor function (which now generates chunks automatically)
         const { data: processingResult, error: processingError } = await supabaseClient
           .functions.invoke('child-job-processor', {
             body: { childJobId: page.id }
@@ -126,7 +139,7 @@ serve(async (req) => {
             autoRetried: shouldRetry
           });
         } else {
-          console.log(`✅ Successfully auto-processed page ${page.id}`);
+          console.log(`✅ Successfully auto-processed page ${page.id} with ${processingResult?.chunksCreated || 0} chunks`);
           results.push({
             pageId: page.id,
             url: page.url,
@@ -164,8 +177,9 @@ serve(async (req) => {
     const successCount = results.filter(r => r.success).length;
     const failedCount = results.filter(r => !r.success).length;
     const autoRetriedCount = results.filter(r => r.autoRetried).length;
+    const totalChunksCreated = results.reduce((sum, r) => sum + (r.result?.chunksCreated || 0), 0);
 
-    console.log(`📊 Auto-processing complete: ${successCount} successful, ${failedCount} failed, ${autoRetriedCount} auto-retried`);
+    console.log(`📊 Auto-processing complete: ${successCount} successful, ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
 
     // Auto-trigger parent status aggregation for affected parents
     const parentIds = [...new Set(pendingPages.map(p => p.parent_source_id).filter(Boolean))];
@@ -178,6 +192,21 @@ serve(async (req) => {
       }
     }
 
+    // After processing pending pages, also check for any completed pages missing chunks
+    if (successCount > 0) {
+      console.log('🔍 Checking for any remaining completed pages without chunks...');
+      try {
+        const { data: missingChunksResult } = await supabaseClient
+          .functions.invoke('generate-missing-chunks');
+        
+        if (missingChunksResult?.processedCount > 0) {
+          console.log(`✅ Additionally generated chunks for ${missingChunksResult.processedCount} completed pages`);
+        }
+      } catch (chunksError) {
+        console.error('❌ Failed to generate missing chunks:', chunksError);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -186,6 +215,7 @@ serve(async (req) => {
         failedCount,
         autoRetriedCount,
         autoRecoveredCount: stuckPages?.length || 0,
+        totalChunksCreated,
         results,
         affectedParents: parentIds.length
       }),
@@ -204,7 +234,7 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+      status: 500,
       }
     );
   }
