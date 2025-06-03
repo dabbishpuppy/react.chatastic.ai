@@ -1,4 +1,6 @@
 
+import { RAGIntegrationTests } from './ragIntegrationTests';
+
 // Re-export all test types and classes
 export { RAGIntegrationTests } from './ragIntegrationTests';
 export { OrchestrationTests } from './orchestrationTests';
