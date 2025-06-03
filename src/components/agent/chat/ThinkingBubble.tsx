@@ -27,15 +27,15 @@ const ThinkingBubble: React.FC<ThinkingBubbleProps> = ({
           <div 
             className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" 
             style={{animationDelay: "0ms", animationDuration: "1.5s"}}
-          />
+          ></div>
           <div 
             className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" 
             style={{animationDelay: "500ms", animationDuration: "1.5s"}}
-          />
+          ></div>
           <div 
             className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" 
             style={{animationDelay: "1000ms", animationDuration: "1.5s"}}
-          />
+          ></div>
         </div>
       </div>
     </div>

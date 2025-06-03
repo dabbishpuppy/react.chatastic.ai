@@ -2,7 +2,6 @@
 import React from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChatMessageList from "./ChatMessageList";
-import ThinkingBubble from "../ThinkingBubble";
 import { ChatMessage } from "@/types/chatInterface";
 
 interface ChatScrollAreaProps {
@@ -78,26 +77,6 @@ const ChatScrollArea: React.FC<ChatScrollAreaProps> = ({
           typingMessageId={typingMessageId}
           onTypingComplete={onTypingComplete}
         />
-        
-        {/* Show thinking bubble when AI is thinking */}
-        {isThinking && (
-          <ThinkingBubble
-            agentName={agentName}
-            profilePicture={profilePicture}
-            agentBubbleClass={themeClasses.agentMessage}
-          />
-        )}
-
-        {/* Legacy typing indicator for backward compatibility */}
-        {isTyping && !isThinking && !typingMessageId && (
-          <div className="flex mb-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "0ms"}}></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "300ms"}}></div>
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{animationDelay: "600ms"}}></div>
-            </div>
-          </div>
-        )}
 
         <div ref={messagesEndRef} />
       </div>

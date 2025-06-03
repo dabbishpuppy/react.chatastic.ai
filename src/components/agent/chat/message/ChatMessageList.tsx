@@ -5,6 +5,7 @@ import { ChatMessage } from "@/types/chatInterface";
 import ChatMessageComponent from "../ChatMessage";
 import InlineLeadForm from "../InlineLeadForm";
 import TypingChatMessageBubble from "./TypingChatMessageBubble";
+import ThinkingBubble from "../ThinkingBubble";
 
 interface ChatMessageListProps {
   chatHistory: ChatMessage[];
@@ -53,9 +54,14 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
   typingMessageId,
   onTypingComplete
 }) => {
+  // Find the last agent message index for regenerate functionality
+  const lastAgentMessageIndex = chatHistory.reduceRight((lastIndex, msg, index) => {
+    return lastIndex === -1 && msg.isAgent && msg.content !== "LEAD_FORM_WIDGET" ? index : lastIndex;
+  }, -1);
+
   return (
     <div className="space-y-4">
-      {/* Render messages in chronological order, replacing lead form widgets with actual forms */}
+      {/* Render messages in chronological order */}
       {chatHistory.map((msg, index) => {
         if (msg.content === "LEAD_FORM_WIDGET") {
           // Render lead form inline at the correct position
@@ -81,10 +87,10 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
         }
         
         // Check if this message is currently typing
-        const isMessageTyping = msg.id === typingMessageId;
+        const isMessageTyping = msg.id === typingMessageId && typingMessageId !== null;
         
-        if (isMessageTyping) {
-          // Render message with typing effect
+        if (isMessageTyping && msg.isAgent) {
+          // Render agent message with typing effect
           return (
             <div key={`typing-${index}`} className="flex mb-4">
               <Avatar className="h-8 w-8 mr-2 mt-1 border-0">
@@ -109,7 +115,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
           );
         }
         
-        // Detect if this is the initial message - use same logic as other components
+        // Detect if this is the initial message
         const isInitialMessage = (index === 0 && msg.isAgent) || msg.id === 'initial-message';
         
         // Render regular message
@@ -129,10 +135,19 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             userBubbleClass={themeClasses.userMessage}
             userMessageStyle={userMessageStyle}
             isInitialMessage={isInitialMessage}
-            isLastAgentMessage={index === chatHistory.length - 1}
+            isLastAgentMessage={index === lastAgentMessageIndex}
           />
         );
       })}
+
+      {/* Show thinking bubble when AI is thinking (before typing starts) */}
+      {isThinking && !typingMessageId && (
+        <ThinkingBubble
+          agentName={agentName}
+          profilePicture={profilePicture}
+          agentBubbleClass={themeClasses.agentMessage}
+        />
+      )}
     </div>
   );
 };

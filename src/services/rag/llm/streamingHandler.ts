@@ -1,4 +1,3 @@
-
 export interface StreamingChunk {
   delta: string;
   isComplete: boolean;
@@ -13,6 +12,10 @@ export interface StreamingOptions {
   onChunk?: (chunk: StreamingChunk) => void;
   onComplete?: (fullResponse: string) => void;
   onError?: (error: Error) => void;
+  onThinkingStart?: () => void;
+  onThinkingEnd?: () => void;
+  onTypingStart?: (messageId: string) => void;
+  onTypingComplete?: (messageId: string) => void;
   abortSignal?: AbortSignal;
 }
 
@@ -41,7 +44,26 @@ export class StreamingHandler {
       let fullResponse = '';
       let chunkCount = 0;
 
-      // Simulate streaming chunks (in real implementation, this would be SSE or WebSocket)
+      // Start thinking phase
+      console.log('🤔 Starting thinking phase');
+      options.onThinkingStart?.();
+
+      // Thinking delay (simulates AI processing time)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      if (abortController.signal.aborted) {
+        throw new Error('Stream aborted during thinking phase');
+      }
+
+      // End thinking, start typing
+      console.log('⌨️ Starting typing phase');
+      options.onThinkingEnd?.();
+      
+      // Generate a message ID for typing
+      const messageId = `stream-${streamId}`;
+      options.onTypingStart?.(messageId);
+
+      // Simulate streaming chunks
       const simulateStreaming = () => {
         return new Promise<string>((resolve, reject) => {
           const chunks = [
@@ -73,6 +95,7 @@ export class StreamingHandler {
 
               options.onChunk?.(finalChunk);
               options.onComplete?.(fullResponse);
+              options.onTypingComplete?.(messageId);
               resolve(fullResponse);
               return;
             }
@@ -89,8 +112,8 @@ export class StreamingHandler {
             console.log(`📦 Streaming chunk ${chunkCount}:`, delta.substring(0, 30) + '...');
             options.onChunk?.(chunk);
 
-            // Simulate network delay
-            setTimeout(() => sendChunk(index + 1), 200 + Math.random() * 300);
+            // Simulate realistic typing speed
+            setTimeout(() => sendChunk(index + 1), 800 + Math.random() * 400);
           };
 
           sendChunk(0);

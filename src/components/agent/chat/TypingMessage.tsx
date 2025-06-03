@@ -10,10 +10,16 @@ interface TypingMessageProps {
 const TypingMessage: React.FC<TypingMessageProps> = ({
   content,
   onComplete,
-  typingSpeed = 50
+  typingSpeed = 30
 }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    // Reset when content changes
+    setDisplayedText("");
+    setCurrentIndex(0);
+  }, [content]);
 
   useEffect(() => {
     if (currentIndex < content.length) {
@@ -23,16 +29,15 @@ const TypingMessage: React.FC<TypingMessageProps> = ({
       }, typingSpeed);
 
       return () => clearTimeout(timer);
-    } else if (onComplete) {
-      onComplete();
+    } else if (currentIndex === content.length && onComplete) {
+      // Small delay before calling onComplete to ensure the last character is visible
+      const completeTimer = setTimeout(() => {
+        onComplete();
+      }, typingSpeed);
+      
+      return () => clearTimeout(completeTimer);
     }
   }, [currentIndex, content, typingSpeed, onComplete]);
-
-  useEffect(() => {
-    // Reset when content changes
-    setDisplayedText("");
-    setCurrentIndex(0);
-  }, [content]);
 
   return <span>{displayedText}</span>;
 };

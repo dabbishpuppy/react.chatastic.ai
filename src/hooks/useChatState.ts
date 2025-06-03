@@ -16,12 +16,8 @@ export const useChatState = (
       {
         isAgent: true,
         content: "Hi! I'm Wonder AI. How can I help you today?",
-        timestamp: new Date().toISOString()
-      },
-      {
-        isAgent: false,
-        content: "Hello, World!",
-        timestamp: new Date(Date.now() + 1000).toISOString()
+        timestamp: new Date().toISOString(),
+        id: 'initial-message'
       }
     ];
   });
@@ -31,9 +27,55 @@ export const useChatState = (
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const [timeUntilReset, setTimeUntilReset] = useState<number | null>(null);
   const [isWaitingForRateLimit, setIsWaitingForRateLimit] = useState(false);
-  const [userHasMessaged, setUserHasMessaged] = useState(true);
+  const [userHasMessaged, setUserHasMessaged] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper function to add a message with typing effect
+  const addMessageWithTyping = (content: string, isAgent: boolean = true) => {
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    if (isAgent) {
+      // Start thinking state
+      setIsThinking(true);
+      setIsTyping(false);
+      setTypingMessageId(null);
+
+      // After thinking period, add message and start typing
+      setTimeout(() => {
+        const newMessage: ChatMessage = {
+          id: messageId,
+          isAgent: true,
+          content,
+          timestamp: new Date().toISOString()
+        };
+
+        setChatHistory(prev => [...prev, newMessage]);
+        setIsThinking(false);
+        setIsTyping(true);
+        setTypingMessageId(messageId);
+      }, 1500); // 1.5 second thinking period
+    } else {
+      // User messages don't need typing effect
+      const newMessage: ChatMessage = {
+        id: messageId,
+        isAgent: false,
+        content,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, newMessage]);
+    }
+
+    return messageId;
+  };
+
+  // Helper function to handle typing complete
+  const handleTypingComplete = (messageId: string) => {
+    if (messageId === typingMessageId) {
+      setIsTyping(false);
+      setTypingMessageId(null);
+    }
+  };
 
   return {
     message,
@@ -55,6 +97,8 @@ export const useChatState = (
     userHasMessaged,
     setUserHasMessaged,
     inputRef,
-    countdownIntervalRef
+    countdownIntervalRef,
+    addMessageWithTyping,
+    handleTypingComplete
   };
 };
