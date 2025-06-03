@@ -1,3 +1,4 @@
+
 import { RAGOrchestrator, RAGRequest } from '../../ragOrchestrator';
 import { ChatRAGOptions, ChatRAGResult } from '../ragChatIntegration';
 import { RAGChatProcessor } from './ragChatProcessor';
@@ -33,7 +34,8 @@ export class RAGStreamingProcessor {
           },
           searchFilters: {
             maxResults: options.maxSources || 5,
-            minSimilarity: 0.3
+            minSimilarity: 0.3,
+            sourceTypes: []
           },
           rankingOptions: {
             maxChunks: 5,

@@ -22,12 +22,19 @@ export interface RAGRequest {
       model?: string;
       temperature?: number;
       systemPrompt?: string;
+      maxTokens?: number;
     };
     streaming: boolean;
+    streamingOptions?: {
+      onChunk?: (chunk: any) => void;
+      onComplete?: (response: string) => void;
+      onError?: (error: Error) => void;
+    };
     postProcessing: {
       addSourceCitations: boolean;
       formatMarkdown: boolean;
       enforceContentSafety: boolean;
+      addTimestamp?: boolean;
     };
   };
 }
@@ -42,14 +49,23 @@ export interface RAGResponse {
       processingTime: number;
     };
   };
+  performance: {
+    totalTime: number;
+    queryProcessingTime: number;
+    llmResponseTime: number;
+    postProcessingTime: number;
+  };
 }
 
 export class RAGOrchestrator {
   static async processRAGRequest(request: RAGRequest): Promise<RAGResponse> {
     console.log('🎯 RAG Orchestrator: Processing request with model:', request.options.llmOptions.model);
     
+    const startTime = Date.now();
+    
     try {
       // Step 1: Query and rank relevant content
+      const queryStartTime = Date.now();
       const queryResult = await RAGQueryEngine.processQuery(
         request.query,
         request.agentId,
@@ -59,6 +75,7 @@ export class RAGOrchestrator {
           sourceTypes: request.options.searchFilters.sourceTypes
         }
       );
+      const queryProcessingTime = Date.now() - queryStartTime;
 
       console.log('📊 Query processing complete:', {
         chunksFound: queryResult.rankedContext.chunks.length,
@@ -73,6 +90,7 @@ export class RAGOrchestrator {
       // Step 3: Generate response using enhanced LLM integration with agent configuration
       console.log('🤖 Generating response with configured model:', request.options.llmOptions.model);
       
+      const llmStartTime = Date.now();
       const llmResponse = await RAGLLMIntegrationEnhanced.processQueryWithConfig(
         request.agentId,
         request.query,
@@ -83,6 +101,10 @@ export class RAGOrchestrator {
           systemPrompt: request.options.llmOptions.systemPrompt
         }
       );
+      const llmResponseTime = Date.now() - llmStartTime;
+
+      const postProcessStartTime = Date.now();
+      const postProcessingTime = Date.now() - postProcessStartTime;
 
       const response: RAGResponse = {
         queryResult,
@@ -91,8 +113,14 @@ export class RAGOrchestrator {
           metadata: {
             model: request.options.llmOptions.model || 'gpt-4o-mini',
             temperature: request.options.llmOptions.temperature || 0.7,
-            processingTime: Date.now()
+            processingTime: Date.now() - startTime
           }
+        },
+        performance: {
+          totalTime: Date.now() - startTime,
+          queryProcessingTime,
+          llmResponseTime,
+          postProcessingTime
         }
       };
 
@@ -102,5 +130,13 @@ export class RAGOrchestrator {
       console.error('❌ RAG Orchestrator: Processing failed:', error);
       throw error;
     }
+  }
+
+  static getPerformanceMetrics() {
+    return {
+      averageResponseTime: 1000,
+      totalRequests: 0,
+      successRate: 100
+    };
   }
 }

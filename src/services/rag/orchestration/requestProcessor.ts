@@ -1,4 +1,3 @@
-
 import { RAGRequest } from '../ragOrchestrator';
 import { RAGQueryRequest } from '../queryProcessing/ragQueryEngine';
 import { RAGQueryResult } from '../queryProcessing/ragQueryEngine';
@@ -28,7 +27,7 @@ export class RequestProcessor {
       searchFilters: {
         maxResults: request.options?.searchFilters?.maxResults || 10,
         minSimilarity: request.options?.searchFilters?.minSimilarity || 0.5,
-        sourceTypes: request.options?.searchFilters?.sourceTypes,
+        sourceTypes: request.options?.searchFilters?.sourceTypes || [],
         ...request.options?.searchFilters
       },
       rankingOptions: {
@@ -222,12 +221,37 @@ export class RequestProcessor {
     const complexity = this.calculateQueryComplexity(optimized.query);
     
     if (!optimized.options) {
-      optimized.options = {};
+      optimized.options = {
+        searchFilters: {
+          maxResults: 10,
+          minSimilarity: 0.5,
+          sourceTypes: []
+        },
+        rankingOptions: {
+          maxChunks: 8,
+          maxTokens: 4000,
+          diversityWeight: 0.3,
+          recencyWeight: 0.2
+        },
+        llmOptions: {
+          temperature: 0.7
+        },
+        streaming: false,
+        postProcessing: {
+          addSourceCitations: true,
+          formatMarkdown: true,
+          enforceContentSafety: true
+        }
+      };
     }
 
     // Optimize search filters based on complexity
     if (!optimized.options.searchFilters) {
-      optimized.options.searchFilters = {};
+      optimized.options.searchFilters = {
+        maxResults: 10,
+        minSimilarity: 0.5,
+        sourceTypes: []
+      };
     }
 
     if (complexity < 0.3) {
@@ -246,7 +270,12 @@ export class RequestProcessor {
 
     // Optimize ranking options
     if (!optimized.options.rankingOptions) {
-      optimized.options.rankingOptions = {};
+      optimized.options.rankingOptions = {
+        maxChunks: 8,
+        maxTokens: 4000,
+        diversityWeight: 0.3,
+        recencyWeight: 0.2
+      };
     }
 
     // Adjust token limits based on query length
@@ -298,12 +327,37 @@ export class RequestProcessor {
     const defaultRequest = { ...request };
     
     if (!defaultRequest.options) {
-      defaultRequest.options = {};
+      defaultRequest.options = {
+        searchFilters: {
+          maxResults: 10,
+          minSimilarity: 0.5,
+          sourceTypes: []
+        },
+        rankingOptions: {
+          maxChunks: 8,
+          maxTokens: 4000,
+          diversityWeight: 0.3,
+          recencyWeight: 0.2
+        },
+        llmOptions: {
+          temperature: 0.7
+        },
+        streaming: false,
+        postProcessing: {
+          addSourceCitations: true,
+          formatMarkdown: true,
+          enforceContentSafety: true
+        }
+      };
     }
 
     // Set default search filters
     if (!defaultRequest.options.searchFilters) {
-      defaultRequest.options.searchFilters = {};
+      defaultRequest.options.searchFilters = {
+        maxResults: 10,
+        minSimilarity: 0.5,
+        sourceTypes: []
+      };
     }
     if (!defaultRequest.options.searchFilters.maxResults) {
       defaultRequest.options.searchFilters.maxResults = 10;
@@ -314,7 +368,12 @@ export class RequestProcessor {
 
     // Set default ranking options
     if (!defaultRequest.options.rankingOptions) {
-      defaultRequest.options.rankingOptions = {};
+      defaultRequest.options.rankingOptions = {
+        maxChunks: 8,
+        maxTokens: 4000,
+        diversityWeight: 0.3,
+        recencyWeight: 0.2
+      };
     }
     if (!defaultRequest.options.rankingOptions.maxChunks) {
       defaultRequest.options.rankingOptions.maxChunks = 8;

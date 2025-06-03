@@ -29,7 +29,7 @@ export class ResponseCoordinator {
       conversationId: request.conversationId,
       systemPrompt: request.options?.llmOptions?.systemPrompt,
       temperature: request.options?.llmOptions?.temperature,
-      maxTokens: request.options?.llmOptions?.maxTokens,
+      maxTokens: request.options?.llmOptions?.maxTokens || 1000,
       stream: request.options?.streaming
     };
 
@@ -54,12 +54,15 @@ export class ResponseCoordinator {
     const postProcessingTime = Date.now() - postProcessStartTime;
 
     return {
-      query: request.query,
-      agentId: request.agentId,
-      conversationId: request.conversationId,
       queryResult,
-      llmResponse,
-      processedResponse,
+      processedResponse: {
+        content: processedResponse.content,
+        metadata: {
+          model: request.options?.llmOptions?.model || 'gpt-4o-mini',
+          temperature: request.options?.llmOptions?.temperature || 0.7,
+          processingTime: postProcessingTime
+        }
+      },
       performance: {
         totalTime: queryProcessingTime + llmResponseTime + postProcessingTime,
         queryProcessingTime,
