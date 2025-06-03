@@ -40,11 +40,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
               </HoverCardTrigger>
               <HoverCardContent 
                 side="right" 
-                className="w-80 p-4 bg-white border shadow-lg z-[100]"
+                className="w-96 p-4 bg-white border shadow-lg z-[100]"
                 sideOffset={10}
               >
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <img 
                       src={modelOption.logo} 
                       alt={`${modelOption.provider} logo`}
@@ -55,18 +55,23 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
                       <p className="text-sm text-gray-600">{modelOption.provider}</p>
                     </div>
                   </div>
+                  
                   <p className="text-sm text-gray-700 leading-relaxed">{modelOption.description}</p>
-                  <div className="space-y-2">
+                  
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-gray-700">Cost:</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        modelOption.cost === 'Very Low' || modelOption.cost === 'Low' ? 'bg-green-100 text-green-700' :
+                        modelOption.cost === 'Very Low' ? 'bg-green-100 text-green-700' :
+                        modelOption.cost === 'Low' ? 'bg-green-100 text-green-700' :
                         modelOption.cost === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                        modelOption.cost === 'High' ? 'bg-orange-100 text-orange-700' :
                         'bg-red-100 text-red-700'
                       }`}>
                         {modelOption.cost}
                       </span>
                     </div>
+                    
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-gray-700">Speed:</span>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -78,6 +83,21 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
                       </span>
                     </div>
                   </div>
+
+                  {modelOption.contextWindow && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">Context Window:</span>
+                      <span className="text-sm text-gray-600">{modelOption.contextWindow}</span>
+                    </div>
+                  )}
+
+                  {modelOption.creditsPerMessage && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">Credits per Message:</span>
+                      <span className="text-sm text-gray-600">{modelOption.creditsPerMessage}</span>
+                    </div>
+                  )}
+
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">Capabilities:</p>
                     <div className="flex flex-wrap gap-1">
