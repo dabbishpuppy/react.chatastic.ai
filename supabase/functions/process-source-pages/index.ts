@@ -196,7 +196,7 @@ serve(async (req) => {
     // Auto-recovery first
     const autoRecoveredCount = await autoRecoverStuckPages(supabaseClient);
     
-    // Reset failed pages for retry
+    // Reset failed pages for retry (but be more selective)
     const resetFailedCount = await resetFailedPages(supabaseClient);
 
     // Process pending pages

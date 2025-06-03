@@ -65,8 +65,63 @@ serve(async (req) => {
     const textContent = extractTextContent(htmlContent);
     const contentSize = textContent.length;
 
-    if (contentSize < 100) {
-      throw new Error('Content too short after extraction');
+    console.log(`📏 Content extracted: ${contentSize} characters from ${job.url}`);
+
+    // Relaxed content length check - allow shorter content but ensure it's not empty
+    if (contentSize < 20) {
+      console.warn(`⚠️ Very short content (${contentSize} chars) for ${job.url}, but processing anyway`);
+      
+      // Try to get at least the page title if content is extremely short
+      const title = extractTitle(htmlContent);
+      if (title && title.length > 0) {
+        const fallbackContent = `Page: ${title}`;
+        console.log(`📝 Using fallback content: "${fallbackContent}"`);
+        
+        // Store minimal chunk with title
+        const fallbackChunks = [{
+          source_id: job.parent_source_id,
+          chunk_index: 0,
+          content: fallbackContent,
+          token_count: Math.ceil(fallbackContent.length / 4),
+          metadata: {
+            url: job.url,
+            page_id: job.id,
+            content_hash: await generateContentHash(fallbackContent),
+            extraction_method: 'title_fallback',
+            page_title: title,
+            crawled_at: new Date().toISOString(),
+            original_content_length: contentSize
+          }
+        }];
+
+        await insertChunks(supabaseClient, fallbackChunks);
+        
+        await updateJobStatus(supabaseClient, childJobId, 'completed', {
+          content_size: fallbackContent.length,
+          chunks_created: 1,
+          processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime(),
+          content_hash: await generateContentHash(fallbackContent)
+        });
+
+        console.log(`✅ Processed minimal content page ${childJobId} with title fallback`);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            jobId: childJobId,
+            parentSourceId: job.parent_source_id,
+            contentSize: fallbackContent.length,
+            chunksCreated: 1,
+            message: 'Job processed with title fallback due to minimal content'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } else {
+        throw new Error(`No meaningful content found for ${job.url} (${contentSize} chars, no title)`);
+      }
     }
 
     // Create semantic chunks from the content
@@ -76,10 +131,7 @@ serve(async (req) => {
     // Generate content hash for deduplication
     const contentHash = await generateContentHash(textContent);
 
-    // Calculate compression ratio (simple estimation)
-    const compressionRatio = Math.min(0.7, Math.max(0.3, 1000 / contentSize));
-
-    // Store chunks in database - IMPORTANT: Link to parent source, not the individual page
+    // Store chunks in database - Link to parent source, not the individual page
     if (chunks.length > 0) {
       const chunksToInsert = chunks.map((chunk, index) => ({
         source_id: job.parent_source_id, // Use parent source ID, not the page ID
@@ -90,9 +142,10 @@ serve(async (req) => {
           url: job.url,
           page_id: job.id, // Store page ID in metadata for reference
           content_hash: contentHash,
-          extraction_method: 'automatic',
+          extraction_method: 'semantic_chunking',
           page_title: extractTitle(htmlContent),
-          crawled_at: new Date().toISOString()
+          crawled_at: new Date().toISOString(),
+          original_content_length: contentSize
         }
       }));
 
@@ -100,14 +153,12 @@ serve(async (req) => {
       console.log(`✅ Stored ${chunks.length} chunks for parent source ${job.parent_source_id} from page ${job.id}`);
     }
 
-    // Mark job as completed with comprehensive metadata (only valid fields)
+    // Mark job as completed with comprehensive metadata
     await updateJobStatus(supabaseClient, childJobId, 'completed', {
       content_size: contentSize,
-      compression_ratio: compressionRatio,
       chunks_created: chunks.length,
-      duplicates_found: 0,
-      content_hash: contentHash,
-      processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime()
+      processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime(),
+      content_hash: contentHash
     });
 
     console.log(`✅ Successfully completed job ${childJobId} with ${chunks.length} chunks linked to parent ${job.parent_source_id}`);
@@ -118,7 +169,6 @@ serve(async (req) => {
         jobId: childJobId,
         parentSourceId: job.parent_source_id,
         contentSize,
-        compressionRatio,
         chunksCreated: chunks.length,
         message: 'Job processed successfully with chunks linked to parent source'
       }),
