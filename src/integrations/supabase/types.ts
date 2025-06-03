@@ -1670,6 +1670,7 @@ export type Database = {
           content: string
           content_hash: string | null
           created_at: string
+          created_by: string | null
           duplicate_of_chunk_id: string | null
           id: string
           is_duplicate: boolean | null
@@ -1682,6 +1683,7 @@ export type Database = {
           content: string
           content_hash?: string | null
           created_at?: string
+          created_by?: string | null
           duplicate_of_chunk_id?: string | null
           id?: string
           is_duplicate?: boolean | null
@@ -1694,6 +1696,7 @@ export type Database = {
           content?: string
           content_hash?: string | null
           created_at?: string
+          created_by?: string | null
           duplicate_of_chunk_id?: string | null
           id?: string
           is_duplicate?: boolean | null

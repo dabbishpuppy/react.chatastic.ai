@@ -5,51 +5,34 @@ export class EmbeddingGenerator {
   static async generateEmbeddings(sourceId: string): Promise<void> {
     console.log(`🤖 Generating embeddings for source: ${sourceId}`);
 
-    // Get chunks for this source
-    const { data: chunks, error } = await supabase
-      .from('source_chunks')
-      .select('*')
-      .eq('source_id', sourceId);
+    try {
+      // Call the Edge Function to generate embeddings
+      const { data, error } = await supabase.functions.invoke('generate-embeddings', {
+        body: { sourceId }
+      });
 
-    if (error) throw error;
-
-    // Generate embeddings using OpenAI
-    for (const chunk of chunks || []) {
-      try {
-        const response = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY || 'your-api-key-here'}`
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: chunk.content
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`OpenAI API error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const embedding = data.data[0].embedding;
-
-        // Store embedding
-        await supabase
-          .from('source_embeddings')
-          .upsert({
-            chunk_id: chunk.id,
-            embedding: JSON.stringify(embedding),
-            model: 'text-embedding-3-small'
-          });
-
-      } catch (error) {
-        console.error(`❌ Failed to generate embedding for chunk ${chunk.id}:`, error);
-        // Continue with other chunks even if one fails
+      if (error) {
+        console.error('❌ Edge Function error:', error);
+        throw new Error(`Failed to generate embeddings: ${error.message}`);
       }
-    }
 
-    console.log(`✅ Generated embeddings for source: ${sourceId}`);
+      if (!data?.success) {
+        const errorMessage = data?.error || 'Unknown error occurred';
+        console.error('❌ Embedding generation failed:', errorMessage);
+        throw new Error(`Embedding generation failed: ${errorMessage}`);
+      }
+
+      const { processedCount, errorCount, totalChunks } = data;
+      
+      if (errorCount > 0) {
+        console.warn(`⚠️ Generated embeddings with ${errorCount} errors out of ${totalChunks} chunks`);
+      }
+
+      console.log(`✅ Generated embeddings for source: ${sourceId} (${processedCount}/${totalChunks} successful)`);
+
+    } catch (error) {
+      console.error(`❌ Failed to generate embeddings for source ${sourceId}:`, error);
+      throw error;
+    }
   }
 }
