@@ -34,6 +34,17 @@ serve(async (req) => {
       throw new Error(`Job not found: ${jobError?.message}`);
     }
 
+    // Get the parent source to ensure it exists
+    const { data: parentSource, error: parentError } = await supabaseClient
+      .from('agent_sources')
+      .select('id, agent_id')
+      .eq('id', job.parent_source_id)
+      .single();
+
+    if (parentError || !parentSource) {
+      throw new Error(`Parent source not found: ${parentError?.message}`);
+    }
+
     // Mark as in_progress
     await updateJobStatus(supabaseClient, childJobId, 'in_progress');
 
@@ -69,22 +80,25 @@ serve(async (req) => {
     const compressionRatio = Math.min(0.7, Math.max(0.3, 1000 / contentSize));
     const compressedSize = Math.round(contentSize * compressionRatio);
 
-    // Store chunks in database
+    // Store chunks in database - IMPORTANT: Link to parent source, not the individual page
     if (chunks.length > 0) {
       const chunksToInsert = chunks.map((chunk, index) => ({
-        source_id: childJobId,
+        source_id: job.parent_source_id, // Use parent source ID, not the page ID
         chunk_index: index,
         content: chunk,
         token_count: Math.ceil(chunk.length / 4),
         metadata: {
           url: job.url,
+          page_id: job.id, // Store page ID in metadata for reference
           content_hash: contentHash,
-          extraction_method: 'automatic'
+          extraction_method: 'automatic',
+          page_title: extractTitle(htmlContent),
+          crawled_at: new Date().toISOString()
         }
       }));
 
       await insertChunks(supabaseClient, chunksToInsert);
-      console.log(`✅ Stored ${chunks.length} chunks for job ${childJobId}`);
+      console.log(`✅ Stored ${chunks.length} chunks for parent source ${job.parent_source_id} from page ${job.id}`);
     }
 
     // Mark job as completed with comprehensive metadata
@@ -100,21 +114,23 @@ serve(async (req) => {
         title: extractTitle(htmlContent),
         processing_method: 'automatic',
         chunks_generated: true,
-        processing_timestamp: new Date().toISOString()
+        processing_timestamp: new Date().toISOString(),
+        linked_to_parent: job.parent_source_id
       }
     });
 
-    console.log(`✅ Successfully completed job ${childJobId} with ${chunks.length} chunks`);
+    console.log(`✅ Successfully completed job ${childJobId} with ${chunks.length} chunks linked to parent ${job.parent_source_id}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         jobId: childJobId,
+        parentSourceId: job.parent_source_id,
         contentSize,
         compressedSize,
         compressionRatio,
         chunksCreated: chunks.length,
-        message: 'Job processed successfully with chunks generated'
+        message: 'Job processed successfully with chunks linked to parent source'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

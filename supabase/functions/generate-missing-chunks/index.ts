@@ -9,9 +9,10 @@ const corsHeaders = {
 };
 
 async function findPagesWithoutChunks(supabaseClient: any) {
+  // Find completed pages that don't have chunks yet
   const { data: pagesWithoutChunks, error: searchError } = await supabaseClient
     .from('source_pages')
-    .select('id, url, parent_source_id, content_size, metadata')
+    .select('id, url, parent_source_id, content_size')
     .eq('status', 'completed')
     .gt('content_size', 100)
     .limit(50);
@@ -24,13 +25,14 @@ async function findPagesWithoutChunks(supabaseClient: any) {
     return [];
   }
 
-  // Filter pages that actually don't have chunks
+  // Filter pages that actually don't have chunks by checking if their parent source has chunks for this specific page
   const pagesNeedingChunks = [];
   for (const page of pagesWithoutChunks) {
     const { data: existingChunks } = await supabaseClient
       .from('source_chunks')
       .select('id')
-      .eq('source_id', page.id)
+      .eq('source_id', page.parent_source_id)
+      .contains('metadata', { page_id: page.id })
       .limit(1);
 
     if (!existingChunks || existingChunks.length === 0) {
@@ -43,6 +45,17 @@ async function findPagesWithoutChunks(supabaseClient: any) {
 
 async function processPageForChunks(supabaseClient: any, page: any) {
   console.log(`🔄 Generating chunks for page: ${page.url} (ID: ${page.id})`);
+
+  // Verify parent source exists
+  const { data: parentSource, error: parentError } = await supabaseClient
+    .from('agent_sources')
+    .select('id, agent_id')
+    .eq('id', page.parent_source_id)
+    .single();
+
+  if (parentError || !parentSource) {
+    throw new Error(`Parent source not found for page ${page.id}: ${parentError?.message}`);
+  }
 
   // Re-fetch the page content
   const response = await fetch(page.url, {
@@ -72,39 +85,38 @@ async function processPageForChunks(supabaseClient: any, page: any) {
   // Generate content hash
   const contentHash = await generateContentHash(textContent);
 
-  // Store chunks in database
+  // Store chunks in database - Link to parent source, not the individual page
   const chunksToInsert = chunks.map((chunk, index) => ({
-    source_id: page.id,
+    source_id: page.parent_source_id, // Use parent source ID
     chunk_index: index,
     content: chunk,
     token_count: Math.ceil(chunk.length / 4),
     metadata: {
       url: page.url,
+      page_id: page.id, // Store page ID in metadata
       content_hash: contentHash,
       extraction_method: 'missing_chunks_recovery',
-      generated_at: new Date().toISOString()
+      generated_at: new Date().toISOString(),
+      recovery_process: true
     }
   }));
 
   await insertChunks(supabaseClient, chunksToInsert);
 
-  // Update the page metadata to indicate chunks were generated
+  // Update the page to indicate chunks were generated
   await supabaseClient
     .from('source_pages')
     .update({
-      metadata: {
-        ...(page.metadata || {}),
-        chunks_generated: true,
-        chunks_generated_at: new Date().toISOString(),
-        chunks_count: chunks.length
-      }
+      chunks_created: chunks.length,
+      processing_time_ms: Date.now() // Simple timestamp for processing
     })
     .eq('id', page.id);
 
-  console.log(`✅ Generated ${chunks.length} chunks for page ${page.id}`);
+  console.log(`✅ Generated ${chunks.length} chunks for page ${page.id} linked to parent ${page.parent_source_id}`);
   
   return {
     pageId: page.id,
+    parentSourceId: page.parent_source_id,
     url: page.url,
     success: true,
     chunksCreated: chunks.length
@@ -150,6 +162,7 @@ serve(async (req) => {
         console.error(`❌ Error processing page ${page.id}:`, error);
         results.push({
           pageId: page.id,
+          parentSourceId: page.parent_source_id,
           url: page.url,
           success: false,
           error: error.message
@@ -171,7 +184,7 @@ serve(async (req) => {
         failedCount,
         totalChunksCreated: totalChunks,
         results,
-        message: `Generated chunks for ${successCount} pages`
+        message: `Generated chunks for ${successCount} pages, linked to their parent sources`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
