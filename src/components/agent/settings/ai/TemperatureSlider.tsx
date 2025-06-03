@@ -21,10 +21,10 @@ export const TemperatureSlider: React.FC<TemperatureSliderProps> = ({ value, onC
           step="0.1"
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
-          className="w-full max-w-md"
+          className="w-full"
         />
       </div>
-      <div className="flex justify-between max-w-md text-sm text-gray-500 mt-1">
+      <div className="flex justify-between w-full text-sm text-gray-500 mt-1">
         <span>Focused</span>
         <span>Balanced</span>
         <span>Creative</span>

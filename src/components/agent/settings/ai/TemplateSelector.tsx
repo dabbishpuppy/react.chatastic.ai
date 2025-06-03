@@ -34,8 +34,8 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({ value, templ
             </SelectItem>
           ))}
           <SelectItem value="create_new">
-            <div className="flex items-center">
-              <Plus className="h-4 w-4 mr-2" />
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
               Create New Template
             </div>
           </SelectItem>

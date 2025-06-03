@@ -3,7 +3,6 @@ import React from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Label } from "@/components/ui/label";
-import { Info } from "lucide-react";
 import { AI_MODELS } from "./AIModelData";
 
 interface ModelSelectorProps {
@@ -26,7 +25,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
             <HoverCard key={modelOption.value} openDelay={300} closeDelay={100}>
               <HoverCardTrigger asChild>
                 <SelectItem value={modelOption.value} className="cursor-pointer">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <img 
                       src={modelOption.logo} 
                       alt={`${modelOption.provider} logo`}
@@ -36,7 +35,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ value, onChange })
                       <span className="font-medium">{modelOption.label}</span>
                       <span className="text-xs text-gray-500">{modelOption.provider}</span>
                     </div>
-                    <Info className="h-3 w-3 text-gray-400 ml-auto" />
                   </div>
                 </SelectItem>
               </HoverCardTrigger>
