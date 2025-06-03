@@ -90,41 +90,34 @@ export class MissingChunksService {
     missingPercentage: number;
   }> {
     try {
-      // Get total chunks for the agent
-      const { data: totalChunks, error: totalError } = await supabase
+      // Get total chunks for the agent using a proper join
+      const { data: totalChunksData, error: totalError } = await supabase
         .from('source_chunks')
-        .select('id', { count: 'exact' })
-        .in('source_id', 
-          supabase
-            .from('agent_sources')
-            .select('id')
-            .eq('agent_id', agentId)
-        );
+        .select('id')
+        .innerJoin('agent_sources', 'source_chunks.source_id', 'agent_sources.id')
+        .eq('agent_sources.agent_id', agentId);
 
       if (totalError) {
         console.error('Error fetching total chunks:', totalError);
         return { chunksWithoutEmbeddings: 0, totalChunks: 0, missingPercentage: 0 };
       }
 
-      // Get chunks without embeddings
-      const { data: chunksWithoutEmbeddings, error: missingError } = await supabase
+      // Get chunks without embeddings using a proper join
+      const { data: chunksWithoutEmbeddingsData, error: missingError } = await supabase
         .from('source_chunks')
-        .select('id', { count: 'exact' })
-        .in('source_id', 
-          supabase
-            .from('agent_sources')
-            .select('id')
-            .eq('agent_id', agentId)
-        )
+        .select('source_chunks.id')
+        .innerJoin('agent_sources', 'source_chunks.source_id', 'agent_sources.id')
+        .leftJoin('source_embeddings', 'source_chunks.id', 'source_embeddings.chunk_id')
+        .eq('agent_sources.agent_id', agentId)
         .is('source_embeddings.id', null);
 
       if (missingError) {
         console.error('Error fetching chunks without embeddings:', missingError);
-        return { chunksWithoutEmbeddings: 0, totalChunks: totalChunks?.length || 0, missingPercentage: 0 };
+        return { chunksWithoutEmbeddings: 0, totalChunks: totalChunksData?.length || 0, missingPercentage: 0 };
       }
 
-      const totalCount = totalChunks?.length || 0;
-      const missingCount = chunksWithoutEmbeddings?.length || 0;
+      const totalCount = totalChunksData?.length || 0;
+      const missingCount = chunksWithoutEmbeddingsData?.length || 0;
       const missingPercentage = totalCount > 0 ? (missingCount / totalCount) * 100 : 0;
 
       return {
