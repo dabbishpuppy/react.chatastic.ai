@@ -2,42 +2,39 @@
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { ChatSectionState } from "./ChatSectionState";
-import { ChatSectionHooks } from "./ChatSectionHooks";
 
 interface MessageHandling {
   sendMessage: (content: string, messages: any[], onNewMessage: (message: any) => void) => Promise<void>;
-  isAILoading: boolean;
+  isLoading: boolean;
 }
 
 export const useChatSectionHandlers = (
   state: ChatSectionState,
-  hooks: ChatSectionHooks,
   messageHandling: MessageHandling
 ) => {
   const { toast } = useToast();
 
   const handleSendMessage = useCallback(async () => {
-    if (!state.inputValue.trim() || messageHandling.isAILoading) return;
+    if (!state.message.trim() || messageHandling.isLoading) return;
 
     const userMessage = {
       id: Date.now().toString(),
-      content: state.inputValue.trim(),
+      content: state.message.trim(),
       isAgent: false,
       timestamp: new Date().toISOString()
     };
 
     // Add user message immediately
-    state.setMessages(prev => [...prev, userMessage]);
-    state.setInputValue("");
-    state.setHasUserSentMessage(true);
+    state.setChatHistory(prev => [...prev, userMessage]);
+    state.setMessage("");
 
     try {
       // Send message to AI and get response
       await messageHandling.sendMessage(
         userMessage.content,
-        state.messages,
+        state.chatHistory,
         (responseMessage) => {
-          state.setMessages(prev => [...prev, responseMessage]);
+          state.setChatHistory(prev => [...prev, responseMessage]);
         }
       );
     } catch (error) {
@@ -48,11 +45,11 @@ export const useChatSectionHandlers = (
         variant: "destructive"
       });
     }
-  }, [state.inputValue, state.messages, messageHandling, state.setMessages, state.setInputValue, state.setHasUserSentMessage, toast]);
+  }, [state.message, state.chatHistory, messageHandling, state.setChatHistory, state.setMessage, toast]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    state.setInputValue(e.target.value);
-  }, [state.setInputValue]);
+    state.setMessage(e.target.value);
+  }, [state.setMessage]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -62,8 +59,7 @@ export const useChatSectionHandlers = (
   }, [handleSendMessage]);
 
   const handleSuggestedMessageClick = useCallback((message: string) => {
-    state.setInputValue(message);
-    state.setHasUserSentMessage(true);
+    state.setMessage(message);
     
     const userMessage = {
       id: Date.now().toString(),
@@ -72,27 +68,27 @@ export const useChatSectionHandlers = (
       timestamp: new Date().toISOString()
     };
 
-    state.setMessages(prev => [...prev, userMessage]);
+    state.setChatHistory(prev => [...prev, userMessage]);
 
     // Send to AI
     messageHandling.sendMessage(
       message,
-      state.messages,
+      state.chatHistory,
       (responseMessage) => {
-        state.setMessages(prev => [...prev, responseMessage]);
+        state.setChatHistory(prev => [...prev, responseMessage]);
       }
     );
   }, [state, messageHandling]);
 
   const handleRegenerate = useCallback(async (messageIndex: number) => {
-    if (messageIndex === 0 || messageHandling.isAILoading) return;
+    if (messageIndex === 0 || messageHandling.isLoading) return;
 
-    const userMessage = state.messages[messageIndex - 1];
+    const userMessage = state.chatHistory[messageIndex - 1];
     if (!userMessage || userMessage.isAgent) return;
 
     // Remove the previous AI response
-    const updatedMessages = state.messages.slice(0, messageIndex);
-    state.setMessages(updatedMessages);
+    const updatedMessages = state.chatHistory.slice(0, messageIndex);
+    state.setChatHistory(prev => updatedMessages);
 
     try {
       // Regenerate response
@@ -100,7 +96,7 @@ export const useChatSectionHandlers = (
         userMessage.content,
         updatedMessages.slice(0, -1), // Exclude the user message we're regenerating for
         (responseMessage) => {
-          state.setMessages(prev => [...prev, responseMessage]);
+          state.setChatHistory(prev => [...prev, responseMessage]);
         }
       );
     } catch (error) {
@@ -111,7 +107,7 @@ export const useChatSectionHandlers = (
         variant: "destructive"
       });
     }
-  }, [state.messages, messageHandling, state.setMessages, toast]);
+  }, [state.chatHistory, messageHandling, state.setChatHistory, toast]);
 
   const handleFeedback = useCallback((messageId: string, isPositive: boolean) => {
     console.log(`Feedback for message ${messageId}: ${isPositive ? 'positive' : 'negative'}`);
@@ -128,7 +124,7 @@ export const useChatSectionHandlers = (
     handleSuggestedMessageClick,
     handleRegenerate,
     handleFeedback,
-    isLoading: messageHandling.isAILoading
+    isLoading: messageHandling.isLoading
   };
 };
 

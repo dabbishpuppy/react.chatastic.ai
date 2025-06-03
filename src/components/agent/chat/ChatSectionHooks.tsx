@@ -15,7 +15,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
   const { agentId: propAgentId, initialMessages, isEmbedded, conversationSource, leadSettings } = props;
   const agentId = propAgentId || routeAgentId;
 
-  const { settings, refreshSettings } = useChatSettings(); // Remove agentId parameter
+  const { settings, refreshSettings } = useChatSettings();
   
   // Use the leadSettings from props if provided, otherwise use the hook
   const leadSettingsHook = useLeadSettings(agentId || '');
@@ -24,10 +24,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
 
   const { currentConversation, conversationEnded, startNewConversation, endCurrentConversation, loadConversation, saveMessage, getConversationMessages } = useConversationManager(conversationSource);
   
-  const messageHandling = useMessageHandling(initialMessages, isEmbedded, currentConversation?.id, agentId, conversationSource, async () => {
-    const conversation = await startNewConversation();
-    return conversation?.id || null;
-  });
+  const messageHandling = useMessageHandling(agentId || '');
   
   const {
     message,
@@ -36,11 +33,7 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     setChatHistory,
     isTyping,
     rateLimitError,
-    setRateLimitError,
     timeUntilReset,
-    setTimeUntilReset,
-    isWaitingForRateLimit,
-    setIsWaitingForRateLimit,
     userHasMessaged,
     inputRef,
     handleSubmit,
@@ -49,8 +42,6 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
     handleFeedback,
     regenerateResponse,
     insertEmoji,
-    proceedWithMessage,
-    submitMessage,
     handleCountdownFinished,
     cleanup,
     isSubmitting
@@ -58,18 +49,6 @@ export const useChatSectionHooks = (props: ChatSectionProps): ChatSectionState =
 
   const { messagesEndRef, chatContainerRef, scrollToBottom } = useChatScroll(isEmbedded || false, chatHistory, isTyping);
   const { handleSubmitWithAgentId, handleSuggestedMessageClickWithAgentId, handleRegenerateWithAgentId } = useChatHandlers(handleSubmit, handleSuggestedMessageClick, regenerateResponse);
-
-  // Function to add a message to the chat history and save it
-  const addMessageToChatHistory = async (content: string, isAgent: boolean) => {
-    const timestamp = new Date().toISOString();
-    const newMessage = { content, isAgent, timestamp };
-
-    // Save the message to the database
-    await saveMessage(content, isAgent);
-
-    // Update the local chat history
-    setChatHistory(prevHistory => [...prevHistory, newMessage]);
-  };
 
   // Enhanced getConversationMessages that uses the agentId
   const getConversationMessagesWithAgent = async (conversationId: string) => {
