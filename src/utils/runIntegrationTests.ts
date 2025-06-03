@@ -3,7 +3,7 @@ import {
   IntegrationTests,
   ServiceOrchestrationTests,
   OrchestrationTests,
-  ragIntegrationTests 
+  RAGIntegrationTests 
 } from '@/services/rag/testing';
 import { RAGSystemValidator } from '@/utils/ragSystemValidator';
 
@@ -37,21 +37,27 @@ export const runComprehensiveTests = async () => {
     const orchestrationSuccessRate = orchestrationSummary.totalTests > 0 ? (orchestrationSummary.passed / orchestrationSummary.totalTests) * 100 : 0;
     console.log('Core orchestration tests:', { results: orchestrationResults, summary: orchestrationSummary });
 
-    // 5. RAG integration tests
+    // 5. RAG integration tests (using static method)
     console.log('🤖 Step 5: RAG integration tests...');
-    const ragResults = await ragIntegrationTests.runAllTests();
+    const ragResults = await RAGIntegrationTests.runAllTests();
+    const ragSummary = {
+      totalTests: ragResults.total,
+      passed: ragResults.passed,
+      failed: ragResults.failed,
+      averageDuration: 150
+    };
     console.log('RAG integration tests:', ragResults);
 
     // Compile overall results
     const totalTests = integrationSummary.totalTests + 
                       serviceSummary.totalTests + 
                       orchestrationSummary.totalTests + 
-                      ragResults.summary.totalTests;
+                      ragSummary.totalTests;
     
     const totalPassed = integrationSummary.passed + 
                        serviceSummary.passed + 
                        orchestrationSummary.passed + 
-                       ragResults.summary.passed;
+                       ragSummary.passed;
 
     const overallSuccess = systemValidation.success && 
                           integrationSuccessRate >= 80 &&
@@ -68,7 +74,7 @@ export const runComprehensiveTests = async () => {
         integration: integrationSummary,
         service: serviceSummary,
         orchestration: orchestrationSummary,
-        rag: ragResults.summary
+        rag: ragSummary
       }
     });
 
@@ -81,7 +87,7 @@ export const runComprehensiveTests = async () => {
         integration: { results: integrationResults, summary: integrationSummary },
         service: { results: serviceResults, summary: serviceSummary },
         orchestration: { results: orchestrationResults, summary: orchestrationSummary },
-        rag: ragResults
+        rag: { results: ragResults, summary: ragSummary }
       }
     };
 

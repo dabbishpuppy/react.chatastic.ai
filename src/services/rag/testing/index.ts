@@ -14,8 +14,8 @@ export type { OrchestrationTestResult } from './orchestrationTests';
 export type { ServiceOrchestrationTestResult } from './serviceOrchestrationTests';
 export type { IntegrationTestResult } from './integrationTests';
 
-// Export test instances
-export const ragIntegrationTests = new RAGIntegrationTests();
+// Export test instances - but note that RAGIntegrationTests uses static methods
+export const ragIntegrationTests = RAGIntegrationTests;
 
 // Export missing types for compatibility
 export interface TestResult {
