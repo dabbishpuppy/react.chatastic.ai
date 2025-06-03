@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
+import WebsiteSourceInfo from './components/WebsiteSourceInfo';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
@@ -73,26 +74,26 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     <Card className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <Checkbox
               checked={isSelected}
               onCheckedChange={onSelectionChange}
             />
             
-            {hasChildSources && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="p-1 h-6 w-6"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </Button>
-            )}
+            {/* Dropdown arrow - always visible but only functional when hasChildSources */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => hasChildSources && setIsExpanded(!isExpanded)}
+              className={`p-1 h-6 w-6 ${!hasChildSources ? 'opacity-30 cursor-not-allowed' : ''}`}
+              disabled={!hasChildSources}
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </Button>
             
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
@@ -133,8 +134,23 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 </div>
               ) : (
                 <div className="mb-2">
-                  <p className="text-sm font-medium truncate">{source.title || source.url}</p>
-                  <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+                  {/* Use the WebsiteSourceInfo component for detailed information */}
+                  <WebsiteSourceInfo
+                    title={source.title}
+                    url={source.url}
+                    createdAt={source.created_at}
+                    linksCount={linksCount}
+                    lastCrawledAt={source.last_crawled_at}
+                    crawlStatus={source.crawl_status}
+                    metadata={source.metadata}
+                    content={source.content}
+                    childSources={childSources}
+                    isChild={false}
+                    totalContentSize={source.total_content_size}
+                    compressedContentSize={source.compressed_content_size}
+                    originalSize={source.original_size}
+                    compressedSize={source.compressed_size}
+                  />
                 </div>
               )}
               
@@ -276,8 +292,20 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                     )}
                     
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{childSource.title || childSource.url}</p>
-                      <p className="text-xs text-muted-foreground truncate">{childSource.url}</p>
+                      <WebsiteSourceInfo
+                        title={childSource.title}
+                        url={childSource.url}
+                        createdAt={childSource.created_at}
+                        lastCrawledAt={childSource.last_crawled_at}
+                        crawlStatus={childSource.crawl_status}
+                        metadata={childSource.metadata}
+                        content={childSource.content}
+                        isChild={true}
+                        totalContentSize={childSource.total_content_size}
+                        compressedContentSize={childSource.compressed_content_size}
+                        originalSize={childSource.original_size}
+                        compressedSize={childSource.compressed_size}
+                      />
                     </div>
                   </div>
                   
