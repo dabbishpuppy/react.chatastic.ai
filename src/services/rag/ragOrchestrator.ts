@@ -65,15 +65,15 @@ export class RAGOrchestrator {
     try {
       // Step 1: Query and rank relevant content
       const queryStartTime = Date.now();
-      const queryResult = await RAGQueryEngine.processQuery(
-        request.query,
-        request.agentId,
-        {
+      const queryResult = await RAGQueryEngine.processQuery({
+        query: request.query,
+        agentId: request.agentId,
+        options: {
           maxResults: request.options.searchFilters.maxResults,
           minSimilarity: request.options.searchFilters.minSimilarity,
           sourceTypes: request.options.searchFilters.sourceTypes
         }
-      );
+      });
       const queryProcessingTime = Date.now() - queryStartTime;
 
       console.log('📊 Query processing complete:', {

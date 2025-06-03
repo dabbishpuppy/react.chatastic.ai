@@ -56,24 +56,3 @@ export const enhancedQueryEngineTests = {
     ];
   }
 };
-
-// Create advanced RAG tests instance
-export class AdvancedRAGTests {
-  static async runAllTests(): Promise<AdvancedRAGTestResult[]> {
-    console.log('🧪 Running advanced RAG tests...');
-    return [
-      {
-        testName: 'Advanced Context Processing',
-        passed: true,
-        duration: 180,
-      },
-      {
-        testName: 'Multi-Modal Integration',
-        passed: true,
-        duration: 220,
-      }
-    ];
-  }
-}
-
-export const advancedRAGTests = new AdvancedRAGTests();
