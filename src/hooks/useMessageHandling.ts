@@ -1,130 +1,98 @@
 
-import { ChatMessage } from "@/types/chatInterface";
-import { useChatState } from "./useChatState";
-import { useSubmissionState } from "./useSubmissionState";
-import { useMessageSubmission } from "./useMessageSubmission";
-import { useMessageOperations } from "./useMessageOperations";
-import { useMessageHandlers } from "./useMessageHandlers";
-import { useFormSubmissionHandlers } from "./useFormSubmissionHandlers";
-import { copyMessageToClipboard } from "@/utils/messageUtils";
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { MultiProviderLLMService, LLMRequest } from '@/services/rag/llm/multiProviderLLMService';
 
-export const useMessageHandling = (
-  initialMessages: ChatMessage[] = [],
-  isEmbedded: boolean = false,
-  conversationId?: string,
-  agentId?: string,
-  source: 'iframe' | 'bubble' = 'iframe',
-  createConversationCallback?: () => Promise<string | null>
-) => {
-  const {
-    message,
-    setMessage,
-    chatHistory,
-    setChatHistory,
-    isTyping,
-    setIsTyping,
-    rateLimitError,
-    setRateLimitError,
-    timeUntilReset,
-    setTimeUntilReset,
-    isWaitingForRateLimit,
-    setIsWaitingForRateLimit,
-    userHasMessaged,
-    setUserHasMessaged,
-    inputRef,
-    countdownIntervalRef
-  } = useChatState(initialMessages, isEmbedded);
+export interface Message {
+  id: string;
+  content: string;
+  isAgent: boolean;
+  timestamp: string;
+}
 
-  const {
-    isSubmitting,
-    isSubmissionBlocked,
-    recordSubmission,
-    resetSubmission
-  } = useSubmissionState();
+export const useMessageHandling = (agentId: string) => {
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { proceedWithMessage } = useMessageOperations({
-    setChatHistory,
-    setUserHasMessaged,
-    setIsTyping,
-    inputRef,
-    isEmbedded,
-    conversationId,
-    createConversationCallback
-  });
+  const sendMessage = async (
+    content: string,
+    messages: Message[],
+    onNewMessage: (message: Message) => void
+  ): Promise<void> => {
+    setIsLoading(true);
 
-  const { submitMessage } = useMessageSubmission({
-    proceedWithMessage,
-    setMessage,
-    setRateLimitError,
-    setTimeUntilReset,
-    isSubmissionBlocked,
-    recordSubmission,
-    resetSubmission
-  });
+    try {
+      // Get agent's AI configuration
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('ai_model, ai_instructions, ai_temperature')
+        .eq('id', agentId)
+        .single();
 
-  const {
-    handleFeedback,
-    regenerateResponse,
-    insertEmoji,
-    handleCountdownFinished
-  } = useMessageHandlers({
-    chatHistory,
-    isTyping,
-    setChatHistory,
-    setIsTyping,
-    setMessage,
-    inputRef,
-    conversationId,
-    setRateLimitError,
-    setTimeUntilReset,
-    rateLimitError
-  });
+      if (agentError || !agent) {
+        console.error('Error fetching agent configuration:', agentError);
+        throw new Error('Failed to load agent configuration');
+      }
 
-  const {
-    handleSubmit,
-    handleSuggestedMessageClick
-  } = useFormSubmissionHandlers({
-    message,
-    isTyping,
-    rateLimitError,
-    isSubmitting,
-    submitMessage,
-    inputRef,
-    isEmbedded
-  });
+      // Build conversation history for context
+      const conversationMessages = messages
+        .slice(-5) // Keep last 5 messages for context
+        .map(msg => ({
+          role: msg.isAgent ? 'assistant' as const : 'user' as const,
+          content: msg.content
+        }));
 
-  // Cleanup countdown on unmount
-  const cleanup = () => {
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
+      // Add system message with agent instructions
+      const llmMessages = [
+        {
+          role: 'system' as const,
+          content: agent.ai_instructions || 'You are a helpful AI assistant.'
+        },
+        ...conversationMessages,
+        {
+          role: 'user' as const,
+          content: content
+        }
+      ];
+
+      // Create LLM request
+      const request: LLMRequest = {
+        model: agent.ai_model || 'gpt-4o-mini',
+        messages: llmMessages,
+        temperature: agent.ai_temperature || 0.7,
+        max_tokens: 1000
+      };
+
+      // Call the LLM service
+      const response = await MultiProviderLLMService.callLLM(request);
+
+      // Create response message
+      const responseMessage: Message = {
+        id: Date.now().toString() + '_response',
+        content: response.content,
+        isAgent: true,
+        timestamp: new Date().toISOString()
+      };
+
+      onNewMessage(responseMessage);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Fallback error message
+      const errorMessage: Message = {
+        id: Date.now().toString() + '_error',
+        content: 'I apologize, but I encountered an error while processing your message. Please try again.',
+        isAgent: true,
+        timestamp: new Date().toISOString()
+      };
+
+      onNewMessage(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return {
-    message,
-    setMessage,
-    chatHistory,
-    setChatHistory,
-    isTyping,
-    rateLimitError,
-    setRateLimitError,
-    timeUntilReset,
-    setTimeUntilReset,
-    isWaitingForRateLimit,
-    setIsWaitingForRateLimit,
-    userHasMessaged,
-    inputRef,
-    handleSubmit,
-    handleSuggestedMessageClick,
-    copyMessageToClipboard,
-    handleFeedback,
-    regenerateResponse,
-    insertEmoji,
-    proceedWithMessage,
-    submitMessage,
-    handleCountdownFinished,
-    cleanup,
-    isSubmitting
+    sendMessage,
+    isLoading
   };
 };
