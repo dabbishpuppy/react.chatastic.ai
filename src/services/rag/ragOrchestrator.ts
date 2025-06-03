@@ -96,12 +96,12 @@ export class RAGOrchestrator {
       console.log('🤖 Generating response with configured model:', request.options.llmOptions.model);
       
       const llmStartTime = Date.now();
-      const llmResponse = await RAGLLMIntegrationEnhanced.processQueryWithConfig({
-        agentId: request.agentId,
-        query: request.query,
+      const llmResponse = await RAGLLMIntegrationEnhanced.processQueryWithConfig(
+        request.agentId,
+        request.query,
         contextChunks,
-        llmOptions: request.options.llmOptions
-      });
+        request.options.llmOptions
+      );
       const llmResponseTime = Date.now() - llmStartTime;
 
       const postProcessStartTime = Date.now();
