@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AgentSource } from '@/types/rag';
 import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
+import { useChildSourcesRealtime } from './hooks/useChildSourcesRealtime';
 import WebsiteSourceHeader from './components/WebsiteSourceHeader';
 import WebsiteSourceActions from './components/WebsiteSourceActions';
 import WebsiteSourceChildList from './components/WebsiteSourceChildList';
@@ -32,6 +33,9 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   const [editUrl, setEditUrl] = useState(source.url);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Use real-time hook for child sources
+  const realtimeChildSources = useChildSourcesRealtime(source.id, childSources);
+
   // Use the operations hook for enhanced recrawl
   const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
 
@@ -40,7 +44,9 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     setIsEditing(false);
   };
 
-  const hasChildSources = childSources && childSources.length > 0;
+  // Check if this is a parent source (no parent_source_id)
+  const isParentSource = !source.parent_source_id;
+  const hasChildSources = realtimeChildSources && realtimeChildSources.length > 0;
 
   const handleToggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -77,7 +83,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         <div className="flex items-center justify-between">
           <WebsiteSourceHeader
             source={source}
-            childSources={childSources}
+            childSources={realtimeChildSources}
             isSelected={isSelected}
             isEditing={isEditing}
             editUrl={editUrl}
@@ -96,17 +102,26 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             onRecrawl={handleRecrawl}
             onEnhancedRecrawl={handleEnhancedRecrawlClick}
             onDelete={handleDelete}
-            onToggleExpanded={handleToggleExpanded}
+            onToggleExpanded={isParentSource ? handleToggleExpanded : undefined}
           />
         </div>
 
-        {/* Child Sources Section */}
-        {hasChildSources && isExpanded && (
-          <WebsiteSourceChildList
-            childSources={childSources}
-            onExclude={onExclude}
-            onDelete={onDelete}
-          />
+        {/* Child Sources Section - Always show for parent sources when expanded */}
+        {isParentSource && isExpanded && (
+          <div className="mt-4 pl-6 border-l-2 border-gray-200">
+            {hasChildSources ? (
+              <WebsiteSourceChildList
+                childSources={realtimeChildSources}
+                onExclude={onExclude}
+                onDelete={onDelete}
+              />
+            ) : (
+              <div className="py-4 px-3 bg-gray-50 rounded-md border text-center">
+                <p className="text-sm text-gray-500">No links found yet</p>
+                <p className="text-xs text-gray-400 mt-1">Child pages will appear here as they are discovered</p>
+              </div>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

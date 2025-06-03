@@ -19,11 +19,11 @@ interface WebsiteSourceActionsProps {
   source: AgentSource;
   hasChildSources?: boolean;
   isExpanded?: boolean;
-  onEdit?: (sourceId: string, newUrl: string) => void;
-  onExclude?: (source: AgentSource) => void;
-  onRecrawl?: (source: AgentSource) => void;
+  onEdit?: () => void;
+  onExclude?: () => void;
+  onRecrawl?: () => void;
   onEnhancedRecrawl?: () => void;
-  onDelete?: (source: AgentSource) => void;
+  onDelete?: () => void;
   onToggleExpanded?: () => void;
   showRecrawl?: boolean;
   isChild?: boolean;
@@ -42,30 +42,6 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   showRecrawl = true,
   isChild = false
 }) => {
-  const handleEdit = () => {
-    if (onEdit) {
-      onEdit(source.id, source.url);
-    }
-  };
-
-  const handleExclude = () => {
-    if (onExclude) {
-      onExclude(source);
-    }
-  };
-
-  const handleRecrawl = () => {
-    if (onRecrawl) {
-      onRecrawl(source);
-    }
-  };
-
-  const handleDelete = () => {
-    if (onDelete) {
-      onDelete(source);
-    }
-  };
-
   return (
     <div className="flex items-center gap-1 ml-4">
       <TooltipProvider>
@@ -93,7 +69,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleEdit}
+                onClick={onEdit}
                 className="h-6 w-6 p-0"
               >
                 <Edit2 className="w-3 h-3" />
@@ -113,7 +89,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleExclude}
+                onClick={onExclude}
                 className="h-6 w-6 p-0"
               >
                 {source.is_excluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
@@ -133,7 +109,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleRecrawl}
+                onClick={onRecrawl}
                 className="h-6 w-6 p-0"
               >
                 <RefreshCw className="w-3 h-3" />
@@ -154,7 +130,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={onEnhancedRecrawl}
-                className="h-6 w-6 p-0 text-blue-600"
+                className="h-6 w-6 p-0"
               >
                 <Zap className="w-3 h-3" />
               </Button>
@@ -173,7 +149,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleDelete}
+                onClick={onDelete}
                 className="h-6 w-6 p-0 text-red-600"
               >
                 <Trash2 className="w-3 h-3" />
@@ -186,7 +162,8 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         </TooltipProvider>
       )}
 
-      {!isChild && onToggleExpanded && (
+      {/* Always show expand/collapse arrow for parent sources (when onToggleExpanded is provided) */}
+      {onToggleExpanded && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -204,7 +181,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isExpanded ? 'Collapse' : 'Expand'} {hasChildSources ? 'child sources' : 'details'}</p>
+              <p>{isExpanded ? 'Collapse' : 'Expand'} child sources</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
