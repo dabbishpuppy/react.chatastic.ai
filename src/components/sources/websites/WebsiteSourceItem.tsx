@@ -1,185 +1,229 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { Trash2, ExternalLink, RefreshCw, Eye, EyeOff, Edit2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  ChevronDown, 
-  ChevronRight
-} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
-import { supabase } from '@/integrations/supabase/client';
-import WebsiteSourceInfo from './components/WebsiteSourceInfo';
-import WebsiteSourceStatus from './components/WebsiteSourceStatus';
-import WebsiteSourceActions from './components/WebsiteSourceActions';
-import WebsiteChildSources from './components/WebsiteChildSources';
+import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
-  childSources?: AgentSource[];
-  onEdit: (sourceId: string, newUrl: string) => void;
-  onExclude: (source: AgentSource) => void;
-  onDelete: (source: AgentSource) => void;
-  onRecrawl: (source: AgentSource) => void;
-  isSelected?: boolean;
-  onSelectionChange?: (selected: boolean) => void;
+  onRefetch: () => void;
+  onRemove: (sourceId: string) => void;
 }
 
-const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
-  source,
-  childSources = [],
-  onEdit,
-  onExclude,
-  onDelete,
-  onRecrawl,
-  isSelected = false,
-  onSelectionChange
+export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({ 
+  source, 
+  onRefetch, 
+  onRemove 
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [sourcePages, setSourcePages] = useState<any[]>([]);
-  const [sourcePagesLoading, setSourcePagesLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUrl, setEditUrl] = useState(source.url);
   
-  const isParentSource = !source.parent_source_id;
-  const showToggle = isParentSource;
-  const isCrawling = source.crawl_status === 'in_progress' || source.crawl_status === 'pending';
+  const { 
+    handleEdit, 
+    handleExclude, 
+    handleDelete, 
+    handleRecrawl,
+    handleEnhancedRecrawl
+  } = useWebsiteSourceOperations(onRefetch, onRemove);
 
-  // Fetch source pages count for parent sources
-  useEffect(() => {
-    if (isParentSource) {
-      fetchSourcePages();
-    }
-  }, [source.id, isParentSource]);
+  const handleSaveEdit = async () => {
+    await handleEdit(source.id, editUrl);
+    setIsEditing(false);
+  };
 
-  const fetchSourcePages = async () => {
-    setSourcePagesLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('source_pages')
-        .select('id, status, content_size')
-        .eq('parent_source_id', source.id);
-
-      if (error) {
-        console.error('Error fetching source pages:', error);
-        return;
-      }
-
-      setSourcePages(data || []);
-    } catch (error) {
-      console.error('Error in fetchSourcePages:', error);
-    } finally {
-      setSourcePagesLoading(false);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500';
+      case 'in_progress': return 'bg-blue-500';
+      case 'pending': return 'bg-yellow-500';
+      case 'failed': return 'bg-red-500';
+      default: return 'bg-gray-500';
     }
   };
 
-  // Real-time subscription for source_pages changes
-  useEffect(() => {
-    if (!isParentSource) return;
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'completed': return 'Completed';
+      case 'in_progress': return 'In Progress';
+      case 'pending': return 'Pending';
+      case 'failed': return 'Failed';
+      default: return 'Unknown';
+    }
+  };
 
-    const channel = supabase
-      .channel(`source-pages-count-${source.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'source_pages',
-          filter: `parent_source_id=eq.${source.id}`
-        },
-        () => {
-          // Refetch source pages when changes occur
-          fetchSourcePages();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [source.id, isParentSource]);
-
-  const hasSourcePages = sourcePages.length > 0;
+  const progress = source.progress || 0;
+  const linksCount = source.links_count || 0;
 
   return (
-    <div className="border border-gray-200 rounded-lg">
-      {/* Main source item with fixed width container */}
-      <div className="flex items-center justify-between p-4 min-h-[60px]">
-        <div className="flex items-center flex-1 min-w-0 pr-4">
-          <Checkbox 
-            checked={isSelected}
-            onCheckedChange={onSelectionChange}
-            className="rounded border-gray-300 text-black focus:ring-black mr-4 flex-shrink-0"
-            aria-label={`Select ${source.title || source.url}`}
-          />
-          
-          <div className="flex-1 min-w-0 max-w-none">
-            <WebsiteSourceInfo
-              title={source.title}
-              url={source.url}
-              createdAt={source.created_at}
-              linksCount={source.links_count}
-              lastCrawledAt={source.last_crawled_at}
-              crawlStatus={source.crawl_status}
-              metadata={source.metadata}
-              content={source.content}
-              childSources={childSources}
-              sourcePages={sourcePages}
-              totalContentSize={source.total_content_size}
-              compressedContentSize={source.compressed_content_size}
-              originalSize={source.original_size}
-              compressedSize={source.compressed_size}
-            />
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge 
+                variant="outline" 
+                className={`${getStatusColor(source.crawl_status)} text-white`}
+              >
+                {getStatusText(source.crawl_status)}
+              </Badge>
+              
+              {source.is_excluded && (
+                <Badge variant="secondary">
+                  <EyeOff className="w-3 h-3 mr-1" />
+                  Excluded
+                </Badge>
+              )}
+              
+              {linksCount > 0 && (
+                <Badge variant="outline">
+                  {linksCount} links
+                </Badge>
+              )}
+            </div>
+            
+            {isEditing ? (
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={editUrl}
+                  onChange={(e) => setEditUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button size="sm" onClick={handleSaveEdit}>
+                  Save
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="mb-2">
+                <p className="text-sm font-medium truncate">{source.title || source.url}</p>
+                <p className="text-xs text-muted-foreground truncate">{source.url}</p>
+              </div>
+            )}
+            
+            {progress > 0 && progress < 100 && (
+              <div className="mb-2">
+                <Progress value={progress} className="w-full h-2" />
+                <p className="text-xs text-muted-foreground mt-1">{progress}% complete</p>
+              </div>
+            )}
           </div>
           
-          {/* Show status and progress with real-time updates - always show progress bar for parent sources */}
-          <div className="ml-4 flex-shrink-0">
-            <WebsiteSourceStatus
-              sourceId={source.id}
-              status={source.crawl_status}
-              progress={source.progress}
-              linksCount={sourcePages.length || source.links_count}
-              metadata={source.metadata}
-              showProgressBar={true}
-              isChild={!isParentSource}
-            />
+          <div className="flex items-center gap-1 ml-4">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => window.open(source.url, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Open URL</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit URL</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleExclude(source)}
+                  >
+                    {source.is_excluded ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{source.is_excluded ? 'Include' : 'Exclude'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRecrawl(source)}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Recrawl</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEnhancedRecrawl(source)}
+                    className="text-blue-600"
+                  >
+                    <Zap className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Enhanced Recrawl (Better Content Extraction)</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(source)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Delete</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <WebsiteSourceActions
-            source={source}
-            onEdit={onEdit}
-            onExclude={onExclude}
-            onDelete={onDelete}
-            onRecrawl={onRecrawl}
-          />
-          
-          {showToggle && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setIsExpanded(!isExpanded)}
-              disabled={!hasSourcePages && !isCrawling}
-              aria-label={isExpanded ? "Collapse child sources" : "Expand child sources"}
-            >
-              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </Button>
-          )}
-        </div>
-      </div>
-      
-      {/* Child sources (crawled links) or loading state */}
-      {isExpanded && (
-        <WebsiteChildSources
-          parentSourceId={source.id}
-          isCrawling={isCrawling}
-          onEdit={onEdit}
-          onExclude={onExclude}
-          onDelete={onDelete}
-          onRecrawl={onRecrawl}
-        />
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 };
-
-export default WebsiteSourceItem;

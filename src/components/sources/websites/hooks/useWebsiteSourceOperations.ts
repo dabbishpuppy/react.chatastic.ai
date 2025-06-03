@@ -120,6 +120,84 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
     }
   }, [sourceService, refetch]);
 
+  const handleEnhancedRecrawl = useCallback(async (source: AgentSource) => {
+    if (recrawlInProgressRef.current.has(source.id)) {
+      console.log(`Enhanced recrawl already in progress for source ${source.id}`);
+      return;
+    }
+
+    try {
+      recrawlInProgressRef.current.add(source.id);
+
+      toast({
+        title: "Enhanced Recrawl Initiated",
+        description: "Re-crawling with improved content extraction for better accuracy"
+      });
+
+      // First, delete existing chunks for this source to avoid duplicates
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { error: deleteError } = await supabase
+        .from('source_chunks')
+        .delete()
+        .eq('source_id', source.id);
+
+      if (deleteError) {
+        console.error('Error deleting existing chunks:', deleteError);
+      }
+
+      // Update source status and trigger enhanced recrawl
+      await sourceService.updateSource(source.id, {
+        crawl_status: 'pending',
+        progress: 0,
+        links_count: 0,
+        last_crawled_at: new Date().toISOString(),
+        metadata: {
+          ...source.metadata,
+          last_progress_update: new Date().toISOString(),
+          restart_count: (source.metadata?.restart_count || 0) + 1,
+          enhanced_extraction: true,
+          recrawl_reason: 'enhanced_content_extraction'
+        }
+      });
+
+      // Trigger enhanced crawl
+      const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
+        body: {
+          agentId: source.agent_id,
+          url: source.url,
+          crawlMode: 'single-page',
+          maxPages: 1,
+          enableCompression: true,
+          enableDeduplication: true,
+          priority: 'high'
+        }
+      });
+
+      if (error) {
+        throw new Error(`Enhanced crawl failed: ${error.message}`);
+      }
+
+      toast({
+        title: "Enhanced Recrawl Started",
+        description: "Page will be processed with improved content extraction"
+      });
+      
+      refetch();
+    } catch (error) {
+      console.error('Enhanced recrawl error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initiate enhanced recrawl",
+        variant: "destructive"
+      });
+    } finally {
+      setTimeout(() => {
+        recrawlInProgressRef.current.delete(source.id);
+      }, 2000);
+    }
+  }, [sourceService, refetch]);
+
   const handleGenerateMissingEmbeddings = useCallback(async () => {
     try {
       toast({
@@ -152,6 +230,7 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
     handleExclude,
     handleDelete,
     handleRecrawl,
+    handleEnhancedRecrawl,
     handleGenerateMissingEmbeddings
   };
 };

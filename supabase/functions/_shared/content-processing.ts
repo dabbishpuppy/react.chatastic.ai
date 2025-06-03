@@ -11,27 +11,53 @@ export function extractTextContent(html: string): string {
     .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '');
 
-  // Extract text from common content containers first
+  // Enhanced content extraction for privacy/legal pages
   const contentSelectors = [
+    // Privacy policy specific selectors
+    /<div[^>]*class="[^"]*privacy[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*id="[^"]*privacy[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<section[^>]*class="[^"]*privacy[^"]*"[^>]*>([\s\S]*?)<\/section>/gi,
+    /<div[^>]*class="[^"]*policy[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*id="[^"]*policy[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    
+    // Legal content selectors
+    /<div[^>]*class="[^"]*legal[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*class="[^"]*terms[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    
+    // Generic content containers
     /<main[^>]*>([\s\S]*?)<\/main>/gi,
     /<article[^>]*>([\s\S]*?)<\/article>/gi,
     /<section[^>]*>([\s\S]*?)<\/section>/gi,
     /<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-    /<div[^>]*class="[^"]*main[^"]*"[^>]*>([\s\S]*?)<\/div>/gi
+    /<div[^>]*class="[^"]*main[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*id="[^"]*content[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    /<div[^>]*id="[^"]*main[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
+    
+    // Fallback: look for divs with substantial text content
+    /<div[^>]*class="[^"]*text[^"]*"[^>]*>([\s\S]*?)<\/div>/gi
   ];
 
   let extractedContent = '';
+  let bestMatch = '';
+  let bestMatchLength = 0;
+
   for (const selector of contentSelectors) {
     const matches = cleanedHtml.match(selector);
     if (matches) {
-      extractedContent += matches.map(match => match.replace(selector, '$1')).join(' ');
+      for (const match of matches) {
+        const content = match.replace(selector, '$1');
+        const textLength = content.replace(/<[^>]+>/g, '').trim().length;
+        
+        if (textLength > bestMatchLength) {
+          bestMatch = content;
+          bestMatchLength = textLength;
+        }
+      }
     }
   }
 
-  // If no content containers found, use the entire cleaned HTML
-  if (!extractedContent.trim()) {
-    extractedContent = cleanedHtml;
-  }
+  // Use the best match if found, otherwise use entire cleaned HTML
+  extractedContent = bestMatch || cleanedHtml;
 
   // Convert to plain text and clean up
   const textContent = extractedContent
@@ -45,8 +71,34 @@ export function extractTextContent(html: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 
-  // If content is still very short, try to extract from title and meta description
-  if (textContent.length < 50) {
+  // Enhanced fallback for legal/policy pages
+  if (textContent.length < 100) {
+    console.log('📄 Content too short, trying enhanced extraction...');
+    
+    // Look for policy-specific content patterns
+    const policyPatterns = [
+      /privacy\s+policy[\s\S]{0,2000}/gi,
+      /terms\s+of\s+service[\s\S]{0,2000}/gi,
+      /data\s+protection[\s\S]{0,2000}/gi,
+      /cookie\s+policy[\s\S]{0,2000}/gi
+    ];
+    
+    for (const pattern of policyPatterns) {
+      const match = cleanedHtml.match(pattern);
+      if (match && match[0].length > textContent.length) {
+        const enhancedContent = match[0]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        
+        if (enhancedContent.length > 50) {
+          console.log('✅ Found enhanced policy content');
+          return enhancedContent;
+        }
+      }
+    }
+
+    // Final fallback with title and meta description
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const descriptionMatch = html.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/i);
     
@@ -81,17 +133,21 @@ export function extractTitle(html: string): string {
   return '';
 }
 
-export function createSemanticChunks(content: string, maxTokens: number = 150): string[] {
+export function createSemanticChunks(content: string, maxTokens: number = 200): string[] {
   // If content is very short, create a single chunk
   if (content.length < 100) {
     return content.trim() ? [content.trim()] : [];
   }
 
+  // For legal/policy content, use smaller chunks to preserve context
+  const isLegalContent = /privacy|policy|terms|legal|cookie|gdpr|data protection/i.test(content);
+  const chunkSize = isLegalContent ? 150 : maxTokens;
+
   // Split by sentences but be more flexible
   const sentences = content
     .split(/[.!?]+/)
     .map(s => s.trim())
-    .filter(s => s.length > 10); // Reduced minimum sentence length
+    .filter(s => s.length > 5); // Reduced minimum sentence length for legal text
 
   if (sentences.length === 0) {
     return content.trim() ? [content.trim()] : [];
@@ -104,8 +160,8 @@ export function createSemanticChunks(content: string, maxTokens: number = 150): 
   for (const sentence of sentences) {
     const sentenceTokens = Math.ceil(sentence.trim().length / 3.5);
     
-    if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
-      if (currentChunk.trim().length > 20) { // Reduced minimum chunk length
+    if (tokenCount + sentenceTokens > chunkSize && currentChunk) {
+      if (currentChunk.trim().length > 10) { // Reduced minimum chunk length for legal text
         chunks.push(currentChunk.trim());
       }
       currentChunk = sentence;
@@ -116,7 +172,7 @@ export function createSemanticChunks(content: string, maxTokens: number = 150): 
     }
   }
   
-  if (currentChunk.trim().length > 20) {
+  if (currentChunk.trim().length > 10) {
     chunks.push(currentChunk.trim());
   }
   
@@ -125,7 +181,7 @@ export function createSemanticChunks(content: string, maxTokens: number = 150): 
     chunks.push(content.trim());
   }
   
-  return chunks.filter(chunk => chunk.length > 15); // Further reduced minimum
+  return chunks.filter(chunk => chunk.length > 10); // Further reduced minimum for legal content
 }
 
 export async function generateContentHash(content: string): Promise<string> {
