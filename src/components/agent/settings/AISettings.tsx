@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useToast } from "@/hooks/use-toast";
 import { useParams } from "react-router-dom";
 import { useAISettings } from "@/hooks/useAISettings";
@@ -13,14 +14,86 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Plus } from "lucide-react";
 
 const AI_MODELS = [
-  { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
-  { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "OpenAI" },
-  { value: "claude-3-haiku", label: "Claude 3 Haiku", provider: "Anthropic" },
-  { value: "claude-3-sonnet", label: "Claude 3 Sonnet", provider: "Anthropic" },
-  { value: "claude-3-opus", label: "Claude 3 Opus", provider: "Anthropic" },
-  { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash", provider: "Google" },
-  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro", provider: "Google" }
+  { 
+    value: "gpt-4o-mini", 
+    label: "GPT-4o Mini", 
+    provider: "OpenAI",
+    logo: "🤖",
+    cost: "Very Low",
+    description: "A fast, cost-effective model perfect for most conversational tasks. Offers excellent performance for general chat applications while being highly efficient.",
+    capabilities: ["Text generation", "Conversation", "Code assistance", "Analysis"],
+    speed: "Very Fast"
+  },
+  { 
+    value: "gpt-4o", 
+    label: "GPT-4o", 
+    provider: "OpenAI",
+    logo: "🤖",
+    cost: "Medium",
+    description: "Our most advanced model with superior reasoning capabilities. Perfect for complex tasks requiring deep understanding and nuanced responses.",
+    capabilities: ["Advanced reasoning", "Complex analysis", "Creative writing", "Code generation"],
+    speed: "Fast"
+  },
+  { 
+    value: "gpt-4-turbo", 
+    label: "GPT-4 Turbo", 
+    provider: "OpenAI",
+    logo: "🤖",
+    cost: "High",
+    description: "An optimized version of GPT-4, generating text faster and more efficiently. Ideal for tasks needing advanced GPT-4 capabilities with enhanced speed.",
+    capabilities: ["Advanced reasoning", "Large context", "Multimodal", "Code generation"],
+    speed: "Medium"
+  },
+  { 
+    value: "claude-3-haiku", 
+    label: "Claude 3 Haiku", 
+    provider: "Anthropic",
+    logo: "🎭",
+    cost: "Low",
+    description: "Anthropic's fastest model, designed for rapid responses while maintaining high quality. Great for customer service and quick interactions.",
+    capabilities: ["Fast responses", "Helpful assistant", "Safety focused", "Conversational"],
+    speed: "Very Fast"
+  },
+  { 
+    value: "claude-3-sonnet", 
+    label: "Claude 3 Sonnet", 
+    provider: "Anthropic",
+    logo: "🎭",
+    cost: "Medium",
+    description: "Balanced performance and capability model. Excellent for most business applications requiring reliable, thoughtful responses.",
+    capabilities: ["Balanced reasoning", "Creative tasks", "Analysis", "Safety focused"],
+    speed: "Fast"
+  },
+  { 
+    value: "claude-3-opus", 
+    label: "Claude 3 Opus", 
+    provider: "Anthropic",
+    logo: "🎭",
+    cost: "High",
+    description: "Anthropic's most powerful model with exceptional reasoning and creative capabilities. Best for complex tasks requiring deep analysis.",
+    capabilities: ["Superior reasoning", "Complex analysis", "Creative writing", "Advanced tasks"],
+    speed: "Medium"
+  },
+  { 
+    value: "gemini-1.5-flash", 
+    label: "Gemini 1.5 Flash", 
+    provider: "Google",
+    logo: "💎",
+    cost: "Low",
+    description: "Google's optimized model for speed and efficiency. Perfect for applications requiring quick responses with good quality.",
+    capabilities: ["Fast processing", "Multimodal", "Code generation", "Analysis"],
+    speed: "Very Fast"
+  },
+  { 
+    value: "gemini-1.5-pro", 
+    label: "Gemini 1.5 Pro", 
+    provider: "Google",
+    logo: "💎",
+    cost: "Medium",
+    description: "Google's advanced model with enhanced reasoning and multimodal capabilities. Excellent for complex conversational applications.",
+    capabilities: ["Advanced reasoning", "Multimodal", "Large context", "Complex tasks"],
+    speed: "Fast"
+  }
 ];
 
 const AISettings: React.FC = () => {
@@ -130,12 +203,13 @@ Primary Function: You are an AI chatbot who helps users with their inquiries, is
           <CardDescription>Configure your agent's AI model, behavior, and response style</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Model Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="model" className="block text-sm font-medium">
-              AI Model
-            </Label>
-            <div className="max-w-md">
+          {/* Model Selection and Prompt Template - Same Line */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Model Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="model" className="block text-sm font-medium">
+                AI Model
+              </Label>
               <div className="bg-blue-50 text-blue-800 text-xs px-2.5 py-1 rounded inline-block mb-2">
                 Configure API keys in Functions settings to enable all models
               </div>
@@ -145,26 +219,76 @@ Primary Function: You are an AI chatbot who helps users with their inquiries, is
                 </SelectTrigger>
                 <SelectContent>
                   {AI_MODELS.map((modelOption) => (
-                    <SelectItem key={modelOption.value} value={modelOption.value}>
-                      <div className="flex flex-col">
-                        <span>{modelOption.label}</span>
-                        <span className="text-xs text-gray-500">{modelOption.provider}</span>
-                      </div>
-                    </SelectItem>
+                    <HoverCard key={modelOption.value}>
+                      <HoverCardTrigger asChild>
+                        <SelectItem value={modelOption.value}>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-lg">{modelOption.logo}</span>
+                            <div className="flex flex-col">
+                              <span>{modelOption.label}</span>
+                              <span className="text-xs text-gray-500">{modelOption.provider}</span>
+                            </div>
+                          </div>
+                        </SelectItem>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80" side="right">
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-2xl">{modelOption.logo}</span>
+                            <div>
+                              <h4 className="font-semibold">{modelOption.label}</h4>
+                              <p className="text-sm text-gray-600">{modelOption.provider}</p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700">{modelOption.description}</p>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">Cost:</span>
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                modelOption.cost === 'Very Low' || modelOption.cost === 'Low' ? 'bg-green-100 text-green-800' :
+                                modelOption.cost === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {modelOption.cost}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">Speed:</span>
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                modelOption.speed === 'Very Fast' ? 'bg-green-100 text-green-800' :
+                                modelOption.speed === 'Fast' ? 'bg-blue-100 text-blue-800' :
+                                'bg-orange-100 text-orange-800'
+                              }`}>
+                                {modelOption.speed}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm mb-1">Capabilities:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {modelOption.capabilities.map((capability, index) => (
+                                <span key={index} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                                  {capability}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          {/* Prompt Template Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="template" className="block text-sm font-medium">
-              Prompt Template
-            </Label>
-            <div className="flex gap-2 max-w-md">
+            {/* Prompt Template Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="template" className="block text-sm font-medium">
+                Prompt Template
+              </Label>
+              <div className="h-6"></div> {/* Spacer to align with model field */}
               <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select a template" />
                 </SelectTrigger>
                 <SelectContent>
