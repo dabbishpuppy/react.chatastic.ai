@@ -68,10 +68,16 @@ export class RAGOrchestrator {
       const queryResult = await RAGQueryEngine.processQuery({
         query: request.query,
         agentId: request.agentId,
-        options: {
+        searchFilters: {
           maxResults: request.options.searchFilters.maxResults,
           minSimilarity: request.options.searchFilters.minSimilarity,
           sourceTypes: request.options.searchFilters.sourceTypes
+        },
+        rankingOptions: {
+          maxChunks: request.options.rankingOptions.maxChunks,
+          maxTokens: request.options.rankingOptions.maxTokens,
+          diversityWeight: request.options.rankingOptions.diversityWeight,
+          recencyWeight: request.options.rankingOptions.recencyWeight
         }
       });
       const queryProcessingTime = Date.now() - queryStartTime;
