@@ -1,160 +1,106 @@
-import { RequestProcessor, ResponseCoordinator, PerformanceTracker, StreamingManager } from './orchestration';
-import { RAGQueryRequest, RAGQueryResult } from './queryProcessing/ragQueryEngine';
-import { LLMRequest, LLMResponse } from './llm/llmRouter';
-import { ResponsePostProcessor, PostProcessingOptions, ProcessedResponse } from './llm/responsePostProcessor';
-import { StreamingHandler, StreamingOptions } from './llm/streamingHandler';
+
+import { RAGQueryEngine, RAGQueryResult } from './queryProcessing/ragQueryEngine';
+import { RAGLLMIntegrationEnhanced } from './llm/ragLLMIntegrationEnhanced';
 
 export interface RAGRequest {
   query: string;
   agentId: string;
   conversationId?: string;
-  options?: {
-    // Query processing options
-    searchFilters?: {
-      sourceTypes?: ('text' | 'file' | 'website' | 'qa')[];
-      sources?: string[];
-      minSimilarity?: number;
-      maxResults?: number;
+  options: {
+    searchFilters: {
+      maxResults: number;
+      minSimilarity: number;
+      sourceTypes: string[];
     };
-    rankingOptions?: {
-      maxTokens?: number;
-      maxChunks?: number;
-      diversityWeight?: number;
-      recencyWeight?: number;
+    rankingOptions: {
+      maxChunks: number;
+      maxTokens: number;
+      diversityWeight: number;
+      recencyWeight: number;
     };
-    
-    // LLM options
-    llmOptions?: {
-      provider?: string;
+    llmOptions: {
+      model?: string;
       temperature?: number;
-      maxTokens?: number;
       systemPrompt?: string;
     };
-    
-    // Post-processing options
-    postProcessing?: PostProcessingOptions;
-    
-    // Streaming options
-    streaming?: boolean;
-    streamingOptions?: StreamingOptions;
+    streaming: boolean;
+    postProcessing: {
+      addSourceCitations: boolean;
+      formatMarkdown: boolean;
+      enforceContentSafety: boolean;
+    };
   };
 }
 
 export interface RAGResponse {
-  query: string;
-  agentId: string;
-  conversationId?: string;
-  
-  // Query processing results
   queryResult: RAGQueryResult;
-  
-  // LLM response
-  llmResponse: LLMResponse;
-  
-  // Post-processed response
-  processedResponse: ProcessedResponse;
-  
-  // Performance metrics
-  performance: {
-    totalTime: number;
-    queryProcessingTime: number;
-    llmResponseTime: number;
-    postProcessingTime: number;
+  processedResponse: {
+    content: string;
+    metadata: {
+      model: string;
+      temperature: number;
+      processingTime: number;
+    };
   };
 }
 
 export class RAGOrchestrator {
   static async processRAGRequest(request: RAGRequest): Promise<RAGResponse> {
-    const startTime = Date.now();
+    console.log('🎯 RAG Orchestrator: Processing request with model:', request.options.llmOptions.model);
     
     try {
-      // Validate and prepare request
-      RequestProcessor.validateRequest(request);
-      const processedRequest = RequestProcessor.setDefaultOptions(request);
+      // Step 1: Query and rank relevant content
+      const queryResult = await RAGQueryEngine.processQuery(
+        request.query,
+        request.agentId,
+        {
+          maxResults: request.options.searchFilters.maxResults,
+          minSimilarity: request.options.searchFilters.minSimilarity,
+          sourceTypes: request.options.searchFilters.sourceTypes
+        }
+      );
 
-      // Process the request
-      const response = await ResponseCoordinator.processRAGRequest(processedRequest);
-      
-      // Record performance metrics
-      const totalTime = Date.now() - startTime;
-      PerformanceTracker.recordRequest(request.agentId, totalTime, true);
-
-      console.log('✅ RAG request processing complete:', {
-        totalTime: response.performance.totalTime,
-        queryTime: response.performance.queryProcessingTime,
-        llmTime: response.performance.llmResponseTime,
-        postProcessTime: response.performance.postProcessingTime,
-        finalContentLength: response.processedResponse.content.length,
-        sources: response.queryResult.rankedContext.sources.length
+      console.log('📊 Query processing complete:', {
+        chunksFound: queryResult.rankedContext.chunks.length,
+        sourcesFound: queryResult.rankedContext.sources.length
       });
 
-      return response;
+      // Step 2: Build context from ranked chunks
+      const contextChunks = queryResult.rankedContext.chunks
+        .slice(0, request.options.rankingOptions.maxChunks)
+        .map(chunk => chunk.content);
 
-    } catch (error) {
-      // Record failed request
-      const totalTime = Date.now() - startTime;
-      PerformanceTracker.recordRequest(request.agentId, totalTime, false);
+      // Step 3: Generate response using enhanced LLM integration with agent configuration
+      console.log('🤖 Generating response with configured model:', request.options.llmOptions.model);
       
-      console.error('❌ RAG request processing failed:', error);
-      throw error;
-    }
-  }
+      const llmResponse = await RAGLLMIntegrationEnhanced.processQueryWithConfig(
+        request.agentId,
+        request.query,
+        contextChunks,
+        {
+          model: request.options.llmOptions.model,
+          temperature: request.options.llmOptions.temperature,
+          systemPrompt: request.options.llmOptions.systemPrompt
+        }
+      );
 
-  // Quick response method for simple queries
-  static async quickResponse(
-    query: string,
-    agentId: string,
-    options?: {
-      maxSources?: number;
-      streaming?: boolean;
-    }
-  ): Promise<string> {
-    console.log('⚡ Processing quick RAG response');
-
-    try {
-      const request: RAGRequest = {
-        query,
-        agentId,
-        options: {
-          searchFilters: {
-            maxResults: options?.maxSources || 3,
-            minSimilarity: 0.3
-          },
-          rankingOptions: {
-            maxChunks: 3,
-            maxTokens: 1000
-          },
-          streaming: options?.streaming || false,
-          postProcessing: {
-            addSourceCitations: false,
-            formatMarkdown: true
+      const response: RAGResponse = {
+        queryResult,
+        processedResponse: {
+          content: llmResponse,
+          metadata: {
+            model: request.options.llmOptions.model || 'gpt-4o-mini',
+            temperature: request.options.llmOptions.temperature || 0.7,
+            processingTime: Date.now()
           }
         }
       };
 
-      const response = await this.processRAGRequest(request);
-      return response.processedResponse.content;
+      console.log('✅ RAG Orchestrator: Response generated successfully');
+      return response;
     } catch (error) {
-      console.error('❌ Quick RAG response failed:', error);
+      console.error('❌ RAG Orchestrator: Processing failed:', error);
       throw error;
     }
-  }
-
-  // Performance monitoring
-  static getPerformanceMetrics(): {
-    averageResponseTime: number;
-    successRate: number;
-    activeStreams: number;
-  } {
-    const metrics = PerformanceTracker.getMetrics();
-    return {
-      averageResponseTime: metrics.averageResponseTime,
-      successRate: metrics.successRate,
-      activeStreams: StreamingManager.getActiveStreamsCount()
-    };
-  }
-
-  static getAgentPerformanceMetrics(agentId: string) {
-    return PerformanceTracker.getAgentMetrics(agentId);
   }
 }

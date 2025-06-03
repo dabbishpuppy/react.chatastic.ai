@@ -2,6 +2,7 @@
 import { RAGOrchestrator, RAGRequest, RAGResponse } from '../../ragOrchestrator';
 import { AdvancedQueryPreprocessor } from '../../queryProcessing/advancedQueryPreprocessor';
 import { ChatRAGOptions, ChatRAGResult } from '../ragChatIntegration';
+import { supabase } from '@/integrations/supabase/client';
 
 export class RAGChatProcessor {
   static async processMessageWithRAG(
@@ -31,6 +32,30 @@ export class RAGChatProcessor {
 
       const startTime = Date.now();
 
+      // Load agent's AI configuration from database
+      console.log('📖 Loading agent AI configuration for agent:', agentId);
+      const { data: agentConfig, error: agentError } = await supabase
+        .from('agents')
+        .select('ai_model, ai_instructions, ai_temperature')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError) {
+        console.error('❌ Failed to load agent AI configuration:', agentError);
+        throw new Error('Failed to load agent AI configuration');
+      }
+
+      if (!agentConfig) {
+        console.error('❌ Agent configuration not found for agent:', agentId);
+        throw new Error('Agent configuration not found');
+      }
+
+      console.log('✅ Agent AI configuration loaded:', {
+        model: agentConfig.ai_model,
+        temperature: agentConfig.ai_temperature,
+        hasInstructions: !!agentConfig.ai_instructions
+      });
+
       // Perform advanced query analysis using preprocessQueryWithContext
       const advancedAnalysis = await AdvancedQueryPreprocessor.preprocessQueryWithContext(
         message,
@@ -38,7 +63,7 @@ export class RAGChatProcessor {
         conversationId
       );
 
-      // Build RAG request with advanced options
+      // Build RAG request with agent's AI configuration
       const ragRequest: RAGRequest = {
         query: message,
         agentId,
@@ -56,8 +81,9 @@ export class RAGChatProcessor {
             recencyWeight: 0.2
           },
           llmOptions: {
-            temperature: this.getTemperatureForIntent(advancedAnalysis.analysis.intentConfidence),
-            systemPrompt: options.customSystemPrompt
+            model: agentConfig.ai_model, // Use agent's configured model
+            temperature: agentConfig.ai_temperature, // Use agent's configured temperature
+            systemPrompt: options.customSystemPrompt || agentConfig.ai_instructions // Use agent's instructions
           },
           streaming: options.enableStreaming || false,
           postProcessing: {
@@ -67,6 +93,12 @@ export class RAGChatProcessor {
           }
         }
       };
+
+      console.log('🚀 Processing RAG request with agent configuration:', {
+        model: ragRequest.options.llmOptions?.model,
+        temperature: ragRequest.options.llmOptions?.temperature,
+        hasSystemPrompt: !!ragRequest.options.llmOptions?.systemPrompt
+      });
 
       // Process with RAG
       const ragResponse = await RAGOrchestrator.processRAGRequest(ragRequest);
@@ -85,7 +117,8 @@ export class RAGChatProcessor {
       console.log('✅ RAG chat integration complete:', {
         totalTime: result.processingMetadata?.totalTime,
         sourcesUsed: result.processingMetadata?.sourcesUsed,
-        responseLength: result.response.length
+        responseLength: result.response.length,
+        modelUsed: agentConfig.ai_model
       });
 
       return result;
