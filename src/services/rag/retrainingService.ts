@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { SemanticChunkingService } from "./semanticChunkingService";
 
@@ -120,7 +119,7 @@ export class RetrainingService {
 
     console.log(`🧩 Created ${chunks.length} chunks for source ${source.id}`);
 
-    // Store chunks in database - REMOVED created_by field
+    // Store chunks in database - only include fields that exist in the table
     const chunkData = chunks.map((chunk, index) => ({
       source_id: source.id,
       chunk_index: index,
