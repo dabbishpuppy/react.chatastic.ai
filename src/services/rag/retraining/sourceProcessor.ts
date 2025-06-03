@@ -27,7 +27,7 @@ export class SourceProcessor {
 
     console.log(`🧩 Created ${chunks.length} chunks for source ${source.id}`);
 
-    // Store chunks in database
+    // Store chunks in database - removed created_by field
     const chunkData = chunks.map((chunk, index) => ({
       source_id: source.id,
       chunk_index: index,
