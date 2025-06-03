@@ -551,31 +551,37 @@ export class SemanticChunkingService {
     if (content.length > 100) score += 0.1;
     if (content.length > 300) score += 0.1;
 
-    // Structure factor
-    if (/[.!?]/.test(content)) score += 0.1; // Has proper sentences
-    if (/\n/.test(content)) score += 0.1; // Has line breaks
-    
-    // Readability factor
-    const words = content.split(/\s+/).length;
-    const sentences = content.split(/[.!?]+/).length;
-    const avgWordsPerSentence = words / sentences;
-    
-    if (avgWordsPerSentence >= 8 && avgWordsPerSentence <= 20) score += 0.2;
+    // Sentence structure
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    if (sentences.length > 1) score += 0.1;
 
-    return Math.min(Math.max(score, 0), 1);
+    // Word diversity
+    const words = content.toLowerCase().split(/\s+/);
+    const uniqueWords = new Set(words);
+    const diversity = uniqueWords.size / words.length;
+    if (diversity > 0.7) score += 0.1;
+
+    // Information density
+    const meaningfulWords = words.filter(word => 
+      word.length > 3 && !this.isStopWord(word)
+    ).length;
+    if (meaningfulWords / words.length > 0.3) score += 0.1;
+
+    return Math.min(1.0, score);
   }
 
   // Determine content complexity
   private static determineComplexity(content: string): 'simple' | 'medium' | 'complex' {
-    const words = content.split(/\s+/).length;
-    const sentences = content.split(/[.!?]+/).length;
-    const avgWordsPerSentence = words / sentences;
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const avgSentenceLength = sentences.reduce((sum, s) => sum + s.length, 0) / sentences.length;
     
-    const hasComplexStructures = /[{}()\[\]]/.test(content) || 
-                                 /\b(however|therefore|furthermore|consequently|nevertheless)\b/i.test(content);
-
-    if (avgWordsPerSentence > 20 || hasComplexStructures || words > 200) return 'complex';
-    if (avgWordsPerSentence > 12 || words > 100) return 'medium';
+    // Check for complex patterns
+    const hasComplexPunctuation = /[;:()[\]{}]/.test(content);
+    const hasNumbers = /\d/.test(content);
+    const hasTechnicalTerms = /\b(function|class|API|database|algorithm|implementation)\b/i.test(content);
+    
+    if (avgSentenceLength > 150 || hasTechnicalTerms) return 'complex';
+    if (avgSentenceLength > 80 || hasComplexPunctuation || hasNumbers) return 'medium';
     return 'simple';
   }
 
@@ -583,41 +589,30 @@ export class SemanticChunkingService {
   private static isStopWord(word: string): boolean {
     const stopWords = new Set([
       'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-      'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did',
+      'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
       'will', 'would', 'could', 'should', 'may', 'might', 'can', 'this', 'that', 'these', 'those'
     ]);
-    return stopWords.has(word);
+    return stopWords.has(word.toLowerCase());
   }
 
-  // Get overlap text from the end of a chunk
+  // Get overlap text for chunk continuity
   private static getOverlapText(text: string, targetTokens: number): string {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    let overlap = '';
-    let tokens = 0;
-
-    // Take sentences from the end until we reach target tokens
-    for (let i = sentences.length - 1; i >= 0; i--) {
-      const sentence = sentences[i].trim() + '.';
-      const sentenceTokens = this.estimateTokens(sentence);
-      
-      if (tokens + sentenceTokens > targetTokens) {
-        break;
-      }
-      
-      overlap = sentence + ' ' + overlap;
-      tokens += sentenceTokens;
-    }
-
-    return overlap.trim();
+    const words = text.split(/\s+/);
+    const targetWords = Math.ceil(targetTokens / 0.75); // Rough token-to-word ratio
+    
+    if (words.length <= targetWords) return text;
+    
+    // Take last N words for overlap
+    return words.slice(-targetWords).join(' ');
   }
 
   // Validate and filter chunks
   private static validateChunks(chunks: SemanticChunk[]): SemanticChunk[] {
     return chunks.filter(chunk => {
-      // Filter out chunks that are too small or have poor quality
-      return chunk.tokenCount >= 10 && 
-             chunk.content.trim().length > 20 &&
-             (chunk.metadata.qualityScore || 0) > 0.2;
+      // Remove chunks that are too short or low quality
+      return chunk.content.length >= 50 && 
+             chunk.tokenCount >= 10 &&
+             (chunk.metadata.qualityScore || 0) >= 0.3;
     });
   }
 
