@@ -47,8 +47,12 @@ export class CrawlRecoveryService {
       }
 
       // Reset to in_progress if stuck in crawling state
+      const existingMetadata = currentSource.metadata && typeof currentSource.metadata === 'object' 
+        ? currentSource.metadata as Record<string, any>
+        : {};
+
       const updatedMetadata = {
-        ...(currentSource.metadata || {}),
+        ...existingMetadata,
         reset_at: new Date().toISOString(),
         reset_reason: 'Manual recovery from stuck state'
       };
