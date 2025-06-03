@@ -8,8 +8,17 @@ export class SourceProcessor {
   static async processSource(source: DatabaseSource): Promise<void> {
     console.log(`📄 Processing source: ${source.title} (type: ${source.source_type})`);
 
+    // Handle Q&A sources with structured content
+    let contentToProcess = source.content;
+    if (source.source_type === 'qa') {
+      const metadata = source.metadata as any;
+      if (metadata?.question && metadata?.answer) {
+        contentToProcess = `Q: ${metadata.question}\nA: ${metadata.answer}`;
+      }
+    }
+
     // Skip if no content
-    if (!source.content || source.content.trim().length === 0) {
+    if (!contentToProcess || contentToProcess.trim().length === 0) {
       console.log(`⚠️ Skipping source ${source.id} - no content`);
       
       // Update metadata to mark as processed even if no content
@@ -38,7 +47,7 @@ export class SourceProcessor {
 
       // Create semantic chunks with appropriate settings for each source type
       const chunkingOptions = this.getChunkingOptionsForSourceType(source.source_type);
-      const chunks = SemanticChunkingService.createSemanticChunks(source.content, chunkingOptions);
+      const chunks = SemanticChunkingService.createSemanticChunks(contentToProcess, chunkingOptions);
 
       console.log(`🧩 Created ${chunks.length} chunks for source ${source.id} (${source.source_type})`);
 
@@ -152,31 +161,42 @@ export class SourceProcessor {
   private static async deleteExistingChunks(sourceId: string): Promise<void> {
     console.log(`🗑️ Deleting existing chunks for source: ${sourceId}`);
     
-    // Delete embeddings first (foreign key constraint)
-    const { error: embeddingError } = await supabase
-      .from('source_embeddings')
-      .delete()
-      .in('chunk_id', 
-        supabase
-          .from('source_chunks')
-          .select('id')
-          .eq('source_id', sourceId)
-      );
-
-    if (embeddingError) {
-      console.warn(`Warning: Failed to delete existing embeddings: ${embeddingError.message}`);
-    }
-
-    // Delete chunks
-    const { error: chunkError } = await supabase
+    // First, get all chunk IDs for this source
+    const { data: chunks, error: chunksQueryError } = await supabase
       .from('source_chunks')
-      .delete()
+      .select('id')
       .eq('source_id', sourceId);
 
-    if (chunkError) {
-      throw new Error(`Failed to delete existing chunks: ${chunkError.message}`);
+    if (chunksQueryError) {
+      throw new Error(`Failed to query existing chunks: ${chunksQueryError.message}`);
     }
 
-    console.log(`✅ Deleted existing chunks and embeddings for source: ${sourceId}`);
+    if (chunks && chunks.length > 0) {
+      const chunkIds = chunks.map(chunk => chunk.id);
+
+      // Delete embeddings first (foreign key constraint)
+      const { error: embeddingError } = await supabase
+        .from('source_embeddings')
+        .delete()
+        .in('chunk_id', chunkIds);
+
+      if (embeddingError) {
+        console.warn(`Warning: Failed to delete existing embeddings: ${embeddingError.message}`);
+      }
+
+      // Delete chunks
+      const { error: chunkError } = await supabase
+        .from('source_chunks')
+        .delete()
+        .eq('source_id', sourceId);
+
+      if (chunkError) {
+        throw new Error(`Failed to delete existing chunks: ${chunkError.message}`);
+      }
+
+      console.log(`✅ Deleted ${chunks.length} existing chunks and embeddings for source: ${sourceId}`);
+    } else {
+      console.log(`ℹ️ No existing chunks found for source: ${sourceId}`);
+    }
   }
 }
