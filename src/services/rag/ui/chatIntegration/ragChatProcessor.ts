@@ -1,4 +1,3 @@
-
 import { RAGOrchestrator, RAGRequest, RAGResponse } from '../../ragOrchestrator';
 import { AdvancedQueryPreprocessor } from '../../queryProcessing/advancedQueryPreprocessor';
 import { ChatRAGOptions, ChatRAGResult } from '../ragChatIntegration';
@@ -9,7 +8,13 @@ export class RAGChatProcessor {
     message: string,
     agentId: string,
     conversationId?: string,
-    options: ChatRAGOptions = {}
+    options: ChatRAGOptions = {},
+    callbacks?: {
+      onThinkingStart?: () => void;
+      onThinkingEnd?: () => void;
+      onTypingStart?: (messageId: string) => void;
+      onTypingComplete?: (messageId: string) => void;
+    }
   ): Promise<ChatRAGResult> {
     console.log('🤖 Processing message with RAG integration:', {
       message: message.substring(0, 50) + '...',
@@ -32,6 +37,9 @@ export class RAGChatProcessor {
 
       const startTime = Date.now();
 
+      // Start thinking callback
+      callbacks?.onThinkingStart?.();
+
       // Load agent's AI configuration from database
       console.log('📖 Loading agent AI configuration for agent:', agentId);
       const { data: agentConfig, error: agentError } = await supabase
@@ -42,11 +50,13 @@ export class RAGChatProcessor {
 
       if (agentError) {
         console.error('❌ Failed to load agent AI configuration:', agentError);
+        callbacks?.onThinkingEnd?.();
         throw new Error('Failed to load agent AI configuration');
       }
 
       if (!agentConfig) {
         console.error('❌ Agent configuration not found for agent:', agentId);
+        callbacks?.onThinkingEnd?.();
         throw new Error('Agent configuration not found');
       }
 
@@ -56,12 +66,18 @@ export class RAGChatProcessor {
         hasInstructions: !!agentConfig.ai_instructions
       });
 
-      // Perform advanced query analysis using preprocessQueryWithContext
+      // Perform advanced query analysis
       const advancedAnalysis = await AdvancedQueryPreprocessor.preprocessQueryWithContext(
         message,
         agentId,
         conversationId
       );
+
+      // Thinking delay to show thinking dots
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // End thinking callback
+      callbacks?.onThinkingEnd?.();
 
       // Build RAG request with agent's AI configuration
       const ragRequest: RAGRequest = {
@@ -81,9 +97,9 @@ export class RAGChatProcessor {
             recencyWeight: 0.2
           },
           llmOptions: {
-            model: agentConfig.ai_model, // Use agent's configured model
-            temperature: agentConfig.ai_temperature, // Use agent's configured temperature
-            systemPrompt: options.customSystemPrompt || agentConfig.ai_instructions // Use agent's instructions
+            model: agentConfig.ai_model,
+            temperature: agentConfig.ai_temperature,
+            systemPrompt: options.customSystemPrompt || agentConfig.ai_instructions
           },
           streaming: options.enableStreaming || false,
           postProcessing: {
@@ -125,6 +141,9 @@ export class RAGChatProcessor {
     } catch (error) {
       console.error('❌ RAG chat integration failed:', error);
       
+      // End thinking on error
+      callbacks?.onThinkingEnd?.();
+      
       // Return fallback response
       return {
         response: 'I apologize, but I encountered an issue processing your request. Please try again.',
@@ -150,8 +169,6 @@ export class RAGChatProcessor {
   }
 
   private static getTemperatureForIntent(intentConfidence: number): number {
-    // Lower temperature for high confidence (more factual queries)
-    // Higher temperature for low confidence (more creative queries)
     if (intentConfidence > 0.8) return 0.1;
     if (intentConfidence > 0.6) return 0.3;
     if (intentConfidence > 0.4) return 0.5;

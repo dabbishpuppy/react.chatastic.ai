@@ -11,7 +11,7 @@ export const proceedWithMessage = async (
   setIsTyping: (value: boolean) => void,
   inputRef: React.RefObject<HTMLInputElement>,
   isEmbedded: boolean = false,
-  conversationId: string, // Now required, no longer optional
+  conversationId: string,
   setIsThinking?: (value: boolean) => void,
   setTypingMessageId?: (id: string | null) => void
 ) => {
@@ -68,6 +68,15 @@ export const proceedWithMessage = async (
 
     console.log('🧠 Processing message with RAG system for agent:', agentId);
     
+    // Thinking delay (1.5 seconds to show thinking dots)
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Hide thinking bubble before processing
+    if (setIsThinking) {
+      console.log('🤔 Setting thinking state to false');
+      setIsThinking(false);
+    }
+    
     // Process with RAG integration
     const ragResult = await RAGChatIntegration.processMessageWithRAG(
       trimmedText,
@@ -115,12 +124,7 @@ export const proceedWithMessage = async (
       console.error('❌ Failed to save AI response to database');
     }
 
-    // Hide thinking bubble and start typing animation
-    if (setIsThinking) {
-      console.log('🤔 Setting thinking state to false');
-      setIsThinking(false);
-    }
-    
+    // Start typing animation
     if (setTypingMessageId) {
       console.log('⌨️ Setting typing message ID:', aiMessage.id);
       setTypingMessageId(aiMessage.id);
@@ -130,7 +134,15 @@ export const proceedWithMessage = async (
       console.log('🤖 Adding RAG-powered AI response to chat history UI with typing animation');
       return [...prev, aiMessage];
     });
-    setIsTyping(false);
+
+    // Simulate typing completion based on content length
+    setTimeout(() => {
+      console.log('✅ Typing animation complete for message:', aiMessage.id);
+      if (setTypingMessageId) {
+        setTypingMessageId(null);
+      }
+      setIsTyping(false);
+    }, ragResult.response.length * 30 + 1000); // ~30ms per character + 1s buffer
 
     // Focus input field after response
     setTimeout(() => {
@@ -174,7 +186,14 @@ export const proceedWithMessage = async (
     }
 
     setChatHistory(prev => [...prev, errorMessage]);
-    setIsTyping(false);
+
+    // Simulate typing for error message
+    setTimeout(() => {
+      if (setTypingMessageId) {
+        setTypingMessageId(null);
+      }
+      setIsTyping(false);
+    }, 2000);
 
     // Focus input field after error response
     setTimeout(() => {
@@ -196,7 +215,6 @@ async function getAgentIdFromConversation(conversationId: string): Promise<strin
     }
 
     // If not found in URL, try to get from conversation data
-    // This would require querying the conversations table
     const { supabase } = await import("@/integrations/supabase/client");
     
     const { data: conversation, error } = await supabase
