@@ -1,3 +1,4 @@
 
 // Re-export the refactored hook
-export * from './useEnhancedCrawl';
+export { useEnhancedCrawl } from './useEnhancedCrawl';
+export * from './useEnhancedCrawl/types';
