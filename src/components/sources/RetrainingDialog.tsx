@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Info, FileX } from 'lucide-react';
 import { type RetrainingProgress } from '@/services/rag/retrainingService';
 
 interface RetrainingDialogProps {
@@ -22,6 +22,8 @@ interface RetrainingDialogProps {
     needed: boolean;
     unprocessedSources: number;
     reasons: string[];
+    status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'no_sources';
+    message: string;
   } | null;
   onStartRetraining: () => void;
 }
@@ -40,18 +42,96 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const getStatusIcon = () => {
-    if (!progress) return null;
-    
-    switch (progress.status) {
-      case 'completed':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'failed':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
-      case 'processing':
-        return <Loader2 className="h-5 w-5 animate-spin text-blue-600" />;
-      default:
-        return null;
+    if (isRetraining && progress) {
+      switch (progress.status) {
+        case 'completed':
+          return <CheckCircle className="h-5 w-5 text-green-600" />;
+        case 'failed':
+          return <AlertCircle className="h-5 w-5 text-red-600" />;
+        case 'processing':
+          return <Loader2 className="h-5 w-5 animate-spin text-blue-600" />;
+        default:
+          return <Loader2 className="h-5 w-5 animate-spin text-blue-600" />;
+      }
     }
+
+    if (retrainingNeeded) {
+      switch (retrainingNeeded.status) {
+        case 'up_to_date':
+          return <CheckCircle className="h-5 w-5 text-green-600" />;
+        case 'no_sources':
+          return <FileX className="h-5 w-5 text-gray-600" />;
+        case 'needs_processing':
+        case 'needs_reprocessing':
+          return <AlertCircle className="h-5 w-5 text-orange-600" />;
+        default:
+          return <Info className="h-5 w-5 text-blue-600" />;
+      }
+    }
+
+    return <Info className="h-5 w-5 text-blue-600" />;
+  };
+
+  const getDialogTitle = () => {
+    if (isRetraining) {
+      return "Agent Retraining";
+    }
+    
+    if (retrainingNeeded) {
+      switch (retrainingNeeded.status) {
+        case 'up_to_date':
+          return "Processing Status";
+        case 'no_sources':
+          return "No Sources Found";
+        case 'needs_processing':
+          return "Sources Need Processing";
+        case 'needs_reprocessing':
+          return "Sources Need Reprocessing";
+        default:
+          return "Agent Retraining";
+      }
+    }
+    
+    return "Agent Retraining";
+  };
+
+  const getStatusBadgeVariant = () => {
+    if (retrainingNeeded) {
+      switch (retrainingNeeded.status) {
+        case 'up_to_date':
+          return "secondary";
+        case 'no_sources':
+          return "outline";
+        case 'needs_processing':
+        case 'needs_reprocessing':
+          return "destructive";
+        default:
+          return "secondary";
+      }
+    }
+    return "secondary";
+  };
+
+  const getStatusBadgeText = () => {
+    if (retrainingNeeded) {
+      switch (retrainingNeeded.status) {
+        case 'up_to_date':
+          return "Up to date";
+        case 'no_sources':
+          return "No sources";
+        case 'needs_processing':
+          return "Processing required";
+        case 'needs_reprocessing':
+          return "Reprocessing required";
+        default:
+          return "Unknown";
+      }
+    }
+    return "Checking...";
+  };
+
+  const shouldShowRetrainButton = () => {
+    return retrainingNeeded?.needed && !isRetraining;
   };
 
   return (
@@ -60,36 +140,54 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getStatusIcon()}
-            Agent Retraining
+            {getDialogTitle()}
           </DialogTitle>
           <DialogDescription>
-            Process your sources to make them searchable by the AI
+            {isRetraining 
+              ? "Processing your sources to make them searchable by the AI"
+              : "Check the status of your sources and AI search capabilities"
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Retraining Status */}
-          {retrainingNeeded && (
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+          {/* Current Status */}
+          {retrainingNeeded && !isRetraining && (
+            <div className={`p-4 rounded-lg border ${
+              retrainingNeeded.status === 'up_to_date' ? 'bg-green-50 border-green-200' :
+              retrainingNeeded.status === 'no_sources' ? 'bg-gray-50 border-gray-200' :
+              'bg-orange-50 border-orange-200'
+            }`}>
               <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-blue-900">Retraining Status</span>
-                <Badge variant={retrainingNeeded.needed ? "destructive" : "secondary"}>
-                  {retrainingNeeded.needed ? "Required" : "Up to date"}
+                <span className="font-medium text-gray-900">Status</span>
+                <Badge variant={getStatusBadgeVariant()}>
+                  {getStatusBadgeText()}
                 </Badge>
               </div>
               
-              {retrainingNeeded.needed && (
-                <div className="text-sm text-blue-700">
-                  <div className="font-medium mb-1">
-                    {retrainingNeeded.unprocessedSources} sources need processing
-                  </div>
-                  <ul className="list-disc list-inside space-y-1">
-                    {retrainingNeeded.reasons.map((reason, index) => (
-                      <li key={index}>{reason}</li>
-                    ))}
-                  </ul>
+              <div className={`text-sm ${
+                retrainingNeeded.status === 'up_to_date' ? 'text-green-700' :
+                retrainingNeeded.status === 'no_sources' ? 'text-gray-700' :
+                'text-orange-700'
+              }`}>
+                <div className="font-medium mb-1">
+                  {retrainingNeeded.message}
                 </div>
-              )}
+                
+                {retrainingNeeded.needed && retrainingNeeded.reasons.length > 0 && (
+                  <div className="mt-2">
+                    <div className="font-medium mb-1">Details:</div>
+                    <ul className="list-disc list-inside space-y-1">
+                      {retrainingNeeded.reasons.slice(0, 5).map((reason, index) => (
+                        <li key={index}>{reason}</li>
+                      ))}
+                      {retrainingNeeded.reasons.length > 5 && (
+                        <li>... and {retrainingNeeded.reasons.length - 5} more</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -150,9 +248,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               {isRetraining ? 'Processing...' : 'Close'}
             </Button>
             
-            {retrainingNeeded?.needed && !isRetraining && (
+            {shouldShowRetrainButton() && (
               <Button onClick={onStartRetraining}>
-                Start Retraining
+                {retrainingNeeded?.status === 'needs_reprocessing' ? 'Reprocess Sources' : 'Process Sources'}
               </Button>
             )}
           </div>

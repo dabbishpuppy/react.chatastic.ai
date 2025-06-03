@@ -10,6 +10,8 @@ export const useAgentRetraining = (agentId?: string) => {
     needed: boolean;
     unprocessedSources: number;
     reasons: string[];
+    status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'no_sources';
+    message: string;
   } | null>(null);
   
   const { toast } = useToast();
