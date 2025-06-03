@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
@@ -35,6 +36,9 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Use the operations hook for enhanced recrawl
+  const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
 
   const handleSaveEdit = async () => {
     await onEdit(source.id, editUrl);
@@ -218,12 +222,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      // Call the enhanced recrawl from the operations hook
-                      const { useWebsiteSourceOperations } = require('./hooks/useWebsiteSourceOperations');
-                      const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
-                      handleEnhancedRecrawl(source);
-                    }}
+                    onClick={() => handleEnhancedRecrawl(source)}
                     className="text-blue-600"
                   >
                     <Zap className="w-4 h-4" />
