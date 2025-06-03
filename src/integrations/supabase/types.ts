@@ -233,10 +233,15 @@ export type Database = {
       }
       agents: {
         Row: {
+          ai_instructions: string | null
+          ai_model: string | null
+          ai_prompt_template: string | null
+          ai_temperature: number | null
           color: string
           created_at: string | null
           id: string
           image: string | null
+          last_trained_at: string | null
           name: string
           rate_limit_enabled: boolean
           rate_limit_message: string
@@ -248,10 +253,15 @@ export type Database = {
           visibility: string
         }
         Insert: {
+          ai_instructions?: string | null
+          ai_model?: string | null
+          ai_prompt_template?: string | null
+          ai_temperature?: number | null
           color: string
           created_at?: string | null
           id?: string
           image?: string | null
+          last_trained_at?: string | null
           name: string
           rate_limit_enabled?: boolean
           rate_limit_message?: string
@@ -263,10 +273,15 @@ export type Database = {
           visibility?: string
         }
         Update: {
+          ai_instructions?: string | null
+          ai_model?: string | null
+          ai_prompt_template?: string | null
+          ai_temperature?: number | null
           color?: string
           created_at?: string | null
           id?: string
           image?: string | null
+          last_trained_at?: string | null
           name?: string
           rate_limit_enabled?: boolean
           rate_limit_message?: string
@@ -1534,6 +1549,47 @@ export type Database = {
             foreignKeyName: "notification_settings_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: true
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prompt_templates: {
+        Row: {
+          agent_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          instructions: string
+          is_predefined: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          instructions: string
+          is_predefined?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          instructions?: string
+          is_predefined?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_templates_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
             referencedRelation: "agents"
             referencedColumns: ["id"]
           },
