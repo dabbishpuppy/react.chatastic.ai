@@ -6,7 +6,7 @@ import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
 import { useChildSourcesRealtime } from './hooks/useChildSourcesRealtime';
 import WebsiteSourceHeader from './components/WebsiteSourceHeader';
 import WebsiteSourceActions from './components/WebsiteSourceActions';
-import WebsiteSourceChildList from './components/WebsiteSourceChildList';
+import WebsiteChildSources from './components/WebsiteChildSources';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
@@ -106,22 +106,16 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           />
         </div>
 
-        {/* Child Sources Section - Always show for parent sources when expanded */}
+        {/* Child Sources Section - Show for parent sources when expanded */}
         {isParentSource && isExpanded && (
-          <div className="mt-4 pl-6 border-l-2 border-gray-200">
-            {hasChildSources ? (
-              <WebsiteSourceChildList
-                childSources={realtimeChildSources}
-                onExclude={onExclude}
-                onDelete={onDelete}
-              />
-            ) : (
-              <div className="py-4 px-3 bg-gray-50 rounded-md border text-center">
-                <p className="text-sm text-gray-500">No links found yet</p>
-                <p className="text-xs text-gray-400 mt-1">Child pages will appear here as they are discovered</p>
-              </div>
-            )}
-          </div>
+          <WebsiteChildSources
+            parentSourceId={source.id}
+            isCrawling={source.crawl_status === 'in_progress'}
+            onEdit={onEdit}
+            onExclude={onExclude}
+            onDelete={onDelete}
+            onRecrawl={onRecrawl}
+          />
         )}
       </CardContent>
     </Card>

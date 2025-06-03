@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -354,10 +355,30 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
               crawl_status: page.status,
               is_active: true
             } as any}
-            onEdit={onEdit}
-            onExclude={onExclude}
+            onEdit={() => onEdit(page.id, page.url)}
+            onExclude={() => onExclude({
+              id: page.id,
+              url: page.url,
+              title: page.url,
+              source_type: 'website',
+              agent_id: '',
+              team_id: '',
+              created_at: page.created_at,
+              crawl_status: page.status,
+              is_active: true
+            })}
             onDelete={() => handleDelete(page)}
-            onRecrawl={onRecrawl}
+            onRecrawl={() => onRecrawl({
+              id: page.id,
+              url: page.url,
+              title: page.url,
+              source_type: 'website',
+              agent_id: '',
+              team_id: '',
+              created_at: page.created_at,
+              crawl_status: page.status,
+              is_active: true
+            })}
             showRecrawl={false}
             isChild={true}
           />
