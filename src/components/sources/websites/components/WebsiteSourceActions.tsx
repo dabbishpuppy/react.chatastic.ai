@@ -1,147 +1,171 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
-  RotateCcw, 
+  ExternalLink, 
+  Edit2, 
+  Eye, 
   EyeOff, 
-  Eye,
-  RefreshCw
+  RefreshCw, 
+  Zap, 
+  Trash2,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
-import { CrawlRecoveryService } from '@/services/rag/crawlRecoveryService';
-import { toast } from '@/hooks/use-toast';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
-  onEdit: (sourceId: string, newUrl: string) => void;
-  onExclude: (source: AgentSource) => void;
-  onDelete: (source: AgentSource) => void;
-  onRecrawl: (source: AgentSource) => void;
-  showRecrawl?: boolean;
-  isChild?: boolean;
+  hasChildSources: boolean;
+  isExpanded: boolean;
+  onEdit: () => void;
+  onExclude: () => void;
+  onRecrawl: () => void;
+  onEnhancedRecrawl: () => void;
+  onDelete: () => void;
+  onToggleExpanded: () => void;
 }
 
 const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   source,
+  hasChildSources,
+  isExpanded,
   onEdit,
   onExclude,
-  onDelete,
   onRecrawl,
-  showRecrawl = true,
-  isChild = false
+  onEnhancedRecrawl,
+  onDelete,
+  onToggleExpanded
 }) => {
-  const [isAutoRecovering, setIsAutoRecovering] = useState(false);
-  
-  const isParentSource = !source.parent_source_id;
-  const isStuck = isParentSource && 
-    (source.crawl_status === 'pending' || source.crawl_status === 'in_progress') &&
-    source.updated_at && 
-    new Date(source.updated_at) < new Date(Date.now() - 5 * 60 * 1000); // 5+ minutes old
-
-  const handleEdit = () => {
-    const newUrl = prompt('Enter new URL:', source.url);
-    if (newUrl && newUrl !== source.url) {
-      onEdit(source.id, newUrl);
-    }
-  };
-
-  const handleAutoRecover = async () => {
-    if (!isParentSource) return;
-    
-    setIsAutoRecovering(true);
-    try {
-      const result = await CrawlRecoveryService.performAutoRecovery(source.id);
-      
-      if (result.success) {
-        toast({
-          title: "Auto-Recovery Successful",
-          description: result.message,
-        });
-      } else {
-        toast({
-          title: "Auto-Recovery Issue",
-          description: result.message,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Automatic recovery encountered an issue",
-        variant: "destructive"
-      });
-    } finally {
-      setIsAutoRecovering(false);
-    }
-  };
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6">
-          <MoreHorizontal size={14} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={handleEdit}>
-          <Edit size={14} className="mr-2" />
-          Edit URL
-        </DropdownMenuItem>
-        
-        <DropdownMenuItem onClick={() => onExclude(source)}>
-          {source.is_excluded ? (
-            <>
-              <Eye size={14} className="mr-2" />
-              Include
-            </>
-          ) : (
-            <>
-              <EyeOff size={14} className="mr-2" />
-              Exclude
-            </>
-          )}
-        </DropdownMenuItem>
-        
-        {showRecrawl && isParentSource && (
-          <DropdownMenuItem onClick={() => onRecrawl(source)}>
-            <RotateCcw size={14} className="mr-2" />
-            Recrawl
-          </DropdownMenuItem>
-        )}
-        
-        {isStuck && (
-          <DropdownMenuItem 
-            onClick={handleAutoRecover}
-            disabled={isAutoRecovering}
-            className="text-blue-600"
-          >
-            {isAutoRecovering ? (
-              <RefreshCw size={14} className="mr-2 animate-spin" />
-            ) : (
-              <RefreshCw size={14} className="mr-2" />
-            )}
-            Auto-Fix
-          </DropdownMenuItem>
-        )}
-        
-        <DropdownMenuItem 
-          onClick={() => onDelete(source)}
-          className="text-red-600"
-        >
-          <Trash2 size={14} className="mr-2" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex items-center gap-1 ml-4">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.open(source.url, '_blank')}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Open URL</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEdit}
+            >
+              <Edit2 className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Edit URL</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onExclude}
+            >
+              {source.is_excluded ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{source.is_excluded ? 'Include' : 'Exclude'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRecrawl}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Recrawl</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEnhancedRecrawl}
+              className="text-blue-600"
+            >
+              <Zap className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Enhanced Recrawl (Better Content Extraction)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="text-red-600"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Delete</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleExpanded}
+              className="p-1 h-8 w-8"
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{isExpanded ? 'Collapse' : 'Expand'} {hasChildSources ? 'child sources' : 'details'}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
   );
 };
 
