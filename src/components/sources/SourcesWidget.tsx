@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
 import { useAgentRetraining } from "@/hooks/useAgentRetraining";
@@ -31,28 +31,46 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   
   useAgentSourcesRealtime();
 
-  // Listen for training events
+  // Memoize stable values to prevent infinite loops
+  const isTrainingActive = useMemo(() => 
+    trainingProgress?.status === 'training' || isRetraining, 
+    [trainingProgress?.status, isRetraining]
+  );
+  
+  const isTrainingCompleted = useMemo(() => 
+    trainingProgress?.status === 'completed' && !retrainingNeeded?.needed, 
+    [trainingProgress?.status, retrainingNeeded?.needed]
+  );
+
+  // Memoize event handlers to prevent re-creation on every render
+  const handleTrainingCompleted = useCallback((event: CustomEvent) => {
+    toast({
+      title: "Training Complete!",
+      description: "Your AI agent is fully trained and ready to use.",
+      duration: 5000,
+    });
+    
+    refetchStats();
+    setTimeout(() => checkRetrainingNeeded(), 1000);
+  }, [refetchStats, checkRetrainingNeeded]);
+
+  const handleTrainingContinuesInBackground = useCallback(() => {
+    setIsTrainingInBackground(true);
+    toast({
+      title: "Training Continues",
+      description: "Training is running in the background. You'll be notified when complete.",
+      duration: 4000,
+    });
+  }, []);
+
+  const handleSourceEvent = useCallback(() => {
+    setIsTrainingInBackground(false);
+    refetchStats();
+    setTimeout(() => checkRetrainingNeeded(), 1500);
+  }, [refetchStats, checkRetrainingNeeded]);
+
+  // Listen for training events with stable handlers
   useEffect(() => {
-    const handleTrainingCompleted = (event: CustomEvent) => {
-      toast({
-        title: "Training Complete!",
-        description: "Your AI agent is fully trained and ready to use.",
-        duration: 5000,
-      });
-      
-      refetchStats();
-      setTimeout(() => checkRetrainingNeeded(), 1000);
-    };
-
-    const handleTrainingContinuesInBackground = () => {
-      setIsTrainingInBackground(true);
-      toast({
-        title: "Training Continues",
-        description: "Training is running in the background. You'll be notified when complete.",
-        duration: 4000,
-      });
-    };
-
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     window.addEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     
@@ -60,35 +78,32 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     };
-  }, [refetchStats, checkRetrainingNeeded]);
+  }, [handleTrainingCompleted, handleTrainingContinuesInBackground]);
 
-  // Check retraining status on stats changes
+  // Check retraining status only when necessary values change
   useEffect(() => {
-    if (agentId && stats) {
+    if (agentId && stats?.totalSources !== undefined) {
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
+  }, [agentId, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
 
-  // Handle training state transitions
+  // Handle training state transitions with stable dependencies
   useEffect(() => {
-    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
+    if (isTrainingCompleted) {
       setIsTrainingInBackground(false);
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         refetchStats();
         checkRetrainingNeeded();
       }, 2000);
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
+  }, [isTrainingCompleted, refetchStats, checkRetrainingNeeded]);
 
-  // Listen for source events
+  // Listen for source events with stable handler
   useEffect(() => {
-    const handleSourceEvent = () => {
-      setIsTrainingInBackground(false);
-      refetchStats();
-      setTimeout(() => checkRetrainingNeeded(), 1500);
-    };
-
     const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged'];
+    
     eventTypes.forEach(eventType => {
       window.addEventListener(eventType, handleSourceEvent);
     });
@@ -98,28 +113,25 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         window.removeEventListener(eventType, handleSourceEvent);
       });
     };
-  }, [refetchStats, checkRetrainingNeeded]);
+  }, [handleSourceEvent]);
 
-  const formatTotalSize = (bytes: number) => {
+  const formatTotalSize = useCallback((bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${Math.round(bytes / (1024 * 1024))} MB`;
-  };
+  }, []);
 
-  const handleRetrainClick = () => {
+  const handleRetrainClick = useCallback(() => {
     setShowRetrainingDialog(true);
-  };
+  }, []);
 
-  const handleDialogClose = (open: boolean) => {
+  const handleDialogClose = useCallback((open: boolean) => {
     setShowRetrainingDialog(open);
     
-    if (!open && (trainingProgress?.status === 'training' || isRetraining)) {
+    if (!open && isTrainingActive) {
       setIsTrainingInBackground(true);
     }
-  };
-
-  const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
-  const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
+  }, [isTrainingActive]);
 
   if (isLoading) return <SourcesLoadingState />;
   if (error) return <SourcesErrorState error={error.message} />;
