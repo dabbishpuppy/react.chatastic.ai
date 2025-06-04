@@ -13,6 +13,8 @@ interface SourcesContentProps {
   onRetrainClick: () => void;
   retrainingNeeded: boolean;
   isRetraining: boolean;
+  isTrainingInBackground?: boolean;
+  isTrainingCompleted?: boolean;
   requiresTraining?: boolean;
   unprocessedCrawledPages?: number;
 }
@@ -25,20 +27,35 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   onRetrainClick,
   retrainingNeeded,
   isRetraining,
+  isTrainingInBackground = false,
+  isTrainingCompleted = false,
   requiresTraining = false,
   unprocessedCrawledPages = 0
 }) => {
   const getRetrainButtonProps = () => {
-    if (isRetraining) {
+    // Training completed - show green success state
+    if (isTrainingCompleted && !retrainingNeeded && !requiresTraining) {
+      return {
+        variant: "outline" as const,
+        disabled: false,
+        icon: <CheckCircle className="h-4 w-4" />,
+        text: "Agent Trained",
+        className: "bg-green-50 border-green-200 text-green-700"
+      };
+    }
+    
+    // Training active or in background - show yellow progress state
+    if (isRetraining || isTrainingInBackground) {
       return {
         variant: "outline" as const,
         disabled: true,
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
-        text: "Processing...",
-        className: "bg-blue-50 border-blue-200 text-blue-700"
+        text: isTrainingInBackground ? "Agent Training In Progress" : "Processing...",
+        className: "bg-yellow-50 border-yellow-200 text-yellow-700"
       };
     }
     
+    // Training needed - show action button
     if (retrainingNeeded || requiresTraining) {
       return {
         variant: "default" as const,
@@ -49,6 +66,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
       };
     }
     
+    // Default up-to-date state
     return {
       variant: "outline" as const,
       disabled: false,
@@ -61,6 +79,9 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   const buttonProps = getRetrainButtonProps();
 
   const getTrainingMessage = () => {
+    if (isTrainingInBackground) {
+      return "Training is running in the background";
+    }
     if (unprocessedCrawledPages > 0) {
       return `${unprocessedCrawledPages} crawled page${unprocessedCrawledPages > 1 ? 's' : ''} need${unprocessedCrawledPages === 1 ? 's' : ''} training`;
     }

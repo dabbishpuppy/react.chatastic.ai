@@ -1,7 +1,8 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { RetrainingService, type RetrainingProgress } from '@/services/rag/retrainingService';
 import { useToast } from '@/hooks/use-toast';
+import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
 
 export const useAgentRetraining = (agentId?: string) => {
   const [isRetraining, setIsRetraining] = useState(false);
@@ -22,6 +23,30 @@ export const useAgentRetraining = (agentId?: string) => {
   } | null>(null);
   
   const { toast } = useToast();
+  const { trainingProgress } = useTrainingNotifications();
+
+  // Sync with training notifications system
+  useEffect(() => {
+    if (trainingProgress) {
+      // Update isRetraining based on trainingProgress status
+      setIsRetraining(trainingProgress.status === 'training');
+      
+      // Update progress state
+      setProgress({
+        totalSources: trainingProgress.totalSources,
+        processedSources: trainingProgress.processedSources,
+        totalChunks: 0,
+        processedChunks: 0,
+        status: trainingProgress.status === 'training' ? 'processing' : 
+               trainingProgress.status === 'completed' ? 'completed' : 'pending'
+      });
+
+      // Reset isRetraining when training completes
+      if (trainingProgress.status === 'completed') {
+        setIsRetraining(false);
+      }
+    }
+  }, [trainingProgress]);
 
   const checkRetrainingNeeded = useCallback(async () => {
     if (!agentId) return;

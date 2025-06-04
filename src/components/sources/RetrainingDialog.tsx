@@ -38,16 +38,40 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     onStartRetraining(); // Keep the original logic for backward compatibility
   };
 
+  // Prioritize trainingProgress status over legacy isRetraining
+  const getTrainingStatus = () => {
+    if (trainingProgress?.status === 'completed') {
+      return 'completed';
+    }
+    if (trainingProgress?.status === 'training') {
+      return 'training';
+    }
+    if (isRetraining) {
+      return 'training';
+    }
+    return 'idle';
+  };
+
   const getProgressPercentage = () => {
-    if (trainingProgress?.status === 'completed') return 100;
-    if (trainingProgress?.progress !== undefined) return trainingProgress.progress;
+    const status = getTrainingStatus();
+    
+    if (status === 'completed') return 100;
+    
+    // Prioritize trainingProgress data
+    if (trainingProgress?.progress !== undefined) {
+      return trainingProgress.progress;
+    }
+    
+    // Fallback to legacy progress
     if (progress?.processedSources && progress?.totalSources) {
       return Math.round((progress.processedSources / progress.totalSources) * 100);
     }
+    
     return 0;
   };
 
   const getProcessedCount = () => {
+    // Prioritize trainingProgress data
     if (trainingProgress?.processedSources !== undefined) {
       return trainingProgress.processedSources;
     }
@@ -55,29 +79,36 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const getTotalCount = () => {
-    // Use the actual sources that need processing from retrainingNeeded
+    // Use the actual sources that need processing from retrainingNeeded first
     if (retrainingNeeded?.sourceDetails?.length > 0) {
       return retrainingNeeded.sourceDetails.length;
     }
+    
     // Fallback to training progress data
     if (trainingProgress?.totalSources !== undefined) {
       return trainingProgress.totalSources;
     }
+    
     return progress?.totalSources || 0;
   };
 
   const getStatusMessage = () => {
-    if (trainingProgress?.status === 'completed') {
+    const status = getTrainingStatus();
+    
+    if (status === 'completed') {
       return "Training completed successfully! Your AI agent is trained and ready.";
     }
-    if (trainingProgress?.status === 'training' || isRetraining) {
+    
+    if (status === 'training') {
       const processed = getProcessedCount();
       const total = getTotalCount();
       return `Training in progress... (${processed}/${total} sources processed)`;
     }
+    
     if (retrainingNeeded?.needed) {
       return retrainingNeeded.message || `${retrainingNeeded.unprocessedSources} sources need to be processed for training.`;
     }
+    
     return "Your agent is up to date.";
   };
 
@@ -109,8 +140,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }
   };
 
-  const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
-  const isTrainingCompleted = trainingProgress?.status === 'completed';
+  const status = getTrainingStatus();
+  const isTrainingActive = status === 'training';
+  const isTrainingCompleted = status === 'completed';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

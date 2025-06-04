@@ -18,6 +18,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { agentId } = useParams();
   const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
+  const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
   
   const {
     isRetraining,
@@ -39,6 +40,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       checkRetrainingNeeded();
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
+
+  // Reset background training state when training completes
+  useEffect(() => {
+    if (trainingProgress?.status === 'completed') {
+      setIsTrainingInBackground(false);
+    }
+  }, [trainingProgress?.status]);
 
   // Listen for various source events to trigger retraining status check
   useEffect(() => {
@@ -70,7 +78,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     requiresTraining: stats?.requiresTraining || false,
     unprocessedCrawledPages: stats?.unprocessedCrawledPages || 0,
     retrainingNeeded: retrainingNeeded?.needed,
-    trainingProgress: trainingProgress?.status
+    trainingProgress: trainingProgress?.status,
+    isTrainingInBackground
   });
 
   // Format total size from stats
@@ -84,8 +93,18 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     setShowRetrainingDialog(true);
   };
 
-  // Check if training is active (either old system or new system)
-  const isTrainingActive = isRetraining || trainingProgress?.status === 'training';
+  const handleDialogClose = (open: boolean) => {
+    setShowRetrainingDialog(open);
+    
+    // If training is active and dialog is closed, set background training state
+    if (!open && (trainingProgress?.status === 'training' || isRetraining)) {
+      setIsTrainingInBackground(true);
+    }
+  };
+
+  // Check if training is active (prioritize trainingProgress over isRetraining)
+  const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
+  const isTrainingCompleted = trainingProgress?.status === 'completed';
 
   if (isLoading) {
     return <SourcesLoadingState />;
@@ -109,13 +128,15 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         onRetrainClick={handleRetrainClick}
         retrainingNeeded={retrainingNeeded?.needed || false}
         isRetraining={isTrainingActive}
+        isTrainingInBackground={isTrainingInBackground}
+        isTrainingCompleted={isTrainingCompleted}
         requiresTraining={stats.requiresTraining}
         unprocessedCrawledPages={stats.unprocessedCrawledPages}
       />
 
       <RetrainingDialog
         open={showRetrainingDialog}
-        onOpenChange={setShowRetrainingDialog}
+        onOpenChange={handleDialogClose}
         isRetraining={isTrainingActive}
         progress={progress}
         retrainingNeeded={retrainingNeeded}
