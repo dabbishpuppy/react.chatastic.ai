@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getSupabaseClient } from '../_shared/database-helpers.ts';
 
@@ -112,8 +111,35 @@ async function processPendingPages(supabaseClient: any) {
         });
 
       if (processingError) {
+        // Check if it's a 409 Conflict response (job already processed/in progress)
+        if (processingError.message?.includes('409') || processingError.status === 409) {
+          console.log(`✅ Page ${page.id} already processed (409 Conflict) - marking as completed`);
+          
+          // Mark as completed since it was already processed
+          await supabaseClient
+            .from('source_pages')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              error_message: 'Already processed by another worker'
+            })
+            .eq('id', page.id);
+          
+          results.push({
+            pageId: page.id,
+            url: page.url,
+            success: true,
+            result: { message: 'Already processed', chunksCreated: 0 },
+            wasAlreadyProcessed: true
+          });
+          continue;
+        }
+
+        // For actual errors, increment retry count and handle retry logic
         const newRetryCount = (page.retry_count || 0) + 1;
         const shouldRetry = newRetryCount < 3;
+        
+        console.error(`❌ Error processing page ${page.id}: ${processingError.message}`);
         
         await supabaseClient
           .from('source_pages')
@@ -142,8 +168,34 @@ async function processPendingPages(supabaseClient: any) {
         });
       }
     } catch (error) {
+      // Check if it's a 409 error in the catch block as well
+      if (error.message?.includes('409') || error.status === 409) {
+        console.log(`✅ Page ${page.id} already processed (409 Conflict - caught) - marking as completed`);
+        
+        await supabaseClient
+          .from('source_pages')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            error_message: 'Already processed by another worker'
+          })
+          .eq('id', page.id);
+        
+        results.push({
+          pageId: page.id,
+          url: page.url,
+          success: true,
+          result: { message: 'Already processed', chunksCreated: 0 },
+          wasAlreadyProcessed: true
+        });
+        continue;
+      }
+
+      // For actual errors, handle retry logic
       const newRetryCount = (page.retry_count || 0) + 1;
       const shouldRetry = newRetryCount < 3;
+      
+      console.error(`❌ Exception processing page ${page.id}: ${error.message}`);
       
       await supabaseClient
         .from('source_pages')
@@ -235,9 +287,10 @@ serve(async (req) => {
     const successCount = processingResults.results.filter(r => r.success).length;
     const failedCount = processingResults.results.filter(r => !r.success).length;
     const autoRetriedCount = processingResults.results.filter(r => r.autoRetried).length;
+    const alreadyProcessedCount = processingResults.results.filter(r => r.wasAlreadyProcessed).length;
     const totalChunksCreated = processingResults.results.reduce((sum, r) => sum + (r.result?.chunksCreated || 0), 0);
 
-    console.log(`📊 Auto-processing complete: ${successCount} successful, ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
+    console.log(`📊 Auto-processing complete: ${successCount} successful (${alreadyProcessedCount} already processed), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
 
     // Check for missing chunks after processing
     if (successCount > 0) {
@@ -261,6 +314,7 @@ serve(async (req) => {
         successCount,
         failedCount,
         autoRetriedCount,
+        alreadyProcessedCount,
         autoRecoveredCount,
         resetFailedCount,
         totalChunksCreated,
