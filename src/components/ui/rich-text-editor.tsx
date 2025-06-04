@@ -149,7 +149,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onPaste={handlePaste}
         className={cn(
           "min-h-[200px] p-3 outline-none prose max-w-none",
-          disabled && "bg-gray-50 cursor-not-allowed"
+          disabled && "bg-gray-50 cursor-not-allowed",
+          !value && !disabled && "empty-editor"
         )}
         style={{ 
           fontSize: '0.875rem',
@@ -158,17 +159,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           textAlign: 'left'
         }}
         suppressContentEditableWarning={true}
-        data-placeholder={!value ? placeholder : undefined}
       />
       {!value && !disabled && (
-        <style jsx>{`
-          [data-placeholder]:empty::before {
-            content: attr(data-placeholder);
+        <style>
+          {`.empty-editor:empty::before {
+            content: "${placeholder}";
             color: #9ca3af;
             pointer-events: none;
             display: block;
-          }
-        `}</style>
+          }`}
+        </style>
       )}
     </div>
   );
