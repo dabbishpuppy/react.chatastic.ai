@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, AlertCircle, Loader2, FileText, Globe, HelpCircle, File } from "lucide-react";
+import { useTrainingStatusDebounced } from "@/hooks/useTrainingStatusDebounced";
 
 interface RetrainingDialogProps {
   open: boolean;
@@ -32,73 +33,31 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // FIXED: Simplified status determination - rely primarily on trainingProgress
-  const getTrainingStatus = () => {
-    console.log('🔍 RetrainingDialog - Enhanced status check:', {
-      trainingProgressStatus: trainingProgress?.status,
-      trainingProgressData: trainingProgress,
-      retrainingNeeded: retrainingNeeded?.needed,
-      isRetraining
-    });
-
-    // Primary source of truth: trainingProgress status
-    if (trainingProgress?.status === 'training') {
-      return 'training';
-    }
-    
-    if (trainingProgress?.status === 'completed') {
-      // Only show completed if no new sources need training
-      return !retrainingNeeded?.needed ? 'completed' : 'idle';
-    }
-    
-    if (trainingProgress?.status === 'failed') {
-      return 'failed';
-    }
-    
-    // If sources need training but no active training
-    if (retrainingNeeded?.needed) {
-      return 'idle';
-    }
-    
-    return 'idle';
-  };
-
-  const getProgressPercentage = () => {
-    const status = getTrainingStatus();
-    
-    if (status === 'completed') return 100;
-    if (status === 'failed') return 0;
-    
-    // Use trainingProgress as primary source
-    if (trainingProgress?.progress !== undefined) {
-      const progressValue = Math.min(100, Math.max(0, trainingProgress.progress));
-      console.log('📊 Using trainingProgress.progress:', progressValue);
-      return progressValue;
-    }
-    
-    return 0;
-  };
+  // Use debounced status to prevent rapid switching
+  const debouncedStatus = useTrainingStatusDebounced(trainingProgress, retrainingNeeded);
+  
+  console.log('🔍 RetrainingDialog - Debounced status:', {
+    debouncedStatus,
+    trainingProgressStatus: trainingProgress?.status,
+    retrainingNeeded: retrainingNeeded?.needed
+  });
 
   const getProcessedCount = () => {
     return trainingProgress?.processedSources || 0;
   };
 
   const getTotalCount = () => {
-    // Use trainingProgress total as primary source
     if (trainingProgress?.totalSources > 0) {
       return trainingProgress.totalSources;
     }
-    
-    // Fallback to retrainingNeeded count
     if (retrainingNeeded?.sourceDetails?.length > 0) {
       return retrainingNeeded.sourceDetails.length;
     }
-    
     return 0;
   };
 
   const getStatusMessage = () => {
-    const status = getTrainingStatus();
+    const { status, progress } = debouncedStatus;
     
     if (status === 'training') {
       const processed = getProcessedCount();
@@ -160,13 +119,13 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const handleStartTraining = async () => {
-    console.log('🚀 Enhanced Start Training button clicked');
+    console.log('🚀 Start Training button clicked');
     
     try {
       await onStartRetraining();
-      console.log('✅ Enhanced training initiated successfully');
+      console.log('✅ Training initiated successfully');
     } catch (error) {
-      console.error('❌ Failed to start enhanced training:', error);
+      console.error('❌ Failed to start training:', error);
     }
   };
 
@@ -174,28 +133,24 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     console.log('📱 Continue in background clicked');
     onOpenChange(false);
     
-    // Show a subtle notification that training continues
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { agentId: trainingProgress?.agentId }
     }));
   };
 
-  const status = getTrainingStatus();
-  const isTrainingActive = status === 'training';
-  const isTrainingCompleted = status === 'completed';
-  const isTrainingFailed = status === 'failed';
-  const progressPercentage = getProgressPercentage();
+  const { status: currentStatus, progress: currentProgress } = debouncedStatus;
+  const isTrainingActive = currentStatus === 'training';
+  const isTrainingCompleted = currentStatus === 'completed';
+  const isTrainingFailed = currentStatus === 'failed';
 
-  console.log('🔍 Enhanced RetrainingDialog render state:', {
-    status,
+  console.log('🔍 RetrainingDialog render state:', {
+    currentStatus,
     isTrainingActive,
     isTrainingCompleted,
     isTrainingFailed,
-    progressPercentage,
+    currentProgress,
     processedCount: getProcessedCount(),
-    totalCount: getTotalCount(),
-    retrainingNeeded: retrainingNeeded?.needed,
-    currentlyProcessing: trainingProgress?.currentlyProcessing
+    totalCount: getTotalCount()
   });
 
   return (
@@ -224,16 +179,16 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          {/* Enhanced Progress Section */}
+          {/* Progress Section */}
           {(isTrainingActive || isTrainingCompleted || isTrainingFailed) && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Progress</span>
-                  <span>{progressPercentage}%</span>
+                  <span>{currentProgress}%</span>
                 </div>
                 <Progress 
-                  value={progressPercentage} 
+                  value={currentProgress} 
                   className={`w-full ${isTrainingFailed ? 'bg-red-100' : ''}`}
                 />
               </div>

@@ -1,11 +1,10 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { RetrainingService, type RetrainingProgress } from '@/services/rag/retrainingService';
 import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
 
 export const useAgentRetraining = (agentId?: string) => {
-  // Always call hooks in the same order - move useToast to top
   const { toast } = useToast();
   const { trainingProgress, startTraining } = useTrainingNotifications();
   
@@ -25,19 +24,38 @@ export const useAgentRetraining = (agentId?: string) => {
     }>;
   } | null>(null);
 
-  // Sync all state with training notifications system
+  // Add state guards to prevent race conditions
+  const isTrainingActiveRef = useRef(false);
+  const lastStatusUpdateRef = useRef<string>('');
+
+  // Simplified status determination
   const isRetraining = trainingProgress?.status === 'training';
 
+  // Guard against rapid state changes
   useEffect(() => {
     if (trainingProgress) {
-      console.log('🔄 useAgentRetraining - Syncing with trainingProgress:', trainingProgress);
+      const statusKey = `${trainingProgress.status}-${trainingProgress.progress}`;
       
-      // Update progress state to match training notifications
+      // Prevent duplicate status updates
+      if (lastStatusUpdateRef.current === statusKey) {
+        return;
+      }
+      lastStatusUpdateRef.current = statusKey;
+      
+      console.log('🔄 useAgentRetraining - Status update:', trainingProgress);
+      
+      // Update progress state with guard
+      if (trainingProgress.status === 'training') {
+        isTrainingActiveRef.current = true;
+      } else if (trainingProgress.status === 'completed') {
+        isTrainingActiveRef.current = false;
+      }
+      
       setProgress({
         totalSources: trainingProgress.totalSources,
         processedSources: trainingProgress.processedSources,
-        totalChunks: 0, // Not used in new system
-        processedChunks: 0, // Not used in new system
+        totalChunks: 0,
+        processedChunks: 0,
         status: trainingProgress.status === 'training' ? 'processing' : 
                trainingProgress.status === 'completed' ? 'completed' : 'pending'
       });
@@ -64,15 +82,15 @@ export const useAgentRetraining = (agentId?: string) => {
   }, [agentId, toast]);
 
   const startRetraining = useCallback(async () => {
-    if (!agentId || isRetraining) {
-      console.log('⚠️ Cannot start training:', { agentId, isRetraining });
+    if (!agentId || isTrainingActiveRef.current) {
+      console.log('⚠️ Cannot start training:', { agentId, isTrainingActive: isTrainingActiveRef.current });
       return;
     }
 
     console.log('🚀 Starting retraining via training notifications system');
+    isTrainingActiveRef.current = true;
 
     try {
-      // Use the training notifications system to start training
       await startTraining();
 
       toast({
@@ -80,20 +98,22 @@ export const useAgentRetraining = (agentId?: string) => {
         description: "Processing your sources and generating embeddings..."
       });
 
-      // After starting training, refresh the retraining status
+      // Refresh retraining status after starting
       setTimeout(() => {
         checkRetrainingNeeded();
-      }, 1000);
+      }, 1500);
 
     } catch (error) {
       console.error('Retraining failed:', error);
+      isTrainingActiveRef.current = false;
+      
       toast({
         title: "Training Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
     }
-  }, [agentId, isRetraining, startTraining, toast, checkRetrainingNeeded]);
+  }, [agentId, startTraining, toast, checkRetrainingNeeded]);
 
   return {
     isRetraining,
@@ -101,7 +121,6 @@ export const useAgentRetraining = (agentId?: string) => {
     retrainingNeeded,
     startRetraining,
     checkRetrainingNeeded,
-    // Expose trainingProgress for components that need direct access
     trainingProgress
   };
 };
