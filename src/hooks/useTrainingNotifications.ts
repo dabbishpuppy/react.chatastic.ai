@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -30,6 +29,8 @@ export const useTrainingNotifications = () => {
   const hasShownCompletionNotificationRef = useRef<boolean>(false);
   const currentSessionIdRef = useRef<string>('');
   const lastCompletionCheckRef = useRef<number>(0);
+  const hasShownInitialConnectionRef = useRef<boolean>(false);
+  const connectionEstablishedRef = useRef<boolean>(false);
   
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -130,16 +131,26 @@ export const useTrainingNotifications = () => {
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
+            connectionEstablishedRef.current = true;
+            hasShownInitialConnectionRef.current = true;
             if (pollInterval) clearInterval(pollInterval);
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000);
             
-            toast({
-              title: "Connection Issue",
-              description: "Training updates may be delayed. We're working on it.",
-              duration: 3000,
-            });
+            // Only show connection issue toast if we previously had a connection
+            // and it's not the initial page load
+            if (connectionEstablishedRef.current && hasShownInitialConnectionRef.current) {
+              // Add a delay to prevent showing toast immediately on page reload
+              setTimeout(() => {
+                toast({
+                  title: "Connection Issue",
+                  description: "Training updates may be delayed. We're working on it.",
+                  duration: 3000,
+                });
+              }, 2000); // 2 second delay
+            }
+            
+            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000);
           }
         });
 
