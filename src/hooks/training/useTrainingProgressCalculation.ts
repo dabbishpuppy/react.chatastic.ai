@@ -1,4 +1,5 @@
 
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DatabaseSource {
@@ -19,7 +20,7 @@ interface TrainingProgress {
 }
 
 export const useTrainingProgressCalculation = () => {
-  const calculateTrainingProgress = async (agentId: string): Promise<TrainingProgress | null> => {
+  const calculateTrainingProgress = useCallback(async (agentId: string): Promise<TrainingProgress | null> => {
     try {
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
@@ -96,15 +97,6 @@ export const useTrainingProgressCalculation = () => {
         status = 'training';
       }
 
-      // Only log significant progress updates
-      if (status === 'completed' || currentlyProcessingPages.length > 0) {
-        console.log('📊 Training progress:', {
-          status,
-          progress: `${progress}%`,
-          processed: `${totalPagesProcessed}/${totalPagesNeedingProcessing}`
-        });
-      }
-
       return {
         agentId,
         status,
@@ -118,7 +110,7 @@ export const useTrainingProgressCalculation = () => {
       console.error('Error calculating training progress:', error);
       return null;
     }
-  };
+  }, []);
 
   return { calculateTrainingProgress };
 };

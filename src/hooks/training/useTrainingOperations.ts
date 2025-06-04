@@ -1,4 +1,5 @@
 
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { SourceProcessor } from '@/services/rag/retraining/sourceProcessor';
@@ -12,12 +13,10 @@ interface DatabaseSource {
 }
 
 export const useTrainingOperations = () => {
-  const startTraining = async (agentId: string, onProgressUpdate: (agentId: string) => void) => {
+  const startTraining = useCallback(async (agentId: string, onProgressUpdate: (agentId: string) => void) => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting training for agent:', agentId);
-
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content')
@@ -75,7 +74,7 @@ export const useTrainingOperations = () => {
       await Promise.allSettled(processingPromises);
       
       // Give a moment for database updates to propagate
-      setTimeout(() => onProgressUpdate(agentId), 1000);
+      setTimeout(() => onProgressUpdate(agentId), 1500);
 
     } catch (error) {
       console.error('Failed to start training:', error);
@@ -95,7 +94,7 @@ export const useTrainingOperations = () => {
         });
       }
     }
-  };
+  }, []);
 
   return { startTraining };
 };

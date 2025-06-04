@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -20,33 +20,49 @@ export const useTrainingSubscriptions = (
     connectionAttempts: 0
   });
 
-  // Stabilize websiteSources array to prevent unnecessary subscription recreation
-  const stableWebsiteSources = useMemo(() => websiteSources, [websiteSources.join(',')]);
+  // Stabilize inputs to prevent subscription recreation
+  const stableAgentId = useMemo(() => agentId, [agentId]);
+  const stableWebsiteSources = useMemo(() => {
+    const sorted = [...websiteSources].sort();
+    return sorted.join(',');
+  }, [websiteSources]);
 
-  // Stabilize the progress update callback
-  const stableOnProgressUpdate = useCallback(
-    (targetAgentId: string) => {
-      onProgressUpdate(targetAgentId);
-    },
-    [onProgressUpdate]
-  );
+  const stableOnProgressUpdate = useRef(onProgressUpdate);
+  stableOnProgressUpdate.current = onProgressUpdate;
 
-  // Debounce subscription updates to prevent rapid recreation
+  // Debounce subscription updates
   const [subscriptionKey, setSubscriptionKey] = useState(0);
+  const updateTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    if (!agentId) return;
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      setSubscriptionKey(prev => prev + 1);
+    }, 1000); // 1 second debounce
 
-    // Only log essential setup information
-    console.log('🔔 Setting up training subscriptions for agent:', agentId);
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [stableWebsiteSources]);
+
+  useEffect(() => {
+    if (!stableAgentId) return;
 
     let pollInterval: NodeJS.Timeout;
     let reconnectTimeout: NodeJS.Timeout;
     let connectionStable = false;
+    let hasShownConnectionError = false;
 
     const setupRealtimeChannels = () => {
+      const sourceIds = stableWebsiteSources ? stableWebsiteSources.split(',').filter(Boolean) : [];
+      
       const channel = supabase
-        .channel(`training-notifications-${agentId}-${subscriptionKey}`)
+        .channel(`training-notifications-${stableAgentId}-${subscriptionKey}`)
         
         // Subscribe to processing_status changes
         .on(
@@ -55,19 +71,14 @@ export const useTrainingSubscriptions = (
             event: 'UPDATE',
             schema: 'public',
             table: 'source_pages',
-            filter: stableWebsiteSources.length > 0 ? `parent_source_id=in.(${stableWebsiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
+            filter: sourceIds.length > 0 ? `parent_source_id=in.(${sourceIds.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
           },
           (payload) => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // Only log significant status changes
-              if (updatedPage.processing_status === 'processed' || updatedPage.processing_status === 'processing') {
-                console.log('📄 Page processing update:', updatedPage.url, '→', updatedPage.processing_status);
-              }
-              
-              setTimeout(() => stableOnProgressUpdate(agentId), 100);
+              setTimeout(() => stableOnProgressUpdate.current(stableAgentId), 200);
             }
           }
         )
@@ -79,7 +90,7 @@ export const useTrainingSubscriptions = (
             event: 'UPDATE',
             schema: 'public',
             table: 'agent_sources',
-            filter: `agent_id=eq.${agentId}`
+            filter: `agent_id=eq.${stableAgentId}`
           },
           (payload) => {
             const updatedSource = payload.new as any;
@@ -88,12 +99,7 @@ export const useTrainingSubscriptions = (
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              // Only log processing completion
-              if (metadata.processing_status === 'completed') {
-                console.log('✅ Source processing completed:', updatedSource.source_type);
-              }
-              
-              setTimeout(() => stableOnProgressUpdate(agentId), 100);
+              setTimeout(() => stableOnProgressUpdate.current(stableAgentId), 200);
             }
           }
         )
@@ -120,24 +126,21 @@ export const useTrainingSubscriptions = (
               connectionAttempts: prev.connectionAttempts + 1
             }));
             
-            // Only show error toast if we had a stable connection and this isn't the initial load
-            if (wasConnected && !subscriptionState.isInitialConnection) {
-              console.warn('📡 Training subscription connection lost');
-              
+            // Only show error toast once per session and not during initial load
+            if (wasConnected && !subscriptionState.isInitialConnection && !hasShownConnectionError) {
+              hasShownConnectionError = true;
               reconnectTimeout = setTimeout(() => {
-                if (!connectionStable && subscriptionState.connectionAttempts >= 2) {
-                  toast({
-                    title: "Connection Issue",
-                    description: "Training updates may be delayed. We're working on it.",
-                    duration: 3000,
-                  });
-                }
-              }, 3000); // Increased delay to prevent showing during normal startup
+                toast({
+                  title: "Connection Issue",
+                  description: "Training updates may be delayed. We're working on it.",
+                  duration: 3000,
+                });
+              }, 5000);
             }
             
             // Start polling as fallback
             if (!pollInterval) {
-              pollInterval = setInterval(() => stableOnProgressUpdate(agentId), 5000);
+              pollInterval = setInterval(() => stableOnProgressUpdate.current(stableAgentId), 8000);
             }
           }
         });
@@ -155,17 +158,9 @@ export const useTrainingSubscriptions = (
       cleanup();
       if (pollInterval) clearInterval(pollInterval);
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
     };
-  }, [agentId, stableWebsiteSources, stableOnProgressUpdate, subscriptionKey]);
-
-  // Trigger subscription recreation when sources change significantly
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setSubscriptionKey(prev => prev + 1);
-    }, 500); // Debounce subscription recreation
-
-    return () => clearTimeout(timeoutId);
-  }, [stableWebsiteSources]);
+  }, [stableAgentId, stableWebsiteSources, subscriptionKey, subscriptionState.isInitialConnection]);
 
   return subscriptionState;
 };

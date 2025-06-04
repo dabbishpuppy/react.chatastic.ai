@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
@@ -20,6 +20,7 @@ export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [websiteSources, setWebsiteSources] = useState<string[]>([]);
+  const lastCompletionStatusRef = useRef<string | null>(null);
 
   const { calculateTrainingProgress } = useTrainingProgressCalculation();
   const { startTraining: performTraining } = useTrainingOperations();
@@ -29,10 +30,11 @@ export const useTrainingNotifications = () => {
     if (progress) {
       setTrainingProgress(progress);
 
-      // Show completion notification only for genuine completions
-      if (progress.status === 'completed' && trainingProgress?.status !== 'completed' && progress.totalSources > 0) {
-        console.log('🎉 Training completed! Showing success notification');
-        
+      // Only show completion notification for genuine completions
+      const wasCompleted = lastCompletionStatusRef.current === 'completed';
+      const isNowCompleted = progress.status === 'completed';
+      
+      if (isNowCompleted && !wasCompleted && progress.totalSources > 0) {
         toast({
           title: "Training Complete!",
           description: "Your AI agent is trained and ready",
@@ -43,15 +45,21 @@ export const useTrainingNotifications = () => {
           detail: { agentId: targetAgentId, progress }
         }));
       }
+      
+      lastCompletionStatusRef.current = progress.status;
     }
-  }, [calculateTrainingProgress, trainingProgress?.status]);
+  }, [calculateTrainingProgress]);
 
   // Stabilize website sources to prevent subscription issues
-  const stableWebsiteSources = useMemo(() => websiteSources, [websiteSources.join(',')]);
+  const stableWebsiteSources = useMemo(() => {
+    return websiteSources.sort().join(',');
+  }, [websiteSources]);
 
-  // Initialize website sources
+  // Initialize website sources once
   useEffect(() => {
     if (!agentId) return;
+
+    let mounted = true;
 
     const initializeWebsiteSources = async () => {
       try {
@@ -62,29 +70,25 @@ export const useTrainingNotifications = () => {
           .eq('source_type', 'website')
           .eq('is_active', true);
 
-        if (error) {
-          console.error('Error fetching website sources:', error);
-          return;
-        }
+        if (error || !mounted) return;
 
         const sourceIds = sources?.map(s => s.id) || [];
         setWebsiteSources(sourceIds);
-        
-        // Only log if there are sources to monitor
-        if (sourceIds.length > 0) {
-          console.log('📄 Monitoring website sources:', sourceIds.length);
-        }
       } catch (error) {
         console.error('Error initializing website sources:', error);
       }
     };
 
     initializeWebsiteSources();
+
+    return () => {
+      mounted = false;
+    };
   }, [agentId]);
 
   const subscriptionState = useTrainingSubscriptions(
     agentId || '',
-    stableWebsiteSources,
+    websiteSources,
     checkTrainingCompletion
   );
 
@@ -98,7 +102,11 @@ export const useTrainingNotifications = () => {
   return {
     trainingProgress,
     startTraining,
-    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId),
+    checkTrainingCompletion: useCallback(() => {
+      if (agentId) {
+        checkTrainingCompletion(agentId);
+      }
+    }, [agentId, checkTrainingCompletion]),
     isConnected: subscriptionState.isConnected
   };
 };

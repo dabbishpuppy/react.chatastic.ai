@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTrainingNotifications } from './useTrainingNotifications';
 
 interface RetrainingNeeded {
@@ -30,14 +30,23 @@ export const useAgentRetraining = (agentId?: string) => {
   
   const { trainingProgress, startTraining } = useTrainingNotifications();
 
-  // Memoize the check function to prevent infinite loops
+  // Use ref to track previous values to prevent infinite updates
+  const prevTrainingProgressRef = useRef(trainingProgress);
+
+  // Stabilize the check function to prevent infinite loops
   const checkRetrainingNeeded = useCallback(async () => {
     if (!agentId) return;
 
     try {
-      // This would normally call an API to check if retraining is needed
-      // For now, we'll use a simple check based on training progress
-      const needed = trainingProgress?.status !== 'completed' && trainingProgress?.totalSources > 0;
+      // Only check if training progress actually changed
+      const currentProgress = trainingProgress;
+      const prevProgress = prevTrainingProgressRef.current;
+      
+      if (currentProgress === prevProgress) return;
+      
+      prevTrainingProgressRef.current = currentProgress;
+      
+      const needed = currentProgress?.status !== 'completed' && (currentProgress?.totalSources || 0) > 0;
       
       setRetrainingNeeded({
         needed,
@@ -47,7 +56,7 @@ export const useAgentRetraining = (agentId?: string) => {
     } catch (error) {
       console.error('Error checking retraining status:', error);
     }
-  }, [agentId, trainingProgress?.status, trainingProgress?.totalSources]);
+  }, [agentId, trainingProgress]);
 
   const startRetraining = useCallback(async () => {
     if (!agentId) return;
@@ -69,23 +78,25 @@ export const useAgentRetraining = (agentId?: string) => {
     }
   }, [agentId, startTraining]);
 
-  // Update progress based on training progress
+  // Update progress based on training progress - only when it actually changes
   useEffect(() => {
-    if (trainingProgress) {
-      setProgress({
-        totalSources: trainingProgress.totalSources,
-        processedSources: trainingProgress.processedSources,
-        totalChunks: 0,
-        processedChunks: 0,
-        status: trainingProgress.status === 'training' ? 'processing' : 
-                trainingProgress.status === 'completed' ? 'completed' : 'pending'
-      });
+    if (!trainingProgress) return;
+    
+    const newProgress = {
+      totalSources: trainingProgress.totalSources,
+      processedSources: trainingProgress.processedSources,
+      totalChunks: 0,
+      processedChunks: 0,
+      status: trainingProgress.status === 'training' ? 'processing' as const : 
+              trainingProgress.status === 'completed' ? 'completed' as const : 'pending' as const
+    };
 
-      if (trainingProgress.status === 'completed' || trainingProgress.status === 'failed') {
-        setIsRetraining(false);
-      }
+    setProgress(newProgress);
+
+    if (trainingProgress.status === 'completed' || trainingProgress.status === 'failed') {
+      setIsRetraining(false);
     }
-  }, [trainingProgress]);
+  }, [trainingProgress?.status, trainingProgress?.totalSources, trainingProgress?.processedSources]);
 
   return {
     isRetraining,

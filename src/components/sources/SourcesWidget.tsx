@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
 import { useAgentRetraining } from "@/hooks/useAgentRetraining";
@@ -31,6 +31,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   
   useAgentSourcesRealtime();
 
+  // Refs to track previous values and prevent infinite loops
+  const prevStatsRef = useRef(stats);
+  const prevTrainingStatusRef = useRef(trainingProgress?.status);
+
   // Memoize stable values to prevent infinite loops
   const isTrainingActive = useMemo(() => 
     trainingProgress?.status === 'training' || isRetraining, 
@@ -42,7 +46,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     [trainingProgress?.status, retrainingNeeded?.needed]
   );
 
-  // Memoize event handlers to prevent re-creation on every render
+  // Stable event handlers
   const handleTrainingCompleted = useCallback((event: CustomEvent) => {
     toast({
       title: "Training Complete!",
@@ -51,7 +55,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     });
     
     refetchStats();
-    setTimeout(() => checkRetrainingNeeded(), 1000);
+    setTimeout(() => checkRetrainingNeeded(), 2000);
   }, [refetchStats, checkRetrainingNeeded]);
 
   const handleTrainingContinuesInBackground = useCallback(() => {
@@ -66,7 +70,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const handleSourceEvent = useCallback(() => {
     setIsTrainingInBackground(false);
     refetchStats();
-    setTimeout(() => checkRetrainingNeeded(), 1500);
+    setTimeout(() => checkRetrainingNeeded(), 2000);
   }, [refetchStats, checkRetrainingNeeded]);
 
   // Listen for training events with stable handlers
@@ -80,25 +84,40 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [handleTrainingCompleted, handleTrainingContinuesInBackground]);
 
-  // Check retraining status only when necessary values change
+  // Check retraining status only when stats actually change
   useEffect(() => {
-    if (agentId && stats?.totalSources !== undefined) {
-      checkRetrainingNeeded();
+    if (!agentId || !stats) return;
+    
+    const statsChanged = prevStatsRef.current?.totalSources !== stats.totalSources ||
+                        prevStatsRef.current?.requiresTraining !== stats.requiresTraining ||
+                        prevStatsRef.current?.unprocessedCrawledPages !== stats.unprocessedCrawledPages;
+    
+    if (statsChanged) {
+      prevStatsRef.current = stats;
+      const timeoutId = setTimeout(() => checkRetrainingNeeded(), 1000);
+      return () => clearTimeout(timeoutId);
     }
-  }, [agentId, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
+  }, [agentId, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages, checkRetrainingNeeded]);
 
   // Handle training state transitions with stable dependencies
   useEffect(() => {
-    if (isTrainingCompleted) {
+    const currentStatus = trainingProgress?.status;
+    const statusChanged = prevTrainingStatusRef.current !== currentStatus;
+    
+    if (statusChanged && currentStatus === 'completed') {
+      prevTrainingStatusRef.current = currentStatus;
       setIsTrainingInBackground(false);
+      
       const timeoutId = setTimeout(() => {
         refetchStats();
         checkRetrainingNeeded();
       }, 2000);
       
       return () => clearTimeout(timeoutId);
+    } else if (statusChanged) {
+      prevTrainingStatusRef.current = currentStatus;
     }
-  }, [isTrainingCompleted, refetchStats, checkRetrainingNeeded]);
+  }, [trainingProgress?.status, refetchStats, checkRetrainingNeeded]);
 
   // Listen for source events with stable handler
   useEffect(() => {
