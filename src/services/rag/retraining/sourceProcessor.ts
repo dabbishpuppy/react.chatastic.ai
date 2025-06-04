@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DatabaseSource } from '../types/retrainingTypes';
 
@@ -11,7 +12,7 @@ export class SourceProcessor {
         // Check if this source has unprocessed crawled pages
         const { data: unprocessedPages, error: pagesError } = await supabase
           .from('source_pages')
-          .select('id')
+          .select('id, url, status, processing_status')
           .eq('parent_source_id', source.id)
           .eq('status', 'completed')
           .in('processing_status', ['pending', null]);
@@ -23,16 +24,97 @@ export class SourceProcessor {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Processing ${unprocessedPages.length} crawled pages for ${source.title}`);
           
-          // Process crawled pages via edge function WITHOUT pre-marking as processed
-          const { data, error } = await supabase.functions.invoke('process-crawled-pages', {
-            body: { parentSourceId: source.id }
-          });
+          // Process each page individually via process-page-content
+          let processedCount = 0;
+          let totalChunks = 0;
+          
+          for (const page of unprocessedPages) {
+            try {
+              console.log(`🔧 Processing page: ${page.url} (ID: ${page.id})`);
+              
+              // Mark page as processing to avoid duplicate processing
+              await supabase
+                .from('source_pages')
+                .update({ 
+                  processing_status: 'processing',
+                  metadata: {
+                    chunk_processing_started: new Date().toISOString()
+                  }
+                })
+                .eq('id', page.id);
 
-          if (error) {
-            throw new Error(`Failed to process crawled pages: ${error.message}`);
+              // Call process-page-content directly for this specific page
+              const { data: processingResult, error: processingError } = await supabase.functions.invoke('process-page-content', {
+                body: { pageId: page.id }
+              });
+
+              if (processingError) {
+                console.error(`❌ Failed to process page ${page.id}:`, processingError);
+                
+                // Mark as failed
+                await supabase
+                  .from('source_pages')
+                  .update({ 
+                    processing_status: 'failed',
+                    metadata: {
+                      processing_error: processingError.message,
+                      chunk_processing_failed_at: new Date().toISOString()
+                    }
+                  })
+                  .eq('id', page.id);
+                
+                continue;
+              }
+
+              // Mark as processed successfully
+              await supabase
+                .from('source_pages')
+                .update({ 
+                  processing_status: 'processed',
+                  chunks_created: processingResult?.chunksCreated || 0,
+                  metadata: {
+                    chunk_processing_completed_at: new Date().toISOString(),
+                    chunks_created: processingResult?.chunksCreated || 0
+                  }
+                })
+                .eq('id', page.id);
+
+              processedCount++;
+              totalChunks += processingResult?.chunksCreated || 0;
+              console.log(`✅ Processed page ${page.id} - created ${processingResult?.chunksCreated || 0} chunks`);
+
+            } catch (error) {
+              console.error(`❌ Error processing page ${page.id}:`, error);
+              
+              // Mark as failed
+              await supabase
+                .from('source_pages')
+                .update({ 
+                  processing_status: 'failed',
+                  metadata: {
+                    processing_error: error.message,
+                    chunk_processing_failed_at: new Date().toISOString()
+                  }
+                })
+                .eq('id', page.id);
+            }
           }
 
-          console.log(`✅ Processed crawled pages for ${source.title}:`, data);
+          // Update parent source metadata after processing all pages
+          await supabase
+            .from('agent_sources')
+            .update({ 
+              requires_manual_training: false,
+              metadata: {
+                last_training_at: new Date().toISOString(),
+                pages_processed: processedCount,
+                total_chunks_created: totalChunks,
+                processing_method: 'direct_page_processing'
+              }
+            })
+            .eq('id', source.id);
+
+          console.log(`✅ Completed processing ${source.title}: ${processedCount}/${unprocessedPages.length} pages, created ${totalChunks} total chunks`);
           return;
         } else {
           console.log(`⚠️ Website source ${source.title} has no crawled pages to process`);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
+import { SourceProcessor } from '@/services/rag/retraining/sourceProcessor';
 
 interface TrainingProgress {
   agentId: string;
@@ -330,105 +331,6 @@ export const useTrainingNotifications = () => {
     }
   };
 
-  const processSource = async (source: DatabaseSource) => {
-    try {
-      console.log(`🔄 Processing source: ${source.title} (${source.source_type})`);
-
-      // Get content for processing
-      let contentToProcess = '';
-      
-      if (source.source_type === 'qa') {
-        const metadata = (source.metadata as Record<string, any>) || {};
-        if (metadata?.question && metadata?.answer) {
-          contentToProcess = `Question: ${metadata.question}\nAnswer: ${metadata.answer}`;
-        } else {
-          throw new Error('Q&A source missing question or answer');
-        }
-      } else {
-        contentToProcess = source.content || '';
-        if (!contentToProcess.trim()) {
-          throw new Error('Source has no content to process');
-        }
-      }
-
-      // Mark as processing first
-      const currentMetadata = (source.metadata as Record<string, any>) || {};
-      await supabase
-        .from('agent_sources')
-        .update({
-          metadata: {
-            ...currentMetadata,
-            processing_status: 'processing',
-            training_started_at: new Date().toISOString()
-          }
-        })
-        .eq('id', source.id);
-
-      // Generate chunks
-      console.log(`🔧 Generating chunks for source ${source.id}`);
-      const { data: chunkData, error: chunkError } = await supabase.functions.invoke('generate-chunks', {
-        body: { 
-          sourceId: source.id,
-          content: contentToProcess,
-          sourceType: source.source_type 
-        }
-      });
-
-      if (chunkError) {
-        throw new Error(`Failed to generate chunks: ${chunkError.message}`);
-      }
-
-      console.log(`✅ Generated chunks for source ${source.id}:`, chunkData);
-
-      // Generate embeddings
-      console.log(`🤖 Generating embeddings for source ${source.id}`);
-      const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
-        body: { sourceId: source.id }
-      });
-
-      if (embeddingError) {
-        throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
-      }
-
-      console.log(`✅ Generated embeddings for source ${source.id}:`, embeddingData);
-
-      // Update source metadata to reflect successful processing
-      await supabase
-        .from('agent_sources')
-        .update({
-          metadata: {
-            ...currentMetadata,
-            processing_status: 'completed',
-            last_processed_at: new Date().toISOString(),
-            chunks_generated: chunkData?.chunksCreated || embeddingData?.processedCount || 0,
-            embeddings_generated: embeddingData?.processedCount || 0
-          }
-        })
-        .eq('id', source.id);
-
-      console.log(`✅ Successfully processed source ${source.id}`);
-
-    } catch (error) {
-      console.error(`❌ Failed to process source ${source.title}:`, error);
-      
-      // Update source metadata to reflect processing failure
-      const currentMetadata = (source.metadata as Record<string, any>) || {};
-      await supabase
-        .from('agent_sources')
-        .update({
-          metadata: {
-            ...currentMetadata,
-            processing_status: 'failed',
-            last_processing_attempt: new Date().toISOString(),
-            processing_error: error instanceof Error ? error.message : 'Unknown error'
-          }
-        })
-        .eq('id', source.id);
-      
-      throw error;
-    }
-  };
-
   const startTraining = async () => {
     if (!agentId) return;
 
@@ -476,8 +378,6 @@ export const useTrainingNotifications = () => {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Found ${unprocessedPages.length} crawled pages to process for ${websiteSource.title}`);
           sourcesToProcess.push(websiteSource);
-          
-          // DON'T mark pages as processed here - let process-crawled-pages handle it
         }
       }
 
@@ -516,23 +416,19 @@ export const useTrainingNotifications = () => {
         processedSources: 0
       });
 
-      // IMPROVED: Show better toast notification
       toast({
         title: "Training Started",
         description: `Processing ${sourcesToProcess.length} source${sourcesToProcess.length > 1 ? 's' : ''} for AI training...`,
         duration: 3000,
       });
 
-      // Process non-website sources
-      const nonWebsiteSources = sourcesToProcess.filter(s => s.source_type !== 'website');
-      const processingPromises = nonWebsiteSources.map(async (source) => {
-        return processSource(source);
+      // Process all sources using the improved SourceProcessor
+      const processingPromises = sourcesToProcess.map(async (source) => {
+        return SourceProcessor.processSource(source);
       });
 
-      // Process all non-website sources in parallel
-      if (processingPromises.length > 0) {
-        await Promise.allSettled(processingPromises);
-      }
+      // Process all sources in parallel
+      await Promise.allSettled(processingPromises);
 
       // Trigger immediate completion check
       setTimeout(() => {
@@ -542,7 +438,6 @@ export const useTrainingNotifications = () => {
     } catch (error) {
       console.error('Failed to start training:', error);
       
-      // IMPROVED: Show more specific error message
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
       
       if (isConflictError) {
