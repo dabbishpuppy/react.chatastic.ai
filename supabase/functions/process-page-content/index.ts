@@ -49,7 +49,7 @@ serve(async (req) => {
 
     console.log(`🔄 Processing content for page: ${pageId}`);
 
-    // FIXED: Use atomic update with proper concurrency control
+    // FIXED: Use atomic update with proper concurrency control for processing_status
     const { data: updateResult, error: lockError } = await supabase
       .from('source_pages')
       .update({ 
@@ -57,16 +57,17 @@ serve(async (req) => {
         started_at: new Date().toISOString()
       })
       .eq('id', pageId)
-      .in('processing_status', ['pending']) // Only update if currently pending
+      .eq('status', 'completed') // Only process completed crawled pages
+      .in('processing_status', ['pending', null]) // Only update if not already being processed
       .select()
       .single();
 
     if (lockError || !updateResult) {
-      console.log(`⏭️ Page ${pageId} already being processed or completed`);
+      console.log(`⏭️ Page ${pageId} already being processed, not crawled yet, or doesn't exist`);
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Page is already being processed or completed',
+          message: 'Page is already being processed, not crawled yet, or does not exist',
           pageId
         }),
         {

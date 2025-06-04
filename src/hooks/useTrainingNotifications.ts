@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -62,7 +63,7 @@ export const useTrainingNotifications = () => {
       const channel = supabase
         .channel(`enhanced-training-notifications-${agentId}`)
         
-        // FIXED: Subscribe to processing_status changes (not status changes)
+        // FIXED: Subscribe to processing_status changes (not status changes) 
         .on(
           'postgres_changes',
           {
@@ -75,13 +76,13 @@ export const useTrainingNotifications = () => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
-            // Only trigger on processing_status changes
+            // FIXED: Only trigger on processing_status changes, not crawling status
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
               console.log('📡 Page processing status change:', {
                 pageId: updatedPage.id,
                 url: updatedPage.url,
-                oldStatus: oldPage?.processing_status,
-                newStatus: updatedPage.processing_status,
+                oldProcessingStatus: oldPage?.processing_status,
+                newProcessingStatus: updatedPage.processing_status,
                 parentSourceId: updatedPage.parent_source_id
               });
 
@@ -195,7 +196,7 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // FIXED: Calculate what needs training more accurately
+      // FIXED: Calculate what needs training more accurately - focus on processing status
       const sourcesNeedingTraining = [];
       let totalPagesNeedingProcessing = 0;
       let totalPagesProcessed = 0;
@@ -229,7 +230,7 @@ export const useTrainingNotifications = () => {
             currentlyProcessingPages.push(...processingPages.map(p => p.url || p.id));
           }
         } else {
-          // For other sources, check processing status
+          // For other sources, check processing status in metadata
           const hasContent = source.source_type === 'qa' ? 
             (metadata?.question && metadata?.answer) :
             source.content && source.content.trim().length > 0;
@@ -257,7 +258,7 @@ export const useTrainingNotifications = () => {
       if (currentlyProcessingPages.length > 0) {
         status = 'training';
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-        // Only mark as completed if we have processed some pages and nothing needs training
+        // FIXED: Only mark as completed if we have processed some pages and nothing needs training
         status = 'completed';
       } else if (totalPagesProcessed > 0 && totalPagesProcessed < totalPagesNeedingProcessing) {
         status = 'training'; // Some processed, but not all
