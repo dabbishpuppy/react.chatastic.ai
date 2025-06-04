@@ -33,11 +33,11 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   unprocessedCrawledPages = 0
 }) => {
   const getRetrainButtonProps = () => {
-    // Training completed - show green success state
+    // Training completed - show green success state (highest priority)
     if (isTrainingCompleted && !retrainingNeeded && !requiresTraining) {
       return {
         variant: "outline" as const,
-        disabled: false,
+        disabled: false, // Always clickable
         icon: <CheckCircle className="h-4 w-4" />,
         text: "Agent Trained",
         className: "bg-green-50 border-green-200 text-green-700"
@@ -48,7 +48,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     if (isRetraining || isTrainingInBackground) {
       return {
         variant: "outline" as const,
-        disabled: true,
+        disabled: false, // Always clickable to view progress
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
         text: isTrainingInBackground ? "Agent Training In Progress" : "Processing...",
         className: "bg-yellow-50 border-yellow-200 text-yellow-700"
@@ -59,7 +59,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     if (retrainingNeeded || requiresTraining) {
       return {
         variant: "default" as const,
-        disabled: false,
+        disabled: false, // Always clickable
         icon: <RefreshCw className="h-4 w-4" />,
         text: unprocessedCrawledPages > 0 ? "Train crawled pages" : "Retrain agent",
         className: "bg-black hover:bg-gray-800 text-white w-full"
@@ -69,7 +69,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     // Default up-to-date state
     return {
       variant: "outline" as const,
-      disabled: false,
+      disabled: false, // Always clickable
       icon: <CheckCircle className="h-4 w-4" />,
       text: "Agent Trained",
       className: "bg-green-50 border-green-200 text-green-700"
@@ -92,6 +92,16 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   };
 
   const trainingMessage = getTrainingMessage();
+
+  console.log('🔍 SourcesContent button state:', {
+    isTrainingCompleted,
+    isRetraining,
+    isTrainingInBackground,
+    retrainingNeeded,
+    requiresTraining,
+    buttonText: buttonProps.text,
+    buttonDisabled: buttonProps.disabled
+  });
 
   return (
     <div className="space-y-6">

@@ -19,6 +19,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
+  const [isTrainingCompleted, setIsTrainingCompleted] = useState(false);
   
   const {
     isRetraining,
@@ -41,17 +42,36 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
 
-  // Reset background training state when training completes
+  // Handle training state transitions with improved logic
   useEffect(() => {
     if (trainingProgress?.status === 'completed') {
+      console.log('🎉 Training completed, updating states');
       setIsTrainingInBackground(false);
+      setIsTrainingCompleted(true);
+      
+      // After a brief period, refresh stats and recheck training status
+      setTimeout(() => {
+        refetchStats();
+        checkRetrainingNeeded();
+      }, 2000);
+    } else if (trainingProgress?.status === 'training') {
+      setIsTrainingCompleted(false);
     }
-  }, [trainingProgress?.status]);
+  }, [trainingProgress?.status, refetchStats, checkRetrainingNeeded]);
+
+  // Reset completion state when new training is needed
+  useEffect(() => {
+    if (retrainingNeeded?.needed || stats?.requiresTraining) {
+      setIsTrainingCompleted(false);
+    }
+  }, [retrainingNeeded?.needed, stats?.requiresTraining]);
 
   // Listen for various source events to trigger retraining status check
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
       console.log(`📁 Source event: ${event.type}, checking retraining status`);
+      // Reset completion state when sources change
+      setIsTrainingCompleted(false);
       // Refetch stats and check retraining status
       refetchStats();
       setTimeout(() => {
@@ -73,13 +93,15 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [refetchStats, checkRetrainingNeeded]);
 
-  console.log(`📊 SourcesWidget render with enhanced stats:`, {
+  console.log(`📊 SourcesWidget render with enhanced state management:`, {
     totalSources: stats?.totalSources || 0,
     requiresTraining: stats?.requiresTraining || false,
     unprocessedCrawledPages: stats?.unprocessedCrawledPages || 0,
     retrainingNeeded: retrainingNeeded?.needed,
-    trainingProgress: trainingProgress?.status,
-    isTrainingInBackground
+    trainingProgressStatus: trainingProgress?.status,
+    isTrainingInBackground,
+    isTrainingCompleted,
+    isRetraining
   });
 
   // Format total size from stats
@@ -104,7 +126,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
 
   // Check if training is active (prioritize trainingProgress over isRetraining)
   const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
-  const isTrainingCompleted = trainingProgress?.status === 'completed';
 
   if (isLoading) {
     return <SourcesLoadingState />;
