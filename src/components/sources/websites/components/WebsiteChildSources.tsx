@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -268,12 +267,14 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   const getStatusBadge = (status: string, processingStatus?: string) => {
     const baseClasses = 'px-2 py-1 text-xs rounded-full font-medium';
     
-    // Show processing status for completed crawls
+    // New status flow: Handle new status and training states
     if (status === 'completed' && processingStatus) {
       if (processingStatus === 'processed') {
-        return `${baseClasses} bg-green-100 text-green-800`;
+        return `${baseClasses} bg-cyan-100 text-cyan-800`; // trained - cyan
+      } else if (processingStatus === 'processing') {
+        return `${baseClasses} bg-yellow-100 text-yellow-800`; // training - yellow
       } else if (processingStatus === 'pending') {
-        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+        return `${baseClasses} bg-green-100 text-green-800`; // new - green
       } else if (processingStatus === 'failed') {
         return `${baseClasses} bg-red-100 text-red-800`;
       }
@@ -290,9 +291,11 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   };
 
   const getStatusText = (status: string, processingStatus?: string) => {
+    // New status flow labels
     if (status === 'completed' && processingStatus) {
       if (processingStatus === 'processed') return 'trained';
-      if (processingStatus === 'pending') return 'crawled';
+      if (processingStatus === 'processing') return 'training';
+      if (processingStatus === 'pending') return 'new';
       if (processingStatus === 'failed') return 'training failed';
     }
     return status.replace('_', ' ');

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
 import { useAgentRetraining } from "@/hooks/useAgentRetraining";
+import { useTrainingNotifications } from "@/hooks/useTrainingNotifications";
 import { useParams } from "react-router-dom";
 import SourcesLoadingState from "./SourcesLoadingState";
 import SourcesErrorState from "./SourcesErrorState";
@@ -25,6 +26,9 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     startRetraining,
     checkRetrainingNeeded
   } = useAgentRetraining(agentId);
+
+  // Use the new training notifications system
+  const { trainingProgress } = useTrainingNotifications();
   
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
@@ -40,7 +44,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     totalSources: stats?.totalSources || 0,
     requiresTraining: stats?.requiresTraining || false,
     unprocessedCrawledPages: stats?.unprocessedCrawledPages || 0,
-    retrainingNeeded: retrainingNeeded?.needed
+    retrainingNeeded: retrainingNeeded?.needed,
+    trainingProgress: trainingProgress?.status
   });
 
   // Format total size from stats
@@ -53,6 +58,9 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const handleRetrainClick = () => {
     setShowRetrainingDialog(true);
   };
+
+  // Check if training is active (either old system or new system)
+  const isTrainingActive = isRetraining || trainingProgress?.status === 'training';
 
   if (isLoading) {
     return <SourcesLoadingState />;
@@ -75,7 +83,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         currentTab={currentTab}
         onRetrainClick={handleRetrainClick}
         retrainingNeeded={retrainingNeeded?.needed || false}
-        isRetraining={isRetraining}
+        isRetraining={isTrainingActive}
         requiresTraining={stats.requiresTraining}
         unprocessedCrawledPages={stats.unprocessedCrawledPages}
       />
@@ -83,7 +91,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       <RetrainingDialog
         open={showRetrainingDialog}
         onOpenChange={setShowRetrainingDialog}
-        isRetraining={isRetraining}
+        isRetraining={isTrainingActive}
         progress={progress}
         retrainingNeeded={retrainingNeeded}
         onStartRetraining={startRetraining}
