@@ -1,17 +1,19 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { CrawlOptions } from "./website/types";
+import { EnhancedPageProcessor } from "./website/enhancedPageProcessor";
+import { StandardPageProcessor } from "./website/standardPageProcessor";
 import { CrawlMetadataManager } from "./website/crawlMetadataManager";
 
 export class WebsiteCrawlService {
-  // Enhanced crawling function - only crawls, no content processing
+  // Enhanced crawling function with advanced compression
   static async startEnhancedCrawl(
     agentId: string,
     sourceId: string,
     initialUrl: string,
     options: CrawlOptions = {}
   ): Promise<void> {
-    console.log('🚀 Starting enhanced crawl (crawl only, no processing)');
+    console.log('🚀 Starting enhanced crawl with advanced compression pipeline');
     
     // Get team_id for metrics
     const { data: agent } = await supabase
@@ -26,13 +28,13 @@ export class WebsiteCrawlService {
     }
 
     try {
-      // Update the source metadata
+      // Update the source metadata with advanced compression settings
       await CrawlMetadataManager.updateSourceCrawlMetadata(sourceId, {
         ...options,
-        enableContentProcessing: false // Key change: disable automatic processing
+        enableAdvancedCompression: true
       });
 
-      // Call the edge function with content processing disabled
+      // Call the edge function with advanced compression enabled
       const { data, error } = await supabase.functions.invoke('crawl-website', {
         body: { 
           source_id: sourceId,
@@ -41,25 +43,59 @@ export class WebsiteCrawlService {
           max_pages: options.maxPages,
           max_depth: options.maxDepth,
           concurrency: options.concurrency,
-          enable_content_pipeline: false, // Disable automatic content processing
-          enable_advanced_compression: false,
+          enable_content_pipeline: true,
+          enable_advanced_compression: true, // Critical flag for advanced compression
           include_paths: typeof options.includePaths === 'string' ? options.includePaths.split(',') : options.includePaths,
           exclude_paths: typeof options.excludePaths === 'string' ? options.excludePaths.split(',') : options.excludePaths
         }
       });
 
       if (error) {
-        console.error('Error calling crawl function:', error);
+        console.error('Error calling enhanced crawl function:', error);
         throw error;
       }
 
-      console.log('Crawl function response (crawl only):', data);
+      console.log('Enhanced crawl function response:', data);
     } catch (error) {
-      console.error('Failed to start crawl:', error);
+      console.error('Failed to start enhanced crawl:', error);
       
       // Update source status to failed
       await CrawlMetadataManager.updateSourceStatus(sourceId, 'failed', 0);
       throw error;
     }
+  }
+
+  // Enhanced page processing with advanced compression
+  static async processPageContentAdvanced(
+    sourceId: string,
+    agentId: string,
+    teamId: string,
+    url: string,
+    htmlContent: string
+  ) {
+    return EnhancedPageProcessor.processPageContentAdvanced(
+      sourceId,
+      agentId,
+      teamId,
+      url,
+      htmlContent
+    );
+  }
+
+  // Process a single page through the complete content pipeline
+  static async processPageContent(
+    sourceId: string,
+    agentId: string,
+    teamId: string,
+    url: string,
+    htmlContent: string
+  ) {
+    return StandardPageProcessor.processPageContent(
+      sourceId,
+      agentId,
+      teamId,
+      url,
+      htmlContent
+    );
   }
 }

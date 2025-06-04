@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DatabaseSource } from '../types/retrainingTypes';
 
@@ -11,10 +12,10 @@ export class SourceProcessor {
         // Check if this source has unprocessed crawled pages
         const { data: unprocessedPages, error: pagesError } = await supabase
           .from('source_pages')
-          .select('id, url, status, processing_status')
+          .select('id')
           .eq('parent_source_id', source.id)
           .eq('status', 'completed')
-          .in('processing_status', ['pending', null]);
+          .eq('processing_status', 'pending');
 
         if (pagesError) {
           throw new Error(`Failed to check crawled pages: ${pagesError.message}`);
@@ -23,79 +24,16 @@ export class SourceProcessor {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Processing ${unprocessedPages.length} crawled pages for ${source.title}`);
           
-          // Process each page individually via process-page-content
-          let processedCount = 0;
-          let totalChunks = 0;
-          
-          for (const page of unprocessedPages) {
-            try {
-              console.log(`🔧 Processing page: ${page.url} (ID: ${page.id})`);
-              
-              // Call process-page-content directly for this specific page
-              const { data: processingResult, error: processingError } = await supabase.functions.invoke('process-page-content', {
-                body: { pageId: page.id }
-              });
+          // Process crawled pages
+          const { data, error } = await supabase.functions.invoke('process-crawled-pages', {
+            body: { parentSourceId: source.id }
+          });
 
-              if (processingError) {
-                console.error(`❌ Failed to process page ${page.id}:`, processingError);
-                
-                // Mark as failed directly - no intermediate processing status
-                await supabase
-                  .from('source_pages')
-                  .update({ 
-                    processing_status: 'failed',
-                    error_message: processingError.message
-                  })
-                  .eq('id', page.id);
-                
-                continue;
-              }
-
-              // Mark as processed successfully directly - no intermediate processing status
-              await supabase
-                .from('source_pages')
-                .update({ 
-                  processing_status: 'processed',
-                  chunks_created: processingResult?.chunksCreated || 0
-                })
-                .eq('id', page.id);
-
-              processedCount++;
-              totalChunks += processingResult?.chunksCreated || 0;
-              console.log(`✅ Processed page ${page.id} - created ${processingResult?.chunksCreated || 0} chunks`);
-
-            } catch (error) {
-              console.error(`❌ Error processing page ${page.id}:`, error);
-              
-              // Mark as failed directly - no intermediate processing status
-              await supabase
-                .from('source_pages')
-                .update({ 
-                  processing_status: 'failed',
-                  error_message: error.message
-                })
-                .eq('id', page.id);
-            }
+          if (error) {
+            throw new Error(`Failed to process crawled pages: ${error.message}`);
           }
 
-          // Update parent source metadata after processing all pages
-          await supabase
-            .from('agent_sources')
-            .update({ 
-              requires_manual_training: false,
-              metadata: {
-                last_training_at: new Date().toISOString(),
-                pages_processed: processedCount,
-                total_chunks_created: totalChunks,
-                processing_method: 'direct_page_processing'
-              }
-            })
-            .eq('id', source.id);
-
-          console.log(`✅ Completed processing ${source.title}: ${processedCount}/${unprocessedPages.length} pages, created ${totalChunks} total chunks`);
-          return;
-        } else {
-          console.log(`⚠️ Website source ${source.title} has no crawled pages to process`);
+          console.log(`✅ Processed crawled pages for ${source.title}:`, data);
           return;
         }
       }
@@ -144,19 +82,6 @@ export class SourceProcessor {
     try {
       console.log(`🔄 Processing text content for source ${sourceId} (${sourceType})`);
 
-      // Mark as processing first
-      const currentMetadata = await this.getSourceMetadata(sourceId);
-      await supabase
-        .from('agent_sources')
-        .update({
-          metadata: {
-            ...currentMetadata,
-            processing_status: 'processing',
-            training_started_at: new Date().toISOString()
-          }
-        })
-        .eq('id', sourceId);
-
       // First, create chunks for the content
       console.log(`🔧 Generating chunks for source ${sourceId}...`);
       const { data: chunkData, error: chunkError } = await supabase.functions.invoke('generate-chunks', {
@@ -181,7 +106,7 @@ export class SourceProcessor {
         console.log(`✅ Generated chunks for source ${sourceId}:`, chunkData);
       }
 
-      // Then generate embeddings for the chunks
+      // Then generate embeddings for the chunks with better error handling
       console.log(`🤖 Generating embeddings for source ${sourceId}...`);
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
         body: { sourceId }
@@ -189,7 +114,17 @@ export class SourceProcessor {
 
       if (embeddingError) {
         console.error(`❌ Failed to generate embeddings for source ${sourceId}:`, embeddingError);
-        throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
+        
+        // Check if it's a network/connection error or function error
+        if (embeddingError.message?.includes('Failed to send a request') || 
+            embeddingError.message?.includes('network') ||
+            embeddingError.message?.includes('connection')) {
+          throw new Error(`Network error while generating embeddings. Please check your internet connection and try again.`);
+        } else if (embeddingError.message?.includes('OpenAI API key')) {
+          throw new Error(`OpenAI API key is missing or invalid. Please configure your API key in the Supabase secrets.`);
+        } else {
+          throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
+        }
       }
 
       console.log(`✅ Generated embeddings for source ${sourceId}:`, embeddingData);
@@ -199,7 +134,7 @@ export class SourceProcessor {
         .from('agent_sources')
         .update({
           metadata: {
-            ...currentMetadata,
+            ...(await this.getSourceMetadata(sourceId)),
             processing_status: 'completed',
             last_processed_at: new Date().toISOString(),
             chunks_generated: chunkData?.chunksCreated || embeddingData?.processedCount || 0,

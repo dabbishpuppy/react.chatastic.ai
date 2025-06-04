@@ -1,3 +1,4 @@
+
 export interface CrawlOptions {
   maxDepth?: number;
   maxPages?: number;
@@ -6,7 +7,6 @@ export interface CrawlOptions {
   respectRobots?: boolean;
   concurrency?: number;
   enableAdvancedCompression?: boolean;
-  enableContentProcessing?: boolean;
 }
 
 export interface ProcessingResult {

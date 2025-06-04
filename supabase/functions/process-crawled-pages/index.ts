@@ -21,13 +21,13 @@ serve(async (req) => {
 
     console.log(`🔄 Processing crawled pages for parent source: ${parentSourceId}`);
 
-    // Get all crawled but unprocessed pages - FIXED: Check for pending processing status
+    // Get all crawled but unprocessed pages
     const { data: pages, error: pagesError } = await supabase
       .from('source_pages')
       .select('*')
       .eq('parent_source_id', parentSourceId)
       .eq('status', 'completed')
-      .eq('processing_status', 'pending'); // Only get truly pending pages
+      .eq('processing_status', 'pending');
 
     if (pagesError) {
       throw new Error(`Failed to fetch pages: ${pagesError.message}`);
@@ -45,37 +45,23 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📄 Found ${pages.length} pages to process for chunk creation`);
+    console.log(`Found ${pages.length} pages to process`);
 
     let processedCount = 0;
     let totalChunks = 0;
-    let errors = [];
 
-    // Process each page to create chunks
+    // Process each page
     for (const page of pages) {
       try {
-        console.log(`🔧 Creating chunks for page: ${page.url} (ID: ${page.id})`);
+        console.log(`Processing page: ${page.url}`);
 
-        // Mark page as processing to avoid duplicate processing
-        await supabase
-          .from('source_pages')
-          .update({ 
-            processing_status: 'processing',
-            metadata: {
-              ...page.metadata,
-              chunk_processing_started: new Date().toISOString()
-            }
-          })
-          .eq('id', page.id);
-
-        // Call the page content processor to create chunks
+        // Call the child job processor to create chunks and embeddings
         const processingResult = await supabase.functions.invoke('process-page-content', {
           body: { pageId: page.id }
         });
 
         if (processingResult.error) {
-          console.error(`❌ Failed to process page ${page.id}:`, processingResult.error);
-          
+          console.error(`Failed to process page ${page.id}:`, processingResult.error);
           // Mark as failed
           await supabase
             .from('source_pages')
@@ -84,16 +70,14 @@ serve(async (req) => {
               metadata: {
                 ...page.metadata,
                 processing_error: processingResult.error.message,
-                chunk_processing_failed_at: new Date().toISOString()
+                processed_at: new Date().toISOString()
               }
             })
             .eq('id', page.id);
-          
-          errors.push(`Page ${page.url}: ${processingResult.error.message}`);
           continue;
         }
 
-        // Mark as processed successfully
+        // Mark as processed
         await supabase
           .from('source_pages')
           .update({ 
@@ -101,8 +85,7 @@ serve(async (req) => {
             chunks_created: processingResult.data?.chunksCreated || 0,
             metadata: {
               ...page.metadata,
-              chunk_processing_completed_at: new Date().toISOString(),
-              chunks_created: processingResult.data?.chunksCreated || 0
+              processed_at: new Date().toISOString()
             }
           })
           .eq('id', page.id);
@@ -112,8 +95,7 @@ serve(async (req) => {
         console.log(`✅ Processed page ${page.id} - created ${processingResult.data?.chunksCreated || 0} chunks`);
 
       } catch (error) {
-        console.error(`❌ Error processing page ${page.id}:`, error);
-        
+        console.error(`Error processing page ${page.id}:`, error);
         // Mark as failed
         await supabase
           .from('source_pages')
@@ -122,16 +104,14 @@ serve(async (req) => {
             metadata: {
               ...page.metadata,
               processing_error: error.message,
-              chunk_processing_failed_at: new Date().toISOString()
+              processed_at: new Date().toISOString()
             }
           })
           .eq('id', page.id);
-        
-        errors.push(`Page ${page.url}: ${error.message}`);
       }
     }
 
-    // Update parent source metadata
+    // Update parent source
     await supabase
       .from('agent_sources')
       .update({ 
@@ -139,29 +119,21 @@ serve(async (req) => {
         metadata: {
           last_training_at: new Date().toISOString(),
           pages_processed: processedCount,
-          total_chunks_created: totalChunks,
-          processing_errors: errors.length > 0 ? errors : undefined
+          total_chunks_created: totalChunks
         }
       })
       .eq('id', parentSourceId);
 
-    console.log(`✅ Completed chunk processing: ${processedCount}/${pages.length} pages, created ${totalChunks} total chunks`);
-
-    const result = {
-      success: true,
-      processedPages: processedCount,
-      totalPages: pages.length,
-      totalChunks,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully processed ${processedCount} pages and created ${totalChunks} chunks`
-    };
-
-    if (errors.length > 0) {
-      console.warn(`⚠️ Processing completed with ${errors.length} errors:`, errors);
-    }
+    console.log(`✅ Completed processing ${processedCount}/${pages.length} pages, created ${totalChunks} total chunks`);
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({
+        success: true,
+        processedPages: processedCount,
+        totalPages: pages.length,
+        totalChunks,
+        message: `Successfully processed ${processedCount} pages and created ${totalChunks} chunks`
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
