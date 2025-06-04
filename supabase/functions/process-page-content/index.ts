@@ -13,23 +13,122 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { pageId } = await req.json();
+    
+    // Parse request body with error handling
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (error) {
+      console.error('❌ Invalid JSON in request body:', error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid JSON in request body'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
+    const { pageId } = requestBody;
 
     if (!pageId) {
-      throw new Error('pageId is required');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'pageId is required'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
     console.log(`🔄 Processing content for page: ${pageId}`);
 
-    // Get the page details
+    // Get the page details with error handling
     const { data: page, error: pageError } = await supabase
       .from('source_pages')
       .select('*')
       .eq('id', pageId)
       .single();
 
-    if (pageError || !page) {
-      throw new Error(`Page not found: ${pageError?.message}`);
+    if (pageError) {
+      console.error('❌ Database error fetching page:', pageError);
+      if (pageError.code === 'PGRST116') {
+        // No rows returned
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Page not found: ${pageId}`,
+            pageId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Database error: ${pageError.message}`
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    if (!page) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Page not found: ${pageId}`,
+          pageId
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
+    }
+
+    // Check if page is already processed
+    if (page.processing_status === 'processed') {
+      console.log(`✅ Page ${pageId} already processed, returning success`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Page was already processed',
+          pageId,
+          data: {
+            chunksCreated: page.chunks_created || 0,
+            alreadyProcessed: true
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if page is currently being processed
+    if (page.processing_status === 'processing') {
+      console.log(`⏳ Page ${pageId} currently being processed`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Page is currently being processed',
+          pageId
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 409,
+        }
+      );
     }
 
     console.log(`📄 Processing page: ${page.url}`);
@@ -61,7 +160,18 @@ serve(async (req) => {
       } catch (error) {
         attempts++;
         if (attempts >= maxAttempts) {
-          throw new Error(`Failed to fetch after ${maxAttempts} attempts: ${error.message}`);
+          console.error(`❌ Failed to fetch after ${maxAttempts} attempts:`, error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Failed to fetch page content after ${maxAttempts} attempts: ${error.message}`,
+              pageId
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 502, // Bad Gateway - upstream server error
+            }
+          );
         }
         console.log(`Attempt ${attempts} failed for ${page.url}, retrying...`);
         await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
@@ -69,7 +179,17 @@ serve(async (req) => {
     }
 
     if (!response || !response.ok) {
-      throw new Error(`HTTP ${response?.status}: ${response?.statusText}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Failed to fetch page content: HTTP ${response?.status}: ${response?.statusText}`,
+          pageId
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 502,
+        }
+      );
     }
 
     const htmlContent = await response.text();
@@ -157,16 +277,42 @@ serve(async (req) => {
           }
         }];
 
-        // Insert chunks
-        const { error: insertError } = await supabase
-          .from('source_chunks')
-          .insert(fallbackChunks);
+        // Insert chunks with conflict handling
+        try {
+          const { error: insertError } = await supabase
+            .from('source_chunks')
+            .insert(fallbackChunks);
 
-        if (insertError) {
-          throw new Error(`Failed to insert chunks: ${insertError.message}`);
+          if (insertError) {
+            console.error('❌ Error inserting fallback chunks:', insertError);
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: `Failed to insert chunks: ${insertError.message}`,
+                pageId
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500,
+              }
+            );
+          }
+        } catch (error) {
+          console.error('❌ Unexpected error inserting fallback chunks:', error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Unexpected error inserting chunks: ${error.message}`,
+              pageId
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500,
+            }
+          );
         }
         
-        // Generate embeddings
+        // Generate embeddings with error handling
         try {
           await supabase.functions.invoke('generate-embeddings', {
             body: { sourceId: page.parent_source_id }
@@ -178,13 +324,26 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             success: true,
-            chunksCreated: 1,
-            message: 'Processed with title fallback'
+            data: {
+              chunksCreated: 1,
+              message: 'Processed with title fallback',
+              pageId
+            }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } else {
-        throw new Error(`No meaningful content found for ${page.url}`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `No meaningful content found for ${page.url}`,
+            pageId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 422, // Unprocessable Entity
+          }
+        );
       }
     }
 
@@ -213,18 +372,44 @@ serve(async (req) => {
         }
       }));
 
-      const { error: insertError } = await supabase
-        .from('source_chunks')
-        .insert(chunksToInsert);
+      try {
+        const { error: insertError } = await supabase
+          .from('source_chunks')
+          .insert(chunksToInsert);
 
-      if (insertError) {
-        throw new Error(`Failed to insert chunks: ${insertError.message}`);
+        if (insertError) {
+          console.error('❌ Error inserting chunks:', insertError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Failed to insert chunks: ${insertError.message}`,
+              pageId
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500,
+            }
+          );
+        }
+      } catch (error) {
+        console.error('❌ Unexpected error inserting chunks:', error);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Unexpected error inserting chunks: ${error.message}`,
+            pageId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
       }
 
       console.log(`✅ Stored ${chunks.length} chunks for parent source ${page.parent_source_id}`);
     }
 
-    // Generate embeddings for new chunks
+    // Generate embeddings for new chunks with error handling
     if (chunks.length > 0) {
       try {
         console.log(`🤖 Generating embeddings for source ${page.parent_source_id}`);
@@ -240,18 +425,21 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        chunksCreated: chunks.length,
-        message: 'Content processed successfully'
+        data: {
+          chunksCreated: chunks.length,
+          message: 'Content processed successfully',
+          pageId
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('❌ Content processing error:', error);
+    console.error('❌ Unexpected error in content processing:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: `Unexpected error: ${error.message}`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
