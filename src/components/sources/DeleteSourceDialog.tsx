@@ -5,7 +5,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -33,7 +32,7 @@ const DeleteSourceDialog: React.FC<DeleteSourceDialogProps> = ({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Source</AlertDialogTitle>
-          <AlertDialogDescription className="space-y-2">
+          <div className="text-sm text-muted-foreground space-y-2">
             <div>Are you sure you want to delete "{sourceTitle}"?</div>
             {isWebsiteSource && (
               <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mt-2">
@@ -51,7 +50,7 @@ const DeleteSourceDialog: React.FC<DeleteSourceDialogProps> = ({
             <div className="text-sm text-gray-600 mt-2">
               This action cannot be undone.
             </div>
-          </AlertDialogDescription>
+          </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
