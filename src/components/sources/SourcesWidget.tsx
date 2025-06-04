@@ -46,6 +46,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     [trainingProgress?.status, retrainingNeeded?.needed]
   );
 
+  // Extract just the count values for SourcesContent
+  const sourcesByTypeCount = useMemo(() => {
+    if (!stats?.sourcesByType) return {};
+    
+    const result: Record<string, number> = {};
+    Object.entries(stats.sourcesByType).forEach(([type, data]) => {
+      result[type] = data.count;
+    });
+    return result;
+  }, [stats?.sourcesByType]);
+
   // Stable event handlers
   const handleTrainingCompleted = useCallback((event: CustomEvent) => {
     toast({
@@ -161,7 +172,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       <SourcesContent
         totalSources={stats.totalSources}
         totalSize={formatTotalSize(stats.totalBytes)}
-        sourcesByType={stats.sourcesByType}
+        sourcesByType={sourcesByTypeCount}
         currentTab={currentTab}
         onRetrainClick={handleRetrainClick}
         retrainingNeeded={retrainingNeeded?.needed || false}
