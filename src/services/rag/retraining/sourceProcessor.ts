@@ -23,19 +23,7 @@ export class SourceProcessor {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Processing ${unprocessedPages.length} crawled pages for ${source.title}`);
           
-          // Mark pages as processed (not processing to avoid constraint violation)
-          const { error: updateError } = await supabase
-            .from('source_pages')
-            .update({ processing_status: 'processed' })
-            .eq('parent_source_id', source.id)
-            .eq('status', 'completed')
-            .in('processing_status', ['pending', null]);
-
-          if (updateError) {
-            throw new Error(`Failed to update page status: ${updateError.message}`);
-          }
-
-          // Process crawled pages via edge function
+          // Process crawled pages via edge function WITHOUT pre-marking as processed
           const { data, error } = await supabase.functions.invoke('process-crawled-pages', {
             body: { parentSourceId: source.id }
           });

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -478,17 +477,7 @@ export const useTrainingNotifications = () => {
           console.log(`📄 Found ${unprocessedPages.length} crawled pages to process for ${websiteSource.title}`);
           sourcesToProcess.push(websiteSource);
           
-          // Mark pages as processed (skip processing step to avoid constraint violation)
-          const { error: pagesError } = await supabase
-            .from('source_pages')
-            .update({ processing_status: 'processed' })
-            .eq('parent_source_id', websiteSource.id)
-            .eq('status', 'completed')
-            .in('processing_status', ['pending', null]);
-
-          if (pagesError) {
-            console.error('Error updating website pages status:', pagesError);
-          }
+          // DON'T mark pages as processed here - let process-crawled-pages handle it
         }
       }
 
