@@ -12,8 +12,7 @@ interface WebsiteSourceStatusBadgesProps {
 
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   crawlStatus,
-  isExcluded,
-  linksCount
+  isExcluded
 }) => {
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -64,12 +63,6 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
           <EyeOff className="w-3 h-3 mr-1" />
           Excluded
         </Badge>
-      )}
-      
-      {linksCount > 0 && (
-        <span className="text-sm text-muted-foreground">
-          {linksCount} links
-        </span>
       )}
     </div>
   );
