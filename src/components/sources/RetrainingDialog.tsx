@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -32,7 +31,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // Simplified status determination - rely primarily on trainingProgress
+  // FIXED: Simplified status determination - rely primarily on trainingProgress
   const getTrainingStatus = () => {
     console.log('🔍 RetrainingDialog - Enhanced status check:', {
       trainingProgressStatus: trainingProgress?.status,

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -63,14 +62,14 @@ export const useTrainingNotifications = () => {
       const channel = supabase
         .channel(`enhanced-training-notifications-${agentId}`)
         
-        // Enhanced: Direct subscription to source_pages processing status changes
+        // FIXED: Subscribe to processing_status changes (not status changes)
         .on(
           'postgres_changes',
           {
             event: 'UPDATE',
             schema: 'public',
             table: 'source_pages',
-            filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.never-match'
+            filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
           },
           (payload) => {
             const updatedPage = payload.new as any;
@@ -182,7 +181,7 @@ export const useTrainingNotifications = () => {
       // Get all active sources for this agent
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id, source_type, metadata, title, content')
+        .select('id, source_type, metadata, title, content, crawl_status')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -196,7 +195,7 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // Calculate what needs training
+      // FIXED: Calculate what needs training more accurately
       const sourcesNeedingTraining = [];
       let totalPagesNeedingProcessing = 0;
       let totalPagesProcessed = 0;
@@ -206,26 +205,28 @@ export const useTrainingNotifications = () => {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // For website sources, count pages
+          // FIXED: Only count completed crawled pages for processing
           const { data: pages } = await supabase
             .from('source_pages')
-            .select('id, url, processing_status')
+            .select('id, url, processing_status, status')
             .eq('parent_source_id', source.id)
-            .eq('status', 'completed');
+            .eq('status', 'completed'); // Only completed crawled pages
 
           if (pages && pages.length > 0) {
             const pendingPages = pages.filter(p => !p.processing_status || p.processing_status === 'pending');
             const processingPages = pages.filter(p => p.processing_status === 'processing');
             const processedPages = pages.filter(p => p.processing_status === 'processed');
 
+            // FIXED: Only consider this source as needing training if there are unprocessed pages
             if (pendingPages.length > 0 || processingPages.length > 0) {
               sourcesNeedingTraining.push(source);
-              totalPagesNeedingProcessing += pages.length;
-              totalPagesProcessed += processedPages.length;
-              
-              // Track currently processing pages
-              currentlyProcessingPages.push(...processingPages.map(p => p.url || p.id));
             }
+            
+            totalPagesNeedingProcessing += pages.length;
+            totalPagesProcessed += processedPages.length;
+            
+            // Track currently processing pages
+            currentlyProcessingPages.push(...processingPages.map(p => p.url || p.id));
           }
         } else {
           // For other sources, check processing status
@@ -250,12 +251,13 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // Determine status
+      // FIXED: Determine status more accurately
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
       if (currentlyProcessingPages.length > 0) {
         status = 'training';
-      } else if (sourcesNeedingTraining.length === 0) {
+      } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
+        // Only mark as completed if we have processed some pages and nothing needs training
         status = 'completed';
       } else if (totalPagesProcessed > 0 && totalPagesProcessed < totalPagesNeedingProcessing) {
         status = 'training'; // Some processed, but not all
@@ -282,8 +284,8 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newProgress);
 
-      // Show completion notification
-      if (status === 'completed' && trainingProgress?.status !== 'completed') {
+      // FIXED: Only show completion notification when actually complete (not during crawling)
+      if (status === 'completed' && trainingProgress?.status !== 'completed' && totalPagesNeedingProcessing > 0) {
         console.log('🎉 Training completed! Showing success notification');
         
         toast({
