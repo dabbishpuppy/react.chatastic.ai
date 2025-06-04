@@ -3,8 +3,8 @@ import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
 import { useAgentRetraining } from "@/hooks/useAgentRetraining";
-import { useTrainingNotifications } from "@/hooks/useTrainingNotifications";
 import { useParams } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 import SourcesLoadingState from "./SourcesLoadingState";
 import SourcesErrorState from "./SourcesErrorState";
 import SourcesContent from "./SourcesContent";
@@ -19,88 +19,116 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
-  const [isTrainingCompleted, setIsTrainingCompleted] = useState(false);
   
+  // Use enhanced training hooks
   const {
     isRetraining,
     progress,
     retrainingNeeded,
     startRetraining,
-    checkRetrainingNeeded
+    checkRetrainingNeeded,
+    trainingProgress
   } = useAgentRetraining(agentId);
-
-  // Use the new training notifications system
-  const { trainingProgress } = useTrainingNotifications();
   
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Check retraining status on mount and when stats change
+  // Enhanced: Listen for training completion events
+  useEffect(() => {
+    const handleTrainingCompleted = (event: CustomEvent) => {
+      console.log('🎉 Training completed event received:', event.detail);
+      
+      toast({
+        title: "Training Complete!",
+        description: "Your AI agent is fully trained and ready to use.",
+        duration: 5000,
+      });
+      
+      // Refresh stats and check status
+      refetchStats();
+      setTimeout(() => checkRetrainingNeeded(), 1000);
+    };
+
+    const handleTrainingContinuesInBackground = () => {
+      console.log('📱 Training continues in background');
+      setIsTrainingInBackground(true);
+      
+      toast({
+        title: "Training Continues",
+        description: "Training is running in the background. You'll be notified when complete.",
+        duration: 4000,
+      });
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+    window.addEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
+    
+    return () => {
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+      window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
+    };
+  }, [refetchStats, checkRetrainingNeeded]);
+
+  // Enhanced: Check retraining status on stats changes
   useEffect(() => {
     if (agentId && stats) {
+      console.log('🔍 Enhanced retraining check due to stats change:', {
+        totalSources: stats.totalSources,
+        requiresTraining: stats.requiresTraining,
+        unprocessedCrawledPages: stats.unprocessedCrawledPages
+      });
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
+  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
 
-  // Handle training state transitions with improved logic
+  // Enhanced: Handle training state transitions
   useEffect(() => {
-    if (trainingProgress?.status === 'completed') {
-      console.log('🎉 Training completed, updating states');
+    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
+      console.log('🎉 Enhanced training completed, updating states');
       setIsTrainingInBackground(false);
-      setIsTrainingCompleted(true);
       
-      // After a brief period, refresh stats and recheck training status
+      // Refresh stats after completion
       setTimeout(() => {
         refetchStats();
         checkRetrainingNeeded();
       }, 2000);
-    } else if (trainingProgress?.status === 'training') {
-      setIsTrainingCompleted(false);
     }
-  }, [trainingProgress?.status, refetchStats, checkRetrainingNeeded]);
+  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
 
-  // Reset completion state when new training is needed
-  useEffect(() => {
-    if (retrainingNeeded?.needed || stats?.requiresTraining) {
-      setIsTrainingCompleted(false);
-    }
-  }, [retrainingNeeded?.needed, stats?.requiresTraining]);
-
-  // Listen for various source events to trigger retraining status check
+  // Enhanced: Listen for source events with better debouncing
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
-      console.log(`📁 Source event: ${event.type}, checking retraining status`);
-      // Reset completion state when sources change
-      setIsTrainingCompleted(false);
-      // Refetch stats and check retraining status
+      console.log(`📁 Enhanced source event: ${event.type}`);
+      
+      // Reset background training state when sources change
+      setIsTrainingInBackground(false);
+      
+      // Refresh stats immediately
       refetchStats();
-      setTimeout(() => {
-        checkRetrainingNeeded();
-      }, 1000); // Small delay to ensure database is updated
+      
+      // Check retraining status after a delay
+      setTimeout(() => checkRetrainingNeeded(), 1500);
     };
 
-    // Listen for all source-related events
-    window.addEventListener('fileUploaded', handleSourceEvent as EventListener);
-    window.addEventListener('sourceDeleted', handleSourceEvent as EventListener);
-    window.addEventListener('sourceCreated', handleSourceEvent as EventListener);
-    window.addEventListener('sourceUpdated', handleSourceEvent as EventListener);
+    const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged'];
+    eventTypes.forEach(eventType => {
+      window.addEventListener(eventType, handleSourceEvent as EventListener);
+    });
     
     return () => {
-      window.removeEventListener('fileUploaded', handleSourceEvent as EventListener);
-      window.removeEventListener('sourceDeleted', handleSourceEvent as EventListener);
-      window.removeEventListener('sourceCreated', handleSourceEvent as EventListener);
-      window.removeEventListener('sourceUpdated', handleSourceEvent as EventListener);
+      eventTypes.forEach(eventType => {
+        window.removeEventListener(eventType, handleSourceEvent as EventListener);
+      });
     };
   }, [refetchStats, checkRetrainingNeeded]);
 
-  console.log(`📊 SourcesWidget render with enhanced state management:`, {
+  console.log(`📊 Enhanced SourcesWidget render state:`, {
     totalSources: stats?.totalSources || 0,
     requiresTraining: stats?.requiresTraining || false,
-    unprocessedCrawledPages: stats?.unprocessedCrawledPages || 0,
     retrainingNeeded: retrainingNeeded?.needed,
     trainingProgressStatus: trainingProgress?.status,
+    trainingProgress: trainingProgress?.progress,
     isTrainingInBackground,
-    isTrainingCompleted,
     isRetraining
   });
 
@@ -112,6 +140,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleRetrainClick = () => {
+    console.log('🔄 Enhanced retrain button clicked');
     setShowRetrainingDialog(true);
   };
 
@@ -124,8 +153,9 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   };
 
-  // Check if training is active (prioritize trainingProgress over isRetraining)
+  // Check if training is active
   const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
+  const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
 
   if (isLoading) {
     return <SourcesLoadingState />;
@@ -162,6 +192,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         progress={progress}
         retrainingNeeded={retrainingNeeded}
         onStartRetraining={startRetraining}
+        trainingProgress={trainingProgress}
       />
     </>
   );

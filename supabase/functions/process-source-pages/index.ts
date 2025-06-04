@@ -39,7 +39,6 @@ async function autoRecoverStuckPages(supabaseClient: any) {
 }
 
 async function resetFailedPages(supabaseClient: any) {
-  // Reset failed pages back to pending so they can be reprocessed
   const { data: failedPages, error: failedError } = await supabaseClient
     .from('source_pages')
     .select('id, url, retry_count')
@@ -97,6 +96,7 @@ async function processPendingPages(supabaseClient: any) {
     try {
       console.log(`🚀 Auto-processing page: ${page.url} (ID: ${page.id})`);
       
+      // Mark as in_progress before processing
       await supabaseClient
         .from('source_pages')
         .update({ 
@@ -105,41 +105,25 @@ async function processPendingPages(supabaseClient: any) {
         })
         .eq('id', page.id);
       
+      console.log(`📞 Invoking child-job-processor for page ${page.id}`);
       const { data: processingResult, error: processingError } = await supabaseClient
         .functions.invoke('child-job-processor', {
           body: { childJobId: page.id }
         });
 
-      if (processingError) {
-        // Check if it's a 409 Conflict response (job already processed/in progress)
-        if (processingError.message?.includes('409') || processingError.status === 409) {
-          console.log(`✅ Page ${page.id} already processed (409 Conflict) - marking as completed`);
-          
-          // Mark as completed since it was already processed
-          await supabaseClient
-            .from('source_pages')
-            .update({
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-              error_message: 'Already processed by another worker'
-            })
-            .eq('id', page.id);
-          
-          results.push({
-            pageId: page.id,
-            url: page.url,
-            success: true,
-            result: { message: 'Already processed', chunksCreated: 0 },
-            wasAlreadyProcessed: true
-          });
-          continue;
-        }
+      console.log(`📋 Processing result for page ${page.id}:`, {
+        data: processingResult,
+        error: processingError,
+        success: !processingError
+      });
 
-        // For actual errors, increment retry count and handle retry logic
+      // Handle the response (409s are now returned as 200s with skipped flag)
+      if (processingError) {
+        // For actual errors (5xx, network issues, etc), increment retry count
         const newRetryCount = (page.retry_count || 0) + 1;
         const shouldRetry = newRetryCount < 3;
         
-        console.error(`❌ Error processing page ${page.id}: ${processingError.message}`);
+        console.error(`❌ Actual error processing page ${page.id}: ${processingError.message}`);
         
         await supabaseClient
           .from('source_pages')
@@ -147,7 +131,8 @@ async function processPendingPages(supabaseClient: any) {
             status: shouldRetry ? 'pending' : 'failed',
             error_message: processingError.message,
             completed_at: shouldRetry ? null : new Date().toISOString(),
-            retry_count: newRetryCount
+            retry_count: newRetryCount,
+            started_at: null
           })
           .eq('id', page.id);
         
@@ -156,42 +141,57 @@ async function processPendingPages(supabaseClient: any) {
           url: page.url,
           success: false,
           error: processingError.message,
-          autoRetried: shouldRetry
+          autoRetried: shouldRetry,
+          retryCount: newRetryCount
         });
       } else {
-        console.log(`✅ Successfully auto-processed page ${page.id} with ${processingResult?.chunksCreated || 0} chunks`);
+        // Handle successful responses (including skipped jobs)
+        if (processingResult?.skipped) {
+          console.log(`✅ Page ${page.id} was already processed by another worker (skipped)`);
+          
+          // Ensure it's marked as completed
+          await supabaseClient
+            .from('source_pages')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              error_message: null,
+              processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
+            })
+            .eq('id', page.id);
+        } else {
+          console.log(`✅ Successfully processed page ${page.id}`);
+          
+          // Verify the status was updated correctly
+          const { data: updatedPage } = await supabaseClient
+            .from('source_pages')
+            .select('status, completed_at')
+            .eq('id', page.id)
+            .single();
+          
+          if (updatedPage?.status !== 'completed') {
+            console.log(`⚠️ Page ${page.id} not marked as completed, updating status`);
+            await supabaseClient
+              .from('source_pages')
+              .update({
+                status: 'completed',
+                completed_at: new Date().toISOString(),
+                processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
+              })
+              .eq('id', page.id);
+          }
+        }
+        
         results.push({
           pageId: page.id,
           url: page.url,
           success: true,
-          result: processingResult
+          result: processingResult,
+          wasSkipped: processingResult?.skipped || false
         });
       }
     } catch (error) {
-      // Check if it's a 409 error in the catch block as well
-      if (error.message?.includes('409') || error.status === 409) {
-        console.log(`✅ Page ${page.id} already processed (409 Conflict - caught) - marking as completed`);
-        
-        await supabaseClient
-          .from('source_pages')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            error_message: 'Already processed by another worker'
-          })
-          .eq('id', page.id);
-        
-        results.push({
-          pageId: page.id,
-          url: page.url,
-          success: true,
-          result: { message: 'Already processed', chunksCreated: 0 },
-          wasAlreadyProcessed: true
-        });
-        continue;
-      }
-
-      // For actual errors, handle retry logic
+      // Handle exceptions (should not occur for claiming conflicts anymore)
       const newRetryCount = (page.retry_count || 0) + 1;
       const shouldRetry = newRetryCount < 3;
       
@@ -203,7 +203,8 @@ async function processPendingPages(supabaseClient: any) {
           status: shouldRetry ? 'pending' : 'failed',
           error_message: error.message,
           completed_at: shouldRetry ? null : new Date().toISOString(),
-          retry_count: newRetryCount
+          retry_count: newRetryCount,
+          started_at: null
         })
         .eq('id', page.id);
       
@@ -212,19 +213,22 @@ async function processPendingPages(supabaseClient: any) {
         url: page.url,
         success: false,
         error: error.message,
-        autoRetried: shouldRetry
+        autoRetried: shouldRetry,
+        retryCount: newRetryCount
       });
     }
   }
 
-  // Auto-trigger parent status aggregation
+  // ENHANCED: Force parent status aggregation for all affected parents
   const parentIds = [...new Set(pendingPages.map(p => p.parent_source_id).filter(Boolean))];
+  console.log(`🔄 Triggering parent status aggregation for ${parentIds.length} parents`);
+  
   for (const parentId of parentIds) {
     try {
       await supabaseClient.rpc('aggregate_parent_status', { parent_id: parentId });
-      console.log(`🔄 Auto-aggregated status for parent: ${parentId}`);
+      console.log(`✅ Aggregated status for parent: ${parentId}`);
     } catch (error) {
-      console.error(`❌ Failed to auto-aggregate parent ${parentId}:`, error);
+      console.error(`❌ Failed to aggregate parent ${parentId}:`, error);
     }
   }
 
@@ -248,7 +252,7 @@ serve(async (req) => {
     // Auto-recovery first
     const autoRecoveredCount = await autoRecoverStuckPages(supabaseClient);
     
-    // Reset failed pages for retry (but be more selective)
+    // Reset failed pages for retry
     const resetFailedCount = await resetFailedPages(supabaseClient);
 
     // Process pending pages
@@ -287,10 +291,10 @@ serve(async (req) => {
     const successCount = processingResults.results.filter(r => r.success).length;
     const failedCount = processingResults.results.filter(r => !r.success).length;
     const autoRetriedCount = processingResults.results.filter(r => r.autoRetried).length;
-    const alreadyProcessedCount = processingResults.results.filter(r => r.wasAlreadyProcessed).length;
+    const skippedCount = processingResults.results.filter(r => r.wasSkipped).length;
     const totalChunksCreated = processingResults.results.reduce((sum, r) => sum + (r.result?.chunksCreated || 0), 0);
 
-    console.log(`📊 Auto-processing complete: ${successCount} successful (${alreadyProcessedCount} already processed), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
+    console.log(`📊 Processing complete: ${successCount} successful (${skippedCount} skipped), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
 
     // Check for missing chunks after processing
     if (successCount > 0) {
@@ -314,7 +318,7 @@ serve(async (req) => {
         successCount,
         failedCount,
         autoRetriedCount,
-        alreadyProcessedCount,
+        skippedCount,
         autoRecoveredCount,
         resetFailedCount,
         totalChunksCreated,
