@@ -45,7 +45,7 @@ const TypingMessage: React.FC<TypingMessageProps> = ({
       components={{
         p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
         ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal mb-2">{children}</ol>,
+        ol: ({ children }) => <ol className="list-decimal list-outside pl-5 mb-2">{children}</ol>,
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
         em: ({ children }) => <em className="italic">{children}</em>,
