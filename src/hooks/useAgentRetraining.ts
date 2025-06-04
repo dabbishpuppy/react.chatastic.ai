@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { RetrainingService, type RetrainingProgress } from '@/services/rag/retrainingService';
 import { useToast } from '@/hooks/use-toast';
@@ -26,7 +27,9 @@ export const useAgentRetraining = (agentId?: string) => {
     if (!agentId) return;
 
     try {
+      console.log('🔍 Checking retraining status for agent:', agentId);
       const result = await RetrainingService.checkRetrainingNeeded(agentId);
+      console.log('📋 Retraining check result:', result);
       setRetrainingNeeded(result);
       return result;
     } catch (error) {
@@ -67,8 +70,10 @@ export const useAgentRetraining = (agentId?: string) => {
           description: "Your agent has been successfully retrained with all sources"
         });
         
-        // Refresh retraining status
-        await checkRetrainingNeeded();
+        // Refresh retraining status after successful completion
+        setTimeout(() => {
+          checkRetrainingNeeded();
+        }, 1000);
       } else {
         toast({
           title: "Retraining Failed",

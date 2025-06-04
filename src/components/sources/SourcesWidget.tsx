@@ -16,7 +16,7 @@ interface SourcesWidgetProps {
 
 const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { agentId } = useParams();
-  const { data: stats, isLoading, error } = useAgentSourceStats();
+  const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   
   const {
@@ -39,6 +39,24 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       checkRetrainingNeeded();
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
+
+  // Listen for file upload events to trigger retraining status check
+  useEffect(() => {
+    const handleFileUploaded = (event: CustomEvent) => {
+      console.log('📁 File uploaded, checking retraining status');
+      // Refetch stats and check retraining status
+      refetchStats();
+      setTimeout(() => {
+        checkRetrainingNeeded();
+      }, 1000); // Small delay to ensure database is updated
+    };
+
+    window.addEventListener('fileUploaded', handleFileUploaded as EventListener);
+    
+    return () => {
+      window.removeEventListener('fileUploaded', handleFileUploaded as EventListener);
+    };
+  }, [refetchStats, checkRetrainingNeeded]);
 
   console.log(`📊 SourcesWidget render with enhanced stats:`, {
     totalSources: stats?.totalSources || 0,

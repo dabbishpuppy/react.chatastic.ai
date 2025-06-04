@@ -1,96 +1,91 @@
 
+import { supabase } from '@/integrations/supabase/client';
 import { useParams } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
-import { useRAGServices } from '@/hooks/useRAGServices';
 import { getFileProcessor } from '@/utils/fileProcessing';
 import { UploadedFile } from './types';
-import { supabase } from '@/integrations/supabase/client';
 
 export const useFileProcessor = (
   setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>,
   refetch: () => void
 ) => {
   const { agentId } = useParams();
-  const { sources } = useRAGServices();
 
   const processFile = async (uploadedFile: UploadedFile) => {
+    if (!agentId) return;
+
     try {
+      // Update status to processing
       setUploadedFiles(prev => 
         prev.map(f => f.id === uploadedFile.id ? { ...f, status: 'processing', progress: 50 } : f)
       );
 
       const processor = getFileProcessor(uploadedFile.file);
-      const result = await processor(uploadedFile.file);
-      
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === uploadedFile.id ? { ...f, progress: 75 } : f)
-      );
+      const content = await processor(uploadedFile.file);
 
-      if (!agentId) {
-        throw new Error('Agent ID is required');
+      if (!content || content.trim().length === 0) {
+        throw new Error('No content could be extracted from the file');
       }
 
-      // Get team_id from agent
-      const { data: agent, error: agentError } = await supabase
+      // Get team_id for the current agent
+      const { data: agentData, error: agentError } = await supabase
         .from('agents')
         .select('team_id')
         .eq('id', agentId)
         .single();
 
-      if (agentError || !agent) {
-        throw new Error('Agent not found');
-      }
-
-      // Calculate content size in bytes
-      const contentSize = new Blob([result.content]).size;
+      if (agentError) throw agentError;
 
       // Create the source in the database
-      const newSource = await sources.createSource({
-        agent_id: agentId,
-        team_id: agent.team_id,
-        source_type: 'file',
-        title: uploadedFile.file.name,
-        content: result.content,
-        metadata: {
-          filename: uploadedFile.file.name,
-          original_size: uploadedFile.file.size,
-          file_size: contentSize,
-          fileType: uploadedFile.file.type,
-          uploadedAt: new Date().toISOString(),
-          ...result.metadata
-        }
-      });
+      const { data: source, error: sourceError } = await supabase
+        .from('agent_sources')
+        .insert({
+          agent_id: agentId,
+          team_id: agentData.team_id,
+          source_type: 'file',
+          title: uploadedFile.file.name,
+          content: content,
+          metadata: {
+            file_name: uploadedFile.file.name,
+            file_size: uploadedFile.file.size,
+            file_type: uploadedFile.file.type,
+            processing_status: 'pending',
+            uploaded_at: new Date().toISOString()
+          }
+        })
+        .select()
+        .single();
 
-      console.log('✅ New source created:', newSource);
+      if (sourceError) throw sourceError;
 
+      // Update status to complete
       setUploadedFiles(prev => 
         prev.map(f => f.id === uploadedFile.id ? { ...f, status: 'complete', progress: 100 } : f)
       );
 
+      // Trigger refetch to update the sources list
+      refetch();
+
+      // Trigger a custom event to notify other components about the upload
+      window.dispatchEvent(new CustomEvent('fileUploaded', {
+        detail: { sourceId: source.id, agentId }
+      }));
+
       toast({
         title: "File uploaded successfully",
-        description: `${uploadedFile.file.name} has been processed and added to your sources`
+        description: `${uploadedFile.file.name} has been added to your sources`
       });
-
-      // Manually refetch sources to ensure UI updates immediately
-      setTimeout(() => {
-        refetch();
-      }, 500);
 
     } catch (error) {
       console.error('Error processing file:', error);
+      
       setUploadedFiles(prev => 
-        prev.map(f => f.id === uploadedFile.id ? { 
-          ...f, 
-          status: 'error', 
-          progress: 0,
-          error: error instanceof Error ? error.message : 'Unknown error occurred'
-        } : f)
+        prev.map(f => f.id === uploadedFile.id ? { ...f, status: 'error', progress: 0 } : f)
       );
 
       toast({
         title: "Upload failed",
-        description: `Failed to process ${uploadedFile.file.name}`,
+        description: error instanceof Error ? error.message : "Failed to process file",
         variant: "destructive"
       });
     }
