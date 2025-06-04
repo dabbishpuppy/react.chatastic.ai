@@ -51,10 +51,22 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       }, 1000); // Small delay to ensure database is updated
     };
 
+    // Listen for source deletion events to trigger retraining status check
+    const handleSourceDeleted = (event: CustomEvent) => {
+      console.log('🗑️ Source deleted, checking retraining status');
+      // Refetch stats and check retraining status
+      refetchStats();
+      setTimeout(() => {
+        checkRetrainingNeeded();
+      }, 1000); // Small delay to ensure database is updated
+    };
+
     window.addEventListener('fileUploaded', handleFileUploaded as EventListener);
+    window.addEventListener('sourceDeleted', handleSourceDeleted as EventListener);
     
     return () => {
       window.removeEventListener('fileUploaded', handleFileUploaded as EventListener);
+      window.removeEventListener('sourceDeleted', handleSourceDeleted as EventListener);
     };
   }, [refetchStats, checkRetrainingNeeded]);
 

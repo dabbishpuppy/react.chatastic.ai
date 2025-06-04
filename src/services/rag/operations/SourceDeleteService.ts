@@ -22,6 +22,17 @@ export class SourceDeleteService extends BaseSourceService {
     try {
       console.log(`🗑️ Starting comprehensive deletion of source: ${id}`);
 
+      // Get source info before deletion for event dispatch
+      const { data: sourceInfo, error: sourceInfoError } = await supabase
+        .from('agent_sources')
+        .select('agent_id, source_type')
+        .eq('id', id)
+        .single();
+
+      if (sourceInfoError) {
+        console.warn(`Warning: Could not get source info: ${sourceInfoError.message}`);
+      }
+
       // Check if this is a parent source (has children)
       const { data: childSources, error: childError } = await supabase
         .from('agent_sources')
@@ -131,6 +142,18 @@ export class SourceDeleteService extends BaseSourceService {
         - Crawl jobs: Deleted for parent ${id}
         - Child sources: ${childSources?.length || 0}
         - Parent source: 1`);
+
+      // Trigger a custom event to notify other components about the deletion
+      if (sourceInfo?.agent_id) {
+        window.dispatchEvent(new CustomEvent('sourceDeleted', {
+          detail: { 
+            sourceId: id, 
+            agentId: sourceInfo.agent_id,
+            sourceType: sourceInfo.source_type 
+          }
+        }));
+        console.log('📡 Dispatched sourceDeleted event for real-time UI update');
+      }
 
       return true;
     } catch (error) {
