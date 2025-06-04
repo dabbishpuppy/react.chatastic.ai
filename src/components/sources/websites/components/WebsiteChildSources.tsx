@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -267,7 +268,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   const getStatusBadge = (status: string, processingStatus?: string) => {
     const baseClasses = 'px-2 py-1 text-xs rounded-full font-medium flex items-center gap-1';
     
-    // New status flow: Handle new status and training states
+    // Only show badges for non-completed statuses or specific processing states
     if (status === 'completed' && processingStatus) {
       if (processingStatus === 'processed') {
         return `${baseClasses} bg-cyan-100 text-cyan-800`; // trained - cyan
@@ -280,8 +281,12 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       }
     }
     
+    // Don't show badge for completed status without specific processing status
+    if (status === 'completed') {
+      return null;
+    }
+    
     const colorClasses = {
-      completed: 'bg-green-100 text-green-800',
       failed: 'bg-red-100 text-red-800',
       in_progress: 'bg-blue-100 text-blue-800',
       pending: 'bg-yellow-100 text-yellow-800'
@@ -298,6 +303,12 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       if (processingStatus === 'pending') return 'new';
       if (processingStatus === 'failed') return 'training failed';
     }
+    
+    // Don't show text for completed status without specific processing status
+    if (status === 'completed') {
+      return null;
+    }
+    
     return status.replace('_', ' ');
   };
 
@@ -310,9 +321,13 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       if (processingStatus === 'failed') return '✗'; // training failed
     }
     
+    // Don't show icon for completed status without specific processing status
+    if (status === 'completed') {
+      return null;
+    }
+    
     // For other statuses
     switch (status) {
-      case 'completed': return '✓';
       case 'failed': return '✗';
       case 'in_progress': return '⟳';
       case 'pending': return '●';
@@ -347,6 +362,9 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
   const renderChildPage = (page: SourcePage) => {
     const sizeInfo = formatSize(page.content_size, page.compression_ratio);
+    const statusBadgeClass = getStatusBadge(page.status, page.processing_status);
+    const statusText = getStatusText(page.status, page.processing_status);
+    const statusIcon = getStatusIcon(page.status, page.processing_status);
     
     return (
       <div key={page.id} className="flex items-center justify-between p-3 pl-16 hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0">
@@ -416,10 +434,12 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           </div>
           
           <div className="ml-4 flex-shrink-0">
-            <span className={getStatusBadge(page.status, page.processing_status)}>
-              <span>{getStatusIcon(page.status, page.processing_status)}</span>
-              {getStatusText(page.status, page.processing_status)}
-            </span>
+            {statusBadgeClass && statusText && statusIcon && (
+              <span className={statusBadgeClass}>
+                <span>{statusIcon}</span>
+                {statusText}
+              </span>
+            )}
           </div>
         </div>
         
