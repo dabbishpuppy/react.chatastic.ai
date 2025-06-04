@@ -37,7 +37,8 @@ export const useTrainingNotifications = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'source_pages',
-          filter: `parent_source_id.in.(select id from agent_sources where agent_id=eq.${agentId})`
+          // Fixed: Use proper filter syntax without subquery
+          filter: `parent_source_id=in.(${agentId})`
         },
         (payload) => {
           const updatedPage = payload.new as any;
@@ -80,11 +81,10 @@ export const useTrainingNotifications = () => {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'source_chunks',
-          filter: `source_id.in.(select id from agent_sources where agent_id=eq.${agentId})`
+          table: 'source_chunks'
         },
         (payload) => {
-          console.log('📡 Chunk created for agent source:', payload.new);
+          console.log('📡 Chunk created:', payload.new);
           checkTrainingCompletion(agentId);
         }
       )
@@ -112,6 +112,7 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🔍 Checking training completion for agent:', agentId);
       
+      // Get sources that belong to this agent and need training
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content')
@@ -128,12 +129,12 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // Filter sources that actually need training
+      // Filter sources that actually need training (have content)
       const sourcesNeedingTraining = [];
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
-        // Check if source has content
+        // Check if source has content that needs training
         const hasContent = source.source_type === 'qa' ? 
           (metadata?.question && metadata?.answer) :
           source.content && source.content.trim().length > 0;
@@ -145,6 +146,13 @@ export const useTrainingNotifications = () => {
 
       if (sourcesNeedingTraining.length === 0) {
         console.log('No sources with content need training');
+        setTrainingProgress({
+          agentId,
+          status: 'completed',
+          progress: 100,
+          totalSources: 0,
+          processedSources: 0
+        });
         return;
       }
 
@@ -159,7 +167,7 @@ export const useTrainingNotifications = () => {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // For website sources, check crawled pages
+          // For website sources, get all pages for this source (not agent)
           const { data: sourcePages } = await supabase
             .from('source_pages')
             .select('processing_status')
@@ -205,7 +213,7 @@ export const useTrainingNotifications = () => {
         isCompleted: trainingSources === 0 && processedSources === totalSources
       });
 
-      // Determine training status
+      // Determine training status with improved logic
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
 
       if (trainingSources > 0) {
@@ -223,6 +231,9 @@ export const useTrainingNotifications = () => {
             duration: 8000,
           });
         }
+      } else if (totalSources > 0 && processedSources === 0 && trainingSources === 0) {
+        // No sources are processing or completed - check if we need to start training
+        status = 'idle';
       }
 
       setTrainingProgress({
@@ -235,6 +246,10 @@ export const useTrainingNotifications = () => {
 
     } catch (error) {
       console.error('Error in checkTrainingCompletion:', error);
+      setTrainingProgress(prev => prev ? {
+        ...prev,
+        status: 'failed'
+      } : null);
     }
   };
 
@@ -259,7 +274,20 @@ export const useTrainingNotifications = () => {
         }
       }
 
-      // First, generate chunks
+      // Mark as processing first
+      const currentMetadata = (source.metadata as Record<string, any>) || {};
+      await supabase
+        .from('agent_sources')
+        .update({
+          metadata: {
+            ...currentMetadata,
+            processing_status: 'processing',
+            training_started_at: new Date().toISOString()
+          }
+        })
+        .eq('id', source.id);
+
+      // Generate chunks
       console.log(`🔧 Generating chunks for source ${source.id}`);
       const { data: chunkData, error: chunkError } = await supabase.functions.invoke('generate-chunks', {
         body: { 
@@ -275,7 +303,7 @@ export const useTrainingNotifications = () => {
 
       console.log(`✅ Generated chunks for source ${source.id}:`, chunkData);
 
-      // Then, generate embeddings
+      // Generate embeddings
       console.log(`🤖 Generating embeddings for source ${source.id}`);
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
         body: { sourceId: source.id }
@@ -288,7 +316,6 @@ export const useTrainingNotifications = () => {
       console.log(`✅ Generated embeddings for source ${source.id}:`, embeddingData);
 
       // Update source metadata to reflect successful processing
-      const currentMetadata = (source.metadata as Record<string, any>) || {};
       await supabase
         .from('agent_sources')
         .update({
@@ -400,20 +427,6 @@ export const useTrainingNotifications = () => {
 
       // Process other sources
       const processingPromises = otherSources.map(async (source) => {
-        // Mark as processing
-        const currentMetadata = (source.metadata as Record<string, any>) || {};
-        await supabase
-          .from('agent_sources')
-          .update({
-            metadata: {
-              ...currentMetadata,
-              processing_status: 'processing',
-              training_started_at: new Date().toISOString()
-            }
-          })
-          .eq('id', source.id);
-
-        // Process the source
         return processSource(source);
       });
 
@@ -422,6 +435,11 @@ export const useTrainingNotifications = () => {
         await Promise.allSettled(processingPromises);
       }
 
+      // Trigger immediate completion check
+      setTimeout(() => {
+        checkTrainingCompletion(agentId);
+      }, 1000);
+
     } catch (error) {
       console.error('Failed to start training:', error);
       toast({
@@ -429,6 +447,11 @@ export const useTrainingNotifications = () => {
         description: "Failed to start training process",
         variant: "destructive",
       });
+      
+      setTrainingProgress(prev => prev ? {
+        ...prev,
+        status: 'failed'
+      } : null);
     }
   };
 
