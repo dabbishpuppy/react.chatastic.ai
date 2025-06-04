@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import WebsiteSourceActions from './WebsiteSourceActions';
+import { Loader2 } from '@phosphor-icons/react';
 
 interface SourcePage {
   id: string;
@@ -300,7 +300,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     if (status === 'completed' && processingStatus) {
       if (processingStatus === 'processed') return 'trained';
       if (processingStatus === 'processing') return 'training';
-      if (processingStatus === 'pending') return 'new';
+      if (processingStatus === 'pending') return 'Completed';
       if (processingStatus === 'failed') return 'training failed';
     }
     
@@ -317,7 +317,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     if (status === 'completed' && processingStatus) {
       if (processingStatus === 'processed') return '✓'; // trained
       if (processingStatus === 'processing') return '⟳'; // training
-      if (processingStatus === 'pending') return '●'; // new
+      if (processingStatus === 'pending') return '●'; // Completed
       if (processingStatus === 'failed') return '✗'; // training failed
     }
     
@@ -326,11 +326,11 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       return null;
     }
     
-    // For other statuses
+    // For other statuses - add loader for pending
     switch (status) {
       case 'failed': return '✗';
       case 'in_progress': return '⟳';
-      case 'pending': return '●';
+      case 'pending': return <Loader2 className="w-3 h-3 animate-spin" />;
       default: return '?';
     }
   };
