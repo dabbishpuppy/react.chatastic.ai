@@ -57,16 +57,30 @@ export const useTrainingNotifications = () => {
 
   const checkTrainingCompletion = async (agentId: string) => {
     try {
-      // Get all source pages for this agent
+      // First get agent sources for this agent
+      const { data: agentSources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .eq('is_active', true);
+
+      if (sourcesError) {
+        console.error('Error fetching agent sources:', sourcesError);
+        return;
+      }
+
+      if (!agentSources || agentSources.length === 0) {
+        return;
+      }
+
+      const sourceIds = agentSources.map(s => s.id);
+
+      // Get all source pages for this agent's sources
       const { data: sourcePages, error } = await supabase
         .from('source_pages')
         .select('processing_status, parent_source_id')
-        .in('parent_source_id', 
-          supabase
-            .from('agent_sources')
-            .select('id')
-            .eq('agent_id', agentId)
-        );
+        .in('parent_source_id', sourceIds);
 
       if (error) {
         console.error('Error checking training completion:', error);
@@ -125,18 +139,33 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting training for agent:', agentId);
 
+      // First get agent sources for this agent
+      const { data: agentSources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .eq('is_active', true);
+
+      if (sourcesError) {
+        console.error('Error fetching agent sources:', sourcesError);
+        throw sourcesError;
+      }
+
+      if (!agentSources || agentSources.length === 0) {
+        console.log('No website sources found for agent');
+        return;
+      }
+
+      const sourceIds = agentSources.map(s => s.id);
+
       // Update all pending pages to processing status
       const { error } = await supabase
         .from('source_pages')
         .update({ processing_status: 'processing' })
         .eq('status', 'completed')
         .eq('processing_status', 'pending')
-        .in('parent_source_id', 
-          supabase
-            .from('agent_sources')
-            .select('id')
-            .eq('agent_id', agentId)
-        );
+        .in('parent_source_id', sourceIds);
 
       if (error) {
         console.error('Error starting training:', error);
