@@ -32,14 +32,11 @@ export class SourceProcessor {
             try {
               console.log(`🔧 Processing page: ${page.url} (ID: ${page.id})`);
               
-              // Mark page as processing to avoid duplicate processing
+              // Mark page as processing to avoid duplicate processing - NO METADATA
               await supabase
                 .from('source_pages')
                 .update({ 
-                  processing_status: 'processing',
-                  metadata: {
-                    chunk_processing_started: new Date().toISOString()
-                  }
+                  processing_status: 'processing'
                 })
                 .eq('id', page.id);
 
@@ -51,31 +48,24 @@ export class SourceProcessor {
               if (processingError) {
                 console.error(`❌ Failed to process page ${page.id}:`, processingError);
                 
-                // Mark as failed
+                // Mark as failed - NO METADATA
                 await supabase
                   .from('source_pages')
                   .update({ 
                     processing_status: 'failed',
-                    metadata: {
-                      processing_error: processingError.message,
-                      chunk_processing_failed_at: new Date().toISOString()
-                    }
+                    error_message: processingError.message
                   })
                   .eq('id', page.id);
                 
                 continue;
               }
 
-              // Mark as processed successfully
+              // Mark as processed successfully - NO METADATA
               await supabase
                 .from('source_pages')
                 .update({ 
                   processing_status: 'processed',
-                  chunks_created: processingResult?.chunksCreated || 0,
-                  metadata: {
-                    chunk_processing_completed_at: new Date().toISOString(),
-                    chunks_created: processingResult?.chunksCreated || 0
-                  }
+                  chunks_created: processingResult?.chunksCreated || 0
                 })
                 .eq('id', page.id);
 
@@ -86,15 +76,12 @@ export class SourceProcessor {
             } catch (error) {
               console.error(`❌ Error processing page ${page.id}:`, error);
               
-              // Mark as failed
+              // Mark as failed - NO METADATA
               await supabase
                 .from('source_pages')
                 .update({ 
                   processing_status: 'failed',
-                  metadata: {
-                    processing_error: error.message,
-                    chunk_processing_failed_at: new Date().toISOString()
-                  }
+                  error_message: error.message
                 })
                 .eq('id', page.id);
             }
