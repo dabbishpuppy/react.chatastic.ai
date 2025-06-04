@@ -10,7 +10,7 @@ interface DebouncedTrainingStatus {
 export const useTrainingStatusDebounced = (
   trainingProgress: any,
   retrainingNeeded: any,
-  debounceMs: number = 1000
+  debounceMs: number = 2000 // Increased from 1000ms to 2000ms
 ) => {
   const [debouncedStatus, setDebouncedStatus] = useState<DebouncedTrainingStatus>({
     status: 'idle',
@@ -21,6 +21,7 @@ export const useTrainingStatusDebounced = (
   const timeoutRef = useRef<NodeJS.Timeout>();
   const lastStatusRef = useRef<string>('idle');
   const stabilityCountRef = useRef<number>(0);
+  const lastLogRef = useRef<number>(0);
 
   useEffect(() => {
     // Clear existing timeout
@@ -57,9 +58,22 @@ export const useTrainingStatusDebounced = (
       stabilityCountRef.current += 1;
     }
 
+    // Reduce logging frequency - only log every 10 seconds
+    const now = Date.now();
+    const shouldLog = now - lastLogRef.current > 10000;
+    
+    if (shouldLog && (statusChanged || currentStatus === 'training')) {
+      console.log('🔍 Training status update:', {
+        status: currentStatus,
+        progress: currentProgress,
+        isStable: stabilityCountRef.current >= 2
+      });
+      lastLogRef.current = now;
+    }
+
     // Only update if status is stable or immediate (training/completed)
     const isImmediateStatus = currentStatus === 'training' || currentStatus === 'completed';
-    const isStable = stabilityCountRef.current >= 2; // Stable after 2 consistent reads
+    const isStable = stabilityCountRef.current >= 3; // Increased stability threshold
 
     if (isImmediateStatus || isStable) {
       setDebouncedStatus({

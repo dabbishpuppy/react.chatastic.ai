@@ -27,11 +27,12 @@ export const useAgentRetraining = (agentId?: string) => {
   // Add state guards to prevent race conditions
   const isTrainingActiveRef = useRef(false);
   const lastStatusUpdateRef = useRef<string>('');
+  const lastLogTimeRef = useRef<number>(0);
 
   // Simplified status determination
   const isRetraining = trainingProgress?.status === 'training';
 
-  // Guard against rapid state changes
+  // Guard against rapid state changes with reduced logging
   useEffect(() => {
     if (trainingProgress) {
       const statusKey = `${trainingProgress.status}-${trainingProgress.progress}`;
@@ -42,7 +43,17 @@ export const useAgentRetraining = (agentId?: string) => {
       }
       lastStatusUpdateRef.current = statusKey;
       
-      console.log('🔄 useAgentRetraining - Status update:', trainingProgress);
+      // Reduce logging frequency - only log every 10 seconds
+      const now = Date.now();
+      const shouldLog = now - lastLogTimeRef.current > 10000;
+      
+      if (shouldLog) {
+        console.log('🔄 Training status update:', {
+          status: trainingProgress.status,
+          progress: trainingProgress.progress
+        });
+        lastLogTimeRef.current = now;
+      }
       
       // Update progress state with guard
       if (trainingProgress.status === 'training') {
@@ -66,9 +77,7 @@ export const useAgentRetraining = (agentId?: string) => {
     if (!agentId) return;
 
     try {
-      console.log('🔍 Checking retraining status for agent:', agentId);
       const result = await RetrainingService.checkRetrainingNeeded(agentId);
-      console.log('📋 Retraining check result:', result);
       setRetrainingNeeded(result);
       return result;
     } catch (error) {
@@ -83,11 +92,10 @@ export const useAgentRetraining = (agentId?: string) => {
 
   const startRetraining = useCallback(async () => {
     if (!agentId || isTrainingActiveRef.current) {
-      console.log('⚠️ Cannot start training:', { agentId, isTrainingActive: isTrainingActiveRef.current });
       return;
     }
 
-    console.log('🚀 Starting retraining via training notifications system');
+    console.log('🚀 Starting retraining...');
     isTrainingActiveRef.current = true;
 
     try {
@@ -98,10 +106,10 @@ export const useAgentRetraining = (agentId?: string) => {
         description: "Processing your sources and generating embeddings..."
       });
 
-      // Refresh retraining status after starting
+      // Refresh retraining status after starting (increased delay)
       setTimeout(() => {
         checkRetrainingNeeded();
-      }, 1500);
+      }, 3000);
 
     } catch (error) {
       console.error('Retraining failed:', error);

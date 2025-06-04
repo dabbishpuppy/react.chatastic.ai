@@ -20,13 +20,11 @@ export const useAgentSourcesRealtime = () => {
       supabase.removeChannel(channelRef.current);
     }
 
-    console.log(`🔄 Setting up debounced real-time subscription for agent: ${agentId}`);
-
-    const debouncedRefresh = (eventType: string, delay: number = 500) => {
+    const debouncedRefresh = (eventType: string, delay: number = 1000) => {
       const now = Date.now();
       
       // Prevent too frequent updates
-      if (now - lastUpdateRef.current < 200) {
+      if (now - lastUpdateRef.current < 500) {
         return;
       }
       
@@ -37,7 +35,10 @@ export const useAgentSourcesRealtime = () => {
       }
       
       debounceTimerRef.current = setTimeout(() => {
-        console.log(`📡 Executing debounced refresh for: ${eventType}`);
+        // Only log important events
+        if (eventType.includes('completed') || eventType.includes('inserted')) {
+          console.log(`📡 Source update: ${eventType}`);
+        }
         
         queryClient.refetchQueries({
           queryKey: ['agent-source-stats', agentId]
@@ -49,7 +50,7 @@ export const useAgentSourcesRealtime = () => {
     };
 
     const channel = supabase
-      .channel(`agent-sources-debounced-${agentId}`)
+      .channel(`agent-sources-${agentId}`)
       .on(
         'postgres_changes',
         {
@@ -59,18 +60,9 @@ export const useAgentSourcesRealtime = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          const sourceType = payload.new && typeof payload.new === 'object' && 'source_type' in payload.new 
-            ? payload.new.source_type 
-            : 'unknown';
           const crawlStatus = payload.new && typeof payload.new === 'object' && 'crawl_status' in payload.new
             ? payload.new.crawl_status
             : 'unknown';
-          
-          console.log('📡 Agent source update:', {
-            event: payload.eventType,
-            sourceType,
-            crawlStatus
-          });
           
           // Immediate refresh for important status changes
           if (payload.eventType === 'UPDATE' && crawlStatus === 'completed') {
@@ -78,7 +70,7 @@ export const useAgentSourcesRealtime = () => {
           } else if (payload.eventType === 'INSERT') {
             debouncedRefresh('source-inserted', 200);
           } else {
-            debouncedRefresh('source-updated', 500);
+            debouncedRefresh('source-updated', 1000);
           }
         }
       )
@@ -94,16 +86,11 @@ export const useAgentSourcesRealtime = () => {
             ? payload.new.status
             : 'unknown';
           
-          console.log('📄 Source page update:', {
-            event: payload.eventType,
-            pageStatus
-          });
-          
           // Immediate refresh for page completion
           if (payload.eventType === 'UPDATE' && pageStatus === 'completed') {
             debouncedRefresh('page-completed', 200);
           } else {
-            debouncedRefresh('page-updated', 800);
+            debouncedRefresh('page-updated', 1500);
           }
         }
       )
@@ -113,7 +100,6 @@ export const useAgentSourcesRealtime = () => {
 
     return () => {
       if (channelRef.current) {
-        console.log('🔌 Cleaning up debounced real-time subscription');
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
