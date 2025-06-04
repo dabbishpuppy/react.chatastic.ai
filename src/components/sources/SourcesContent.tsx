@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, CheckCircle, Loader2, AlertTriangle } from "lucide-react";
+import { RefreshCw, CheckCircle, Loader2, AlertTriangle, FileText } from "lucide-react";
 import SourceRow from "./SourceRow";
 
 interface SourcesContentProps {
@@ -103,6 +103,9 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     buttonDisabled: buttonProps.disabled
   });
 
+  // Check if there are no sources
+  const hasAnySources = Object.values(sourcesByType).some(data => data.count > 0);
+
   return (
     <div className="space-y-6">
       <Card className="border border-gray-200 bg-white">
@@ -112,47 +115,64 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Sources List */}
-          <div className="space-y-1">
-            {Object.entries(sourcesByType)
-              .filter(([, data]) => data.count > 0)
-              .map(([type, data]) => (
-                <SourceRow
-                  key={type}
-                  type={type}
-                  count={data.count}
-                  size={data.size}
-                />
-              ))}
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-dotted border-gray-300 my-4"></div>
-
-          {/* Total Size */}
-          <div className="flex justify-between items-center">
-            <span className="text-gray-700 font-medium">Total size:</span>
-            <span className="text-gray-900 font-semibold">{totalSize}</span>
-          </div>
-
-          {/* Retrain Button */}
-          <Button
-            size="sm"
-            variant={buttonProps.variant}
-            onClick={onRetrainClick}
-            disabled={buttonProps.disabled}
-            className={buttonProps.className}
-          >
-            {buttonProps.icon}
-            {buttonProps.text}
-          </Button>
-
-          {/* Training Message */}
-          {trainingMessage && (
-            <div className="flex items-start gap-2 text-sm text-orange-600">
-              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>{trainingMessage}</span>
+          {!hasAnySources ? (
+            /* No Sources Message */
+            <div className="text-center py-8 space-y-4">
+              <div className="flex justify-center">
+                <FileText className="h-12 w-12 text-gray-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium text-gray-900">No sources added yet</h3>
+                <p className="text-gray-600 max-w-sm mx-auto">
+                  Add your first source to train your AI agent. You can upload files, add text content, websites, or Q&A pairs.
+                </p>
+              </div>
             </div>
+          ) : (
+            <>
+              {/* Sources List */}
+              <div className="space-y-1">
+                {Object.entries(sourcesByType)
+                  .filter(([, data]) => data.count > 0)
+                  .map(([type, data]) => (
+                    <SourceRow
+                      key={type}
+                      type={type}
+                      count={data.count}
+                      size={data.size}
+                    />
+                  ))}
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-dotted border-gray-300 my-4"></div>
+
+              {/* Total Size */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700 font-medium">Total size:</span>
+                <span className="text-gray-900 font-semibold">{totalSize}</span>
+              </div>
+
+              {/* Retrain Button */}
+              <Button
+                size="sm"
+                variant={buttonProps.variant}
+                onClick={onRetrainClick}
+                disabled={buttonProps.disabled}
+                className={buttonProps.className}
+              >
+                {buttonProps.icon}
+                {buttonProps.text}
+              </Button>
+
+              {/* Training Message */}
+              {trainingMessage && (
+                <div className="flex items-start gap-2 text-sm text-orange-600">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span>{trainingMessage}</span>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
