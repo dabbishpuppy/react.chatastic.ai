@@ -21,8 +21,6 @@ interface TrainingProgress {
 export const useTrainingProgressCalculation = () => {
   const calculateTrainingProgress = async (agentId: string): Promise<TrainingProgress | null> => {
     try {
-      console.log('🔍 Calculating training progress for agent:', agentId);
-      
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content, crawl_status')
@@ -35,7 +33,6 @@ export const useTrainingProgressCalculation = () => {
       }
 
       if (!agentSources || agentSources.length === 0) {
-        console.log('No sources found for agent');
         return null;
       }
 
@@ -99,14 +96,14 @@ export const useTrainingProgressCalculation = () => {
         status = 'training';
       }
 
-      console.log('📊 Training progress calculated:', {
-        sourcesNeedingTraining: sourcesNeedingTraining.length,
-        totalPagesNeedingProcessing,
-        totalPagesProcessed,
-        currentlyProcessingPages,
-        progress,
-        status
-      });
+      // Only log significant progress updates
+      if (status === 'completed' || currentlyProcessingPages.length > 0) {
+        console.log('📊 Training progress:', {
+          status,
+          progress: `${progress}%`,
+          processed: `${totalPagesProcessed}/${totalPagesNeedingProcessing}`
+        });
+      }
 
       return {
         agentId,

@@ -73,6 +73,8 @@ export const useTrainingOperations = () => {
       });
 
       await Promise.allSettled(processingPromises);
+      
+      // Give a moment for database updates to propagate
       setTimeout(() => onProgressUpdate(agentId), 1000);
 
     } catch (error) {

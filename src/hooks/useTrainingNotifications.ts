@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
@@ -29,7 +29,7 @@ export const useTrainingNotifications = () => {
     if (progress) {
       setTrainingProgress(progress);
 
-      // Show completion notification
+      // Show completion notification only for genuine completions
       if (progress.status === 'completed' && trainingProgress?.status !== 'completed' && progress.totalSources > 0) {
         console.log('🎉 Training completed! Showing success notification');
         
@@ -45,6 +45,9 @@ export const useTrainingNotifications = () => {
       }
     }
   }, [calculateTrainingProgress, trainingProgress?.status]);
+
+  // Stabilize website sources to prevent subscription issues
+  const stableWebsiteSources = useMemo(() => websiteSources, [websiteSources.join(',')]);
 
   // Initialize website sources
   useEffect(() => {
@@ -66,7 +69,11 @@ export const useTrainingNotifications = () => {
 
         const sourceIds = sources?.map(s => s.id) || [];
         setWebsiteSources(sourceIds);
-        console.log('📄 Found website sources to monitor:', sourceIds);
+        
+        // Only log if there are sources to monitor
+        if (sourceIds.length > 0) {
+          console.log('📄 Monitoring website sources:', sourceIds.length);
+        }
       } catch (error) {
         console.error('Error initializing website sources:', error);
       }
@@ -77,7 +84,7 @@ export const useTrainingNotifications = () => {
 
   const subscriptionState = useTrainingSubscriptions(
     agentId || '',
-    websiteSources,
+    stableWebsiteSources,
     checkTrainingCompletion
   );
 
