@@ -2,7 +2,6 @@
 import React, { Suspense, lazy } from 'react';
 import { useTabNavigation } from '../hooks/useTabNavigation';
 import { getTabConfig } from '../config/tabConfig';
-import { useAgentSourcesRealtime } from '@/hooks/useAgentSourcesRealtime';
 
 // Import tab components
 const TextTab = lazy(() => import('../TextTab'));
@@ -12,9 +11,6 @@ const QATab = lazy(() => import('../QATab'));
 
 const TabContainer: React.FC = () => {
   const { currentTab } = useTabNavigation();
-  
-  // Set up real-time subscription for all tabs
-  useAgentSourcesRealtime();
 
   const renderTabContent = () => {
     const tabConfig = getTabConfig(currentTab);
