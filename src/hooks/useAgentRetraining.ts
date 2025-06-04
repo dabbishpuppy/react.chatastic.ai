@@ -64,7 +64,10 @@ export const useAgentRetraining = (agentId?: string) => {
   }, [agentId, toast]);
 
   const startRetraining = useCallback(async () => {
-    if (!agentId || isRetraining) return;
+    if (!agentId || isRetraining) {
+      console.log('⚠️ Cannot start training:', { agentId, isRetraining });
+      return;
+    }
 
     console.log('🚀 Starting retraining via training notifications system');
 
@@ -77,6 +80,11 @@ export const useAgentRetraining = (agentId?: string) => {
         description: "Processing your sources and generating embeddings..."
       });
 
+      // After starting training, refresh the retraining status
+      setTimeout(() => {
+        checkRetrainingNeeded();
+      }, 1000);
+
     } catch (error) {
       console.error('Retraining failed:', error);
       toast({
@@ -85,7 +93,7 @@ export const useAgentRetraining = (agentId?: string) => {
         variant: "destructive"
       });
     }
-  }, [agentId, isRetraining, startTraining, toast]);
+  }, [agentId, isRetraining, startTraining, toast, checkRetrainingNeeded]);
 
   return {
     isRetraining,

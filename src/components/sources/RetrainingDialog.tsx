@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -41,7 +42,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     });
 
     // First priority: Check if there are sources that need training
-    if (retrainingNeeded?.needed) {
+    if (retrainingNeeded?.needed && trainingProgress?.status !== 'training') {
       console.log('📋 Sources need training, status should be idle for new training');
       return 'idle';
     }
@@ -157,6 +158,18 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         return "default";
       default:
         return "outline";
+    }
+  };
+
+  const handleStartTraining = async () => {
+    console.log('🚀 Start Training button clicked');
+    
+    try {
+      // Call the training function
+      await onStartRetraining();
+      console.log('✅ Training initiated successfully');
+    } catch (error) {
+      console.error('❌ Failed to start training:', error);
     }
   };
 
@@ -284,7 +297,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 Close
               </Button>
               <Button 
-                onClick={onStartRetraining} 
+                onClick={handleStartTraining} 
                 className="flex-1"
               >
                 Retry Training
@@ -300,7 +313,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 Cancel
               </Button>
               <Button 
-                onClick={onStartRetraining} 
+                onClick={handleStartTraining} 
                 disabled={isTrainingActive}
                 className="flex-1"
               >
