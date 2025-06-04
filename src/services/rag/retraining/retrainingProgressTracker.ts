@@ -4,15 +4,15 @@ import { RetrainingProgress } from '../types/retrainingTypes';
 export class RetrainingProgressTracker {
   private static progressCallbacks = new Map<string, (progress: RetrainingProgress) => void>();
 
-  static setProgressCallback(agentId: string, callback: (progress: RetrainingProgress) => void): void {
+  static setProgressCallback(agentId: string, callback: (progress: RetrainingProgress) => void) {
     this.progressCallbacks.set(agentId, callback);
   }
 
-  static removeProgressCallback(agentId: string): void {
+  static removeProgressCallback(agentId: string) {
     this.progressCallbacks.delete(agentId);
   }
 
-  static updateProgress(agentId: string, progress: RetrainingProgress): void {
+  static updateProgress(agentId: string, progress: RetrainingProgress) {
     const callback = this.progressCallbacks.get(agentId);
     if (callback) {
       callback(progress);
@@ -25,7 +25,7 @@ export class RetrainingProgressTracker {
       processedSources: 0,
       totalChunks: 0,
       processedChunks: 0,
-      status: 'processing'
+      status: 'pending'
     };
   }
 
@@ -35,19 +35,18 @@ export class RetrainingProgressTracker {
       processedSources,
       totalChunks: 0,
       processedChunks: 0,
-      status: 'completed',
-      currentSource: undefined
+      status: processedSources === totalSources ? 'completed' : 'failed'
     };
   }
 
-  static createErrorProgress(error: string): RetrainingProgress {
+  static createErrorProgress(errorMessage: string): RetrainingProgress {
     return {
       totalSources: 0,
       processedSources: 0,
       totalChunks: 0,
       processedChunks: 0,
       status: 'failed',
-      error
+      errorMessage
     };
   }
 }

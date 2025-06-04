@@ -38,7 +38,7 @@ export class SourceProcessor {
         }
       }
 
-      // Handle other source types (text, file, qa) - existing logic
+      // Handle other source types (text, file, qa)
       if (!source.content || source.content.trim().length === 0) {
         // Check for Q&A sources with structured content
         if (source.source_type === 'qa') {
@@ -48,7 +48,7 @@ export class SourceProcessor {
           }
           // Process Q&A content
           const qaContent = `Question: ${metadata.question}\nAnswer: ${metadata.answer}`;
-          await this.processTextContent(source.id, qaContent);
+          await this.processTextContent(source.id, qaContent, source.source_type);
           return;
         }
         
@@ -56,7 +56,7 @@ export class SourceProcessor {
       }
 
       // Process text content for other source types
-      await this.processTextContent(source.id, source.content);
+      await this.processTextContent(source.id, source.content, source.source_type);
 
     } catch (error) {
       console.error(`❌ Failed to process source ${source.title}:`, error);
@@ -78,26 +78,54 @@ export class SourceProcessor {
     }
   }
 
-  private static async processTextContent(sourceId: string, content: string): Promise<void> {
+  private static async processTextContent(sourceId: string, content: string, sourceType: string): Promise<void> {
     try {
-      // Call the generate embeddings function to process the content
-      const { data, error } = await supabase.functions.invoke('generate-embeddings', {
+      console.log(`🔄 Processing text content for source ${sourceId} (${sourceType})`);
+
+      // First, create chunks for the content
+      const { data: chunkData, error: chunkError } = await supabase.functions.invoke('generate-chunks', {
+        body: { 
+          sourceId,
+          content,
+          sourceType 
+        }
+      });
+
+      if (chunkError) {
+        console.error(`❌ Failed to generate chunks for source ${sourceId}:`, chunkError);
+        
+        // If chunk generation function doesn't exist, create chunks manually
+        if (chunkError.message?.includes('Function not found') || chunkError.message?.includes('404')) {
+          console.log(`🔧 Creating chunks manually for source ${sourceId}`);
+          await this.createChunksManually(sourceId, content, sourceType);
+        } else {
+          throw new Error(`Failed to generate chunks: ${chunkError.message}`);
+        }
+      } else {
+        console.log(`✅ Generated chunks for source ${sourceId}:`, chunkData);
+      }
+
+      // Then generate embeddings for the chunks
+      const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
         body: { sourceId }
       });
 
-      if (error) {
-        throw new Error(`Failed to generate embeddings: ${error.message}`);
+      if (embeddingError) {
+        throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
       }
+
+      console.log(`✅ Generated embeddings for source ${sourceId}:`, embeddingData);
 
       // Update source metadata to reflect successful processing
       await supabase
         .from('agent_sources')
         .update({
           metadata: {
+            ...(await this.getSourceMetadata(sourceId)),
             processing_status: 'completed',
             last_processed_at: new Date().toISOString(),
-            chunks_generated: data?.chunksCreated || 0,
-            embeddings_generated: data?.embeddingsCreated || 0
+            chunks_generated: chunkData?.chunksCreated || embeddingData?.processedCount || 0,
+            embeddings_generated: embeddingData?.processedCount || 0
           }
         })
         .eq('id', sourceId);
@@ -108,5 +136,56 @@ export class SourceProcessor {
       console.error(`❌ Error processing text content for source ${sourceId}:`, error);
       throw error;
     }
+  }
+
+  private static async createChunksManually(sourceId: string, content: string, sourceType: string): Promise<void> {
+    try {
+      // Simple chunking: split content into chunks of ~1000 characters
+      const chunkSize = 1000;
+      const chunks = [];
+      
+      for (let i = 0; i < content.length; i += chunkSize) {
+        const chunk = content.slice(i, i + chunkSize);
+        if (chunk.trim().length > 0) {
+          chunks.push({
+            source_id: sourceId,
+            chunk_index: chunks.length,
+            content: chunk.trim(),
+            token_count: Math.ceil(chunk.length / 4), // Rough estimate: 4 chars per token
+            metadata: {
+              source_type: sourceType,
+              chunk_method: 'manual_split',
+              created_at: new Date().toISOString()
+            }
+          });
+        }
+      }
+
+      // Insert chunks into database
+      if (chunks.length > 0) {
+        const { error: insertError } = await supabase
+          .from('source_chunks')
+          .insert(chunks);
+
+        if (insertError) {
+          throw new Error(`Failed to insert chunks: ${insertError.message}`);
+        }
+
+        console.log(`✅ Manually created ${chunks.length} chunks for source ${sourceId}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to create chunks manually for source ${sourceId}:`, error);
+      throw error;
+    }
+  }
+
+  private static async getSourceMetadata(sourceId: string): Promise<any> {
+    const { data: source } = await supabase
+      .from('agent_sources')
+      .select('metadata')
+      .eq('id', sourceId)
+      .single();
+    
+    return source?.metadata || {};
   }
 }

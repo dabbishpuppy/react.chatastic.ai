@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { RetrainingStatus, SourceProcessingStatus } from '../types/retrainingTypes';
 
@@ -191,9 +192,15 @@ export class RetrainingChecker {
 
   private static async isSourceFullyProcessed(source: any): Promise<SourceProcessingStatus> {
     try {
-      // Check metadata for processing status
+      // Check metadata for processing status first
       const metadata = source.metadata || {};
       const processingStatus = metadata.processing_status;
+
+      console.log(`🔍 Checking processing status for ${source.title}:`, {
+        processingStatus,
+        hasMetadata: !!metadata,
+        sourceType: source.source_type
+      });
 
       // If explicitly marked as completed, verify it has chunks and embeddings
       if (processingStatus === 'completed') {
@@ -205,6 +212,7 @@ export class RetrainingChecker {
           .limit(1);
 
         if (chunksError) {
+          console.error(`❌ Error checking chunks for ${source.title}:`, chunksError);
           return { 
             processed: false, 
             hasAttempted: true, 
@@ -213,6 +221,7 @@ export class RetrainingChecker {
         }
 
         if (!chunks || chunks.length === 0) {
+          console.log(`⚠️ Source ${source.title} marked complete but missing chunks`);
           return { 
             processed: false, 
             hasAttempted: true, 
@@ -220,7 +229,7 @@ export class RetrainingChecker {
           };
         }
 
-        // Verify embeddings exist - simplified approach
+        // Verify embeddings exist
         const { data: embeddings, error: embeddingsError } = await supabase
           .from('source_embeddings')
           .select('id')
@@ -228,6 +237,7 @@ export class RetrainingChecker {
           .limit(1);
 
         if (embeddingsError) {
+          console.error(`❌ Error checking embeddings for ${source.title}:`, embeddingsError);
           return { 
             processed: false, 
             hasAttempted: true, 
@@ -236,6 +246,7 @@ export class RetrainingChecker {
         }
 
         if (!embeddings || embeddings.length === 0) {
+          console.log(`⚠️ Source ${source.title} has chunks but missing embeddings`);
           return { 
             processed: false, 
             hasAttempted: true, 
@@ -243,6 +254,7 @@ export class RetrainingChecker {
           };
         }
 
+        console.log(`✅ Source ${source.title} is fully processed`);
         return { processed: true, hasAttempted: true, reason: 'Fully processed' };
       }
 
@@ -271,6 +283,7 @@ export class RetrainingChecker {
       }
 
       // No processing status and no chunks - never processed
+      console.log(`📋 Source ${source.title} has never been processed`);
       return { 
         processed: false, 
         hasAttempted: false, 
