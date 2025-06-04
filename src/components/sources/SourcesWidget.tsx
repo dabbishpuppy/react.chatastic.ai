@@ -15,7 +15,7 @@ interface SourcesWidgetProps {
 
 const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { agentId } = useParams();
-  const { stats, loading, error } = useAgentSourceStats();
+  const { data: stats, isLoading, error } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   
   const {
@@ -31,15 +31,15 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
 
   // Check retraining status on mount and when stats change
   useEffect(() => {
-    if (agentId) {
+    if (agentId && stats) {
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats.totalSources, stats.requiresTraining]);
+  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
 
   console.log(`📊 SourcesWidget render with enhanced stats:`, {
-    totalSources: stats.totalSources,
-    requiresTraining: stats.requiresTraining,
-    unprocessedCrawledPages: stats.unprocessedCrawledPages,
+    totalSources: stats?.totalSources || 0,
+    requiresTraining: stats?.requiresTraining || false,
+    unprocessedCrawledPages: stats?.unprocessedCrawledPages || 0,
     retrainingNeeded: retrainingNeeded?.needed
   });
 
@@ -54,12 +54,16 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     setShowRetrainingDialog(true);
   };
 
-  if (loading) {
+  if (isLoading) {
     return <SourcesLoadingState />;
   }
 
   if (error) {
-    return <SourcesErrorState error={error} />;
+    return <SourcesErrorState error={error.message} />;
+  }
+
+  if (!stats) {
+    return <SourcesErrorState error="No stats available" />;
   }
 
   return (

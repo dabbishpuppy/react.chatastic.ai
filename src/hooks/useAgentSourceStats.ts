@@ -70,10 +70,20 @@ export const useAgentSourceStats = () => {
       const requiresTraining = (sourcesNeedingTraining?.length || 0) > 0;
       const unprocessedCrawledPages = unprocessedPages?.length || 0;
 
+      // Parse sources_by_type JSON safely
+      let sourcesByType = {};
+      try {
+        if (result.sources_by_type && typeof result.sources_by_type === 'object') {
+          sourcesByType = result.sources_by_type as Record<string, { count: number; size: number }>;
+        }
+      } catch (error) {
+        console.error('Error parsing sources_by_type:', error);
+      }
+
       console.log('📊 Source stats calculated:', {
         totalSources: result.total_sources,
         totalBytes: result.total_bytes,
-        sourcesByType: result.sources_by_type,
+        sourcesByType,
         requiresTraining,
         unprocessedCrawledPages
       });
@@ -81,7 +91,7 @@ export const useAgentSourceStats = () => {
       return {
         totalSources: result.total_sources,
         totalBytes: result.total_bytes,
-        sourcesByType: result.sources_by_type,
+        sourcesByType,
         requiresTraining,
         unprocessedCrawledPages
       };
