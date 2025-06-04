@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -32,23 +31,36 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // Use trainingProgress as the primary source of truth
+  // Prioritize sources needing training over stale completion status
   const getTrainingStatus = () => {
     console.log('🔍 RetrainingDialog - Current training status:', {
+      retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
       isRetraining,
       trainingProgressData: trainingProgress
     });
 
-    if (trainingProgress?.status === 'completed') {
-      return 'completed';
+    // First priority: Check if there are sources that need training
+    if (retrainingNeeded?.needed) {
+      console.log('📋 Sources need training, status should be idle for new training');
+      return 'idle';
     }
-    if (trainingProgress?.status === 'training') {
+
+    // Second priority: Check active training status
+    if (trainingProgress?.status === 'training' || isRetraining) {
       return 'training';
     }
+
+    // Third priority: Check if training failed
     if (trainingProgress?.status === 'failed') {
       return 'failed';
     }
+
+    // Only show completed if no sources need training AND training was actually completed
+    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
+      return 'completed';
+    }
+
     return 'idle';
   };
 
@@ -95,12 +107,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   const getStatusMessage = () => {
     const status = getTrainingStatus();
     
-    if (status === 'completed') {
-      return "Training completed successfully! Your AI agent is trained and ready.";
-    }
-    
-    if (status === 'failed') {
-      return "Training failed. Please try again or check your sources.";
+    // Prioritize showing sources that need training
+    if (retrainingNeeded?.needed && status !== 'training') {
+      return retrainingNeeded.message || `${retrainingNeeded.unprocessedSources} sources need to be processed for training.`;
     }
     
     if (status === 'training') {
@@ -112,8 +121,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       return "Training in progress...";
     }
     
-    if (retrainingNeeded?.needed) {
-      return retrainingNeeded.message || `${retrainingNeeded.unprocessedSources} sources need to be processed for training.`;
+    if (status === 'failed') {
+      return "Training failed. Please try again or check your sources.";
+    }
+    
+    if (status === 'completed') {
+      return "Training completed successfully! Your AI agent is trained and ready.";
     }
     
     return "Your agent is up to date.";
@@ -149,7 +162,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
   const status = getTrainingStatus();
   const isTrainingActive = status === 'training';
-  const isTrainingCompleted = status === 'completed';
+  const isTrainingCompleted = status === 'completed' && !retrainingNeeded?.needed;
   const isTrainingFailed = status === 'failed';
   const progressPercentage = getProgressPercentage();
 
@@ -160,7 +173,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     isTrainingFailed,
     progressPercentage,
     processedCount: getProcessedCount(),
-    totalCount: getTotalCount()
+    totalCount: getTotalCount(),
+    retrainingNeeded: retrainingNeeded?.needed
   });
 
   return (
@@ -189,7 +203,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          {(isTrainingActive || isTrainingCompleted || isTrainingFailed) && (
+          {(isTrainingActive || (isTrainingCompleted && !retrainingNeeded?.needed) || isTrainingFailed) && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -208,7 +222,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             </div>
           )}
 
-          {/* Source Details */}
+          {/* Source Details - Show when sources need training or when training is not completed */}
           {retrainingNeeded?.sourceDetails && retrainingNeeded.sourceDetails.length > 0 && !isTrainingCompleted && (
             <div className="space-y-4">
               <div className="border-t pt-4">

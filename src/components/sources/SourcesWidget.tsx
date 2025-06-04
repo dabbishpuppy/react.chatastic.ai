@@ -42,7 +42,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
 
   // Handle training state transitions with simplified logic
   useEffect(() => {
-    if (trainingProgress?.status === 'completed') {
+    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('🎉 Training completed, updating states');
       setIsTrainingInBackground(false);
       setIsTrainingCompleted(true);
@@ -57,11 +57,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     } else if (trainingProgress?.status === 'training') {
       setIsTrainingCompleted(false);
     }
-  }, [trainingProgress?.status, refetchStats, checkRetrainingNeeded]);
+  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
 
   // Reset completion state when new training is needed
   useEffect(() => {
     if (retrainingNeeded?.needed || stats?.requiresTraining) {
+      console.log('🔄 Resetting completion state - new sources need training');
       setIsTrainingCompleted(false);
     }
   }, [retrainingNeeded?.needed, stats?.requiresTraining]);
@@ -153,7 +154,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         retrainingNeeded={retrainingNeeded?.needed || false}
         isRetraining={isTrainingActive}
         isTrainingInBackground={isTrainingInBackground}
-        isTrainingCompleted={isTrainingCompleted}
+        isTrainingCompleted={isTrainingCompleted && !retrainingNeeded?.needed}
         requiresTraining={stats.requiresTraining}
         unprocessedCrawledPages={stats.unprocessedCrawledPages}
       />
