@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -109,12 +108,14 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2 ml-4">
-      {/* Status Badge - positioned next to the actions */}
-      <WebsiteSourceStatusBadges
-        crawlStatus={source.crawl_status}
-        isExcluded={source.is_excluded}
-        linksCount={source.links_count || 0}
-      />
+      {/* Only show Status Badge for parent sources, not child sources */}
+      {!isChild && (
+        <WebsiteSourceStatusBadges
+          crawlStatus={source.crawl_status}
+          isExcluded={source.is_excluded}
+          linksCount={source.links_count || 0}
+        />
+      )}
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
