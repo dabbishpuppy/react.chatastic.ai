@@ -5,6 +5,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
 
 export const useAgentRetraining = (agentId?: string) => {
+  // Always call hooks in the same order - move useToast to top
+  const { toast } = useToast();
+  const { trainingProgress, startTraining } = useTrainingNotifications();
+  
   const [progress, setProgress] = useState<RetrainingProgress | null>(null);
   const [retrainingNeeded, setRetrainingNeeded] = useState<{
     needed: boolean;
@@ -20,16 +24,13 @@ export const useAgentRetraining = (agentId?: string) => {
       status: string;
     }>;
   } | null>(null);
-  
-  const { toast } = useToast();
-  const { trainingProgress, startTraining } = useTrainingNotifications();
 
   // Sync all state with training notifications system
   const isRetraining = trainingProgress?.status === 'training';
 
   useEffect(() => {
     if (trainingProgress) {
-      console.log('🔄 Syncing useAgentRetraining with trainingProgress:', trainingProgress);
+      console.log('🔄 useAgentRetraining - Syncing with trainingProgress:', trainingProgress);
       
       // Update progress state to match training notifications
       setProgress({
@@ -91,6 +92,8 @@ export const useAgentRetraining = (agentId?: string) => {
     progress,
     retrainingNeeded,
     startRetraining,
-    checkRetrainingNeeded
+    checkRetrainingNeeded,
+    // Expose trainingProgress for components that need direct access
+    trainingProgress
   };
 };

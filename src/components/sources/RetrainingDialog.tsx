@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, AlertCircle, Loader2, FileText, Globe, HelpCircle, File } from "lucide-react";
-import { useTrainingNotifications } from "@/hooks/useTrainingNotifications";
 
 interface RetrainingDialogProps {
   open: boolean;
@@ -21,6 +20,7 @@ interface RetrainingDialogProps {
   progress: any;
   retrainingNeeded: any;
   onStartRetraining: () => void;
+  trainingProgress?: any;
 }
 
 export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
@@ -29,15 +29,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   isRetraining,
   progress,
   retrainingNeeded,
-  onStartRetraining
+  onStartRetraining,
+  trainingProgress
 }) => {
-  const { trainingProgress, startTraining } = useTrainingNotifications();
-
-  const handleStartTraining = async () => {
-    await startTraining();
-    onStartRetraining(); // Keep the original logic for backward compatibility
-  };
-
   // Use trainingProgress as the primary source of truth
   const getTrainingStatus = () => {
     console.log('🔍 RetrainingDialog - Current training status:', {
@@ -61,9 +55,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     if (status === 'completed') return 100;
     
     // Use trainingProgress data as primary source
-    if (trainingProgress?.progress !== undefined) {
+    if (trainingProgress?.progress !== undefined && trainingProgress.progress > 0) {
       console.log('📊 Using trainingProgress.progress:', trainingProgress.progress);
-      return trainingProgress.progress;
+      return Math.min(100, Math.max(0, trainingProgress.progress));
     }
     
     // Calculate from processed vs total sources
@@ -74,7 +68,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         total: trainingProgress.totalSources,
         percentage: calculated
       });
-      return calculated;
+      return Math.min(100, Math.max(0, calculated));
     }
     
     return 0;
@@ -251,7 +245,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 Cancel
               </Button>
               <Button 
-                onClick={handleStartTraining} 
+                onClick={onStartRetraining} 
                 disabled={isTrainingActive}
                 className="flex-1"
               >
