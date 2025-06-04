@@ -128,8 +128,10 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             )}
             Agent Training Status
           </DialogTitle>
-          <DialogDescription>
-            {getStatusMessage()}
+          <DialogDescription asChild>
+            <div className="text-sm text-muted-foreground">
+              {getStatusMessage()}
+            </div>
           </DialogDescription>
         </DialogHeader>
 
@@ -163,10 +165,10 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm truncate">{source.title}</p>
+                          <div className="font-medium text-sm truncate">{source.title}</div>
                           <Badge variant="outline" className="text-xs">{source.type}</Badge>
                         </div>
-                        <p className="text-xs text-gray-600 mb-2">{source.reason}</p>
+                        <div className="text-xs text-gray-600 mb-2">{source.reason}</div>
                         <Badge variant={getStatusBadgeVariant(source.status)} className="text-xs">
                           {source.status}
                         </Badge>
@@ -183,9 +185,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="font-medium text-lg mb-2">Everything is ready!</h3>
-              <p className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600">
                 All your sources have been processed and your AI agent is fully trained.
-              </p>
+              </div>
             </div>
           )}
         </div>
