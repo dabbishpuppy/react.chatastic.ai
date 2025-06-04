@@ -40,7 +40,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
         disabled: false, // Always clickable
         icon: <CheckCircle className="h-4 w-4" />,
         text: "Agent Trained",
-        className: "bg-green-50 border-green-200 text-green-700"
+        className: "bg-green-50 border-green-200 text-green-700 w-full"
       };
     }
     
@@ -51,7 +51,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
         disabled: false, // Always clickable to view progress
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
         text: isTrainingInBackground ? "Agent Training In Progress" : "Processing...",
-        className: "bg-yellow-50 border-yellow-200 text-yellow-700"
+        className: "bg-yellow-50 border-yellow-200 text-yellow-700 w-full"
       };
     }
     
@@ -72,7 +72,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
       disabled: false, // Always clickable
       icon: <CheckCircle className="h-4 w-4" />,
       text: "Agent Trained",
-      className: "bg-green-50 border-green-200 text-green-700"
+      className: "bg-green-50 border-green-200 text-green-700 w-full"
     };
   };
 
