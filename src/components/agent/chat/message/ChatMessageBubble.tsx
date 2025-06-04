@@ -17,6 +17,9 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   userBubbleClass,
   userMessageStyle = {}
 }) => {
+  console.log('ChatMessageBubble - content:', content);
+  console.log('ChatMessageBubble - isAgent:', isAgent);
+  
   return (
     <div 
       className={`rounded-lg p-3 text-[0.875rem] ${
@@ -27,7 +30,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
       {isAgent ? (
         <ReactMarkdown
           components={{
-            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+            p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
             ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
             li: ({ children }) => <li className="leading-relaxed">{children}</li>,
@@ -44,7 +47,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           {content}
         </ReactMarkdown>
       ) : (
-        content
+        <div className="leading-relaxed">{content}</div>
       )}
     </div>
   );
