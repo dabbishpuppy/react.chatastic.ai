@@ -12,6 +12,14 @@ interface TrainingProgress {
   processedSources: number;
 }
 
+interface DatabaseSource {
+  id: string;
+  source_type: string;
+  metadata: any;
+  title: string;
+  content?: string;
+}
+
 export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -108,10 +116,10 @@ export const useTrainingNotifications = () => {
 
   const checkTrainingCompletion = async (agentId: string) => {
     try {
-      // Get all active sources for this agent
+      // Get all active sources for this agent with all required fields
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id, source_type, metadata, title')
+        .select('id, source_type, metadata, title, content')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -129,15 +137,18 @@ export const useTrainingNotifications = () => {
       let trainingSources = 0;
 
       // Check each source type for processing status
-      for (const source of agentSources) {
+      for (const source of agentSources as DatabaseSource[]) {
+        // Type-safe metadata access
+        const metadata = (source.metadata as Record<string, any>) || {};
+        
+        // Check if source has content based on type
         const hasContent = source.source_type === 'qa' ? 
-          (source.metadata?.question && source.metadata?.answer) :
-          source.metadata?.content || source.content;
+          (metadata?.question && metadata?.answer) :
+          metadata?.content || source.content;
 
         if (!hasContent) continue; // Skip sources without content
 
         totalSources++;
-        const metadata = source.metadata || {};
 
         if (source.source_type === 'website') {
           // For website sources, check crawled pages
@@ -159,7 +170,7 @@ export const useTrainingNotifications = () => {
           }
         } else {
           // For other sources, check metadata processing status
-          const processingStatus = metadata.processing_status;
+          const processingStatus = metadata?.processing_status;
           
           if (processingStatus === 'completed') {
             processedSources++;
@@ -214,10 +225,10 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting unified training for agent:', agentId);
 
-      // Get all active sources for this agent
+      // Get all active sources for this agent with metadata
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id, source_type')
+        .select('id, source_type, metadata')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -252,11 +263,13 @@ export const useTrainingNotifications = () => {
       // Handle other source types by updating their metadata
       const otherSources = agentSources.filter(s => s.source_type !== 'website');
       for (const source of otherSources) {
+        const currentMetadata = (source.metadata as Record<string, any>) || {};
+        
         await supabase
           .from('agent_sources')
           .update({
             metadata: {
-              ...(source.metadata || {}),
+              ...currentMetadata,
               processing_status: 'processing',
               training_started_at: new Date().toISOString()
             }
