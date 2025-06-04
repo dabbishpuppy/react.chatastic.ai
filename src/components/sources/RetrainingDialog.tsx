@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -31,31 +32,23 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // Determine the true training status based on current needs vs completion state
+  // Use trainingProgress as the primary source of truth
   const getTrainingStatus = () => {
     console.log('🔍 RetrainingDialog - Current training status:', {
       trainingProgressStatus: trainingProgress?.status,
-      retrainingNeeded: retrainingNeeded?.needed,
       isRetraining,
       trainingProgressData: trainingProgress
     });
 
-    // If we actively need retraining, that takes precedence over completed status
-    if (retrainingNeeded?.needed) {
-      return 'needs_training';
+    if (trainingProgress?.status === 'completed') {
+      return 'completed';
     }
-
-    // Check actual training progress status
     if (trainingProgress?.status === 'training') {
       return 'training';
     }
     if (trainingProgress?.status === 'failed') {
       return 'failed';
     }
-    if (trainingProgress?.status === 'completed') {
-      return 'completed';
-    }
-    
     return 'idle';
   };
 
@@ -64,9 +57,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     
     if (status === 'completed') return 100;
     if (status === 'failed') return 0;
-    if (status === 'needs_training') return 0;
     
-    // Use trainingProgress data as primary source during active training
+    // Use trainingProgress data as primary source
     if (trainingProgress?.progress !== undefined && trainingProgress.progress >= 0) {
       console.log('📊 Using trainingProgress.progress:', trainingProgress.progress);
       return Math.min(100, Math.max(0, trainingProgress.progress));
@@ -103,7 +95,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   const getStatusMessage = () => {
     const status = getTrainingStatus();
     
-    if (status === 'completed' && !retrainingNeeded?.needed) {
+    if (status === 'completed') {
       return "Training completed successfully! Your AI agent is trained and ready.";
     }
     
@@ -120,7 +112,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       return "Training in progress...";
     }
     
-    if (status === 'needs_training' || retrainingNeeded?.needed) {
+    if (retrainingNeeded?.needed) {
       return retrainingNeeded.message || `${retrainingNeeded.unprocessedSources} sources need to be processed for training.`;
     }
     
@@ -157,9 +149,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
   const status = getTrainingStatus();
   const isTrainingActive = status === 'training';
-  const isTrainingCompleted = status === 'completed' && !retrainingNeeded?.needed;
+  const isTrainingCompleted = status === 'completed';
   const isTrainingFailed = status === 'failed';
-  const needsTraining = status === 'needs_training' || retrainingNeeded?.needed;
   const progressPercentage = getProgressPercentage();
 
   console.log('🔍 RetrainingDialog render state:', {
@@ -167,7 +158,6 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     isTrainingActive,
     isTrainingCompleted,
     isTrainingFailed,
-    needsTraining,
     progressPercentage,
     processedCount: getProcessedCount(),
     totalCount: getTotalCount()
@@ -184,7 +174,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <AlertCircle className="h-5 w-5 text-red-600" />
             ) : isTrainingActive ? (
               <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-            ) : needsTraining ? (
+            ) : retrainingNeeded?.needed ? (
               <AlertCircle className="h-5 w-5 text-orange-600" />
             ) : (
               <CheckCircle className="h-5 w-5 text-green-600" />
@@ -199,7 +189,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          {(isTrainingActive || (isTrainingCompleted && !needsTraining) || isTrainingFailed) && (
+          {(isTrainingActive || isTrainingCompleted || isTrainingFailed) && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -218,8 +208,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             </div>
           )}
 
-          {/* Source Details - show when training is needed */}
-          {needsTraining && retrainingNeeded?.sourceDetails && retrainingNeeded.sourceDetails.length > 0 && (
+          {/* Source Details */}
+          {retrainingNeeded?.sourceDetails && retrainingNeeded.sourceDetails.length > 0 && !isTrainingCompleted && (
             <div className="space-y-4">
               <div className="border-t pt-4">
                 <h4 className="font-medium text-sm mb-3">Sources requiring processing:</h4>
@@ -246,8 +236,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             </div>
           )}
 
-          {/* No sources message - only show when truly up to date */}
-          {!needsTraining && !isTrainingActive && isTrainingCompleted && (
+          {/* No sources message */}
+          {!retrainingNeeded?.needed && !isTrainingActive && !isTrainingCompleted && !isTrainingFailed && (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="font-medium text-lg mb-2">Everything is ready!</h3>
@@ -257,8 +247,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             </div>
           )}
 
-          {/* Training completed message - only when no new training is needed */}
-          {isTrainingCompleted && !needsTraining && (
+          {/* Training completed message */}
+          {isTrainingCompleted && (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="font-medium text-lg mb-2">Training Complete!</h3>
@@ -270,7 +260,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         </div>
 
         <DialogFooter className="border-t pt-4">
-          {isTrainingCompleted && !needsTraining ? (
+          {isTrainingCompleted ? (
             <Button onClick={() => onOpenChange(false)} className="w-full">
               Done
             </Button>
@@ -290,7 +280,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
               Continue in Background
             </Button>
-          ) : needsTraining ? (
+          ) : retrainingNeeded?.needed ? (
             <div className="flex gap-2 w-full">
               <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
                 Cancel

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -39,7 +40,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
 
-  // Handle training state transitions with improved logic
+  // Handle training state transitions with simplified logic
   useEffect(() => {
     if (trainingProgress?.status === 'completed') {
       console.log('🎉 Training completed, updating states');
@@ -58,24 +59,19 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [trainingProgress?.status, refetchStats, checkRetrainingNeeded]);
 
-  // Reset completion state when new training is needed - THIS IS THE KEY FIX
+  // Reset completion state when new training is needed
   useEffect(() => {
-    if (retrainingNeeded?.needed) {
-      console.log('🔄 New training needed detected, resetting completion state');
+    if (retrainingNeeded?.needed || stats?.requiresTraining) {
       setIsTrainingCompleted(false);
-      setIsTrainingInBackground(false);
     }
-  }, [retrainingNeeded?.needed]);
+  }, [retrainingNeeded?.needed, stats?.requiresTraining]);
 
   // Listen for source events with debounced refresh
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
       console.log(`📁 Source event: ${event.type}, refreshing state`);
-      
       // Reset completion state when sources change
       setIsTrainingCompleted(false);
-      setIsTrainingInBackground(false);
-      
       // Refetch stats and check retraining status
       refetchStats();
       
@@ -157,7 +153,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         retrainingNeeded={retrainingNeeded?.needed || false}
         isRetraining={isTrainingActive}
         isTrainingInBackground={isTrainingInBackground}
-        isTrainingCompleted={isTrainingCompleted && !retrainingNeeded?.needed}
+        isTrainingCompleted={isTrainingCompleted}
         requiresTraining={stats.requiresTraining}
         unprocessedCrawledPages={stats.unprocessedCrawledPages}
       />

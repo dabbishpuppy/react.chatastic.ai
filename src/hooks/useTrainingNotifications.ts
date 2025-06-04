@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -36,7 +37,8 @@ export const useTrainingNotifications = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'source_pages',
-          filter: `parent_source_id=in.(select id from agent_sources where agent_id = '${agentId}')`
+          // Fixed: Use proper filter syntax without subquery
+          filter: `parent_source_id=in.(${agentId})`
         },
         (payload) => {
           const updatedPage = payload.new as any;
@@ -72,28 +74,6 @@ export const useTrainingNotifications = () => {
           if (metadata.processing_status) {
             checkTrainingCompletion(agentId);
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'agent_sources',
-          filter: `agent_id=eq.${agentId}`
-        },
-        (payload) => {
-          console.log('📡 New source added, resetting training state');
-          // Reset training state when new sources are added
-          setTrainingProgress(prev => prev ? {
-            ...prev,
-            status: 'idle'
-          } : null);
-          
-          // Check training requirements after brief delay to allow DB consistency
-          setTimeout(() => {
-            checkTrainingCompletion(agentId);
-          }, 1000);
         }
       )
       .on(
@@ -146,13 +126,6 @@ export const useTrainingNotifications = () => {
 
       if (!agentSources || agentSources.length === 0) {
         console.log('No sources found for agent');
-        setTrainingProgress({
-          agentId,
-          status: 'completed',
-          progress: 100,
-          totalSources: 0,
-          processedSources: 0
-        });
         return;
       }
 
@@ -186,7 +159,6 @@ export const useTrainingNotifications = () => {
       let totalSources = sourcesNeedingTraining.length;
       let processedSources = 0;
       let trainingSources = 0;
-      let pendingSources = 0;
 
       console.log(`📊 Checking training status for ${totalSources} sources with content`);
 
@@ -195,7 +167,7 @@ export const useTrainingNotifications = () => {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // For website sources, get all pages for this source
+          // For website sources, get all pages for this source (not agent)
           const { data: sourcePages } = await supabase
             .from('source_pages')
             .select('processing_status')
@@ -212,13 +184,7 @@ export const useTrainingNotifications = () => {
             } else if (processedPages === sourcePages.length) {
               processedSources++;
               console.log(`✅ Website source ${source.title}: all ${processedPages} pages processed`);
-            } else {
-              pendingSources++;
-              console.log(`⏳ Website source ${source.title}: pending training`);
             }
-          } else {
-            pendingSources++;
-            console.log(`⏳ Website source ${source.title}: no pages found, pending training`);
           }
         } else {
           // For other sources, check metadata processing status
@@ -231,8 +197,7 @@ export const useTrainingNotifications = () => {
             trainingSources++;
             console.log(`🔄 Source ${source.title}: processing in progress`);
           } else {
-            pendingSources++;
-            console.log(`⏳ Source ${source.title}: pending training (status: ${processingStatus || 'none'})`);
+            console.log(`⏳ Source ${source.title}: processing status = ${processingStatus || 'unknown'}`);
           }
         }
       }
@@ -243,11 +208,9 @@ export const useTrainingNotifications = () => {
         totalSources,
         processedSources,
         trainingSources,
-        pendingSources,
         progress,
         isTraining: trainingSources > 0,
-        hasPendingWork: pendingSources > 0,
-        isCompleted: trainingSources === 0 && pendingSources === 0 && processedSources === totalSources
+        isCompleted: trainingSources === 0 && processedSources === totalSources
       });
 
       // Determine training status with improved logic
@@ -256,15 +219,11 @@ export const useTrainingNotifications = () => {
       if (trainingSources > 0) {
         status = 'training';
         console.log('🔄 Training in progress');
-      } else if (pendingSources > 0) {
-        // Sources need training - reset from completed state if necessary
-        status = 'idle';
-        console.log('⏳ Sources pending training');
       } else if (totalSources > 0 && processedSources === totalSources) {
         status = 'completed';
         console.log('🎉 Training completed!');
         
-        // Show success notification only once when transitioning to completed
+        // Show success notification only once
         if (!trainingProgress || trainingProgress.status !== 'completed') {
           toast({
             title: "Training Complete!",
@@ -272,6 +231,9 @@ export const useTrainingNotifications = () => {
             duration: 8000,
           });
         }
+      } else if (totalSources > 0 && processedSources === 0 && trainingSources === 0) {
+        // No sources are processing or completed - check if we need to start training
+        status = 'idle';
       }
 
       setTrainingProgress({
@@ -395,12 +357,6 @@ export const useTrainingNotifications = () => {
 
     try {
       console.log('🚀 Starting training for agent:', agentId);
-
-      // Reset training state when starting new training
-      setTrainingProgress(prev => prev ? {
-        ...prev,
-        status: 'idle'
-      } : null);
 
       // Get all active sources for this agent
       const { data: agentSources, error: sourcesError } = await supabase
