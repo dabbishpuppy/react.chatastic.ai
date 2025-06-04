@@ -10,7 +10,8 @@ const TextTab: React.FC = () => {
   const {
     data: paginatedData,
     isLoading,
-    error
+    error,
+    refetch
   } = useTextSourcesPaginated(1, 25);
 
   const sources = paginatedData?.sources || [];
@@ -30,7 +31,8 @@ const TextTab: React.FC = () => {
             loading={isLoading}
             error={error?.message || null}
             onSourceDeleted={(sourceId) => {
-              // Handle source deletion if needed
+              // Trigger refetch when source is deleted
+              refetch();
             }}
           />
         </div>

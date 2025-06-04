@@ -40,10 +40,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
 
-  // Listen for file upload events to trigger retraining status check
+  // Listen for various source events to trigger retraining status check
   useEffect(() => {
-    const handleFileUploaded = (event: CustomEvent) => {
-      console.log('📁 File uploaded, checking retraining status');
+    const handleSourceEvent = (event: CustomEvent) => {
+      console.log(`📁 Source event: ${event.type}, checking retraining status`);
       // Refetch stats and check retraining status
       refetchStats();
       setTimeout(() => {
@@ -51,22 +51,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       }, 1000); // Small delay to ensure database is updated
     };
 
-    // Listen for source deletion events to trigger retraining status check
-    const handleSourceDeleted = (event: CustomEvent) => {
-      console.log('🗑️ Source deleted, checking retraining status');
-      // Refetch stats and check retraining status
-      refetchStats();
-      setTimeout(() => {
-        checkRetrainingNeeded();
-      }, 1000); // Small delay to ensure database is updated
-    };
-
-    window.addEventListener('fileUploaded', handleFileUploaded as EventListener);
-    window.addEventListener('sourceDeleted', handleSourceDeleted as EventListener);
+    // Listen for all source-related events
+    window.addEventListener('fileUploaded', handleSourceEvent as EventListener);
+    window.addEventListener('sourceDeleted', handleSourceEvent as EventListener);
+    window.addEventListener('sourceCreated', handleSourceEvent as EventListener);
+    window.addEventListener('sourceUpdated', handleSourceEvent as EventListener);
     
     return () => {
-      window.removeEventListener('fileUploaded', handleFileUploaded as EventListener);
-      window.removeEventListener('sourceDeleted', handleSourceDeleted as EventListener);
+      window.removeEventListener('fileUploaded', handleSourceEvent as EventListener);
+      window.removeEventListener('sourceDeleted', handleSourceEvent as EventListener);
+      window.removeEventListener('sourceCreated', handleSourceEvent as EventListener);
+      window.removeEventListener('sourceUpdated', handleSourceEvent as EventListener);
     };
   }, [refetchStats, checkRetrainingNeeded]);
 

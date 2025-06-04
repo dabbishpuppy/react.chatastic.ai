@@ -80,6 +80,21 @@ export class SourceCreateService extends BaseSourceService {
     }
 
     console.log(`✅ Created ${data.source_type} source: ${source.id}`);
-    return this.formatSource(source);
+    
+    const formattedSource = this.formatSource(source);
+    
+    // Dispatch a custom event to notify other components about the new source
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sourceCreated', {
+        detail: { 
+          sourceId: source.id, 
+          agentId: data.agent_id,
+          sourceType: data.source_type 
+        }
+      }));
+      console.log('📡 Dispatched sourceCreated event for real-time UI update');
+    }
+    
+    return formattedSource;
   }
 }
