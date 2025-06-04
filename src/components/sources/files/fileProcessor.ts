@@ -21,9 +21,9 @@ export const useFileProcessor = (
       );
 
       const processor = getFileProcessor(uploadedFile.file);
-      const content = await processor(uploadedFile.file);
+      const result = await processor(uploadedFile.file);
 
-      if (!content || content.trim().length === 0) {
+      if (!result.content || result.content.trim().length === 0) {
         throw new Error('No content could be extracted from the file');
       }
 
@@ -44,13 +44,14 @@ export const useFileProcessor = (
           team_id: agentData.team_id,
           source_type: 'file',
           title: uploadedFile.file.name,
-          content: content,
+          content: result.content,
           metadata: {
             file_name: uploadedFile.file.name,
             file_size: uploadedFile.file.size,
             file_type: uploadedFile.file.type,
             processing_status: 'pending',
-            uploaded_at: new Date().toISOString()
+            uploaded_at: new Date().toISOString(),
+            ...result.metadata
           }
         })
         .select()
