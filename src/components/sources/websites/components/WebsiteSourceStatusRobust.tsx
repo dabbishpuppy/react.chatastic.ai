@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, CheckCircle, Clock, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import ConnectionStatusIndicator from '@/components/ConnectionStatusIndicator';
 import { useRobustCrawlStatus } from '@/hooks/useRobustCrawlStatus';
 
 interface WebsiteSourceStatusRobustProps {
@@ -17,6 +18,29 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
   showConnectionStatus = true
 }) => {
   const { statusData, isPolling, refreshStatus, isConnected } = useRobustCrawlStatus(sourceId);
+  const [lastStatus, setLastStatus] = useState<string | null>(null);
+
+  // ENHANCED: Emit custom events when status changes to completed
+  useEffect(() => {
+    if (statusData.status !== lastStatus) {
+      console.log(`📊 Status changed for source ${sourceId}: ${lastStatus} -> ${statusData.status}`);
+      
+      if (statusData.status === 'completed' && lastStatus === 'in_progress') {
+        console.log('🎉 Crawl completed, emitting completion event');
+        
+        // Emit custom events for other components to listen to
+        window.dispatchEvent(new CustomEvent('crawlCompleted', {
+          detail: { sourceId, status: statusData.status }
+        }));
+        
+        window.dispatchEvent(new CustomEvent('sourceStatusChanged', {
+          detail: { sourceId, oldStatus: lastStatus, newStatus: statusData.status }
+        }));
+      }
+      
+      setLastStatus(statusData.status);
+    }
+  }, [statusData.status, lastStatus, sourceId]);
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -54,66 +78,54 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
   };
 
   const statusConfig = getStatusConfig(statusData.status);
+  const showProgress = statusData.status === 'in_progress' && statusData.totalPages > 0;
+  const progressPercentage = showProgress 
+    ? Math.round((statusData.completedPages / statusData.totalPages) * 100)
+    : 0;
 
   return (
-    <div className="space-y-3">
-      {/* Status Badge and Progress */}
-      <div className="flex items-center gap-3">
-        <Badge className={`${statusConfig.className} border flex-shrink-0`}>
-          {statusConfig.icon}
-          {statusConfig.text}
-        </Badge>
-        
-        {statusData.totalPages > 0 && (
-          <div className="text-sm text-gray-600">
-            {statusData.completedPages}/{statusData.totalPages} pages
-            {statusData.failedPages > 0 && (
-              <span className="text-red-600 ml-1">
-                ({statusData.failedPages} failed)
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Connection Status and Controls */}
-      {showConnectionStatus && (
-        <div className="flex items-center gap-2 text-xs">
-          {/* Connection Status */}
-          <div className="flex items-center gap-1">
-            {isConnected ? (
-              <>
-                <Wifi size={12} className="text-green-500" />
-                <span className="text-green-600">Live</span>
-              </>
-            ) : isPolling ? (
-              <>
-                <RefreshCw size={12} className="text-blue-500 animate-spin" />
-                <span className="text-blue-600">Polling</span>
-              </>
-            ) : (
-              <>
-                <WifiOff size={12} className="text-gray-400" />
-                <span className="text-gray-500">Offline</span>
-              </>
-            )}
-          </div>
-
-          {/* Last Updated */}
-          <span className="text-gray-400">
-            • Updated {statusData.lastUpdated.toLocaleTimeString()}
+    <div className="flex items-center gap-3">
+      <Badge className={`${statusConfig.className} border flex-shrink-0`}>
+        {statusConfig.icon}
+        {statusConfig.text}
+        {showProgress && (
+          <span className="ml-1 text-xs">
+            ({statusData.completedPages}/{statusData.totalPages})
           </span>
+        )}
+      </Badge>
 
-          {/* Manual Refresh Button */}
-          <Button
-            variant="ghost"
+      {showProgress && (
+        <div className="flex-1 max-w-20">
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div 
+              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {showConnectionStatus && (
+        <div className="flex items-center gap-2">
+          <ConnectionStatusIndicator 
+            isConnected={isConnected}
+            isPolling={isPolling}
+            showText={false}
             size="sm"
-            onClick={refreshStatus}
-            className="h-6 px-2 text-xs"
-          >
-            <RefreshCw size={10} className="mr-1" />
-            Refresh
-          </Button>
+          />
+          
+          {(!isConnected || isPolling) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshStatus}
+              className="h-6 px-2 text-xs"
+            >
+              <RefreshCw size={12} className="mr-1" />
+              Refresh
+            </Button>
+          )}
         </div>
       )}
     </div>

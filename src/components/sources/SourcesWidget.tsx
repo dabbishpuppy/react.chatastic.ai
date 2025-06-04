@@ -33,12 +33,43 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Check retraining status on mount and when stats change
+  // ENHANCED: Check retraining status more frequently and on specific triggers
   useEffect(() => {
     if (agentId && stats) {
+      console.log('🔍 Checking retraining status due to stats change:', {
+        totalSources: stats.totalSources,
+        requiresTraining: stats.requiresTraining,
+        unprocessedCrawledPages: stats.unprocessedCrawledPages
+      });
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining]);
+  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
+
+  // ENHANCED: Listen for completed crawls specifically
+  useEffect(() => {
+    if (!agentId) return;
+
+    const handleCrawlCompletion = () => {
+      console.log('🎉 Crawl completion detected, checking retraining status');
+      
+      // Force stats refresh first
+      refetchStats();
+      
+      // Then check retraining after a brief delay
+      setTimeout(() => {
+        checkRetrainingNeeded();
+      }, 1000);
+    };
+
+    // Listen for custom events that indicate crawl completion
+    window.addEventListener('crawlCompleted', handleCrawlCompletion);
+    window.addEventListener('sourceStatusChanged', handleCrawlCompletion);
+    
+    return () => {
+      window.removeEventListener('crawlCompleted', handleCrawlCompletion);
+      window.removeEventListener('sourceStatusChanged', handleCrawlCompletion);
+    };
+  }, [agentId, refetchStats, checkRetrainingNeeded]);
 
   // Handle training state transitions with simplified logic
   useEffect(() => {

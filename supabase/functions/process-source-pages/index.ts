@@ -117,7 +117,7 @@ async function processPendingPages(supabaseClient: any) {
         success: !processingError
       });
 
-      // SIMPLIFIED: Since 409s are now returned as 200s, we only handle real errors
+      // Handle the response (409s are now returned as 200s with skipped flag)
       if (processingError) {
         // For actual errors (5xx, network issues, etc), increment retry count
         const newRetryCount = (page.retry_count || 0) + 1;
@@ -219,14 +219,16 @@ async function processPendingPages(supabaseClient: any) {
     }
   }
 
-  // Auto-trigger parent status aggregation
+  // ENHANCED: Force parent status aggregation for all affected parents
   const parentIds = [...new Set(pendingPages.map(p => p.parent_source_id).filter(Boolean))];
+  console.log(`🔄 Triggering parent status aggregation for ${parentIds.length} parents`);
+  
   for (const parentId of parentIds) {
     try {
       await supabaseClient.rpc('aggregate_parent_status', { parent_id: parentId });
-      console.log(`🔄 Auto-aggregated status for parent: ${parentId}`);
+      console.log(`✅ Aggregated status for parent: ${parentId}`);
     } catch (error) {
-      console.error(`❌ Failed to auto-aggregate parent ${parentId}:`, error);
+      console.error(`❌ Failed to aggregate parent ${parentId}:`, error);
     }
   }
 
