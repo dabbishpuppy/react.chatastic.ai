@@ -12,7 +12,7 @@ interface TrainingProgress {
   totalSources: number;
   processedSources: number;
   currentlyProcessing?: string[];
-  sessionId?: string; // Add session tracking
+  sessionId?: string;
 }
 
 interface DatabaseSource {
@@ -25,14 +25,17 @@ interface DatabaseSource {
 
 export const useTrainingNotifications = () => {
   const { agentId } = useParams();
-  const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   
-  // Notification guard to prevent duplicate notifications
+  // ALL useRef calls MUST be at the top to maintain consistent hook order
   const hasShownCompletionNotificationRef = useRef<boolean>(false);
   const currentSessionIdRef = useRef<string>('');
   const lastCompletionCheckRef = useRef<number>(0);
+  
+  // ALL useState calls MUST come after useRef calls
+  const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
+  // ALL useEffect calls MUST come after useState calls
   useEffect(() => {
     if (!agentId) return;
 
@@ -43,7 +46,6 @@ export const useTrainingNotifications = () => {
 
     const initializeSubscriptions = async () => {
       try {
-        // Get all website sources for this agent to set up proper filters
         const { data: sources, error } = await supabase
           .from('agent_sources')
           .select('id')
@@ -69,7 +71,6 @@ export const useTrainingNotifications = () => {
       const channel = supabase
         .channel(`enhanced-training-notifications-${agentId}`)
         
-        // Subscribe to processing_status changes
         .on(
           'postgres_changes',
           {
@@ -82,15 +83,12 @@ export const useTrainingNotifications = () => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
-            // Only trigger on processing_status changes, not crawling status
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // Immediate progress check for real-time updates
               setTimeout(() => checkTrainingCompletion(agentId), 100);
             }
           }
         )
         
-        // Monitor agent_sources metadata updates for non-website sources
         .on(
           'postgres_changes',
           {
@@ -105,14 +103,12 @@ export const useTrainingNotifications = () => {
             const metadata = updatedSource.metadata || {};
             const oldMetadata = oldSource?.metadata || {};
             
-            // Check if processing status changed
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
               setTimeout(() => checkTrainingCompletion(agentId), 100);
             }
           }
         )
         
-        // Monitor new sources being added
         .on(
           'postgres_changes',
           {
@@ -124,7 +120,6 @@ export const useTrainingNotifications = () => {
           (payload) => {
             setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
             
-            // Re-initialize if new website source
             if ((payload.new as any)?.source_type === 'website') {
               setTimeout(initializeSubscriptions, 500);
             }
@@ -138,7 +133,7 @@ export const useTrainingNotifications = () => {
             if (pollInterval) clearInterval(pollInterval);
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000); // Reduced frequency
+            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000);
             
             toast({
               title: "Connection Issue",
@@ -163,14 +158,12 @@ export const useTrainingNotifications = () => {
 
   const checkTrainingCompletion = async (agentId: string) => {
     try {
-      // Prevent too frequent checks
       const now = Date.now();
       if (now - lastCompletionCheckRef.current < 2000) {
         return;
       }
       lastCompletionCheckRef.current = now;
       
-      // Get all active sources for this agent
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content, crawl_status')
@@ -186,7 +179,6 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // Calculate what needs training more accurately - focus on processing status
       const sourcesNeedingTraining = [];
       let totalPagesNeedingProcessing = 0;
       let totalPagesProcessed = 0;
@@ -196,19 +188,17 @@ export const useTrainingNotifications = () => {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // Only count completed crawled pages for processing
           const { data: pages } = await supabase
             .from('source_pages')
             .select('id, url, processing_status, status')
             .eq('parent_source_id', source.id)
-            .eq('status', 'completed'); // Only completed crawled pages
+            .eq('status', 'completed');
 
           if (pages && pages.length > 0) {
             const pendingPages = pages.filter(p => !p.processing_status || p.processing_status === 'pending');
             const processingPages = pages.filter(p => p.processing_status === 'processing');
             const processedPages = pages.filter(p => p.processing_status === 'processed');
 
-            // Only consider this source as needing training if there are unprocessed pages
             if (pendingPages.length > 0 || processingPages.length > 0) {
               sourcesNeedingTraining.push(source);
             }
@@ -216,11 +206,9 @@ export const useTrainingNotifications = () => {
             totalPagesNeedingProcessing += pages.length;
             totalPagesProcessed += processedPages.length;
             
-            // Track currently processing pages
             currentlyProcessingPages.push(...processingPages.map(p => p.url || p.id));
           }
         } else {
-          // For other sources, check processing status in metadata
           const hasContent = source.source_type === 'qa' ? 
             (metadata?.question && metadata?.answer) :
             source.content && source.content.trim().length > 0;
@@ -238,26 +226,21 @@ export const useTrainingNotifications = () => {
         }
       }
 
-      // Calculate progress
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // Determine status more accurately
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
       if (currentlyProcessingPages.length > 0) {
         status = 'training';
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-        // Only mark as completed if we have processed some pages and nothing needs training
         status = 'completed';
       } else if (totalPagesProcessed > 0 && totalPagesProcessed < totalPagesNeedingProcessing) {
-        status = 'training'; // Some processed, but not all
+        status = 'training';
       }
 
-      // Generate session ID for this training cycle
       const sessionId = `${agentId}-${totalPagesNeedingProcessing}-${Date.now()}`;
 
-      // Update progress state
       const newProgress: TrainingProgress = {
         agentId,
         status,
@@ -270,7 +253,7 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newProgress);
 
-      // Handle completion notification with guard
+      // Handle completion notification with strict guards
       if (status === 'completed' && 
           trainingProgress?.status !== 'completed' && 
           totalPagesNeedingProcessing > 0 &&
@@ -279,7 +262,6 @@ export const useTrainingNotifications = () => {
         
         console.log('🎉 Training completed! Showing success notification');
         
-        // Set guards to prevent duplicate notifications
         hasShownCompletionNotificationRef.current = true;
         currentSessionIdRef.current = sessionId;
         
@@ -289,12 +271,10 @@ export const useTrainingNotifications = () => {
           duration: 5000,
         });
 
-        // Dispatch completion event for other components
         window.dispatchEvent(new CustomEvent('trainingCompleted', {
           detail: { agentId, progress: newProgress }
         }));
         
-        // Reset guard after a delay to allow for new training sessions
         setTimeout(() => {
           hasShownCompletionNotificationRef.current = false;
         }, 10000);
@@ -312,14 +292,11 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting enhanced training for agent:', agentId);
 
-      // Reset notification guards when starting new training
       hasShownCompletionNotificationRef.current = false;
       currentSessionIdRef.current = '';
 
-      // Reset completion state
       setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
 
-      // Get sources that need training
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content')
@@ -332,7 +309,6 @@ export const useTrainingNotifications = () => {
       const sourcesToProcess = [];
       let totalPages = 0;
 
-      // Calculate what needs processing
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
@@ -371,7 +347,6 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // Set initial training state
       setTrainingProgress({
         agentId,
         status: 'training',
@@ -387,14 +362,12 @@ export const useTrainingNotifications = () => {
         duration: 3000,
       });
 
-      // Process sources
       const processingPromises = sourcesToProcess.map(async (source) => {
         return SourceProcessor.processSource(source);
       });
 
       await Promise.allSettled(processingPromises);
 
-      // Check completion immediately after processing
       setTimeout(() => checkTrainingCompletion(agentId), 1000);
 
     } catch (error) {

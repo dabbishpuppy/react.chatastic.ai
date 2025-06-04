@@ -5,9 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
 
 export const useAgentRetraining = (agentId?: string) => {
-  const { toast } = useToast();
-  const { trainingProgress, startTraining } = useTrainingNotifications();
+  // ALL useRef calls MUST be at the top to maintain consistent hook order
+  const isTrainingActiveRef = useRef(false);
+  const lastStatusUpdateRef = useRef<string>('');
+  const lastLogTimeRef = useRef<number>(0);
   
+  // ALL useState calls MUST come after useRef calls
   const [progress, setProgress] = useState<RetrainingProgress | null>(null);
   const [retrainingNeeded, setRetrainingNeeded] = useState<{
     needed: boolean;
@@ -23,27 +26,23 @@ export const useAgentRetraining = (agentId?: string) => {
       status: string;
     }>;
   } | null>(null);
+  
+  // ALL custom hooks MUST come after useState calls
+  const { toast } = useToast();
+  const { trainingProgress, startTraining } = useTrainingNotifications();
 
-  // Add state guards to prevent race conditions
-  const isTrainingActiveRef = useRef(false);
-  const lastStatusUpdateRef = useRef<string>('');
-  const lastLogTimeRef = useRef<number>(0);
-
-  // Simplified status determination
   const isRetraining = trainingProgress?.status === 'training';
 
-  // Guard against rapid state changes with reduced logging
+  // ALL useEffect calls MUST come after custom hooks
   useEffect(() => {
     if (trainingProgress) {
       const statusKey = `${trainingProgress.status}-${trainingProgress.progress}`;
       
-      // Prevent duplicate status updates
       if (lastStatusUpdateRef.current === statusKey) {
         return;
       }
       lastStatusUpdateRef.current = statusKey;
       
-      // Reduce logging frequency - only log every 10 seconds
       const now = Date.now();
       const shouldLog = now - lastLogTimeRef.current > 10000;
       
@@ -55,7 +54,6 @@ export const useAgentRetraining = (agentId?: string) => {
         lastLogTimeRef.current = now;
       }
       
-      // Update progress state with guard
       if (trainingProgress.status === 'training') {
         isTrainingActiveRef.current = true;
       } else if (trainingProgress.status === 'completed') {
@@ -106,7 +104,6 @@ export const useAgentRetraining = (agentId?: string) => {
         description: "Processing your sources and generating embeddings..."
       });
 
-      // Refresh retraining status after starting (increased delay)
       setTimeout(() => {
         checkRetrainingNeeded();
       }, 3000);
