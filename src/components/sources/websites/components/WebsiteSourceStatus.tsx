@@ -17,15 +17,12 @@ interface WebsiteSourceStatusProps {
 const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
   sourceId,
   status,
-  progress,
   linksCount = 0,
   metadata,
-  showProgressBar = false,
   isChild = false
 }) => {
   const [realtimeData, setRealtimeData] = useState({
     status: status,
-    progress: progress,
     linksCount: linksCount,
     metadata: metadata
   });
@@ -66,13 +63,11 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
             from: oldStatus,
             to: newStatus,
             linksCount: newData.links_count,
-            progress: newData.progress,
             timestamp: new Date().toISOString()
           });
           
           setRealtimeData({
             status: newStatus,
-            progress: newData.progress,
             linksCount: newData.links_count,
             metadata: newData.metadata
           });

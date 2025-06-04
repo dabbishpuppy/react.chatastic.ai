@@ -1,8 +1,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { EyeOff } from 'lucide-react';
+import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle } from 'lucide-react';
 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
@@ -14,54 +13,63 @@ interface WebsiteSourceStatusBadgesProps {
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   crawlStatus,
   isExcluded,
-  linksCount,
-  progress
+  linksCount
 }) => {
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-500';
-      case 'in_progress': return 'bg-blue-500';
-      case 'pending': return 'bg-yellow-500';
-      case 'failed': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'pending':
+        return {
+          icon: <Clock className="w-3 h-3 mr-1" />,
+          text: 'Pending',
+          className: 'bg-yellow-500 text-white'
+        };
+      case 'in_progress':
+        return {
+          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
+          text: 'Crawling',
+          className: 'bg-blue-500 text-white'
+        };
+      case 'completed':
+        return {
+          icon: <CheckCircle className="w-3 h-3 mr-1" />,
+          text: 'Completed',
+          className: 'bg-green-500 text-white'
+        };
+      case 'failed':
+        return {
+          icon: <AlertTriangle className="w-3 h-3 mr-1" />,
+          text: 'Failed',
+          className: 'bg-red-500 text-white'
+        };
+      default:
+        return {
+          icon: <Clock className="w-3 h-3 mr-1" />,
+          text: 'Unknown',
+          className: 'bg-gray-500 text-white'
+        };
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed': return 'Completed';
-      case 'in_progress': return 'In Progress';
-      case 'pending': return 'Pending';
-      case 'failed': return 'Failed';
-      default: return 'Unknown';
-    }
-  };
-
-  const progressValue = progress || 0;
+  const statusConfig = getStatusConfig(crawlStatus);
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <Badge 
-          variant="outline" 
-          className={`${getStatusColor(crawlStatus)} text-white`}
-        >
-          {getStatusText(crawlStatus)}
-        </Badge>
-        
-        {isExcluded && (
-          <Badge variant="secondary">
-            <EyeOff className="w-3 h-3 mr-1" />
-            Excluded
-          </Badge>
-        )}
-      </div>
+    <div className="flex items-center gap-2">
+      <Badge className={`${statusConfig.className} flex items-center`}>
+        {statusConfig.icon}
+        {statusConfig.text}
+      </Badge>
       
-      {(crawlStatus === 'in_progress' || progressValue > 0) && (
-        <div>
-          <Progress value={progressValue} className="w-full h-2" />
-          <p className="text-xs text-muted-foreground mt-1">{progressValue}% complete</p>
-        </div>
+      {isExcluded && (
+        <Badge variant="secondary">
+          <EyeOff className="w-3 h-3 mr-1" />
+          Excluded
+        </Badge>
+      )}
+      
+      {linksCount > 0 && (
+        <span className="text-sm text-muted-foreground">
+          {linksCount} links
+        </span>
       )}
     </div>
   );

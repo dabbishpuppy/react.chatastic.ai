@@ -8,6 +8,39 @@ import { EnhancedCrawlRequest, CrawlResult } from './types';
 export const useCrawlInitiation = () => {
   const [loading, setLoading] = useState(false);
 
+  const checkForExistingCrawl = async (url: string, agentId: string) => {
+    try {
+      // Normalize URL for comparison
+      const normalizedUrl = url.replace(/\/+$/, '').toLowerCase();
+      
+      // Check if there's already an active or completed crawl for this URL
+      const { data: existingSources, error } = await supabase
+        .from('agent_sources')
+        .select('id, crawl_status, url')
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error checking existing crawls:', error);
+        return null;
+      }
+
+      // Check for exact URL matches or very similar URLs
+      const duplicateSource = existingSources?.find(source => {
+        const existingUrl = source.url.replace(/\/+$/, '').toLowerCase();
+        return existingUrl === normalizedUrl || 
+               existingUrl === normalizedUrl + '/' ||
+               normalizedUrl === existingUrl + '/';
+      });
+
+      return duplicateSource;
+    } catch (error) {
+      console.error('Error in checkForExistingCrawl:', error);
+      return null;
+    }
+  };
+
   const initiateCrawl = async (request: EnhancedCrawlRequest): Promise<CrawlResult> => {
     setLoading(true);
     
@@ -16,6 +49,27 @@ export const useCrawlInitiation = () => {
 
       if (!request.agentId || !request.url) {
         throw new Error('Missing required fields: agentId and url are required');
+      }
+
+      // Check for duplicate crawls
+      const existingSource = await checkForExistingCrawl(request.url, request.agentId);
+      
+      if (existingSource) {
+        console.log('🚫 Duplicate crawl detected:', existingSource);
+        
+        if (existingSource.crawl_status === 'completed') {
+          toast({
+            title: "Already Crawled",
+            description: "This website has already been crawled successfully.",
+          });
+          throw new Error('This website has already been crawled');
+        } else if (existingSource.crawl_status === 'in_progress') {
+          toast({
+            title: "Crawl in Progress",
+            description: "This website is currently being crawled. Please wait for it to complete.",
+          });
+          throw new Error('This website is currently being crawled');
+        }
       }
 
       const priority: 'normal' | 'high' | 'slow' = request.priority || 'normal';
@@ -78,7 +132,9 @@ export const useCrawlInitiation = () => {
       
       let errorMessage = 'Failed to start enhanced crawl';
       
-      if (error.message?.includes('Failed to fetch')) {
+      if (error.message?.includes('already been crawled') || error.message?.includes('currently being crawled')) {
+        errorMessage = error.message;
+      } else if (error.message?.includes('Failed to fetch')) {
         errorMessage = 'Network error: Unable to connect to the crawl service. Please check your internet connection and try again.';
       } else if (error.message?.includes('ERR_INSUFFICIENT_RESOURCES')) {
         errorMessage = 'Server resources temporarily unavailable. Please try again in a few moments.';
@@ -90,11 +146,13 @@ export const useCrawlInitiation = () => {
         errorMessage = error.message;
       }
       
-      toast({
-        title: "Crawl Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      if (!error.message?.includes('already been crawled') && !error.message?.includes('currently being crawled')) {
+        toast({
+          title: "Crawl Failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
       
       throw new Error(errorMessage);
     } finally {

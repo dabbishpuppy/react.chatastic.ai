@@ -265,7 +265,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   };
 
   const getStatusBadge = (status: string, processingStatus?: string) => {
-    const baseClasses = 'px-2 py-1 text-xs rounded-full font-medium';
+    const baseClasses = 'px-2 py-1 text-xs rounded-full font-medium flex items-center gap-1';
     
     // New status flow: Handle new status and training states
     if (status === 'completed' && processingStatus) {
@@ -299,6 +299,25 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       if (processingStatus === 'failed') return 'training failed';
     }
     return status.replace('_', ' ');
+  };
+
+  const getStatusIcon = (status: string, processingStatus?: string) => {
+    // For completed status with processing info
+    if (status === 'completed' && processingStatus) {
+      if (processingStatus === 'processed') return '✓'; // trained
+      if (processingStatus === 'processing') return '⟳'; // training
+      if (processingStatus === 'pending') return '●'; // new
+      if (processingStatus === 'failed') return '✗'; // training failed
+    }
+    
+    // For other statuses
+    switch (status) {
+      case 'completed': return '✓';
+      case 'failed': return '✗';
+      case 'in_progress': return '⟳';
+      case 'pending': return '●';
+      default: return '?';
+    }
   };
 
   const handleDelete = async (page: SourcePage) => {
@@ -398,6 +417,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           
           <div className="ml-4 flex-shrink-0">
             <span className={getStatusBadge(page.status, page.processing_status)}>
+              <span>{getStatusIcon(page.status, page.processing_status)}</span>
               {getStatusText(page.status, page.processing_status)}
             </span>
           </div>
