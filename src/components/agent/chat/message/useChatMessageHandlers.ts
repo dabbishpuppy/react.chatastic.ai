@@ -60,7 +60,7 @@ export const useChatMessageHandlers = (
   }, [readOnly, onCopy]);
 
   const handleFeedback = useCallback(async (type: "like" | "dislike") => {
-    if (isUpdatingFeedback || !messageTimestamp || readOnly) return;
+    if (isUpdatingFeedback || readOnly) return;
 
     console.log('🎯 useChatMessageHandlers - Handling feedback:', { 
       messageId, 
@@ -107,13 +107,8 @@ export const useChatMessageHandlers = (
           });
         }
       } else {
-        // No valid messageId available, use callback to update parent state
-        console.log('⚠️ useChatMessageHandlers - No valid messageId provided, using callback for local state update. MessageId:', messageId);
-        
-        if (onFeedback) {
-          // Pass the feedback type to the callback - parent will handle toggle logic
-          onFeedback(messageTimestamp, type);
-        }
+        // No valid messageId available - just use local state for UI feedback
+        console.log('⚠️ useChatMessageHandlers - No valid messageId provided, using local state only. MessageId:', messageId);
         
         toast({
           description: `Feedback ${newFeedback ? (type === 'like' ? 'liked' : 'disliked') : 'removed'}`,
@@ -134,7 +129,7 @@ export const useChatMessageHandlers = (
     } finally {
       setIsUpdatingFeedback(false);
     }
-  }, [isUpdatingFeedback, messageTimestamp, readOnly, messageId, localFeedback, onFeedback]);
+  }, [isUpdatingFeedback, readOnly, messageId, localFeedback]);
 
   return {
     showCopiedTooltip,
