@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getSupabaseClient } from '../_shared/database-helpers.ts';
 
@@ -111,9 +112,9 @@ async function processPendingPages(supabaseClient: any) {
         });
 
       if (processingError) {
-        // Check if it's a 409 Conflict response (job already processed/in progress)
+        // IMPROVED: Handle 409 as success (job already processed/in progress)
         if (processingError.message?.includes('409') || processingError.status === 409) {
-          console.log(`✅ Page ${page.id} already processed (409 Conflict) - marking as completed`);
+          console.log(`✅ Page ${page.id} already processed (409 - normal conflict resolution)`);
           
           // Mark as completed since it was already processed
           await supabaseClient
@@ -121,7 +122,7 @@ async function processPendingPages(supabaseClient: any) {
             .update({
               status: 'completed',
               completed_at: new Date().toISOString(),
-              error_message: 'Already processed by another worker'
+              error_message: null // Clear any error message
             })
             .eq('id', page.id);
           
@@ -129,8 +130,8 @@ async function processPendingPages(supabaseClient: any) {
             pageId: page.id,
             url: page.url,
             success: true,
-            result: { message: 'Already processed', chunksCreated: 0 },
-            wasAlreadyProcessed: true
+            result: { message: 'Successfully handled - job conflict resolved', chunksCreated: 0 },
+            wasConflictResolved: true
           });
           continue;
         }
@@ -168,16 +169,16 @@ async function processPendingPages(supabaseClient: any) {
         });
       }
     } catch (error) {
-      // Check if it's a 409 error in the catch block as well
+      // IMPROVED: Handle 409 errors in the catch block as well
       if (error.message?.includes('409') || error.status === 409) {
-        console.log(`✅ Page ${page.id} already processed (409 Conflict - caught) - marking as completed`);
+        console.log(`✅ Page ${page.id} already processed (409 - caught exception, normal conflict resolution)`);
         
         await supabaseClient
           .from('source_pages')
           .update({
             status: 'completed',
             completed_at: new Date().toISOString(),
-            error_message: 'Already processed by another worker'
+            error_message: null // Clear any error message
           })
           .eq('id', page.id);
         
@@ -185,8 +186,8 @@ async function processPendingPages(supabaseClient: any) {
           pageId: page.id,
           url: page.url,
           success: true,
-          result: { message: 'Already processed', chunksCreated: 0 },
-          wasAlreadyProcessed: true
+          result: { message: 'Successfully handled - job conflict resolved', chunksCreated: 0 },
+          wasConflictResolved: true
         });
         continue;
       }
@@ -287,10 +288,10 @@ serve(async (req) => {
     const successCount = processingResults.results.filter(r => r.success).length;
     const failedCount = processingResults.results.filter(r => !r.success).length;
     const autoRetriedCount = processingResults.results.filter(r => r.autoRetried).length;
-    const alreadyProcessedCount = processingResults.results.filter(r => r.wasAlreadyProcessed).length;
+    const conflictResolvedCount = processingResults.results.filter(r => r.wasConflictResolved).length;
     const totalChunksCreated = processingResults.results.reduce((sum, r) => sum + (r.result?.chunksCreated || 0), 0);
 
-    console.log(`📊 Auto-processing complete: ${successCount} successful (${alreadyProcessedCount} already processed), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
+    console.log(`📊 Auto-processing complete: ${successCount} successful (${conflictResolvedCount} conflicts resolved), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
 
     // Check for missing chunks after processing
     if (successCount > 0) {
@@ -314,7 +315,7 @@ serve(async (req) => {
         successCount,
         failedCount,
         autoRetriedCount,
-        alreadyProcessedCount,
+        conflictResolvedCount,
         autoRecoveredCount,
         resetFailedCount,
         totalChunksCreated,

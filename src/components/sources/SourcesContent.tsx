@@ -50,7 +50,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
         variant: "outline" as const,
         disabled: false, // Always clickable to view progress
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
-        text: isTrainingInBackground ? "Agent Training In Progress" : "Processing...",
+        text: isTrainingInBackground ? "Training In Progress" : "Processing...",
         className: "bg-yellow-50 border-yellow-200 text-yellow-700 w-full"
       };
     }
@@ -165,11 +165,18 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
                 {buttonProps.text}
               </Button>
 
-              {/* Training Message */}
+              {/* IMPROVED: Better training message with more context */}
               {trainingMessage && (
-                <div className="flex items-start gap-2 text-sm text-orange-600">
-                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <span>{trainingMessage}</span>
+                <div className="flex items-start gap-2 text-sm">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-orange-500" />
+                  <div className="space-y-1">
+                    <span className="text-orange-600 font-medium">{trainingMessage}</span>
+                    {(isRetraining || isTrainingInBackground) && (
+                      <div className="text-xs text-gray-500">
+                        This may take a few minutes. You can continue using the app.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </>

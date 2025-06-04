@@ -491,9 +491,10 @@ export const useTrainingNotifications = () => {
         processedSources: 0
       });
 
+      // IMPROVED: Show better toast notification
       toast({
         title: "Training Started",
-        description: "Processing your content for AI training...",
+        description: `Processing ${sourcesToProcess.length} source${sourcesToProcess.length > 1 ? 's' : ''} for AI training...`,
         duration: 3000,
       });
 
@@ -515,15 +516,26 @@ export const useTrainingNotifications = () => {
 
     } catch (error) {
       console.error('Failed to start training:', error);
-      toast({
-        title: "Training Failed",
-        description: "Failed to start training process",
-        variant: "destructive",
-      });
+      
+      // IMPROVED: Show more specific error message
+      const isConflictError = error?.message?.includes('409') || error?.status === 409;
+      
+      if (isConflictError) {
+        toast({
+          title: "Training In Progress",
+          description: "Training is already running - no action needed",
+        });
+      } else {
+        toast({
+          title: "Training Failed",
+          description: "Failed to start training process",
+          variant: "destructive",
+        });
+      }
       
       setTrainingProgress(prev => prev ? {
         ...prev,
-        status: 'failed'
+        status: isConflictError ? 'training' : 'failed'
       } : null);
     }
   };
