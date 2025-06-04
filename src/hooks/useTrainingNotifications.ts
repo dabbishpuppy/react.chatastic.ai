@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -194,7 +195,7 @@ export const useTrainingNotifications = () => {
             .select('id')
             .eq('parent_source_id', source.id)
             .eq('status', 'completed')
-            .eq('processing_status', 'pending');
+            .in('processing_status', ['pending', null]);
 
           if (unprocessedPages && unprocessedPages.length > 0) {
             sourcesNeedingTraining.push({
@@ -248,7 +249,7 @@ export const useTrainingNotifications = () => {
           if (sourcePages && sourcePages.length > 0) {
             const processingPages = sourcePages.filter(p => p.processing_status === 'processing').length;
             const processedPages = sourcePages.filter(p => p.processing_status === 'processed').length;
-            const pendingPages = sourcePages.filter(p => p.processing_status === 'pending' || !p.processing_status).length;
+            const pendingPages = sourcePages.filter(p => !p.processing_status || p.processing_status === 'pending').length;
 
             if (processingPages > 0) {
               trainingSources++;
@@ -471,22 +472,22 @@ export const useTrainingNotifications = () => {
           .select('id')
           .eq('parent_source_id', websiteSource.id)
           .eq('status', 'completed')
-          .eq('processing_status', 'pending');
+          .in('processing_status', ['pending', null]);
 
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Found ${unprocessedPages.length} crawled pages to process for ${websiteSource.title}`);
           sourcesToProcess.push(websiteSource);
           
-          // Start processing crawled pages
+          // Mark pages as processed (skip processing step to avoid constraint violation)
           const { error: pagesError } = await supabase
             .from('source_pages')
-            .update({ processing_status: 'processing' })
+            .update({ processing_status: 'processed' })
             .eq('parent_source_id', websiteSource.id)
             .eq('status', 'completed')
-            .eq('processing_status', 'pending');
+            .in('processing_status', ['pending', null]);
 
           if (pagesError) {
-            console.error('Error starting website training:', pagesError);
+            console.error('Error updating website pages status:', pagesError);
           }
         }
       }

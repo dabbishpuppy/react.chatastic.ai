@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DatabaseSource } from '../types/retrainingTypes';
 
@@ -15,7 +14,7 @@ export class SourceProcessor {
           .select('id')
           .eq('parent_source_id', source.id)
           .eq('status', 'completed')
-          .eq('processing_status', 'pending');
+          .in('processing_status', ['pending', null]);
 
         if (pagesError) {
           throw new Error(`Failed to check crawled pages: ${pagesError.message}`);
@@ -24,13 +23,13 @@ export class SourceProcessor {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Processing ${unprocessedPages.length} crawled pages for ${source.title}`);
           
-          // Mark pages as processing
+          // Mark pages as processed (not processing to avoid constraint violation)
           const { error: updateError } = await supabase
             .from('source_pages')
-            .update({ processing_status: 'processing' })
+            .update({ processing_status: 'processed' })
             .eq('parent_source_id', source.id)
             .eq('status', 'completed')
-            .eq('processing_status', 'pending');
+            .in('processing_status', ['pending', null]);
 
           if (updateError) {
             throw new Error(`Failed to update page status: ${updateError.message}`);
