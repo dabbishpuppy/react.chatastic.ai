@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DatabaseSource } from '../types/retrainingTypes';
 
@@ -32,14 +31,6 @@ export class SourceProcessor {
             try {
               console.log(`🔧 Processing page: ${page.url} (ID: ${page.id})`);
               
-              // Mark page as processing to avoid duplicate processing - NO METADATA
-              await supabase
-                .from('source_pages')
-                .update({ 
-                  processing_status: 'processing'
-                })
-                .eq('id', page.id);
-
               // Call process-page-content directly for this specific page
               const { data: processingResult, error: processingError } = await supabase.functions.invoke('process-page-content', {
                 body: { pageId: page.id }
@@ -48,7 +39,7 @@ export class SourceProcessor {
               if (processingError) {
                 console.error(`❌ Failed to process page ${page.id}:`, processingError);
                 
-                // Mark as failed - NO METADATA
+                // Mark as failed directly - no intermediate processing status
                 await supabase
                   .from('source_pages')
                   .update({ 
@@ -60,7 +51,7 @@ export class SourceProcessor {
                 continue;
               }
 
-              // Mark as processed successfully - NO METADATA
+              // Mark as processed successfully directly - no intermediate processing status
               await supabase
                 .from('source_pages')
                 .update({ 
@@ -76,7 +67,7 @@ export class SourceProcessor {
             } catch (error) {
               console.error(`❌ Error processing page ${page.id}:`, error);
               
-              // Mark as failed - NO METADATA
+              // Mark as failed directly - no intermediate processing status
               await supabase
                 .from('source_pages')
                 .update({ 
