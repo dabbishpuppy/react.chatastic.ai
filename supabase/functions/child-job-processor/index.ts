@@ -77,52 +77,22 @@ serve(async (req) => {
         const fallbackContent = `Page: ${title}`;
         console.log(`📝 Using fallback content: "${fallbackContent}"`);
         
-        // Store minimal chunk with title
-        const fallbackChunks = [{
-          source_id: job.parent_source_id,
-          chunk_index: 0,
-          content: fallbackContent,
-          token_count: Math.ceil(fallbackContent.length / 4),
-          metadata: {
-            url: job.url,
-            page_id: job.id,
-            content_hash: await generateContentHash(fallbackContent),
-            extraction_method: 'title_fallback',
-            page_title: title,
-            crawled_at: new Date().toISOString(),
-            original_content_length: contentSize
-          }
-        }];
-
-        await insertChunks(supabaseClient, fallbackChunks);
-        
-        // Mark job as completed
+        // Mark job as completed but don't create chunks yet - wait for manual training
         await updateJobStatus(supabaseClient, childJobId, 'completed', {
           content_size: fallbackContent.length,
-          chunks_created: 1,
+          chunks_created: 0, // No chunks created yet
           processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime(),
-          content_hash: await generateContentHash(fallbackContent)
+          content_hash: await generateContentHash(fallbackContent),
+          processing_status: 'pending' // Mark as pending processing
         });
 
-        // Generate embeddings for the new chunks
-        try {
-          console.log(`🤖 Auto-generating embeddings for source ${job.parent_source_id}`);
-          supabaseClient.functions.invoke('generate-embeddings', {
-            body: { sourceId: job.parent_source_id }
-          }).then((embeddingResult) => {
-            if (embeddingResult.error) {
-              console.error('❌ Auto-embedding generation failed:', embeddingResult.error);
-            } else {
-              console.log('✅ Auto-embedding generation completed');
-            }
-          }).catch((error) => {
-            console.error('❌ Auto-embedding generation error:', error);
-          });
-        } catch (error) {
-          console.warn('⚠️ Could not trigger auto-embedding generation:', error);
-        }
+        // Mark parent source as requiring manual training
+        await supabaseClient
+          .from('agent_sources')
+          .update({ requires_manual_training: true })
+          .eq('id', job.parent_source_id);
 
-        console.log(`✅ Processed minimal content page ${childJobId} with title fallback`);
+        console.log(`✅ Crawled page ${childJobId} - content ready for manual training`);
 
         return new Response(
           JSON.stringify({
@@ -130,8 +100,8 @@ serve(async (req) => {
             jobId: childJobId,
             parentSourceId: job.parent_source_id,
             contentSize: fallbackContent.length,
-            chunksCreated: 1,
-            message: 'Job processed with title fallback due to minimal content'
+            chunksCreated: 0,
+            message: 'Page crawled successfully - ready for manual training'
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -143,64 +113,40 @@ serve(async (req) => {
       }
     }
 
-    // Create semantic chunks from the content
-    const chunks = createSemanticChunks(textContent);
-    console.log(`📝 Created ${chunks.length} semantic chunks`);
-
     // Generate content hash for deduplication
     const contentHash = await generateContentHash(textContent);
 
-    // Store chunks in database - Link to parent source, not the individual page
-    if (chunks.length > 0) {
-      const chunksToInsert = chunks.map((chunk, index) => ({
-        source_id: job.parent_source_id, // Use parent source ID, not the page ID
-        chunk_index: index,
-        content: chunk,
-        token_count: Math.ceil(chunk.length / 4),
+    // Store the crawled content but don't create chunks yet - wait for manual training
+    // Update the source_pages record with crawled content metadata
+    await supabaseClient
+      .from('source_pages')
+      .update({
+        content_hash: contentHash,
+        content_size: contentSize,
+        processing_status: 'pending', // Mark as pending processing
         metadata: {
-          url: job.url,
-          page_id: job.id, // Store page ID in metadata for reference
-          content_hash: contentHash,
-          extraction_method: 'semantic_chunking',
-          page_title: extractTitle(htmlContent),
+          title: extractTitle(htmlContent),
           crawled_at: new Date().toISOString(),
-          original_content_length: contentSize
+          ready_for_processing: true
         }
-      }));
+      })
+      .eq('id', childJobId);
 
-      await insertChunks(supabaseClient, chunksToInsert);
-      console.log(`✅ Stored ${chunks.length} chunks for parent source ${job.parent_source_id} from page ${job.id}`);
-    }
-
-    // Mark job as completed with comprehensive metadata
+    // Mark job as completed (crawled) but processing is pending
     await updateJobStatus(supabaseClient, childJobId, 'completed', {
       content_size: contentSize,
-      chunks_created: chunks.length,
+      chunks_created: 0, // No chunks created yet
       processing_time_ms: Date.now() - new Date(job.started_at || job.created_at).getTime(),
       content_hash: contentHash
     });
 
-    // Auto-generate embeddings for new chunks (non-blocking)
-    if (chunks.length > 0) {
-      try {
-        console.log(`🤖 Auto-generating embeddings for source ${job.parent_source_id}`);
-        supabaseClient.functions.invoke('generate-embeddings', {
-          body: { sourceId: job.parent_source_id }
-        }).then((embeddingResult) => {
-          if (embeddingResult.error) {
-            console.error('❌ Auto-embedding generation failed:', embeddingResult.error);
-          } else {
-            console.log('✅ Auto-embedding generation completed');
-          }
-        }).catch((error) => {
-          console.error('❌ Auto-embedding generation error:', error);
-        });
-      } catch (error) {
-        console.warn('⚠️ Could not trigger auto-embedding generation:', error);
-      }
-    }
+    // Mark parent source as requiring manual training
+    await supabaseClient
+      .from('agent_sources')
+      .update({ requires_manual_training: true })
+      .eq('id', job.parent_source_id);
 
-    console.log(`✅ Successfully completed job ${childJobId} with ${chunks.length} chunks linked to parent ${job.parent_source_id}`);
+    console.log(`✅ Successfully crawled page ${childJobId} - content ready for manual training`);
 
     return new Response(
       JSON.stringify({
@@ -208,8 +154,8 @@ serve(async (req) => {
         jobId: childJobId,
         parentSourceId: job.parent_source_id,
         contentSize,
-        chunksCreated: chunks.length,
-        message: 'Job processed successfully with chunks linked to parent source'
+        chunksCreated: 0,
+        message: 'Page crawled successfully - ready for manual training'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

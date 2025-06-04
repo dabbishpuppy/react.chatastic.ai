@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,6 +11,7 @@ interface SourcePage {
   id: string;
   url: string;
   status: string;
+  processing_status?: string;
   created_at: string;
   completed_at?: string;
   error_message?: string;
@@ -76,7 +78,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       // Get current child pages count and stats
       const { data: currentPages, error } = await supabase
         .from('source_pages')
-        .select('status')
+        .select('status, processing_status')
         .eq('parent_source_id', parentSourceId);
 
       if (error) {
@@ -89,9 +91,16 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       const failedPages = currentPages?.filter(p => p.status === 'failed').length || 0;
       const pendingPages = currentPages?.filter(p => p.status === 'pending').length || 0;
       const inProgressPages = currentPages?.filter(p => p.status === 'in_progress').length || 0;
+      
+      // Count processed vs unprocessed pages
+      const processedPages = currentPages?.filter(p => p.processing_status === 'processed').length || 0;
+      const unprocessedPages = currentPages?.filter(p => p.status === 'completed' && p.processing_status === 'pending').length || 0;
 
       // Calculate progress
       const progress = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
+
+      // Determine if manual training is required
+      const requiresManualTraining = unprocessedPages > 0;
 
       // Update parent source
       const { error: updateError } = await supabase
@@ -99,12 +108,15 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         .update({
           links_count: totalPages,
           progress: progress,
+          requires_manual_training: requiresManualTraining,
           metadata: {
             total_children: totalPages,
             children_completed: completedPages,
             children_failed: failedPages,
             children_pending: pendingPages,
             children_in_progress: inProgressPages,
+            children_processed: processedPages,
+            children_unprocessed: unprocessedPages,
             last_metadata_update: new Date().toISOString()
           }
         })
@@ -153,40 +165,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     }
   };
 
-  // Enable advanced compression for parent source
-  const enableAdvancedCompression = async () => {
-    try {
-      console.log(`🎯 Enabling advanced compression for parent source: ${parentSourceId}`);
-      
-      const { error } = await supabase
-        .from('agent_sources')
-        .update({
-          metadata: {
-            advanced_compression_enabled: true,
-            compression_target: '10-15%',
-            ultra_aggressive_mode: true,
-            max_efficiency_pipeline: true,
-            target_compression_ratio: 0.15,
-            last_compression_update: new Date().toISOString()
-          }
-        })
-        .eq('id', parentSourceId);
-
-      if (error) {
-        console.error('Failed to enable advanced compression:', error);
-      } else {
-        console.log('✅ Advanced compression enabled for parent source');
-      }
-    } catch (error) {
-      console.error('Error enabling advanced compression:', error);
-    }
-  };
-
-  // Initial fetch and enable advanced compression
+  // Initial fetch
   useEffect(() => {
     if (parentSourceId) {
       fetchChildPages();
-      enableAdvancedCompression();
     }
   }, [parentSourceId]);
 
@@ -215,6 +197,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             event: payload.eventType,
             url: newRecord?.url || oldRecord?.url,
             status: newRecord?.status,
+            processing_status: newRecord?.processing_status,
             contentSize: newRecord?.content_size,
             compressionRatio: newRecord?.compression_ratio,
             timestamp: new Date().toISOString()
@@ -282,8 +265,20 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, processingStatus?: string) => {
     const baseClasses = 'px-2 py-1 text-xs rounded-full font-medium';
+    
+    // Show processing status for completed crawls
+    if (status === 'completed' && processingStatus) {
+      if (processingStatus === 'processed') {
+        return `${baseClasses} bg-green-100 text-green-800`;
+      } else if (processingStatus === 'pending') {
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      } else if (processingStatus === 'failed') {
+        return `${baseClasses} bg-red-100 text-red-800`;
+      }
+    }
+    
     const colorClasses = {
       completed: 'bg-green-100 text-green-800',
       failed: 'bg-red-100 text-red-800',
@@ -292,6 +287,15 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     };
     
     return `${baseClasses} ${colorClasses[status as keyof typeof colorClasses] || 'bg-gray-100 text-gray-800'}`;
+  };
+
+  const getStatusText = (status: string, processingStatus?: string) => {
+    if (status === 'completed' && processingStatus) {
+      if (processingStatus === 'processed') return 'trained';
+      if (processingStatus === 'pending') return 'crawled';
+      if (processingStatus === 'failed') return 'training failed';
+    }
+    return status.replace('_', ' ');
   };
 
   const handleDelete = async (page: SourcePage) => {
@@ -390,8 +394,8 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           </div>
           
           <div className="ml-4 flex-shrink-0">
-            <span className={getStatusBadge(page.status)}>
-              {page.status.replace('_', ' ')}
+            <span className={getStatusBadge(page.status, page.processing_status)}>
+              {getStatusText(page.status, page.processing_status)}
             </span>
           </div>
         </div>

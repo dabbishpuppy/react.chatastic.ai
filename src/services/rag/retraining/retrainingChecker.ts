@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { RetrainingStatus, SourceProcessingStatus } from '../types/retrainingTypes';
 
@@ -7,7 +6,7 @@ export class RetrainingChecker {
     try {
       const { data: sources, error } = await supabase
         .from('agent_sources')
-        .select('id, title, content, metadata, source_type')
+        .select('id, title, content, metadata, source_type, requires_manual_training')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -24,40 +23,47 @@ export class RetrainingChecker {
         };
       }
 
-      const sourcesWithContent = sources.filter(source => 
-        source.content && source.content.trim().length > 0
-      );
-
-      // If no sources have content
-      if (sourcesWithContent.length === 0) {
-        return {
-          needed: false,
-          unprocessedSources: 0,
-          reasons: [],
-          status: 'no_sources',
-          message: 'No sources with content found. Add content to your sources to enable AI search.'
-        };
-      }
-
       const needsProcessing = [];
       const needsReprocessing = [];
+      const crawledButNotTrained = [];
       const reasons = [];
 
-      for (const source of sourcesWithContent) {
-        const isProcessed = await this.isSourceFullyProcessed(source);
-        
-        if (!isProcessed.processed) {
-          if (isProcessed.hasAttempted) {
-            needsReprocessing.push(source);
-            reasons.push(`${source.title}: ${isProcessed.reason}`);
-          } else {
-            needsProcessing.push(source);
-            reasons.push(`${source.title}: Never processed`);
+      for (const source of sources) {
+        // Check for crawled but not trained website sources
+        if (source.source_type === 'website' && source.requires_manual_training) {
+          // Get count of unprocessed pages
+          const { data: unprocessedPages, error: pagesError } = await supabase
+            .from('source_pages')
+            .select('id')
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed')
+            .eq('processing_status', 'pending');
+
+          if (!pagesError && unprocessedPages && unprocessedPages.length > 0) {
+            crawledButNotTrained.push(source);
+            reasons.push(`${source.title}: ${unprocessedPages.length} crawled pages need training`);
+            continue;
+          }
+        }
+
+        // Check other source types for processing needs
+        const sourcesWithContent = source.content && source.content.trim().length > 0;
+        if (sourcesWithContent) {
+          const isProcessed = await this.isSourceFullyProcessed(source);
+          
+          if (!isProcessed.processed) {
+            if (isProcessed.hasAttempted) {
+              needsReprocessing.push(source);
+              reasons.push(`${source.title}: ${isProcessed.reason}`);
+            } else {
+              needsProcessing.push(source);
+              reasons.push(`${source.title}: Never processed`);
+            }
           }
         }
       }
 
-      const totalUnprocessed = needsProcessing.length + needsReprocessing.length;
+      const totalUnprocessed = needsProcessing.length + needsReprocessing.length + crawledButNotTrained.length;
 
       if (totalUnprocessed === 0) {
         return {
@@ -73,7 +79,15 @@ export class RetrainingChecker {
       let status: 'needs_processing' | 'needs_reprocessing' = 'needs_processing';
       let message = '';
 
-      if (needsProcessing.length > 0 && needsReprocessing.length === 0) {
+      if (crawledButNotTrained.length > 0) {
+        // Prioritize crawled but not trained sources
+        status = 'needs_processing';
+        if (crawledButNotTrained.length === totalUnprocessed) {
+          message = `${crawledButNotTrained.length} crawled website${crawledButNotTrained.length > 1 ? 's' : ''} need${crawledButNotTrained.length === 1 ? 's' : ''} training`;
+        } else {
+          message = `${totalUnprocessed} sources need processing (${crawledButNotTrained.length} crawled websites, ${needsProcessing.length} new, ${needsReprocessing.length} reprocessing)`;
+        }
+      } else if (needsProcessing.length > 0 && needsReprocessing.length === 0) {
         status = 'needs_processing';
         message = `${needsProcessing.length} source${needsProcessing.length > 1 ? 's' : ''} need${needsProcessing.length === 1 ? 's' : ''} initial processing`;
       } else if (needsProcessing.length === 0 && needsReprocessing.length > 0) {

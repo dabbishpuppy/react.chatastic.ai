@@ -34,13 +34,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     if (agentId) {
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats.totalSources]);
+  }, [agentId, checkRetrainingNeeded, stats.totalSources, stats.requiresTraining]);
 
-  console.log(`📊 SourcesWidget render with enhanced website stats: tab=${currentTab}`, {
-    websiteLinksCount: stats.sourcesByType.website.count,
-    websiteCompressedSize: stats.sourcesByType.website.size,
-    totalBytes: stats.totalBytes,
-    allStats: stats,
+  console.log(`📊 SourcesWidget render with enhanced stats:`, {
+    totalSources: stats.totalSources,
+    requiresTraining: stats.requiresTraining,
+    unprocessedCrawledPages: stats.unprocessedCrawledPages,
     retrainingNeeded: retrainingNeeded?.needed
   });
 
@@ -73,6 +72,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         onRetrainClick={handleRetrainClick}
         retrainingNeeded={retrainingNeeded?.needed || false}
         isRetraining={isRetraining}
+        requiresTraining={stats.requiresTraining}
+        unprocessedCrawledPages={stats.unprocessedCrawledPages}
       />
 
       <RetrainingDialog

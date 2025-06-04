@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, CheckCircle, Loader2 } from "lucide-react";
+import { RefreshCw, CheckCircle, Loader2, AlertTriangle } from "lucide-react";
 import SourceRow from "./SourceRow";
 
 interface SourcesContentProps {
@@ -13,6 +13,8 @@ interface SourcesContentProps {
   onRetrainClick: () => void;
   retrainingNeeded: boolean;
   isRetraining: boolean;
+  requiresTraining?: boolean;
+  unprocessedCrawledPages?: number;
 }
 
 const SourcesContent: React.FC<SourcesContentProps> = ({
@@ -22,7 +24,9 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   currentTab,
   onRetrainClick,
   retrainingNeeded,
-  isRetraining
+  isRetraining,
+  requiresTraining = false,
+  unprocessedCrawledPages = 0
 }) => {
   const getRetrainButtonProps = () => {
     if (isRetraining) {
@@ -35,12 +39,12 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
       };
     }
     
-    if (retrainingNeeded) {
+    if (retrainingNeeded || requiresTraining) {
       return {
         variant: "default" as const,
         disabled: false,
         icon: <RefreshCw className="h-4 w-4" />,
-        text: "Retrain agent",
+        text: unprocessedCrawledPages > 0 ? "Train crawled pages" : "Retrain agent",
         className: "bg-black hover:bg-gray-800 text-white w-full"
       };
     }
@@ -55,6 +59,18 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   };
 
   const buttonProps = getRetrainButtonProps();
+
+  const getTrainingMessage = () => {
+    if (unprocessedCrawledPages > 0) {
+      return `${unprocessedCrawledPages} crawled page${unprocessedCrawledPages > 1 ? 's' : ''} need${unprocessedCrawledPages === 1 ? 's' : ''} training`;
+    }
+    if (retrainingNeeded) {
+      return "Retraining is required for changes to apply";
+    }
+    return null;
+  };
+
+  const trainingMessage = getTrainingMessage();
 
   return (
     <div className="space-y-6">
@@ -100,11 +116,11 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
             {buttonProps.text}
           </Button>
 
-          {/* Retraining Message */}
-          {retrainingNeeded && (
+          {/* Training Message */}
+          {trainingMessage && (
             <div className="flex items-start gap-2 text-sm text-orange-600">
-              <RefreshCw className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>Retraining is required for changes to apply</span>
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>{trainingMessage}</span>
             </div>
           )}
         </CardContent>

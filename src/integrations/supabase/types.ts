@@ -45,6 +45,7 @@ export type Database = {
           parent_source_id: string | null
           progress: number | null
           raw_text: string | null
+          requires_manual_training: boolean | null
           respect_robots: boolean | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
@@ -93,6 +94,7 @@ export type Database = {
           parent_source_id?: string | null
           progress?: number | null
           raw_text?: string | null
+          requires_manual_training?: boolean | null
           respect_robots?: boolean | null
           source_type: Database["public"]["Enums"]["source_type"]
           team_id: string
@@ -141,6 +143,7 @@ export type Database = {
           parent_source_id?: string | null
           progress?: number | null
           raw_text?: string | null
+          requires_manual_training?: boolean | null
           respect_robots?: boolean | null
           source_type?: Database["public"]["Enums"]["source_type"]
           team_id?: string
@@ -1768,6 +1771,7 @@ export type Database = {
           max_retries: number | null
           parent_source_id: string
           priority: string | null
+          processing_status: string | null
           processing_time_ms: number | null
           retry_count: number
           started_at: string | null
@@ -1789,6 +1793,7 @@ export type Database = {
           max_retries?: number | null
           parent_source_id: string
           priority?: string | null
+          processing_status?: string | null
           processing_time_ms?: number | null
           retry_count?: number
           started_at?: string | null
@@ -1810,6 +1815,7 @@ export type Database = {
           max_retries?: number | null
           parent_source_id?: string
           priority?: string | null
+          processing_status?: string | null
           processing_time_ms?: number | null
           retry_count?: number
           started_at?: string | null
