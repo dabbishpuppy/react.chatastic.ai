@@ -6,7 +6,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceInfo from './WebsiteSourceInfo';
-import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceHeaderProps {
   source: AgentSource;
@@ -31,7 +30,6 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
   onSaveEdit,
   onCancelEdit
 }) => {
-  const progress = source.progress || 0;
   const linksCount = source.links_count || 0;
   const isCrawling = source.crawl_status === 'in_progress';
 
@@ -47,14 +45,7 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
         <Loader2 className="w-4 h-4 animate-spin text-blue-500 flex-shrink-0" />
       )}
       
-      <div className="flex-1 min-w-0">
-        <WebsiteSourceStatusBadges
-          crawlStatus={source.crawl_status}
-          isExcluded={source.is_excluded}
-          linksCount={linksCount}
-          progress={progress}
-        />
-        
+      <div className="flex-1 min-w-0">        
         {isEditing ? (
           <div className="flex gap-2 mb-2">
             <Input

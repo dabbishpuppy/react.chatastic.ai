@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
+import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
@@ -107,7 +108,14 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   const confirmConfig = getConfirmationConfig();
 
   return (
-    <div className="flex items-center gap-1 ml-4">
+    <div className="flex items-center gap-2 ml-4">
+      {/* Status Badge - positioned next to the actions */}
+      <WebsiteSourceStatusBadges
+        crawlStatus={source.crawl_status}
+        isExcluded={source.is_excluded}
+        linksCount={source.links_count || 0}
+      />
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
