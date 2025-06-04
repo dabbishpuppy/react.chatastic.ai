@@ -29,8 +29,8 @@ export const useTrainingNotifications = () => {
   const hasShownCompletionNotificationRef = useRef<boolean>(false);
   const currentSessionIdRef = useRef<string>('');
   const lastCompletionCheckRef = useRef<number>(0);
-  const hasShownInitialConnectionRef = useRef<boolean>(false);
-  const connectionEstablishedRef = useRef<boolean>(false);
+  const pageLoadTimestampRef = useRef<number>(Date.now());
+  const hasEverConnectedRef = useRef<boolean>(false);
   
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -131,23 +131,23 @@ export const useTrainingNotifications = () => {
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
-            connectionEstablishedRef.current = true;
-            hasShownInitialConnectionRef.current = true;
+            hasEverConnectedRef.current = true;
             if (pollInterval) clearInterval(pollInterval);
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
             
-            // Only show connection issue toast if we previously had a connection
-            // and it's not the initial page load
-            if (connectionEstablishedRef.current && hasShownInitialConnectionRef.current) {
-              // Add a delay to prevent showing toast immediately on page reload
-              setTimeout(() => {
-                toast({
-                  title: "Connection Issue",
-                  description: "Training updates may be delayed. We're working on it.",
-                  duration: 3000,
-                });
-              }, 2000); // 2 second delay
+            // Only show connection issue toast if:
+            // 1. We've had a successful connection before
+            // 2. We're past the initial page load grace period (10 seconds)
+            const timeSincePageLoad = Date.now() - pageLoadTimestampRef.current;
+            const isAfterGracePeriod = timeSincePageLoad > 10000; // 10 seconds
+            
+            if (hasEverConnectedRef.current && isAfterGracePeriod) {
+              toast({
+                title: "Connection Issue",
+                description: "Training updates may be delayed. We're working on it.",
+                duration: 3000,
+              });
             }
             
             pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000);
