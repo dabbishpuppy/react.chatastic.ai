@@ -1,38 +1,31 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
 export function getSupabaseClient() {
-  return createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
+  const { createClient } = require('@supabase/supabase-js');
+  
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 }
 
 export async function updateJobStatus(
-  client: any,
+  supabaseClient: any,
   jobId: string,
   status: string,
-  metadata?: any
+  additionalData: Record<string, any> = {}
 ) {
-  const updateData: any = {
+  const updateData = {
     status,
-    ...(status === 'in_progress' && { started_at: new Date().toISOString() }),
-    ...(status === 'completed' && { completed_at: new Date().toISOString() }),
-    ...(status === 'failed' && { completed_at: new Date().toISOString() }),
+    updated_at: new Date().toISOString(),
+    ...additionalData
   };
 
-  // Only add metadata fields that exist in the source_pages table
-  if (metadata) {
-    if (metadata.content_size) updateData.content_size = metadata.content_size;
-    if (metadata.compression_ratio) updateData.compression_ratio = metadata.compression_ratio;
-    if (metadata.chunks_created) updateData.chunks_created = metadata.chunks_created;
-    if (metadata.duplicates_found) updateData.duplicates_found = metadata.duplicates_found;
-    if (metadata.processing_time_ms) updateData.processing_time_ms = metadata.processing_time_ms;
-    if (metadata.error_message) updateData.error_message = metadata.error_message;
-    if (metadata.content_hash) updateData.content_hash = metadata.content_hash;
-  }
-
-  const { error } = await client
+  const { error } = await supabaseClient
     .from('source_pages')
     .update(updateData)
     .eq('id', jobId);
@@ -42,12 +35,27 @@ export async function updateJobStatus(
   }
 }
 
-export async function insertChunks(client: any, chunks: any[]) {
-  const { error } = await client
+export async function insertChunks(
+  supabaseClient: any,
+  sourceId: string,
+  chunks: Array<{ content: string; chunk_index: number }>
+) {
+  const chunksToInsert = chunks.map((chunk, index) => ({
+    source_id: sourceId,
+    content: chunk.content,
+    chunk_index: chunk.chunk_index || index,
+    token_count: Math.ceil(chunk.content.length / 4), // Rough token estimate
+    created_at: new Date().toISOString()
+  }));
+
+  const { data, error } = await supabaseClient
     .from('source_chunks')
-    .insert(chunks);
+    .insert(chunksToInsert)
+    .select();
 
   if (error) {
     throw new Error(`Failed to insert chunks: ${error.message}`);
   }
+
+  return data;
 }
