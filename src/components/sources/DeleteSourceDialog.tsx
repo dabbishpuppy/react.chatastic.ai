@@ -34,12 +34,12 @@ const DeleteSourceDialog: React.FC<DeleteSourceDialogProps> = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Source</AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
-            <p>Are you sure you want to delete "{sourceTitle}"?</p>
+            <div>Are you sure you want to delete "{sourceTitle}"?</div>
             {isWebsiteSource && (
               <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mt-2">
-                <p className="text-sm text-orange-800 font-medium">
+                <div className="text-sm text-orange-800 font-medium">
                   ⚠️ This will permanently delete:
-                </p>
+                </div>
                 <ul className="text-sm text-orange-700 mt-1 list-disc list-inside space-y-1">
                   <li>The main source and all child pages</li>
                   <li>All generated content chunks</li>
@@ -48,9 +48,9 @@ const DeleteSourceDialog: React.FC<DeleteSourceDialogProps> = ({
                 </ul>
               </div>
             )}
-            <p className="text-sm text-gray-600 mt-2">
+            <div className="text-sm text-gray-600 mt-2">
               This action cannot be undone.
-            </p>
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
