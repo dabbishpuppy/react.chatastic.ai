@@ -26,6 +26,8 @@ export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isInitialConnection, setIsInitialConnection] = useState(true);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
 
   useEffect(() => {
     if (!agentId) return;
@@ -34,6 +36,7 @@ export const useTrainingNotifications = () => {
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
+    let reconnectTimeout: NodeJS.Timeout;
 
     const initializeSubscriptions = async () => {
       try {
@@ -148,22 +151,43 @@ export const useTrainingNotifications = () => {
           
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
-            if (pollInterval) clearInterval(pollInterval);
-          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-            setIsConnected(false);
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 3000);
+            setIsInitialConnection(false);
+            setConnectionAttempts(0);
             
-            toast({
-              title: "Connection Issue",
-              description: "Training updates may be delayed. We're working on it.",
-              duration: 3000,
-            });
+            if (pollInterval) clearInterval(pollInterval);
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+            const wasConnected = isConnected;
+            setIsConnected(false);
+            setConnectionAttempts(prev => prev + 1);
+            
+            // Only show error toast if we were previously connected (not on initial connection)
+            if (!isInitialConnection && wasConnected) {
+              console.warn('📡 Connection lost, attempting to reconnect...');
+              
+              // Delay before showing error to avoid false positives
+              reconnectTimeout = setTimeout(() => {
+                if (!isConnected && connectionAttempts >= 2) {
+                  toast({
+                    title: "Connection Issue",
+                    description: "Training updates may be delayed. We're working on it.",
+                    duration: 3000,
+                  });
+                }
+              }, 2000);
+            }
+            
+            // Start polling as fallback
+            if (!pollInterval) {
+              pollInterval = setInterval(() => checkTrainingCompletion(agentId), 5000);
+            }
           }
         });
 
       return () => {
         console.log('🔌 Cleaning up enhanced training notifications');
         if (pollInterval) clearInterval(pollInterval);
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
         supabase.removeChannel(channel);
       };
     };
@@ -172,6 +196,7 @@ export const useTrainingNotifications = () => {
 
     return () => {
       if (pollInterval) clearInterval(pollInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, [agentId]);
 
