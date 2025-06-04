@@ -8,8 +8,8 @@ interface TrainingProgress {
   agentId: string;
   status: 'idle' | 'training' | 'completed' | 'failed';
   progress: number;
-  totalPages: number;
-  processedPages: number;
+  totalSources: number;
+  processedSources: number;
 }
 
 export const useTrainingNotifications = () => {
@@ -19,11 +19,12 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up training notifications for agent:', agentId);
+    console.log('🔔 Setting up unified training notifications for agent:', agentId);
 
-    // Subscribe to source page processing status changes
+    // Subscribe to both source pages and source chunks/embeddings for comprehensive tracking
     const channel = supabase
       .channel(`training-notifications-${agentId}`)
+      // Track website source page processing
       .on(
         'postgres_changes',
         {
@@ -35,34 +36,83 @@ export const useTrainingNotifications = () => {
         (payload) => {
           const updatedPage = payload.new as any;
           
-          console.log('📡 Training status update:', {
+          console.log('📡 Website page training update:', {
             pageId: updatedPage.id,
             processingStatus: updatedPage.processing_status,
             url: updatedPage.url
           });
 
-          // Check if training just completed
-          if (updatedPage.processing_status === 'processed') {
+          checkTrainingCompletion(agentId);
+        }
+      )
+      // Track source metadata updates for other source types
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `agent_id=eq.${agentId}`
+        },
+        (payload) => {
+          const updatedSource = payload.new as any;
+          const metadata = updatedSource.metadata || {};
+          
+          console.log('📡 Source metadata training update:', {
+            sourceId: updatedSource.id,
+            sourceType: updatedSource.source_type,
+            processingStatus: metadata.processing_status,
+            title: updatedSource.title
+          });
+
+          // Check if this is a processing status update
+          if (metadata.processing_status) {
             checkTrainingCompletion(agentId);
           }
+        }
+      )
+      // Track chunk creation for all source types
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'source_chunks',
+          filter: `source_id.in.(select id from agent_sources where agent_id=eq.${agentId})`
+        },
+        (payload) => {
+          console.log('📡 Chunk created for agent source:', payload.new);
+          checkTrainingCompletion(agentId);
+        }
+      )
+      // Track embedding creation for all source types
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'source_embeddings'
+        },
+        (payload) => {
+          console.log('📡 Embedding created:', payload.new);
+          checkTrainingCompletion(agentId);
         }
       )
       .subscribe();
 
     return () => {
-      console.log('🔌 Cleaning up training notifications');
+      console.log('🔌 Cleaning up unified training notifications');
       supabase.removeChannel(channel);
     };
   }, [agentId]);
 
   const checkTrainingCompletion = async (agentId: string) => {
     try {
-      // First get agent sources for this agent
+      // Get all active sources for this agent
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id')
+        .select('id, source_type, metadata, title')
         .eq('agent_id', agentId)
-        .eq('source_type', 'website')
         .eq('is_active', true);
 
       if (sourcesError) {
@@ -74,33 +124,68 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      const sourceIds = agentSources.map(s => s.id);
+      let totalSources = 0;
+      let processedSources = 0;
+      let trainingSources = 0;
 
-      // Get all source pages for this agent's sources
-      const { data: sourcePages, error } = await supabase
-        .from('source_pages')
-        .select('processing_status, parent_source_id')
-        .in('parent_source_id', sourceIds);
+      // Check each source type for processing status
+      for (const source of agentSources) {
+        const hasContent = source.source_type === 'qa' ? 
+          (source.metadata?.question && source.metadata?.answer) :
+          source.metadata?.content || source.content;
 
-      if (error) {
-        console.error('Error checking training completion:', error);
-        return;
+        if (!hasContent) continue; // Skip sources without content
+
+        totalSources++;
+        const metadata = source.metadata || {};
+
+        if (source.source_type === 'website') {
+          // For website sources, check crawled pages
+          const { data: sourcePages } = await supabase
+            .from('source_pages')
+            .select('processing_status')
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed');
+
+          if (sourcePages && sourcePages.length > 0) {
+            const processingPages = sourcePages.filter(p => p.processing_status === 'processing').length;
+            const processedPages = sourcePages.filter(p => p.processing_status === 'processed').length;
+
+            if (processingPages > 0) {
+              trainingSources++;
+            } else if (processedPages === sourcePages.length) {
+              processedSources++;
+            }
+          }
+        } else {
+          // For other sources, check metadata processing status
+          const processingStatus = metadata.processing_status;
+          
+          if (processingStatus === 'completed') {
+            processedSources++;
+          } else if (processingStatus === 'processing') {
+            trainingSources++;
+          }
+        }
       }
 
-      const totalPages = sourcePages?.length || 0;
-      const processedPages = sourcePages?.filter(p => p.processing_status === 'processed').length || 0;
-      const processingPages = sourcePages?.filter(p => p.processing_status === 'processing').length || 0;
+      const progress = totalSources > 0 ? Math.round((processedSources / totalSources) * 100) : 0;
 
-      console.log('📊 Training progress check:', {
-        totalPages,
-        processedPages,
-        processingPages,
-        allCompleted: processingPages === 0 && processedPages === totalPages
+      console.log('📊 Unified training progress check:', {
+        totalSources,
+        processedSources,
+        trainingSources,
+        progress,
+        allCompleted: trainingSources === 0 && processedSources === totalSources
       });
 
-      // If all pages are processed and none are processing, training is complete
-      if (totalPages > 0 && processingPages === 0 && processedPages === totalPages) {
-        console.log('🎉 Training completed for agent:', agentId);
+      // Determine training status
+      let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
+
+      if (trainingSources > 0) {
+        status = 'training';
+      } else if (totalSources > 0 && processedSources === totalSources) {
+        status = 'completed';
         
         // Show success notification
         toast({
@@ -108,28 +193,18 @@ export const useTrainingNotifications = () => {
           description: "Your AI agent is trained and ready",
           duration: 8000,
         });
-
-        setTrainingProgress({
-          agentId,
-          status: 'completed',
-          progress: 100,
-          totalPages,
-          processedPages
-        });
-      } else if (processingPages > 0) {
-        // Training is in progress
-        const progress = totalPages > 0 ? Math.round((processedPages / totalPages) * 100) : 0;
-        
-        setTrainingProgress({
-          agentId,
-          status: 'training',
-          progress,
-          totalPages,
-          processedPages
-        });
       }
+
+      setTrainingProgress({
+        agentId,
+        status,
+        progress,
+        totalSources,
+        processedSources
+      });
+
     } catch (error) {
-      console.error('Error in checkTrainingCompletion:', error);
+      console.error('Error in unified checkTrainingCompletion:', error);
     }
   };
 
@@ -137,14 +212,13 @@ export const useTrainingNotifications = () => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting training for agent:', agentId);
+      console.log('🚀 Starting unified training for agent:', agentId);
 
-      // First get agent sources for this agent
+      // Get all active sources for this agent
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id')
+        .select('id, source_type')
         .eq('agent_id', agentId)
-        .eq('source_type', 'website')
         .eq('is_active', true);
 
       if (sourcesError) {
@@ -153,31 +227,49 @@ export const useTrainingNotifications = () => {
       }
 
       if (!agentSources || agentSources.length === 0) {
-        console.log('No website sources found for agent');
+        console.log('No sources found for agent');
         return;
       }
 
-      const sourceIds = agentSources.map(s => s.id);
+      // Handle website sources
+      const websiteSources = agentSources.filter(s => s.source_type === 'website');
+      if (websiteSources.length > 0) {
+        const websiteSourceIds = websiteSources.map(s => s.id);
+        
+        // Update all pending pages to processing status
+        const { error: pagesError } = await supabase
+          .from('source_pages')
+          .update({ processing_status: 'processing' })
+          .eq('status', 'completed')
+          .eq('processing_status', 'pending')
+          .in('parent_source_id', websiteSourceIds);
 
-      // Update all pending pages to processing status
-      const { error } = await supabase
-        .from('source_pages')
-        .update({ processing_status: 'processing' })
-        .eq('status', 'completed')
-        .eq('processing_status', 'pending')
-        .in('parent_source_id', sourceIds);
+        if (pagesError) {
+          console.error('Error starting website training:', pagesError);
+        }
+      }
 
-      if (error) {
-        console.error('Error starting training:', error);
-        throw error;
+      // Handle other source types by updating their metadata
+      const otherSources = agentSources.filter(s => s.source_type !== 'website');
+      for (const source of otherSources) {
+        await supabase
+          .from('agent_sources')
+          .update({
+            metadata: {
+              ...(source.metadata || {}),
+              processing_status: 'processing',
+              training_started_at: new Date().toISOString()
+            }
+          })
+          .eq('id', source.id);
       }
 
       setTrainingProgress({
         agentId,
         status: 'training',
         progress: 0,
-        totalPages: 0,
-        processedPages: 0
+        totalSources: agentSources.length,
+        processedSources: 0
       });
 
       toast({
@@ -187,7 +279,7 @@ export const useTrainingNotifications = () => {
       });
 
     } catch (error) {
-      console.error('Failed to start training:', error);
+      console.error('Failed to start unified training:', error);
       toast({
         title: "Training Failed",
         description: "Failed to start training process",

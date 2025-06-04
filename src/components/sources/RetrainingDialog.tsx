@@ -40,11 +40,30 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
   const getProgressPercentage = () => {
     if (trainingProgress?.status === 'completed') return 100;
-    if (trainingProgress?.progress) return trainingProgress.progress;
+    if (trainingProgress?.progress !== undefined) return trainingProgress.progress;
     if (progress?.processedSources && progress?.totalSources) {
       return Math.round((progress.processedSources / progress.totalSources) * 100);
     }
     return 0;
+  };
+
+  const getProcessedCount = () => {
+    if (trainingProgress?.processedSources !== undefined) {
+      return trainingProgress.processedSources;
+    }
+    return progress?.processedSources || 0;
+  };
+
+  const getTotalCount = () => {
+    // Use the actual sources that need processing from retrainingNeeded
+    if (retrainingNeeded?.sourceDetails?.length > 0) {
+      return retrainingNeeded.sourceDetails.length;
+    }
+    // Fallback to training progress data
+    if (trainingProgress?.totalSources !== undefined) {
+      return trainingProgress.totalSources;
+    }
+    return progress?.totalSources || 0;
   };
 
   const getStatusMessage = () => {
@@ -52,8 +71,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       return "Training completed successfully! Your AI agent is trained and ready.";
     }
     if (trainingProgress?.status === 'training' || isRetraining) {
-      const processed = trainingProgress?.processedPages || progress?.processedSources || 0;
-      const total = trainingProgress?.totalPages || progress?.totalSources || 0;
+      const processed = getProcessedCount();
+      const total = getTotalCount();
       return `Training in progress... (${processed}/${total} sources processed)`;
     }
     if (retrainingNeeded?.needed) {
@@ -125,11 +144,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 <Progress value={getProgressPercentage()} className="w-full" />
               </div>
 
-              {trainingProgress && (
-                <div className="text-sm text-muted-foreground">
-                  {trainingProgress.processedPages} of {trainingProgress.totalPages} pages processed
-                </div>
-              )}
+              <div className="text-sm text-muted-foreground">
+                {getProcessedCount()} of {getTotalCount()} sources processed
+              </div>
             </div>
           )}
 
