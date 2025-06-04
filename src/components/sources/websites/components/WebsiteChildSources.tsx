@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAgentSources } from '@/hooks/useAgentSources';
+import { useOptimizedAgentSources } from '@/hooks/useOptimizedAgentSources';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -25,7 +25,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   onDelete,
   onRecrawl
 }) => {
-  const { data: allSources, isLoading } = useAgentSources();
+  const { sources: allSources, loading: isLoading } = useOptimizedAgentSources();
 
   // Filter child sources for this parent
   const childSources = allSources?.filter(source => 
