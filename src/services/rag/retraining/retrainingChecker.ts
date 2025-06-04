@@ -2,7 +2,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { RetrainingStatus, SourceProcessingStatus } from '../types/retrainingTypes';
 
 export class RetrainingChecker {
-  static async checkRetrainingNeeded(agentId: string): Promise<RetrainingStatus> {
+  static async checkRetrainingNeeded(agentId: string): Promise<RetrainingStatus & {
+    sourceDetails: Array<{
+      id: string;
+      title: string;
+      type: string;
+      reason: string;
+      status: string;
+    }>;
+  }> {
     try {
       const { data: sources, error } = await supabase
         .from('agent_sources')
@@ -19,7 +27,8 @@ export class RetrainingChecker {
           unprocessedSources: 0,
           reasons: [],
           status: 'no_sources',
-          message: 'No sources found. Add sources to enable AI search capabilities.'
+          message: 'No sources found. Add sources to enable AI search capabilities.',
+          sourceDetails: []
         };
       }
 
@@ -27,6 +36,7 @@ export class RetrainingChecker {
       const needsReprocessing = [];
       const crawledButNotTrained = [];
       const reasons = [];
+      const sourceDetails = [];
 
       for (const source of sources) {
         // Check for crawled but not trained website sources
@@ -41,23 +51,81 @@ export class RetrainingChecker {
 
           if (!pagesError && unprocessedPages && unprocessedPages.length > 0) {
             crawledButNotTrained.push(source);
-            reasons.push(`${source.title}: ${unprocessedPages.length} crawled pages need training`);
+            const reason = `${unprocessedPages.length} crawled pages need training`;
+            reasons.push(`${source.title}: ${reason}`);
+            sourceDetails.push({
+              id: source.id,
+              title: source.title,
+              type: 'Website',
+              reason,
+              status: 'Crawled - Needs Training'
+            });
             continue;
           }
         }
 
         // Check other source types for processing needs
-        const sourcesWithContent = source.content && source.content.trim().length > 0;
-        if (sourcesWithContent) {
+        if (source.source_type === 'qa') {
+          const metadata = source.metadata as any;
+          const hasContent = (source.content && source.content.trim().length > 0) || 
+                            (metadata?.question && metadata?.answer);
+          
+          if (hasContent) {
+            const isProcessed = await this.isSourceFullyProcessed(source);
+            
+            if (!isProcessed.processed) {
+              if (isProcessed.hasAttempted) {
+                needsReprocessing.push(source);
+                reasons.push(`${source.title}: ${isProcessed.reason}`);
+                sourceDetails.push({
+                  id: source.id,
+                  title: source.title,
+                  type: 'Q&A',
+                  reason: isProcessed.reason,
+                  status: 'Needs Reprocessing'
+                });
+              } else {
+                needsProcessing.push(source);
+                reasons.push(`${source.title}: Never processed`);
+                sourceDetails.push({
+                  id: source.id,
+                  title: source.title,
+                  type: 'Q&A',
+                  reason: 'Never processed',
+                  status: 'Needs Processing'
+                });
+              }
+            }
+          }
+        } else if (source.content && source.content.trim().length > 0) {
+          // Handle text and file sources
           const isProcessed = await this.isSourceFullyProcessed(source);
           
           if (!isProcessed.processed) {
+            const sourceType = source.source_type === 'text' ? 'Text' : 
+                             source.source_type === 'file' ? 'File' : 
+                             source.source_type.charAt(0).toUpperCase() + source.source_type.slice(1);
+            
             if (isProcessed.hasAttempted) {
               needsReprocessing.push(source);
               reasons.push(`${source.title}: ${isProcessed.reason}`);
+              sourceDetails.push({
+                id: source.id,
+                title: source.title,
+                type: sourceType,
+                reason: isProcessed.reason,
+                status: 'Needs Reprocessing'
+              });
             } else {
               needsProcessing.push(source);
               reasons.push(`${source.title}: Never processed`);
+              sourceDetails.push({
+                id: source.id,
+                title: source.title,
+                type: sourceType,
+                reason: 'Never processed',
+                status: 'Needs Processing'
+              });
             }
           }
         }
@@ -71,7 +139,8 @@ export class RetrainingChecker {
           unprocessedSources: 0,
           reasons: [],
           status: 'up_to_date',
-          message: '✅ Everything is up to date! All sources have been processed and are ready for AI search.'
+          message: '✅ Everything is up to date! All sources have been processed and are ready for AI search.',
+          sourceDetails: []
         };
       }
 
@@ -103,7 +172,8 @@ export class RetrainingChecker {
         unprocessedSources: totalUnprocessed,
         reasons,
         status,
-        message
+        message,
+        sourceDetails
       };
 
     } catch (error) {
@@ -113,7 +183,8 @@ export class RetrainingChecker {
         unprocessedSources: 0,
         reasons: ['Error checking retraining status'],
         status: 'no_sources',
-        message: 'Unable to check processing status. Please try again.'
+        message: 'Unable to check processing status. Please try again.',
+        sourceDetails: []
       };
     }
   }

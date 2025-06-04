@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { RetrainingService, type RetrainingProgress } from '@/services/rag/retrainingService';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +11,13 @@ export const useAgentRetraining = (agentId?: string) => {
     reasons: string[];
     status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'no_sources';
     message: string;
+    sourceDetails?: Array<{
+      id: string;
+      title: string;
+      type: string;
+      reason: string;
+      status: string;
+    }>;
   } | null>(null);
   
   const { toast } = useToast();
