@@ -48,8 +48,8 @@ export class StreamingHandler {
       console.log('🤔 Starting thinking phase');
       options.onThinkingStart?.();
 
-      // Faster thinking delay (reduced from 1500ms to 800ms)
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Faster thinking delay (reduced from 800ms to 500ms)
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       if (abortController.signal.aborted) {
         throw new Error('Stream aborted during thinking phase');
@@ -112,8 +112,8 @@ export class StreamingHandler {
             console.log(`📦 Streaming chunk ${chunkCount}:`, delta.substring(0, 30) + '...');
             options.onChunk?.(chunk);
 
-            // Faster streaming speed (reduced from 800-1200ms to 300-500ms)
-            setTimeout(() => sendChunk(index + 1), 300 + Math.random() * 200);
+            // Faster streaming speed (reduced from 300-500ms to 200-300ms)
+            setTimeout(() => sendChunk(index + 1), 200 + Math.random() * 100);
           };
 
           sendChunk(0);

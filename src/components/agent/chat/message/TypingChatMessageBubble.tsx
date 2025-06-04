@@ -32,7 +32,7 @@ const TypingChatMessageBubble: React.FC<TypingChatMessageBubbleProps> = ({
         <TypingMessage 
           content={content} 
           onComplete={onTypingComplete}
-          typingSpeed={15}
+          typingSpeed={10}
         />
       ) : (
         content

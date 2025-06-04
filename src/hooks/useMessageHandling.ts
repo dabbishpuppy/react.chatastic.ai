@@ -32,8 +32,8 @@ export const useMessageHandling = (agentId: string) => {
       console.log('🤔 Starting thinking phase');
       options?.onThinkingStart?.();
 
-      // Faster thinking delay (reduced from 1000ms to 600ms)
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Faster thinking delay (reduced from 600ms to 300ms)
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Process with RAG integration
       const ragResult = await RAGChatIntegration.processMessageWithRAG(
@@ -73,11 +73,11 @@ export const useMessageHandling = (agentId: string) => {
       // Add message to chat
       onNewMessage(responseMessage);
 
-      // Faster typing completion (reduced from 5ms per character to 3ms per character)
+      // Faster typing completion (reduced from 3ms per character to 2ms per character)
       setTimeout(() => {
         console.log('✅ Typing complete for message:', messageId);
         options?.onTypingComplete?.(messageId);
-      }, ragResult.response.length * 3 + 150); // Very fast typing: 3ms per character + 150ms buffer
+      }, ragResult.response.length * 2 + 100); // Very fast typing: 2ms per character + 100ms buffer
 
     } catch (error) {
       console.error('❌ RAG processing failed:', error);
@@ -100,7 +100,7 @@ export const useMessageHandling = (agentId: string) => {
 
       setTimeout(() => {
         options?.onTypingComplete?.(errorMessageId);
-      }, 500); // Fast typing for error message too
+      }, 300); // Fast typing for error message too
     } finally {
       setIsLoading(false);
     }
