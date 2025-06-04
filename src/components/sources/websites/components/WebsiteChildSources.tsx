@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import WebsiteSourceActions from './WebsiteSourceActions';
-import { Loader2 } from '@phosphor-icons/react';
+import { Loader2 } from 'lucide-react';
 
 interface SourcePage {
   id: string;
