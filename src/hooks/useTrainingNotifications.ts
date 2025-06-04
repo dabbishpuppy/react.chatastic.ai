@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -36,7 +37,6 @@ export const useTrainingNotifications = () => {
           event: 'UPDATE',
           schema: 'public',
           table: 'source_pages',
-          // Fixed: Use proper filter syntax without subquery
           filter: `parent_source_id=in.(${agentId})`
         },
         (payload) => {
@@ -147,23 +147,40 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // Filter sources that actually need training (have content)
+      // Filter sources that need training (have content or are crawled websites)
       const sourcesNeedingTraining = [];
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
-        // Check if source has content that needs training
-        const hasContent = source.source_type === 'qa' ? 
-          (metadata?.question && metadata?.answer) :
-          source.content && source.content.trim().length > 0;
+        if (source.source_type === 'website') {
+          // For website sources, check if there are crawled pages that need processing
+          const { data: unprocessedPages } = await supabase
+            .from('source_pages')
+            .select('id')
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed')
+            .eq('processing_status', 'pending');
 
-        if (hasContent) {
-          sourcesNeedingTraining.push(source);
+          if (unprocessedPages && unprocessedPages.length > 0) {
+            sourcesNeedingTraining.push({
+              ...source,
+              unprocessedPagesCount: unprocessedPages.length
+            });
+          }
+        } else {
+          // For other sources, check if they have content
+          const hasContent = source.source_type === 'qa' ? 
+            (metadata?.question && metadata?.answer) :
+            source.content && source.content.trim().length > 0;
+
+          if (hasContent && metadata.processing_status !== 'completed') {
+            sourcesNeedingTraining.push(source);
+          }
         }
       }
 
       if (sourcesNeedingTraining.length === 0) {
-        console.log('No sources with content need training');
+        console.log('No sources need training');
         setTrainingProgress({
           agentId,
           status: 'completed',
@@ -179,14 +196,14 @@ export const useTrainingNotifications = () => {
       let trainingSources = 0;
       let sourcesNeedingProcessing = 0;
 
-      console.log(`📊 Checking training status for ${totalSources} sources with content`);
+      console.log(`📊 Checking training status for ${totalSources} sources needing training`);
 
       // Check each source for processing status
       for (const source of sourcesNeedingTraining) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // For website sources, get all pages for this source (not agent)
+          // For website sources, check page processing status
           const { data: sourcePages } = await supabase
             .from('source_pages')
             .select('processing_status')
@@ -238,7 +255,7 @@ export const useTrainingNotifications = () => {
         isCompleted: trainingSources === 0 && processedSources === totalSources && sourcesNeedingProcessing === 0
       });
 
-      // Determine training status with improved logic
+      // Determine training status
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
 
       if (trainingSources > 0) {
@@ -406,39 +423,63 @@ export const useTrainingNotifications = () => {
         return;
       }
 
-      // Filter sources that need training
-      const sourcesNeedingTraining = [];
-      for (const source of agentSources as DatabaseSource[]) {
+      // Separate website sources from others and check what needs training
+      const websiteSources = agentSources.filter(s => s.source_type === 'website');
+      const otherSources = agentSources.filter(s => s.source_type !== 'website');
+
+      const sourcesToProcess = [];
+
+      // Handle website sources - check for crawled pages that need processing
+      for (const websiteSource of websiteSources) {
+        const { data: unprocessedPages } = await supabase
+          .from('source_pages')
+          .select('id')
+          .eq('parent_source_id', websiteSource.id)
+          .eq('status', 'completed')
+          .eq('processing_status', 'pending');
+
+        if (unprocessedPages && unprocessedPages.length > 0) {
+          console.log(`📄 Found ${unprocessedPages.length} crawled pages to process for ${websiteSource.title}`);
+          sourcesToProcess.push(websiteSource);
+          
+          // Start processing crawled pages
+          const { error: pagesError } = await supabase
+            .from('source_pages')
+            .update({ processing_status: 'processing' })
+            .eq('parent_source_id', websiteSource.id)
+            .eq('status', 'completed')
+            .eq('processing_status', 'pending');
+
+          if (pagesError) {
+            console.error('Error starting website training:', pagesError);
+          }
+        }
+      }
+
+      // Handle other sources that have content
+      for (const source of otherSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
         const hasContent = source.source_type === 'qa' ? 
           (metadata?.question && metadata?.answer) :
           source.content && source.content.trim().length > 0;
 
-        if (hasContent) {
-          sourcesNeedingTraining.push(source);
+        if (hasContent && metadata.processing_status !== 'completed') {
+          sourcesToProcess.push(source);
         }
       }
 
-      console.log(`📋 Found ${sourcesNeedingTraining.length} sources that need training`);
+      console.log(`📋 Found ${sourcesToProcess.length} sources that need training`);
 
-      // Separate website sources from others
-      const websiteSources = sourcesNeedingTraining.filter(s => s.source_type === 'website');
-      const otherSources = sourcesNeedingTraining.filter(s => s.source_type !== 'website');
-
-      // Handle website sources (existing crawling process)
-      if (websiteSources.length > 0) {
-        const websiteSourceIds = websiteSources.map(s => s.id);
-        
-        const { error: pagesError } = await supabase
-          .from('source_pages')
-          .update({ processing_status: 'processing' })
-          .eq('status', 'completed')
-          .eq('processing_status', 'pending')
-          .in('parent_source_id', websiteSourceIds);
-
-        if (pagesError) {
-          console.error('Error starting website training:', pagesError);
-        }
+      if (sourcesToProcess.length === 0) {
+        console.log('No sources need training');
+        setTrainingProgress({
+          agentId,
+          status: 'completed',
+          progress: 100,
+          totalSources: 0,
+          processedSources: 0
+        });
+        return;
       }
 
       // Set initial training state
@@ -446,7 +487,7 @@ export const useTrainingNotifications = () => {
         agentId,
         status: 'training',
         progress: 0,
-        totalSources: sourcesNeedingTraining.length,
+        totalSources: sourcesToProcess.length,
         processedSources: 0
       });
 
@@ -456,8 +497,9 @@ export const useTrainingNotifications = () => {
         duration: 3000,
       });
 
-      // Process other sources
-      const processingPromises = otherSources.map(async (source) => {
+      // Process non-website sources
+      const nonWebsiteSources = sourcesToProcess.filter(s => s.source_type !== 'website');
+      const processingPromises = nonWebsiteSources.map(async (source) => {
         return processSource(source);
       });
 

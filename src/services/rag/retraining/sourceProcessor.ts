@@ -24,7 +24,19 @@ export class SourceProcessor {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Processing ${unprocessedPages.length} crawled pages for ${source.title}`);
           
-          // Process crawled pages
+          // Mark pages as processing
+          const { error: updateError } = await supabase
+            .from('source_pages')
+            .update({ processing_status: 'processing' })
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed')
+            .eq('processing_status', 'pending');
+
+          if (updateError) {
+            throw new Error(`Failed to update page status: ${updateError.message}`);
+          }
+
+          // Process crawled pages via edge function
           const { data, error } = await supabase.functions.invoke('process-crawled-pages', {
             body: { parentSourceId: source.id }
           });
@@ -34,6 +46,9 @@ export class SourceProcessor {
           }
 
           console.log(`✅ Processed crawled pages for ${source.title}:`, data);
+          return;
+        } else {
+          console.log(`⚠️ Website source ${source.title} has no crawled pages to process`);
           return;
         }
       }
@@ -82,6 +97,19 @@ export class SourceProcessor {
     try {
       console.log(`🔄 Processing text content for source ${sourceId} (${sourceType})`);
 
+      // Mark as processing first
+      const currentMetadata = await this.getSourceMetadata(sourceId);
+      await supabase
+        .from('agent_sources')
+        .update({
+          metadata: {
+            ...currentMetadata,
+            processing_status: 'processing',
+            training_started_at: new Date().toISOString()
+          }
+        })
+        .eq('id', sourceId);
+
       // First, create chunks for the content
       console.log(`🔧 Generating chunks for source ${sourceId}...`);
       const { data: chunkData, error: chunkError } = await supabase.functions.invoke('generate-chunks', {
@@ -106,7 +134,7 @@ export class SourceProcessor {
         console.log(`✅ Generated chunks for source ${sourceId}:`, chunkData);
       }
 
-      // Then generate embeddings for the chunks with better error handling
+      // Then generate embeddings for the chunks
       console.log(`🤖 Generating embeddings for source ${sourceId}...`);
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
         body: { sourceId }
@@ -114,17 +142,7 @@ export class SourceProcessor {
 
       if (embeddingError) {
         console.error(`❌ Failed to generate embeddings for source ${sourceId}:`, embeddingError);
-        
-        // Check if it's a network/connection error or function error
-        if (embeddingError.message?.includes('Failed to send a request') || 
-            embeddingError.message?.includes('network') ||
-            embeddingError.message?.includes('connection')) {
-          throw new Error(`Network error while generating embeddings. Please check your internet connection and try again.`);
-        } else if (embeddingError.message?.includes('OpenAI API key')) {
-          throw new Error(`OpenAI API key is missing or invalid. Please configure your API key in the Supabase secrets.`);
-        } else {
-          throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
-        }
+        throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
       }
 
       console.log(`✅ Generated embeddings for source ${sourceId}:`, embeddingData);
@@ -134,7 +152,7 @@ export class SourceProcessor {
         .from('agent_sources')
         .update({
           metadata: {
-            ...(await this.getSourceMetadata(sourceId)),
+            ...currentMetadata,
             processing_status: 'completed',
             last_processed_at: new Date().toISOString(),
             chunks_generated: chunkData?.chunksCreated || embeddingData?.processedCount || 0,
