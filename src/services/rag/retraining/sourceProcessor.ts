@@ -83,6 +83,7 @@ export class SourceProcessor {
       console.log(`🔄 Processing text content for source ${sourceId} (${sourceType})`);
 
       // First, create chunks for the content
+      console.log(`🔧 Generating chunks for source ${sourceId}...`);
       const { data: chunkData, error: chunkError } = await supabase.functions.invoke('generate-chunks', {
         body: { 
           sourceId,
@@ -105,13 +106,25 @@ export class SourceProcessor {
         console.log(`✅ Generated chunks for source ${sourceId}:`, chunkData);
       }
 
-      // Then generate embeddings for the chunks
+      // Then generate embeddings for the chunks with better error handling
+      console.log(`🤖 Generating embeddings for source ${sourceId}...`);
       const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
         body: { sourceId }
       });
 
       if (embeddingError) {
-        throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
+        console.error(`❌ Failed to generate embeddings for source ${sourceId}:`, embeddingError);
+        
+        // Check if it's a network/connection error or function error
+        if (embeddingError.message?.includes('Failed to send a request') || 
+            embeddingError.message?.includes('network') ||
+            embeddingError.message?.includes('connection')) {
+          throw new Error(`Network error while generating embeddings. Please check your internet connection and try again.`);
+        } else if (embeddingError.message?.includes('OpenAI API key')) {
+          throw new Error(`OpenAI API key is missing or invalid. Please configure your API key in the Supabase secrets.`);
+        } else {
+          throw new Error(`Failed to generate embeddings: ${embeddingError.message}`);
+        }
       }
 
       console.log(`✅ Generated embeddings for source ${sourceId}:`, embeddingData);
