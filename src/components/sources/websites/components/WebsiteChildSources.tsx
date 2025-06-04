@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -434,7 +433,6 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
               crawl_status: page.status,
               is_active: true
             })}
-            showRecrawl={false}
             isChild={true}
           />
         </div>
