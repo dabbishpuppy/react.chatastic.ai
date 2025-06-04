@@ -38,15 +38,18 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     onStartRetraining(); // Keep the original logic for backward compatibility
   };
 
-  // Prioritize trainingProgress status over legacy isRetraining
+  // Use trainingProgress as the primary source of truth
   const getTrainingStatus = () => {
+    console.log('🔍 RetrainingDialog - Current training status:', {
+      trainingProgressStatus: trainingProgress?.status,
+      isRetraining,
+      trainingProgressData: trainingProgress
+    });
+
     if (trainingProgress?.status === 'completed') {
       return 'completed';
     }
     if (trainingProgress?.status === 'training') {
-      return 'training';
-    }
-    if (isRetraining) {
       return 'training';
     }
     return 'idle';
@@ -57,25 +60,28 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     
     if (status === 'completed') return 100;
     
-    // Prioritize trainingProgress data
+    // Use trainingProgress data as primary source
     if (trainingProgress?.progress !== undefined) {
+      console.log('📊 Using trainingProgress.progress:', trainingProgress.progress);
       return trainingProgress.progress;
     }
     
-    // Fallback to legacy progress
-    if (progress?.processedSources && progress?.totalSources) {
-      return Math.round((progress.processedSources / progress.totalSources) * 100);
+    // Calculate from processed vs total sources
+    if (trainingProgress?.processedSources !== undefined && trainingProgress?.totalSources > 0) {
+      const calculated = Math.round((trainingProgress.processedSources / trainingProgress.totalSources) * 100);
+      console.log('📊 Calculated progress from sources:', {
+        processed: trainingProgress.processedSources,
+        total: trainingProgress.totalSources,
+        percentage: calculated
+      });
+      return calculated;
     }
     
     return 0;
   };
 
   const getProcessedCount = () => {
-    // Prioritize trainingProgress data
-    if (trainingProgress?.processedSources !== undefined) {
-      return trainingProgress.processedSources;
-    }
-    return progress?.processedSources || 0;
+    return trainingProgress?.processedSources || 0;
   };
 
   const getTotalCount = () => {
@@ -85,11 +91,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }
     
     // Fallback to training progress data
-    if (trainingProgress?.totalSources !== undefined) {
-      return trainingProgress.totalSources;
-    }
-    
-    return progress?.totalSources || 0;
+    return trainingProgress?.totalSources || 0;
   };
 
   const getStatusMessage = () => {
@@ -143,6 +145,16 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   const status = getTrainingStatus();
   const isTrainingActive = status === 'training';
   const isTrainingCompleted = status === 'completed';
+  const progressPercentage = getProgressPercentage();
+
+  console.log('🔍 RetrainingDialog render state:', {
+    status,
+    isTrainingActive,
+    isTrainingCompleted,
+    progressPercentage,
+    processedCount: getProcessedCount(),
+    totalCount: getTotalCount()
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,9 +185,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Progress</span>
-                  <span>{getProgressPercentage()}%</span>
+                  <span>{progressPercentage}%</span>
                 </div>
-                <Progress value={getProgressPercentage()} className="w-full" />
+                <Progress value={progressPercentage} className="w-full" />
               </div>
 
               <div className="text-sm text-muted-foreground">

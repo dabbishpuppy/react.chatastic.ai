@@ -5,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
 
 export const useAgentRetraining = (agentId?: string) => {
-  const [isRetraining, setIsRetraining] = useState(false);
   const [progress, setProgress] = useState<RetrainingProgress | null>(null);
   const [retrainingNeeded, setRetrainingNeeded] = useState<{
     needed: boolean;
@@ -23,28 +22,24 @@ export const useAgentRetraining = (agentId?: string) => {
   } | null>(null);
   
   const { toast } = useToast();
-  const { trainingProgress } = useTrainingNotifications();
+  const { trainingProgress, startTraining } = useTrainingNotifications();
 
-  // Sync with training notifications system
+  // Sync all state with training notifications system
+  const isRetraining = trainingProgress?.status === 'training';
+
   useEffect(() => {
     if (trainingProgress) {
-      // Update isRetraining based on trainingProgress status
-      setIsRetraining(trainingProgress.status === 'training');
+      console.log('🔄 Syncing useAgentRetraining with trainingProgress:', trainingProgress);
       
-      // Update progress state
+      // Update progress state to match training notifications
       setProgress({
         totalSources: trainingProgress.totalSources,
         processedSources: trainingProgress.processedSources,
-        totalChunks: 0,
-        processedChunks: 0,
+        totalChunks: 0, // Not used in new system
+        processedChunks: 0, // Not used in new system
         status: trainingProgress.status === 'training' ? 'processing' : 
                trainingProgress.status === 'completed' ? 'completed' : 'pending'
       });
-
-      // Reset isRetraining when training completes
-      if (trainingProgress.status === 'completed') {
-        setIsRetraining(false);
-      }
     }
   }, [trainingProgress]);
 
@@ -70,54 +65,26 @@ export const useAgentRetraining = (agentId?: string) => {
   const startRetraining = useCallback(async () => {
     if (!agentId || isRetraining) return;
 
-    setIsRetraining(true);
-    setProgress({
-      totalSources: 0,
-      processedSources: 0,
-      totalChunks: 0,
-      processedChunks: 0,
-      status: 'pending'
-    });
+    console.log('🚀 Starting retraining via training notifications system');
 
     try {
+      // Use the training notifications system to start training
+      await startTraining();
+
       toast({
-        title: "Retraining Started",
+        title: "Training Started",
         description: "Processing your sources and generating embeddings..."
       });
-
-      const success = await RetrainingService.retrainAgent(agentId, (newProgress) => {
-        setProgress(newProgress);
-      });
-
-      if (success) {
-        toast({
-          title: "Retraining Complete",
-          description: "Your agent has been successfully retrained with all sources"
-        });
-        
-        // Refresh retraining status after successful completion
-        setTimeout(() => {
-          checkRetrainingNeeded();
-        }, 1000);
-      } else {
-        toast({
-          title: "Retraining Failed",
-          description: "Some sources could not be processed",
-          variant: "destructive"
-        });
-      }
 
     } catch (error) {
       console.error('Retraining failed:', error);
       toast({
-        title: "Retraining Failed",
+        title: "Training Failed",
         description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive"
       });
-    } finally {
-      setIsRetraining(false);
     }
-  }, [agentId, isRetraining, toast, checkRetrainingNeeded]);
+  }, [agentId, isRetraining, startTraining, toast]);
 
   return {
     isRetraining,
