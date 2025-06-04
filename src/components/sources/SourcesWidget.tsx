@@ -4,7 +4,6 @@ import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
 import { useAgentRetraining } from "@/hooks/useAgentRetraining";
 import { useParams } from "react-router-dom";
-import { toast } from "@/hooks/use-toast";
 import SourcesLoadingState from "./SourcesLoadingState";
 import SourcesErrorState from "./SourcesErrorState";
 import SourcesContent from "./SourcesContent";
@@ -33,16 +32,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Enhanced: Listen for training completion events
+  // Enhanced: Listen for training completion events (NO DUPLICATE TOAST)
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
-      console.log('🎉 Training completed event received:', event.detail);
+      console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
       
-      toast({
-        title: "Training Complete!",
-        description: "Your AI agent is fully trained and ready to use.",
-        duration: 5000,
-      });
+      // REMOVED: Duplicate toast notification - now handled only in useTrainingNotifications
       
       // Refresh stats and check status
       refetchStats();
@@ -52,12 +47,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     const handleTrainingContinuesInBackground = () => {
       console.log('📱 Training continues in background');
       setIsTrainingInBackground(true);
-      
-      toast({
-        title: "Training Continues",
-        description: "Training is running in the background. You'll be notified when complete.",
-        duration: 4000,
-      });
     };
 
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
@@ -72,11 +61,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Enhanced: Check retraining status on stats changes
   useEffect(() => {
     if (agentId && stats) {
-      console.log('🔍 Enhanced retraining check due to stats change:', {
-        totalSources: stats.totalSources,
-        requiresTraining: stats.requiresTraining,
-        unprocessedCrawledPages: stats.unprocessedCrawledPages
-      });
       checkRetrainingNeeded();
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
@@ -84,7 +68,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Enhanced: Handle training state transitions
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
-      console.log('🎉 Enhanced training completed, updating states');
       setIsTrainingInBackground(false);
       
       // Refresh stats after completion
@@ -98,8 +81,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Enhanced: Listen for source events with better debouncing
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
-      console.log(`📁 Enhanced source event: ${event.type}`);
-      
       // Reset background training state when sources change
       setIsTrainingInBackground(false);
       
@@ -122,16 +103,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [refetchStats, checkRetrainingNeeded]);
 
-  console.log(`📊 Enhanced SourcesWidget render state:`, {
-    totalSources: stats?.totalSources || 0,
-    requiresTraining: stats?.requiresTraining || false,
-    retrainingNeeded: retrainingNeeded?.needed,
-    trainingProgressStatus: trainingProgress?.status,
-    trainingProgress: trainingProgress?.progress,
-    isTrainingInBackground,
-    isRetraining
-  });
-
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -140,7 +111,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleRetrainClick = () => {
-    console.log('🔄 Enhanced retrain button clicked');
     setShowRetrainingDialog(true);
   };
 

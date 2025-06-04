@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
@@ -12,6 +12,7 @@ interface TrainingProgress {
   totalSources: number;
   processedSources: number;
   currentlyProcessing?: string[];
+  sessionId?: string; // Add session tracking
 }
 
 interface DatabaseSource {
@@ -26,6 +27,11 @@ export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Notification guard to prevent duplicate notifications
+  const hasShownCompletionNotificationRef = useRef<boolean>(false);
+  const currentSessionIdRef = useRef<string>('');
+  const lastCompletionCheckRef = useRef<number>(0);
 
   useEffect(() => {
     if (!agentId) return;
@@ -63,7 +69,7 @@ export const useTrainingNotifications = () => {
       const channel = supabase
         .channel(`enhanced-training-notifications-${agentId}`)
         
-        // FIXED: Subscribe to processing_status changes (not status changes) 
+        // Subscribe to processing_status changes
         .on(
           'postgres_changes',
           {
@@ -76,16 +82,8 @@ export const useTrainingNotifications = () => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
-            // FIXED: Only trigger on processing_status changes, not crawling status
+            // Only trigger on processing_status changes, not crawling status
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              console.log('📡 Page processing status change:', {
-                pageId: updatedPage.id,
-                url: updatedPage.url,
-                oldProcessingStatus: oldPage?.processing_status,
-                newProcessingStatus: updatedPage.processing_status,
-                parentSourceId: updatedPage.parent_source_id
-              });
-
               // Immediate progress check for real-time updates
               setTimeout(() => checkTrainingCompletion(agentId), 100);
             }
@@ -109,14 +107,6 @@ export const useTrainingNotifications = () => {
             
             // Check if processing status changed
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              console.log('📡 Source metadata processing update:', {
-                sourceId: updatedSource.id,
-                sourceType: updatedSource.source_type,
-                oldStatus: oldMetadata?.processing_status,
-                newStatus: metadata.processing_status,
-                title: updatedSource.title
-              });
-
               setTimeout(() => checkTrainingCompletion(agentId), 100);
             }
           }
@@ -132,7 +122,6 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
-            console.log('📡 New source added:', payload.new);
             setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
             
             // Re-initialize if new website source
@@ -144,14 +133,12 @@ export const useTrainingNotifications = () => {
         )
         
         .subscribe((status) => {
-          console.log('📡 Enhanced training subscription status:', status);
-          
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
             if (pollInterval) clearInterval(pollInterval);
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 3000);
+            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000); // Reduced frequency
             
             toast({
               title: "Connection Issue",
@@ -162,7 +149,6 @@ export const useTrainingNotifications = () => {
         });
 
       return () => {
-        console.log('🔌 Cleaning up enhanced training notifications');
         if (pollInterval) clearInterval(pollInterval);
         supabase.removeChannel(channel);
       };
@@ -177,7 +163,12 @@ export const useTrainingNotifications = () => {
 
   const checkTrainingCompletion = async (agentId: string) => {
     try {
-      console.log('🔍 Checking enhanced training completion for agent:', agentId);
+      // Prevent too frequent checks
+      const now = Date.now();
+      if (now - lastCompletionCheckRef.current < 2000) {
+        return;
+      }
+      lastCompletionCheckRef.current = now;
       
       // Get all active sources for this agent
       const { data: agentSources, error: sourcesError } = await supabase
@@ -192,11 +183,10 @@ export const useTrainingNotifications = () => {
       }
 
       if (!agentSources || agentSources.length === 0) {
-        console.log('No sources found for agent');
         return;
       }
 
-      // FIXED: Calculate what needs training more accurately - focus on processing status
+      // Calculate what needs training more accurately - focus on processing status
       const sourcesNeedingTraining = [];
       let totalPagesNeedingProcessing = 0;
       let totalPagesProcessed = 0;
@@ -206,7 +196,7 @@ export const useTrainingNotifications = () => {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // FIXED: Only count completed crawled pages for processing
+          // Only count completed crawled pages for processing
           const { data: pages } = await supabase
             .from('source_pages')
             .select('id, url, processing_status, status')
@@ -218,7 +208,7 @@ export const useTrainingNotifications = () => {
             const processingPages = pages.filter(p => p.processing_status === 'processing');
             const processedPages = pages.filter(p => p.processing_status === 'processed');
 
-            // FIXED: Only consider this source as needing training if there are unprocessed pages
+            // Only consider this source as needing training if there are unprocessed pages
             if (pendingPages.length > 0 || processingPages.length > 0) {
               sourcesNeedingTraining.push(source);
             }
@@ -252,26 +242,20 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // FIXED: Determine status more accurately
+      // Determine status more accurately
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
       if (currentlyProcessingPages.length > 0) {
         status = 'training';
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-        // FIXED: Only mark as completed if we have processed some pages and nothing needs training
+        // Only mark as completed if we have processed some pages and nothing needs training
         status = 'completed';
       } else if (totalPagesProcessed > 0 && totalPagesProcessed < totalPagesNeedingProcessing) {
         status = 'training'; // Some processed, but not all
       }
 
-      console.log('📊 Enhanced training progress calculation:', {
-        sourcesNeedingTraining: sourcesNeedingTraining.length,
-        totalPagesNeedingProcessing,
-        totalPagesProcessed,
-        currentlyProcessingPages,
-        progress,
-        status
-      });
+      // Generate session ID for this training cycle
+      const sessionId = `${agentId}-${totalPagesNeedingProcessing}-${Date.now()}`;
 
       // Update progress state
       const newProgress: TrainingProgress = {
@@ -280,25 +264,40 @@ export const useTrainingNotifications = () => {
         progress,
         totalSources: totalPagesNeedingProcessing,
         processedSources: totalPagesProcessed,
-        currentlyProcessing: currentlyProcessingPages
+        currentlyProcessing: currentlyProcessingPages,
+        sessionId
       };
 
       setTrainingProgress(newProgress);
 
-      // FIXED: Only show completion notification when actually complete (not during crawling)
-      if (status === 'completed' && trainingProgress?.status !== 'completed' && totalPagesNeedingProcessing > 0) {
+      // Handle completion notification with guard
+      if (status === 'completed' && 
+          trainingProgress?.status !== 'completed' && 
+          totalPagesNeedingProcessing > 0 &&
+          !hasShownCompletionNotificationRef.current &&
+          currentSessionIdRef.current !== sessionId) {
+        
         console.log('🎉 Training completed! Showing success notification');
+        
+        // Set guards to prevent duplicate notifications
+        hasShownCompletionNotificationRef.current = true;
+        currentSessionIdRef.current = sessionId;
         
         toast({
           title: "Training Complete!",
           description: "Your AI agent is trained and ready",
-          duration: 8000,
+          duration: 5000,
         });
 
         // Dispatch completion event for other components
         window.dispatchEvent(new CustomEvent('trainingCompleted', {
           detail: { agentId, progress: newProgress }
         }));
+        
+        // Reset guard after a delay to allow for new training sessions
+        setTimeout(() => {
+          hasShownCompletionNotificationRef.current = false;
+        }, 10000);
       }
 
     } catch (error) {
@@ -312,6 +311,10 @@ export const useTrainingNotifications = () => {
 
     try {
       console.log('🚀 Starting enhanced training for agent:', agentId);
+
+      // Reset notification guards when starting new training
+      hasShownCompletionNotificationRef.current = false;
+      currentSessionIdRef.current = '';
 
       // Reset completion state
       setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
