@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTextSourcesPaginated } from "@/hooks/useSourcesPaginated";
 import TextSourceForm from "./text/TextSourceForm";
@@ -15,6 +15,22 @@ const TextTab: React.FC = () => {
   } = useTextSourcesPaginated(1, 25);
 
   const sources = paginatedData?.sources || [];
+
+  // Listen for source creation events to trigger immediate refetch
+  useEffect(() => {
+    const handleSourceCreated = (event: CustomEvent) => {
+      console.log('📝 Text source created, triggering refetch:', event.detail);
+      if (event.detail.sourceType === 'text') {
+        refetch();
+      }
+    };
+
+    window.addEventListener('sourceCreated', handleSourceCreated as EventListener);
+    
+    return () => {
+      window.removeEventListener('sourceCreated', handleSourceCreated as EventListener);
+    };
+  }, [refetch]);
 
   return (
     <ErrorBoundary tabName="Text">
