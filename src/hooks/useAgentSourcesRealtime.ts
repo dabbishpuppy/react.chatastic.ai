@@ -54,20 +54,48 @@ export const useAgentSourcesRealtime = () => {
           queryClient.invalidateQueries({ 
             queryKey: ['agent-source-stats', agentId] 
           });
-          queryClient.refetchQueries({
-            queryKey: ['agent-source-stats', agentId]
-          });
           
           // Invalidate all paginated source queries for this agent
           queryClient.invalidateQueries({ 
-            queryKey: ['sources-paginated', agentId] 
+            queryKey: ['agent-sources-paginated', agentId] 
           });
+
+          // For INSERT events (new sources), trigger immediate refetch
+          if (payload.eventType === 'INSERT') {
+            console.log('🔄 New source inserted, triggering immediate refetch');
+            
+            // Immediate refetch for stats
+            setTimeout(() => {
+              queryClient.refetchQueries({
+                queryKey: ['agent-source-stats', agentId]
+              });
+            }, 100);
+            
+            // Immediate refetch for paginated data with source type
+            setTimeout(() => {
+              queryClient.refetchQueries({
+                queryKey: ['agent-sources-paginated', agentId, sourceType]
+              });
+            }, 200);
+            
+            // Additional refetch after longer delay to catch any async updates
+            setTimeout(() => {
+              queryClient.refetchQueries({
+                queryKey: ['agent-source-stats', agentId]
+              });
+              queryClient.refetchQueries({
+                queryKey: ['agent-sources-paginated', agentId, sourceType]
+              });
+            }, 1500);
+          }
 
           // For website sources, ensure immediate refetch
           if (sourceType === 'website') {
-            queryClient.refetchQueries({
-              queryKey: ['sources-paginated', agentId, 'website']
-            });
+            setTimeout(() => {
+              queryClient.refetchQueries({
+                queryKey: ['agent-sources-paginated', agentId, 'website']
+              });
+            }, 100);
           }
 
           // For status updates, also trigger immediate refetch for better UX
@@ -79,7 +107,7 @@ export const useAgentSourcesRealtime = () => {
                 queryKey: ['agent-source-stats', agentId]
               });
               queryClient.refetchQueries({
-                queryKey: ['sources-paginated', agentId, 'website']
+                queryKey: ['agent-sources-paginated', agentId, 'website']
               });
             }, 100);
           }
@@ -92,10 +120,32 @@ export const useAgentSourcesRealtime = () => {
                 queryKey: ['agent-source-stats', agentId]
               });
               queryClient.refetchQueries({
-                queryKey: ['sources-paginated', agentId, sourceType]
+                queryKey: ['agent-sources-paginated', agentId, sourceType]
               });
-            }, 200); // Slightly longer delay to ensure DB consistency
+            }, 500); // Longer delay to ensure DB consistency
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `parent_source_id.in.(${agentId})`
+        },
+        (payload) => {
+          console.log('📡 Source page update detected:', payload.eventType);
+          
+          // When source pages are updated, also refresh the parent sources
+          setTimeout(() => {
+            queryClient.refetchQueries({
+              queryKey: ['agent-source-stats', agentId]
+            });
+            queryClient.refetchQueries({
+              queryKey: ['agent-sources-paginated', agentId, 'website']
+            });
+          }, 200);
         }
       )
       .subscribe();

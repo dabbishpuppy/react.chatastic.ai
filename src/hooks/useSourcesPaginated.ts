@@ -50,6 +50,14 @@ export const useSourcesPaginated = (options: UseSourcesPaginatedOptions = {}) =>
     queryFn: async (): Promise<PaginatedSourcesResult> => {
       if (!agentId) return { sources: [], totalCount: 0, totalPages: 0, currentPage: 1 };
 
+      console.log('🔍 Fetching paginated sources:', {
+        agentId,
+        sourceType,
+        currentPage,
+        pageSize,
+        timestamp: new Date().toISOString()
+      });
+
       let query = supabase
         .from('agent_sources')
         .select(`
@@ -105,6 +113,13 @@ export const useSourcesPaginated = (options: UseSourcesPaginatedOptions = {}) =>
         links_count: source.links_count || 0
       })) as AgentSource[];
 
+      console.log('✅ Fetched paginated sources:', {
+        count: processedSources.length,
+        totalCount: count || 0,
+        sourceType,
+        timestamp: new Date().toISOString()
+      });
+
       return {
         sources: processedSources,
         totalCount: count || 0,
@@ -113,8 +128,9 @@ export const useSourcesPaginated = (options: UseSourcesPaginatedOptions = {}) =>
       };
     },
     enabled: !!agentId && enabled,
-    staleTime: 30000,
+    staleTime: 10000, // Reduced from 30000 to 10000 for faster updates
     refetchOnWindowFocus: false,
+    refetchInterval: false, // Disable automatic refetching, rely on real-time updates
   });
 
   return {

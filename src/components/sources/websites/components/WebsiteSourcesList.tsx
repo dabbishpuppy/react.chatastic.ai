@@ -58,7 +58,12 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     onPageSizeChange: () => clearSelection()
   });
 
-  const { data: paginatedData, refetch } = useSourcesPaginated({
+  const { 
+    data: paginatedData, 
+    sources: allSources,
+    refetch, 
+    isLoading 
+  } = useSourcesPaginated({
     sourceType: 'website',
     page,
     pageSize,
@@ -66,16 +71,29 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   });
 
   const parentSources = useMemo(() => {
-    const allSources = paginatedData?.sources || [];
-    return allSources.filter(source => 
+    console.log('🔍 Processing website sources for list:', {
+      totalSources: allSources.length,
+      page,
+      timestamp: new Date().toISOString()
+    });
+    
+    const parents = allSources.filter(source => 
       !source.parent_source_id && 
       source.source_type === 'website'
     );
-  }, [paginatedData?.sources]);
+    
+    console.log('📊 Parent website sources:', {
+      count: parents.length,
+      sources: parents.map(s => ({ id: s.id, title: s.title, url: s.url })),
+      timestamp: new Date().toISOString()
+    });
+    
+    return parents;
+  }, [allSources, page]);
 
   const getChildSources = useCallback((parentId: string): AgentSource[] => {
-    return (paginatedData?.sources || []).filter(source => source.parent_source_id === parentId);
-  }, [paginatedData?.sources]);
+    return allSources.filter(source => source.parent_source_id === parentId);
+  }, [allSources]);
 
   const currentPageSourceIds = parentSources.map(s => s.id);
   const allCurrentPageSelected = currentPageSourceIds.length > 0 && 
@@ -143,7 +161,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     }
   }, [selectedArray, sourceService, clearSelection, refetch]);
 
-  if (loading && !paginatedData) {
+  if ((loading || isLoading) && !paginatedData) {
     return <WebsiteSourcesLoading />;
   }
 
