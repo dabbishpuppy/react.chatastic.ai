@@ -26,7 +26,6 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     >
       {isAgent ? (
         <ReactMarkdown
-          className="prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-strong:font-semibold prose-em:italic"
           components={{
             p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
             ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
