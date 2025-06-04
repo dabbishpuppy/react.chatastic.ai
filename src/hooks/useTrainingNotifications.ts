@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -23,11 +22,24 @@ interface DatabaseSource {
 export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Fallback polling function
+  const pollTrainingStatus = async () => {
+    if (!agentId) return;
+    try {
+      await checkTrainingCompletion(agentId);
+    } catch (error) {
+      console.error('Polling error:', error);
+    }
+  };
 
   useEffect(() => {
     if (!agentId) return;
 
     console.log('🔔 Setting up training notifications for agent:', agentId);
+
+    let pollInterval: NodeJS.Timeout;
 
     const channel = supabase
       .channel(`training-notifications-${agentId}`)
@@ -85,7 +97,6 @@ export const useTrainingNotifications = () => {
         },
         (payload) => {
           console.log('📡 New source added:', payload.new);
-          // Reset training state when new sources are added
           console.log('🔄 Resetting training state due to new source');
           setTrainingProgress(prev => prev ? {
             ...prev,
@@ -118,10 +129,34 @@ export const useTrainingNotifications = () => {
           checkTrainingCompletion(agentId);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Training notifications subscription status:', status);
+        
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+          // Clear any existing polling when real-time connects
+          if (pollInterval) {
+            clearInterval(pollInterval);
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+          setIsConnected(false);
+          // Start polling as fallback
+          console.log('📡 Real-time failed, starting polling fallback');
+          pollInterval = setInterval(pollTrainingStatus, 5000);
+          
+          toast({
+            title: "Connection Issue",
+            description: "Training updates may be delayed. We're working on it.",
+            duration: 3000,
+          });
+        }
+      });
 
     return () => {
       console.log('🔌 Cleaning up training notifications');
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
       supabase.removeChannel(channel);
     };
   }, [agentId]);
@@ -262,7 +297,7 @@ export const useTrainingNotifications = () => {
         status = 'training';
         console.log('🔄 Training in progress');
       } else if (sourcesNeedingProcessing > 0) {
-        status = 'idle'; // Sources need training but haven't started yet
+        status = 'idle';
         console.log(`⏳ ${sourcesNeedingProcessing} sources need processing`);
       } else if (totalSources > 0 && processedSources === totalSources) {
         status = 'completed';
@@ -542,7 +577,11 @@ export const useTrainingNotifications = () => {
 
   return {
     trainingProgress,
-    startTraining,
-    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId)
+    startTraining: async () => {
+      if (!agentId) return;
+      await startTraining();
+    },
+    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId),
+    isConnected
   };
 };
