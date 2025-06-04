@@ -104,7 +104,7 @@ serve(async (req) => {
       );
     }
 
-    // Check if page is already processed - return 200 instead of 409 for better UX
+    // Enhanced: Check if page is already processed
     if (page.processing_status === 'processed') {
       console.log(`✅ Page ${pageId} already processed, returning success`);
       return new Response(
@@ -121,7 +121,7 @@ serve(async (req) => {
       );
     }
 
-    // Check if page is currently being processed
+    // Enhanced: Check if page is currently being processed
     if (page.processing_status === 'processing') {
       console.log(`⏳ Page ${pageId} currently being processed`);
       return new Response(
@@ -139,8 +139,9 @@ serve(async (req) => {
 
     console.log(`📄 Processing page: ${page.url}`);
 
-    // Mark page as processing first to prevent duplicate processing
+    // Enhanced: Mark page as processing FIRST with immediate status update
     try {
+      console.log(`🔄 Marking page ${pageId} as processing...`);
       const { error: updateError } = await supabase
         .from('source_pages')
         .update({ 
@@ -164,6 +165,8 @@ serve(async (req) => {
           }
         );
       }
+      
+      console.log(`✅ Page ${pageId} marked as processing`);
     } catch (error) {
       console.error('❌ Unexpected error marking page as processing:', error);
       return new Response(
@@ -191,24 +194,24 @@ serve(async (req) => {
             'User-Agent': 'Mozilla/5.0 (compatible; Wonderwave-Bot/1.0)',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           },
-          signal: AbortSignal.timeout(30000) // 30 second timeout
+          signal: AbortSignal.timeout(30000)
         });
 
         if (response.ok) {
-          break; // Success, exit retry loop
+          break;
         }
         
         attempts++;
         if (attempts < maxAttempts) {
           console.log(`Attempt ${attempts} failed for ${page.url}, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
         }
       } catch (error) {
         attempts++;
         if (attempts >= maxAttempts) {
           console.error(`❌ Failed to fetch after ${maxAttempts} attempts:`, error);
           
-          // Mark page as failed before returning
+          // Enhanced: Mark page as failed with immediate update
           try {
             await supabase
               .from('source_pages')
@@ -218,6 +221,8 @@ serve(async (req) => {
                 completed_at: new Date().toISOString()
               })
               .eq('id', pageId);
+            
+            console.log(`❌ Page ${pageId} marked as failed due to fetch error`);
           } catch (updateError) {
             console.error('❌ Failed to update page status to failed:', updateError);
           }
@@ -230,7 +235,7 @@ serve(async (req) => {
             }),
             {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 502, // Bad Gateway - upstream server error
+              status: 502,
             }
           );
         }
@@ -240,7 +245,7 @@ serve(async (req) => {
     }
 
     if (!response || !response.ok) {
-      // Mark page as failed before returning
+      // Enhanced: Mark page as failed with immediate update
       try {
         await supabase
           .from('source_pages')
@@ -250,6 +255,8 @@ serve(async (req) => {
             completed_at: new Date().toISOString()
           })
           .eq('id', pageId);
+        
+        console.log(`❌ Page ${pageId} marked as failed due to HTTP error`);
       } catch (updateError) {
         console.error('❌ Failed to update page status to failed:', updateError);
       }
@@ -273,7 +280,7 @@ serve(async (req) => {
     } catch (error) {
       console.error(`❌ Failed to read response text:`, error);
       
-      // Mark page as failed before returning
+      // Enhanced: Mark page as failed with immediate update
       try {
         await supabase
           .from('source_pages')
@@ -283,6 +290,8 @@ serve(async (req) => {
             completed_at: new Date().toISOString()
           })
           .eq('id', pageId);
+        
+        console.log(`❌ Page ${pageId} marked as failed due to text reading error`);
       } catch (updateError) {
         console.error('❌ Failed to update page status to failed:', updateError);
       }
@@ -302,16 +311,10 @@ serve(async (req) => {
     
     // Simple content extraction (similar to what's in child-job-processor)
     const extractTextContent = (html) => {
-      // Remove script and style elements
       let text = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
       text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
-      
-      // Remove HTML tags
       text = text.replace(/<[^>]*>/g, ' ');
-      
-      // Clean up whitespace
       text = text.replace(/\s+/g, ' ').trim();
-      
       return text;
     };
 
@@ -361,7 +364,7 @@ serve(async (req) => {
 
     console.log(`📏 Content extracted: ${contentSize} characters from ${page.url}`);
 
-    // Handle minimal content
+    // Handle minimal content case
     if (contentSize < 10) {
       const title = extractTitle(htmlContent);
       if (title && title.length > 0) {
@@ -384,7 +387,6 @@ serve(async (req) => {
             }
           }];
 
-          // Insert chunks with conflict handling using upsert
           const { error: insertError } = await supabase
             .from('source_chunks')
             .upsert(fallbackChunks, {
@@ -395,7 +397,7 @@ serve(async (req) => {
           if (insertError) {
             console.error('❌ Error inserting fallback chunks:', insertError);
             
-            // Mark page as failed before returning
+            // Enhanced: Mark page as failed with immediate update
             try {
               await supabase
                 .from('source_pages')
@@ -405,6 +407,8 @@ serve(async (req) => {
                   completed_at: new Date().toISOString()
                 })
                 .eq('id', pageId);
+              
+              console.log(`❌ Page ${pageId} marked as failed due to chunk insertion error`);
             } catch (updateError) {
               console.error('❌ Failed to update page status to failed:', updateError);
             }
@@ -422,7 +426,7 @@ serve(async (req) => {
             );
           }
 
-          // Mark page as processed
+          // Enhanced: Mark page as processed with immediate update
           try {
             await supabase
               .from('source_pages')
@@ -433,13 +437,15 @@ serve(async (req) => {
                 completed_at: new Date().toISOString()
               })
               .eq('id', pageId);
+            
+            console.log(`✅ Page ${pageId} marked as processed (fallback content)`);
           } catch (updateError) {
             console.error('❌ Failed to update page status to processed:', updateError);
           }
         } catch (error) {
           console.error('❌ Unexpected error inserting fallback chunks:', error);
           
-          // Mark page as failed before returning
+          // Enhanced: Mark page as failed with immediate update
           try {
             await supabase
               .from('source_pages')
@@ -449,6 +455,8 @@ serve(async (req) => {
                 completed_at: new Date().toISOString()
               })
               .eq('id', pageId);
+            
+            console.log(`❌ Page ${pageId} marked as failed due to unexpected error`);
           } catch (updateError) {
             console.error('❌ Failed to update page status to failed:', updateError);
           }
@@ -487,7 +495,7 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } else {
-        // Mark page as failed before returning
+        // Enhanced: Mark page as failed with immediate update
         try {
           await supabase
             .from('source_pages')
@@ -497,6 +505,8 @@ serve(async (req) => {
               completed_at: new Date().toISOString()
             })
             .eq('id', pageId);
+          
+          console.log(`❌ Page ${pageId} marked as failed - no meaningful content`);
         } catch (updateError) {
           console.error('❌ Failed to update page status to failed:', updateError);
         }
@@ -509,7 +519,7 @@ serve(async (req) => {
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 422, // Unprocessable Entity
+            status: 422,
           }
         );
       }
@@ -528,7 +538,7 @@ serve(async (req) => {
       contentHash = 'hash-generation-failed';
     }
 
-    // Store chunks in database - Link to parent source
+    // Store chunks in database
     if (chunks.length > 0) {
       const chunksToInsert = chunks.map((chunk, index) => ({
         source_id: page.parent_source_id,
@@ -547,7 +557,6 @@ serve(async (req) => {
       }));
 
       try {
-        // Use upsert to handle potential conflicts gracefully
         const { error: insertError } = await supabase
           .from('source_chunks')
           .upsert(chunksToInsert, {
@@ -558,7 +567,7 @@ serve(async (req) => {
         if (insertError) {
           console.error('❌ Error inserting chunks:', insertError);
           
-          // Mark page as failed before returning
+          // Enhanced: Mark page as failed with immediate update
           try {
             await supabase
               .from('source_pages')
@@ -568,6 +577,8 @@ serve(async (req) => {
                 completed_at: new Date().toISOString()
               })
               .eq('id', pageId);
+            
+            console.log(`❌ Page ${pageId} marked as failed due to chunk insertion error`);
           } catch (updateError) {
             console.error('❌ Failed to update page status to failed:', updateError);
           }
@@ -585,7 +596,7 @@ serve(async (req) => {
           );
         }
 
-        // Mark page as processed
+        // Enhanced: Mark page as processed with immediate update and detailed metrics
         try {
           await supabase
             .from('source_pages')
@@ -593,9 +604,13 @@ serve(async (req) => {
               processing_status: 'processed',
               chunks_created: chunks.length,
               content_size: contentSize,
-              completed_at: new Date().toISOString()
+              completed_at: new Date().toISOString(),
+              processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime(),
+              compression_ratio: contentSize > 0 ? textContent.length / contentSize : 1.0
             })
             .eq('id', pageId);
+          
+          console.log(`✅ Page ${pageId} marked as processed with ${chunks.length} chunks`);
         } catch (updateError) {
           console.error('❌ Failed to update page status to processed:', updateError);
         }
@@ -604,7 +619,7 @@ serve(async (req) => {
       } catch (error) {
         console.error('❌ Unexpected error inserting chunks:', error);
         
-        // Mark page as failed before returning
+        // Enhanced: Mark page as failed with immediate update
         try {
           await supabase
             .from('source_pages')
@@ -614,6 +629,8 @@ serve(async (req) => {
               completed_at: new Date().toISOString()
             })
             .eq('id', pageId);
+          
+          console.log(`❌ Page ${pageId} marked as failed due to unexpected error`);
         } catch (updateError) {
           console.error('❌ Failed to update page status to failed:', updateError);
         }
