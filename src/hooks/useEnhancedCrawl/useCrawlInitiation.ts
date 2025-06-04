@@ -97,23 +97,41 @@ export const useCrawlInitiation = () => {
 
       console.log('✅ Enhanced crawl initiated successfully:', data);
       
-      // Start automatic processing and monitoring
-      setTimeout(() => {
-        supabase.functions.invoke('process-source-pages').then(() => {
-          console.log('🔄 Auto-triggered page processing');
-        }).catch(err => {
+      // Start automatic processing and monitoring with improved error handling
+      setTimeout(async () => {
+        try {
+          const { data: processData, error: processError } = await supabase.functions.invoke('process-source-pages');
+          
+          // Handle 409 responses as success (jobs already processed)
+          if (processError && (processError.message?.includes('409') || processError.status === 409)) {
+            console.log('🔄 Page processing already in progress or completed');
+          } else if (processError) {
+            console.warn('⚠️ Auto-processing trigger failed:', processError);
+          } else {
+            console.log('🔄 Auto-triggered page processing:', processData);
+          }
+        } catch (err) {
           console.warn('⚠️ Auto-processing trigger failed:', err);
-        });
+        }
         
         CrawlRecoveryService.autoRecoverStuckCrawls(request.agentId);
       }, 30000);
 
-      setTimeout(() => {
-        supabase.functions.invoke('generate-missing-chunks').then(() => {
-          console.log('🔄 Auto-triggered missing chunks generation');
-        }).catch(err => {
+      setTimeout(async () => {
+        try {
+          const { data: chunksData, error: chunksError } = await supabase.functions.invoke('generate-missing-chunks');
+          
+          // Handle 409 responses as success for chunks too
+          if (chunksError && (chunksError.message?.includes('409') || chunksError.status === 409)) {
+            console.log('🔄 Chunk generation already in progress or completed');
+          } else if (chunksError) {
+            console.warn('⚠️ Auto-chunk generation failed:', chunksError);
+          } else {
+            console.log('🔄 Auto-triggered missing chunks generation:', chunksData);
+          }
+        } catch (err) {
           console.warn('⚠️ Auto-chunk generation failed:', err);
-        });
+        }
       }, 60000);
       
       toast({

@@ -16,12 +16,21 @@ export const useEnhancedCrawl = () => {
       const result = await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
       
       if (result.success) {
-        setTimeout(() => {
-          supabase.functions.invoke('generate-missing-chunks').then(() => {
-            console.log('🔄 Auto-triggered chunk generation after retry');
-          }).catch(err => {
+        setTimeout(async () => {
+          try {
+            const { data, error } = await supabase.functions.invoke('generate-missing-chunks');
+            
+            // Handle 409 as success - chunks already being generated
+            if (error && (error.message?.includes('409') || error.status === 409)) {
+              console.log('🔄 Chunk generation already in progress or completed');
+            } else if (error) {
+              console.warn('⚠️ Auto-chunk generation failed after retry:', error);
+            } else {
+              console.log('🔄 Auto-triggered chunk generation after retry:', data);
+            }
+          } catch (err) {
             console.warn('⚠️ Auto-chunk generation failed after retry:', err);
-          });
+          }
         }, 5000);
         
         toast({

@@ -78,6 +78,12 @@ export class EnhancedCrawlService {
       
       const { data, error } = await supabase.functions.invoke('process-source-pages');
       
+      // Handle 409 responses as success (processing already in progress)
+      if (error && (error.message?.includes('409') || error.status === 409)) {
+        console.log('🔄 Source page processing already in progress or completed');
+        return { success: true, message: 'Processing already in progress' };
+      }
+      
       if (error) {
         throw error;
       }
