@@ -36,18 +36,19 @@ serve(async (req) => {
       .select()
       .single();
 
-    // If we couldn't claim the job, it means another worker already took it or it's not pending
+    // FIXED: Return 200 success when job is already claimed (not an error)
     if (claimError || !claimedJob) {
       console.log(`⚠️ Job ${childJobId} could not be claimed (already processed or in progress)`);
       return new Response(
         JSON.stringify({
-          success: false,
-          message: 'Job already processed or in progress',
-          jobId: childJobId
+          success: true, // Changed to true - this is not an error
+          message: 'Job already claimed or completed by another worker',
+          jobId: childJobId,
+          skipped: true // Add flag to indicate it was skipped
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 409, // Conflict
+          status: 200, // Changed from 409 to 200
         }
       );
     }

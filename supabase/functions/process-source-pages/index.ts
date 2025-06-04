@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getSupabaseClient } from '../_shared/database-helpers.ts';
 
@@ -118,38 +117,8 @@ async function processPendingPages(supabaseClient: any) {
         success: !processingError
       });
 
-      // FIXED: Properly handle 409 conflicts as successful operations
+      // SIMPLIFIED: Since 409s are now returned as 200s, we only handle real errors
       if (processingError) {
-        const isConflictError = processingError.message?.includes('409') || 
-                               processingError.status === 409 ||
-                               processingError.message?.includes('already processed') ||
-                               processingError.message?.includes('Job already processed') ||
-                               processingError.message?.includes('could not be claimed');
-
-        if (isConflictError) {
-          console.log(`✅ Page ${page.id} already processed successfully (409 conflict resolved)`);
-          
-          // Mark as completed since it was already processed successfully
-          await supabaseClient
-            .from('source_pages')
-            .update({
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-              error_message: null,
-              processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
-            })
-            .eq('id', page.id);
-          
-          results.push({
-            pageId: page.id,
-            url: page.url,
-            success: true,
-            result: { message: 'Successfully handled - job conflict resolved', chunksCreated: 0 },
-            wasConflictResolved: true
-          });
-          continue;
-        }
-
         // For actual errors (5xx, network issues, etc), increment retry count
         const newRetryCount = (page.retry_count || 0) + 1;
         const shouldRetry = newRetryCount < 3;
@@ -176,65 +145,53 @@ async function processPendingPages(supabaseClient: any) {
           retryCount: newRetryCount
         });
       } else {
-        console.log(`✅ Successfully processed page ${page.id}`);
-        
-        // Verify the status was updated correctly
-        const { data: updatedPage } = await supabaseClient
-          .from('source_pages')
-          .select('status, completed_at')
-          .eq('id', page.id)
-          .single();
-        
-        if (updatedPage?.status !== 'completed') {
-          console.log(`⚠️ Page ${page.id} not marked as completed, updating status`);
+        // Handle successful responses (including skipped jobs)
+        if (processingResult?.skipped) {
+          console.log(`✅ Page ${page.id} was already processed by another worker (skipped)`);
+          
+          // Ensure it's marked as completed
           await supabaseClient
             .from('source_pages')
             .update({
               status: 'completed',
               completed_at: new Date().toISOString(),
+              error_message: null,
               processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
             })
             .eq('id', page.id);
+        } else {
+          console.log(`✅ Successfully processed page ${page.id}`);
+          
+          // Verify the status was updated correctly
+          const { data: updatedPage } = await supabaseClient
+            .from('source_pages')
+            .select('status, completed_at')
+            .eq('id', page.id)
+            .single();
+          
+          if (updatedPage?.status !== 'completed') {
+            console.log(`⚠️ Page ${page.id} not marked as completed, updating status`);
+            await supabaseClient
+              .from('source_pages')
+              .update({
+                status: 'completed',
+                completed_at: new Date().toISOString(),
+                processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
+              })
+              .eq('id', page.id);
+          }
         }
         
         results.push({
           pageId: page.id,
           url: page.url,
           success: true,
-          result: processingResult
+          result: processingResult,
+          wasSkipped: processingResult?.skipped || false
         });
       }
     } catch (error) {
-      // Handle 409 errors in the catch block as well
-      const isConflictError = error.message?.includes('409') || 
-                             error.status === 409 ||
-                             error.message?.includes('already processed') ||
-                             error.message?.includes('could not be claimed');
-
-      if (isConflictError) {
-        console.log(`✅ Page ${page.id} already processed successfully (409 caught exception)`);
-        
-        await supabaseClient
-          .from('source_pages')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            error_message: null,
-            processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
-          })
-          .eq('id', page.id);
-        
-        results.push({
-          pageId: page.id,
-          url: page.url,
-          success: true,
-          result: { message: 'Successfully handled - job conflict resolved', chunksCreated: 0 },
-          wasConflictResolved: true
-        });
-        continue;
-      }
-
-      // For actual errors, handle retry logic
+      // Handle exceptions (should not occur for claiming conflicts anymore)
       const newRetryCount = (page.retry_count || 0) + 1;
       const shouldRetry = newRetryCount < 3;
       
@@ -332,10 +289,10 @@ serve(async (req) => {
     const successCount = processingResults.results.filter(r => r.success).length;
     const failedCount = processingResults.results.filter(r => !r.success).length;
     const autoRetriedCount = processingResults.results.filter(r => r.autoRetried).length;
-    const conflictResolvedCount = processingResults.results.filter(r => r.wasConflictResolved).length;
+    const skippedCount = processingResults.results.filter(r => r.wasSkipped).length;
     const totalChunksCreated = processingResults.results.reduce((sum, r) => sum + (r.result?.chunksCreated || 0), 0);
 
-    console.log(`📊 Processing complete: ${successCount} successful (${conflictResolvedCount} conflicts resolved), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
+    console.log(`📊 Processing complete: ${successCount} successful (${skippedCount} skipped), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
 
     // Check for missing chunks after processing
     if (successCount > 0) {
@@ -359,7 +316,7 @@ serve(async (req) => {
         successCount,
         failedCount,
         autoRetriedCount,
-        conflictResolvedCount,
+        skippedCount,
         autoRecoveredCount,
         resetFailedCount,
         totalChunksCreated,
