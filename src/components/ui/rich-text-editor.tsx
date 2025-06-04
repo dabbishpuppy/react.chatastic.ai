@@ -27,9 +27,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     ol: false
   });
 
+  // Handle initial content setting
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value;
+    if (editorRef.current) {
+      const currentContent = editorRef.current.innerHTML;
+      if (currentContent !== value && value !== undefined) {
+        editorRef.current.innerHTML = value || '';
+      }
     }
   }, [value]);
 
@@ -39,7 +43,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     editorRef.current.focus();
     document.execCommand(command, false, value);
     
-    // Update content
+    // Update content immediately after command
     const newContent = editorRef.current.innerHTML;
     onChange(newContent);
     
@@ -56,8 +60,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     });
   };
 
-  const handleInput = () => {
-    if (!editorRef.current) return;
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    if (!editorRef.current || disabled) return;
+    
     const content = editorRef.current.innerHTML;
     onChange(content);
     updateActiveStates();
@@ -79,10 +84,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   };
 
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+    
+    // Update content after paste
+    if (editorRef.current) {
+      const content = editorRef.current.innerHTML;
+      onChange(content);
+    }
   };
 
   return (
@@ -135,19 +146,30 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onKeyDown={handleKeyDown}
         onMouseUp={updateActiveStates}
         onKeyUp={updateActiveStates}
+        onPaste={handlePaste}
         className={cn(
           "min-h-[200px] p-3 outline-none prose max-w-none",
           disabled && "bg-gray-50 cursor-not-allowed"
         )}
         style={{ 
           fontSize: '0.875rem',
-          lineHeight: '1.5'
+          lineHeight: '1.5',
+          direction: 'ltr',
+          textAlign: 'left'
         }}
         suppressContentEditableWarning={true}
-        dangerouslySetInnerHTML={{ 
-          __html: value || (disabled ? '' : `<p style="color: #9ca3af; margin: 0;">${placeholder}</p>`)
-        }}
+        data-placeholder={!value ? placeholder : undefined}
       />
+      {!value && !disabled && (
+        <style jsx>{`
+          [data-placeholder]:empty::before {
+            content: attr(data-placeholder);
+            color: #9ca3af;
+            pointer-events: none;
+            display: block;
+          }
+        `}</style>
+      )}
     </div>
   );
 };
