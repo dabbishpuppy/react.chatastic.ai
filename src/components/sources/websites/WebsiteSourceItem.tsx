@@ -36,6 +36,9 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   // Use real-time hook for child sources
   const realtimeChildSources = useChildSourcesRealtime(source.id, childSources);
 
+  // Use the operations hook for enhanced recrawl
+  const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
+
   const handleSaveEdit = async () => {
     await onEdit(source.id, editUrl);
     setIsEditing(false);
@@ -66,6 +69,10 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     onRecrawl(source);
   };
 
+  const handleEnhancedRecrawlClick = () => {
+    handleEnhancedRecrawl(source);
+  };
+
   const handleDelete = () => {
     onDelete(source);
   };
@@ -93,9 +100,9 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             onEdit={handleEdit}
             onExclude={handleExclude}
             onRecrawl={handleRecrawl}
+            onEnhancedRecrawl={handleEnhancedRecrawlClick}
             onDelete={handleDelete}
             onToggleExpanded={isParentSource ? handleToggleExpanded : undefined}
-            isChild={!isParentSource}
           />
         </div>
 
