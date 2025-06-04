@@ -1,6 +1,5 @@
 
 import { useState, useEffect, useCallback } from "react";
-import { toast } from "@/hooks/use-toast";
 import { analyticsService } from "@/services/analyticsService";
 
 export const useChatMessageHandlers = (
@@ -42,20 +41,9 @@ export const useChatMessageHandlers = (
       if (onCopy) onCopy(content);
       setShowCopiedTooltip(true);
       
-      toast({
-        description: "Copied to clipboard!",
-        duration: 2000,
-      });
-      
       setTimeout(() => setShowCopiedTooltip(false), 2000);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      
-      toast({
-        description: "Failed to copy to clipboard",
-        duration: 2000,
-        variant: "destructive"
-      });
     }
   }, [readOnly, onCopy]);
 
@@ -89,43 +77,21 @@ export const useChatMessageHandlers = (
         
         if (success) {
           console.log('✅ useChatMessageHandlers - Feedback saved to database successfully');
-          
-          toast({
-            description: newFeedback ? `Feedback ${type === 'like' ? 'liked' : 'disliked'}` : "Feedback removed",
-            duration: 2000,
-          });
         } else {
           console.error('❌ useChatMessageHandlers - Failed to save feedback to database - REVERTING UI');
           
           // Revert the optimistic update if database save failed
           setLocalFeedback(localFeedback);
-          
-          toast({
-            description: "Failed to update feedback",
-            duration: 2000,
-            variant: "destructive"
-          });
         }
       } else {
         // No valid messageId available - just use local state for UI feedback
         console.log('⚠️ useChatMessageHandlers - No valid messageId provided, using local state only. MessageId:', messageId);
-        
-        toast({
-          description: `Feedback ${newFeedback ? (type === 'like' ? 'liked' : 'disliked') : 'removed'}`,
-          duration: 2000,
-        });
       }
     } catch (error) {
       console.error('❌ useChatMessageHandlers - Error updating feedback - REVERTING UI:', error);
       
       // Revert the optimistic update if there was an error
       setLocalFeedback(localFeedback);
-      
-      toast({
-        description: "Failed to update feedback",
-        duration: 2000,
-        variant: "destructive"
-      });
     } finally {
       setIsUpdatingFeedback(false);
     }

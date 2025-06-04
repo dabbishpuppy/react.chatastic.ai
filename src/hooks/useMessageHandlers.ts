@@ -1,7 +1,6 @@
 
 import { ChatMessage } from "@/types/chatInterface";
 import { 
-  handleFeedback, 
   regenerateResponse, 
   insertEmoji 
 } from "@/utils/messageUtils";
@@ -32,8 +31,11 @@ export const useMessageHandlers = ({
   rateLimitError
 }: UseMessageHandlersProps) => {
 
+  // Remove the old feedback handler - it should not modify chat history
+  // Feedback is now handled locally in each message component via useChatMessageHandlers
   const handleFeedbackWrapper = async (timestamp: string, type: "like" | "dislike") => {
-    await handleFeedback(timestamp, type, setChatHistory);
+    console.log('⚠️ useMessageHandlers - handleFeedback called but doing nothing. Feedback should be handled by useChatMessageHandlers');
+    // Do nothing - feedback is handled locally in each message component
   };
 
   const regenerateResponseWrapper = async (allowRegenerate: boolean) => {

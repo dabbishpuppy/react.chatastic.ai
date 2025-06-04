@@ -8,54 +8,12 @@ export const handleFeedback = async (
   setChatHistory: (update: (prev: ChatMessage[]) => ChatMessage[]) => void,
   messageId?: string
 ) => {
-  console.log('🎯 messageFeedbackUtils - handleFeedback called:', { timestamp, type, messageId });
+  console.log('⚠️ messageFeedbackUtils - handleFeedback called but doing nothing. Feedback should be handled by useChatMessageHandlers');
   
-  // Update local state immediately for responsiveness
-  setChatHistory(prev => 
-    prev.map(msg => {
-      if (msg.timestamp === timestamp) {
-        // Toggle logic: if same feedback type, remove it; otherwise set it
-        const newFeedback = msg.feedback === type ? undefined : type;
-        
-        console.log('📝 messageFeedbackUtils - Updating message feedback locally:', { 
-          messageId: msg.id, 
-          timestamp, 
-          oldFeedback: msg.feedback, 
-          newFeedback,
-          providedMessageId: messageId
-        });
-        
-        // Use the provided messageId if available, otherwise fall back to msg.id
-        const dbMessageId = messageId || msg.id;
-        
-        // Update database if we have a message ID and it's not the initial message
-        if (dbMessageId && dbMessageId !== 'initial-message' && isValidUUID(dbMessageId)) {
-          console.log('💾 messageFeedbackUtils - Calling analyticsService to update feedback in database with ID:', dbMessageId);
-          analyticsService.updateMessageFeedback(dbMessageId, newFeedback || null)
-            .then(success => {
-              if (success) {
-                console.log('✅ messageFeedbackUtils - Database feedback update successful for message:', dbMessageId);
-              } else {
-                console.error('❌ messageFeedbackUtils - Database feedback update failed for message:', dbMessageId);
-              }
-            })
-            .catch(error => {
-              console.error('❌ messageFeedbackUtils - Error updating feedback in database for message:', dbMessageId, error);
-            });
-        } else {
-          console.warn('⚠️ messageFeedbackUtils - No valid message ID available, cannot save to database:', { 
-            providedMessageId: messageId, 
-            msgId: msg.id 
-          });
-        }
-        
-        return { ...msg, feedback: newFeedback };
-      }
-      return msg;
-    })
-  );
+  // Do nothing - feedback is now handled locally in each message component via useChatMessageHandlers
+  // This prevents the chat history from being modified and causing messages to disappear
   
-  console.log(`✅ messageFeedbackUtils - Feedback ${type} processed for message at ${timestamp}`);
+  console.log(`⚠️ messageFeedbackUtils - Feedback ${type} ignored for message at ${timestamp} - use local feedback handling instead`);
 };
 
 // Helper function to validate UUID format
