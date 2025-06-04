@@ -1,19 +1,34 @@
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { AgentSource } from '@/types/rag';
+import { AgentSource, SourceType } from '@/types/rag';
+import { useParams } from 'react-router-dom';
 
-interface PaginatedSources {
+interface PaginatedSourcesResult {
   sources: AgentSource[];
-  total: number;
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
 }
 
-export const useSourcesPaginated = (
-  agentId: string,
-  currentTab: string,
-  pageSize: number = 10
-) => {
-  const [currentPage, setCurrentPage] = useState(1);
+interface UseSourcesPaginatedOptions {
+  sourceType?: SourceType;
+  page?: number;
+  pageSize?: number;
+  enabled?: boolean;
+}
+
+export const useSourcesPaginated = (options: UseSourcesPaginatedOptions = {}) => {
+  const { agentId } = useParams();
+  const {
+    sourceType,
+    page = 1,
+    pageSize = 10,
+    enabled = true
+  } = options;
+
+  const [currentPage, setCurrentPage] = useState(page);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -30,10 +45,10 @@ export const useSourcesPaginated = (
     setCurrentPage(prev => Math.max(prev - 1, 1));
   };
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['agent-sources-paginated', agentId, currentTab, currentPage, searchQuery, sortBy, sortOrder],
-    queryFn: async () => {
-      if (!agentId) return { sources: [], total: 0 };
+  const query = useQuery({
+    queryKey: ['agent-sources-paginated', agentId, sourceType, currentPage, searchQuery, sortBy, sortOrder],
+    queryFn: async (): Promise<PaginatedSourcesResult> => {
+      if (!agentId) return { sources: [], totalCount: 0, totalPages: 0, currentPage: 1 };
 
       let query = supabase
         .from('agent_sources')
@@ -56,13 +71,15 @@ export const useSourcesPaginated = (
           unique_chunks,
           duplicate_chunks,
           total_children,
-          requires_manual_training
+          requires_manual_training,
+          is_excluded,
+          links_count
         `, { count: 'exact' })
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
-      if (currentTab !== 'all') {
-        query = query.eq('source_type', currentTab);
+      if (sourceType) {
+        query = query.eq('source_type', sourceType);
       }
 
       if (searchQuery) {
@@ -83,27 +100,32 @@ export const useSourcesPaginated = (
       const processedSources = (sources || []).map(source => ({
         ...source,
         metadata: source.metadata as Record<string, any> || {},
-        requires_manual_training: source.requires_manual_training || false
+        requires_manual_training: source.requires_manual_training || false,
+        is_excluded: source.is_excluded || false,
+        links_count: source.links_count || 0
       })) as AgentSource[];
 
       return {
         sources: processedSources,
-        total: count || 0
+        totalCount: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize),
+        currentPage
       };
     },
-    enabled: !!agentId,
+    enabled: !!agentId && enabled,
     staleTime: 30000,
     refetchOnWindowFocus: false,
   });
 
   return {
-    sources: data?.sources || [],
-    total: data?.total || 0,
-    isLoading,
-    error,
-    refetch,
+    data: query.data,
+    sources: query.data?.sources || [],
+    total: query.data?.totalCount || 0,
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
     currentPage,
-    totalPages: Math.ceil((data?.total || 0) / pageSize),
+    totalPages: query.data?.totalPages || Math.ceil((query.data?.totalCount || 0) / pageSize),
     goToPage,
     goToNextPage,
     goToPreviousPage,
@@ -115,4 +137,21 @@ export const useSourcesPaginated = (
     setSortOrder,
     pageSize
   };
+};
+
+// Convenience hooks for specific source types
+export const useTextSourcesPaginated = (page: number = 1, pageSize: number = 25) => {
+  return useSourcesPaginated({ sourceType: 'text', page, pageSize });
+};
+
+export const useFileSourcesPaginated = (page: number = 1, pageSize: number = 25) => {
+  return useSourcesPaginated({ sourceType: 'file', page, pageSize });
+};
+
+export const useWebsiteSourcesPaginated = (page: number = 1, pageSize: number = 25) => {
+  return useSourcesPaginated({ sourceType: 'website', page, pageSize });
+};
+
+export const useQASourcesPaginated = (page: number = 1, pageSize: number = 25) => {
+  return useSourcesPaginated({ sourceType: 'qa', page, pageSize });
 };

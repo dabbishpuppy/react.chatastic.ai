@@ -1,3 +1,4 @@
+
 import { Database } from "@/integrations/supabase/types";
 
 // Use Supabase generated types as base and extend them
@@ -27,6 +28,7 @@ export interface AgentSource {
   created_at: string;
   updated_at: string;
   is_active: boolean;
+  is_excluded?: boolean;
   crawl_status?: string;
   progress?: number;
   total_jobs?: number;
@@ -51,7 +53,8 @@ export interface AgentSource {
   raw_text?: string;
   created_by?: string;
   updated_by?: string;
-  requires_manual_training: boolean; // Add the new required field
+  requires_manual_training: boolean;
+  links_count?: number;
 }
 
 export interface SourceChunk extends Omit<DbSourceChunk, 'metadata'> {
