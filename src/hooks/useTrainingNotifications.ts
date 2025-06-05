@@ -26,46 +26,23 @@ interface DatabaseSource {
 export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   
-  // ALL useRef calls MUST be at the top to maintain consistent hook order
-  const hasShownCompletionNotificationRef = useRef<boolean>(false);
-  const lastCompletedSessionIdRef = useRef<string>('');
-  const lastCompletionCheckRef = useRef<number>(0);
+  // Simplified refs for better state management
   const pageLoadTimestampRef = useRef<number>(Date.now());
   const hasEverConnectedRef = useRef<boolean>(false);
-  const completionToastShownForSessionRef = useRef<Set<string>>(new Set());
   const crawlInitiationInProgressRef = useRef<boolean>(false);
   const crawlInitiationStartTimeRef = useRef<number>(0);
-  const trainingStartedSessionRef = useRef<string>('');
-  const trainingFailedSessionRef = useRef<Set<string>>(new Set());
   
-  // Enhanced tracking refs for better toast management
-  const activeTrainingSessionRef = useRef<string | null>(null);
-  const trainingLockRef = useRef<boolean>(false);
-  const lastStatusUpdateTimeRef = useRef<number>(0);
-  const stableSessionIdRef = useRef<string>('');
-  const trainingStartToastShownRef = useRef<Set<string>>(new Set());
-  const lastCompletionNotificationTimeRef = useRef<number>(0);
-  const completionConfirmationCountRef = useRef<number>(0);
-  const trainingInitiationTimeRef = useRef<number>(0);
+  // Training state management - simplified
+  const currentTrainingSessionRef = useRef<string>('');
+  const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
+  const completedSessionsRef = useRef<Set<string>>(new Set());
+  const lastCompletionCheckRef = useRef<number>(0);
   
-  // NEW: Timer management and completion state tracking
-  const trainingStartTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const trainingCompletedSessionsRef = useRef<Set<string>>(new Set());
-  const hasCompletedRef = useRef<boolean>(false);
+  // Toast tracking - prevent duplicates
+  const shownToastsRef = useRef<Set<string>>(new Set());
   
-  // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-
-  // Clean up timer when component unmounts
-  useEffect(() => {
-    return () => {
-      if (trainingStartTimerRef.current) {
-        clearTimeout(trainingStartTimerRef.current);
-        trainingStartTimerRef.current = null;
-      }
-    };
-  }, []);
 
   // Listen for crawl initiation events to suppress false connection warnings
   useEffect(() => {
@@ -74,7 +51,6 @@ export const useTrainingNotifications = () => {
       crawlInitiationInProgressRef.current = true;
       crawlInitiationStartTimeRef.current = Date.now();
       
-      // Clear the flag after 45 seconds (extended grace period for crawls)
       setTimeout(() => {
         crawlInitiationInProgressRef.current = false;
         console.log('✅ Crawl initiation grace period ended');
@@ -86,7 +62,6 @@ export const useTrainingNotifications = () => {
       crawlInitiationInProgressRef.current = false;
     };
 
-    // Listen for custom crawl events
     window.addEventListener('crawlStarted', handleCrawlStarted);
     window.addEventListener('crawlCompleted', handleCrawlCompleted);
     
@@ -96,11 +71,10 @@ export const useTrainingNotifications = () => {
     };
   }, []);
 
-  // ALL useEffect calls MUST come after useState calls
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up enhanced training notifications for agent:', agentId);
+    console.log('🔔 Setting up simplified training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -130,7 +104,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`enhanced-training-notifications-${agentId}`)
+        .channel(`simplified-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -145,8 +119,8 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // Reduce frequency of completion checks during real-time updates
-              setTimeout(() => checkTrainingCompletion(agentId, false), 500);
+              // Debounced check to prevent spam
+              setTimeout(() => checkTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -166,8 +140,8 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              // Reduce frequency of completion checks during real-time updates
-              setTimeout(() => checkTrainingCompletion(agentId, false), 500);
+              // Debounced check to prevent spam
+              setTimeout(() => checkTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -181,12 +155,10 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
-            setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
-            
             if ((payload.new as any)?.source_type === 'website') {
               setTimeout(initializeSubscriptions, 500);
             }
-            setTimeout(() => checkTrainingCompletion(agentId, false), 1000);
+            setTimeout(() => checkTrainingCompletion(agentId), 1000);
           }
         )
         
@@ -198,17 +170,12 @@ export const useTrainingNotifications = () => {
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
             
-            // Enhanced connection issue detection with crawl awareness
             const timeSincePageLoad = Date.now() - pageLoadTimestampRef.current;
             const timeSinceCrawlStart = Date.now() - crawlInitiationStartTimeRef.current;
-            const isAfterPageLoadGracePeriod = timeSincePageLoad > 10000; // 10 seconds
+            const isAfterPageLoadGracePeriod = timeSincePageLoad > 10000;
             const isCrawlInitiationActive = crawlInitiationInProgressRef.current;
-            const isCrawlRecentlyStarted = timeSinceCrawlStart < 45000; // 45 seconds
+            const isCrawlRecentlyStarted = timeSinceCrawlStart < 45000;
             
-            // Only show connection issue toast if:
-            // 1. We've had a successful connection before
-            // 2. We're past the initial page load grace period
-            // 3. No crawl initiation is in progress or recently started
             const shouldShowConnectionWarning = hasEverConnectedRef.current && 
               isAfterPageLoadGracePeriod && 
               !isCrawlInitiationActive && 
@@ -221,12 +188,9 @@ export const useTrainingNotifications = () => {
                 description: "Training updates may be delayed. We're working on it.",
                 duration: 3000,
               });
-            } else if (isCrawlInitiationActive || isCrawlRecentlyStarted) {
-              console.log('🔄 Connection disruption during crawl initiation - suppressing warning toast');
             }
             
-            // Reduced polling frequency to prevent spam
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId, false), 12000);
+            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 15000);
           }
         });
 
@@ -243,23 +207,15 @@ export const useTrainingNotifications = () => {
     };
   }, [agentId]);
 
-  const checkTrainingCompletion = async (agentId: string, allowAutoStart: boolean = false) => {
+  const checkTrainingCompletion = async (agentId: string) => {
     try {
       const now = Date.now();
       
-      // Enhanced debouncing with stricter limits during training
-      const debounceTime = trainingLockRef.current ? 5000 : 3000;
-      if (now - lastCompletionCheckRef.current < debounceTime) {
+      // Debounce to prevent excessive calls
+      if (now - lastCompletionCheckRef.current < 3000) {
         return;
       }
       lastCompletionCheckRef.current = now;
-      
-      // If training is locked and status update is too frequent, skip
-      if (trainingLockRef.current && now - lastStatusUpdateTimeRef.current < 8000) {
-        console.log('🔒 Training locked, skipping frequent status update');
-        return;
-      }
-      lastStatusUpdateTimeRef.current = now;
       
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
@@ -341,65 +297,21 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // Enhanced status determination with training lock awareness
+      // Simplified status determination
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
-      // If training is locked, only allow transition to completed or failed
-      if (trainingLockRef.current) {
-        if (hasFailedSources && sourcesNeedingTraining.length === 0) {
-          status = 'failed';
-          trainingLockRef.current = false; // Release lock on failure
-        } else if (currentlyProcessingPages.length > 0) {
-          status = 'training'; // Keep training status
-        } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-          status = 'completed';
-          trainingLockRef.current = false; // Release lock on completion
-        } else {
-          status = 'training'; // Keep training until completion
-        }
+      if (hasFailedSources && sourcesNeedingTraining.length === 0) {
+        status = 'failed';
+      } else if (currentlyProcessingPages.length > 0) {
+        status = 'training';
+      } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
+        status = 'completed';
       } else {
-        // Normal status determination when not locked
-        if (hasFailedSources && sourcesNeedingTraining.length === 0) {
-          status = 'failed';
-        } else if (currentlyProcessingPages.length > 0) {
-          status = 'training';
-        } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-          status = 'completed';
-        } else {
-          status = 'idle';
-        }
+        status = 'idle';
       }
 
-      // Use stable session ID when training is active
-      let sessionId: string;
-      if (status === 'training' && stableSessionIdRef.current) {
-        sessionId = stableSessionIdRef.current;
-      } else if (status === 'training' && !stableSessionIdRef.current) {
-        sessionId = `${agentId}-${Date.now()}`;
-        stableSessionIdRef.current = sessionId;
-      } else if (status === 'completed' || status === 'failed') {
-        sessionId = stableSessionIdRef.current || `${agentId}-${Date.now()}`;
-        
-        // NEW: Clean up training start timer on completion/failure
-        if (trainingStartTimerRef.current) {
-          clearTimeout(trainingStartTimerRef.current);
-          trainingStartTimerRef.current = null;
-          console.log('🧹 Cleared training start timer due to completion/failure');
-        }
-        
-        // Mark session as completed
-        if (status === 'completed' && sessionId) {
-          trainingCompletedSessionsRef.current.add(sessionId);
-          hasCompletedRef.current = true;
-        }
-        
-        // Clear stable session ID after completion/failure
-        setTimeout(() => {
-          stableSessionIdRef.current = '';
-        }, 2000);
-      } else {
-        sessionId = `${agentId}-${totalPagesNeedingProcessing}-${totalPagesProcessed}`;
-      }
+      // Session ID management
+      const sessionId = currentTrainingSessionRef.current || `${agentId}-${Date.now()}`;
 
       const newProgress: TrainingProgress = {
         agentId,
@@ -414,34 +326,31 @@ export const useTrainingNotifications = () => {
       console.log('📊 Training status update:', {
         status,
         sessionId,
-        trainingLocked: trainingLockRef.current,
-        stableSessionId: stableSessionIdRef.current
+        progress,
+        currentState: trainingStateRef.current
       });
 
       setTrainingProgress(newProgress);
 
-      // Enhanced completion notification logic with strict duplicate prevention
+      // Handle status transitions with proper toast management
+      const previousStatus = trainingStateRef.current;
+      trainingStateRef.current = status;
+
+      // Training completed - show toast only once
       if (status === 'completed' && 
+          previousStatus !== 'completed' &&
           totalPagesNeedingProcessing > 0 &&
           totalPagesProcessed === totalPagesNeedingProcessing &&
-          !completionToastShownForSessionRef.current.has(sessionId) &&
-          lastCompletedSessionIdRef.current !== sessionId) {
+          !completedSessionsRef.current.has(sessionId)) {
         
-        // Additional confirmation to prevent false positives
-        completionConfirmationCountRef.current += 1;
+        console.log('🎉 Training completed! Showing success notification for session:', sessionId);
         
-        // Only show toast after at least 2 confirmations and minimum time gap
-        const timeSinceLastNotification = now - lastCompletionNotificationTimeRef.current;
-        if (completionConfirmationCountRef.current >= 2 && timeSinceLastNotification > 10000) {
-          console.log('🎉 Training completed! Showing success notification for session:', sessionId);
+        completedSessionsRef.current.add(sessionId);
+        
+        const completionToastId = `completion-${sessionId}`;
+        if (!shownToastsRef.current.has(completionToastId)) {
+          shownToastsRef.current.add(completionToastId);
           
-          // Mark this session as completed
-          completionToastShownForSessionRef.current.add(sessionId);
-          lastCompletedSessionIdRef.current = sessionId;
-          lastCompletionNotificationTimeRef.current = now;
-          completionConfirmationCountRef.current = 0; // Reset confirmation counter
-          
-          // Show training complete toast
           toast({
             title: "Training Complete",
             description: "Your AI agent is trained and ready",
@@ -451,41 +360,28 @@ export const useTrainingNotifications = () => {
           window.dispatchEvent(new CustomEvent('trainingCompleted', {
             detail: { agentId, progress: newProgress }
           }));
-          
-          // Clean up old session IDs to prevent memory leaks (keep only last 3)
-          if (completionToastShownForSessionRef.current.size > 3) {
-            const sessionsArray = Array.from(completionToastShownForSessionRef.current);
-            completionToastShownForSessionRef.current = new Set(sessionsArray.slice(-3));
-          }
         }
-      } else if (status !== 'completed') {
-        // Reset confirmation counter if status changes
-        completionConfirmationCountRef.current = 0;
       }
 
-      // Enhanced failure detection for training
-      if (status === 'failed' && !trainingFailedSessionRef.current.has(sessionId)) {
+      // Training failed - show toast only once
+      if (status === 'failed' && previousStatus !== 'failed') {
         console.log('❌ Training failed for session:', sessionId);
         
-        trainingFailedSessionRef.current.add(sessionId);
-        
-        // Show training failed toast
-        toast({
-          title: "Training Failed",
-          description: "Training process encountered an error. Please try again.",
-          variant: "destructive",
-          duration: 5000,
-        });
-        
-        // Clean up failed sessions (keep only last 3)
-        if (trainingFailedSessionRef.current.size > 3) {
-          const sessionsArray = Array.from(trainingFailedSessionRef.current);
-          trainingFailedSessionRef.current = new Set(sessionsArray.slice(-3));
+        const failureToastId = `failure-${sessionId}`;
+        if (!shownToastsRef.current.has(failureToastId)) {
+          shownToastsRef.current.add(failureToastId);
+          
+          toast({
+            title: "Training Failed",
+            description: "Training process encountered an error. Please try again.",
+            variant: "destructive",
+            duration: 5000,
+          });
         }
       }
 
     } catch (error) {
-      console.error('Error in enhanced checkTrainingCompletion:', error);
+      console.error('Error in simplified checkTrainingCompletion:', error);
       setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
     }
   };
@@ -494,27 +390,28 @@ export const useTrainingNotifications = () => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting enhanced training for agent:', agentId);
+      console.log('🚀 Starting simplified training for agent:', agentId);
 
-      // Set training initiation time for delayed toast
-      trainingInitiationTimeRef.current = Date.now();
-
-      // NEW: Reset completion state when starting new training
-      hasCompletedRef.current = false;
-      trainingCompletedSessionsRef.current.clear();
-
-      // Set training lock and create stable session ID
-      trainingLockRef.current = true;
+      // Create new session
       const sessionId = `training-${agentId}-${Date.now()}`;
-      stableSessionIdRef.current = sessionId;
-      activeTrainingSessionRef.current = sessionId;
+      currentTrainingSessionRef.current = sessionId;
+      trainingStateRef.current = 'training';
 
-      // Reset completion tracking for new training session
-      hasShownCompletionNotificationRef.current = false;
-      lastCompletedSessionIdRef.current = '';
-      completionConfirmationCountRef.current = 0;
+      // Clear previous completion state
+      completedSessionsRef.current.clear();
 
-      setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
+      // Show "Training Started" toast immediately - no delays
+      const startToastId = `start-${sessionId}`;
+      if (!shownToastsRef.current.has(startToastId)) {
+        shownToastsRef.current.add(startToastId);
+        
+        console.log('📢 Showing training start toast immediately for session:', sessionId);
+        toast({
+          title: "Training Started",
+          description: "Processing sources for AI training...",
+          duration: 3000,
+        });
+      }
 
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
@@ -556,21 +453,19 @@ export const useTrainingNotifications = () => {
       }
 
       if (sourcesToProcess.length === 0) {
-        // Release training lock if no sources to process
-        trainingLockRef.current = false;
-        stableSessionIdRef.current = '';
-        activeTrainingSessionRef.current = null;
-        
+        trainingStateRef.current = 'completed';
         setTrainingProgress({
           agentId,
           status: 'completed',
           progress: 100,
           totalSources: 0,
-          processedSources: 0
+          processedSources: 0,
+          sessionId
         });
         return;
       }
 
+      // Set initial training progress
       setTrainingProgress({
         agentId,
         status: 'training',
@@ -581,59 +476,20 @@ export const useTrainingNotifications = () => {
         sessionId
       });
 
-      // NEW: Enhanced "Training Started" toast with proper validation and timer management
-      trainingStartTimerRef.current = setTimeout(() => {
-        // Strong validation before showing training start toast
-        const isStillTraining = trainingLockRef.current && 
-                              activeTrainingSessionRef.current === sessionId &&
-                              !hasCompletedRef.current &&
-                              !trainingCompletedSessionsRef.current.has(sessionId) &&
-                              !trainingStartToastShownRef.current.has(sessionId);
-        
-        if (isStillTraining) {
-          console.log('📢 Showing delayed training start toast for session:', sessionId);
-          trainingStartToastShownRef.current.add(sessionId);
-          
-          toast({
-            title: "Training Started",
-            description: `Processing ${totalPages} item${totalPages > 1 ? 's' : ''} for AI training...`,
-            duration: 3000,
-          });
-          
-          // Clean up old start toast sessions (keep only last 3)
-          if (trainingStartToastShownRef.current.size > 3) {
-            const sessionsArray = Array.from(trainingStartToastShownRef.current);
-            trainingStartToastShownRef.current = new Set(sessionsArray.slice(-3));
-          }
-        } else {
-          console.log('🚫 Skipping training start toast - training no longer active or already completed');
-        }
-        
-        // Clear the timer reference
-        trainingStartTimerRef.current = null;
-      }, 3000); // Increased delay to 3 seconds for better validation
-
+      // Process sources
       const processingPromises = sourcesToProcess.map(async (source) => {
         return SourceProcessor.processSource(source);
       });
 
       await Promise.allSettled(processingPromises);
 
-      setTimeout(() => checkTrainingCompletion(agentId, true), 2000);
+      // Check completion after processing
+      setTimeout(() => checkTrainingCompletion(agentId), 2000);
 
     } catch (error) {
-      console.error('Failed to start enhanced training:', error);
+      console.error('Failed to start simplified training:', error);
       
-      // NEW: Clean up timer on error
-      if (trainingStartTimerRef.current) {
-        clearTimeout(trainingStartTimerRef.current);
-        trainingStartTimerRef.current = null;
-      }
-      
-      // Release training lock on error
-      trainingLockRef.current = false;
-      stableSessionIdRef.current = '';
-      activeTrainingSessionRef.current = null;
+      trainingStateRef.current = 'failed';
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
       
@@ -644,7 +500,6 @@ export const useTrainingNotifications = () => {
         });
         setTrainingProgress(prev => prev ? { ...prev, status: 'training' } : null);
       } else {
-        // Show training failed toast
         toast({
           title: "Training Failed",
           description: "Failed to start training process",
@@ -661,7 +516,7 @@ export const useTrainingNotifications = () => {
       if (!agentId) return;
       await startTraining();
     },
-    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId, true),
+    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId),
     isConnected
   };
 };
