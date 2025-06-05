@@ -67,7 +67,7 @@ export const useTrainingNotifications = () => {
         refs.activeTrainingSessionRef.current = '';
         refs.trainingStartTimeRef.current = 0;
         refs.globalTrainingActiveRef.current = false;
-        refs.lastTrainingActionRef.current = '';
+        refs.lastTrainingActionRef.current = 'none'; // FIXED: Use valid enum value instead of empty string
         refs.lastCompletionCheckRef.current = 0;
         refs.completedSessionsRef.current.clear();
         refs.sessionCompletionFlagRef.current.clear();

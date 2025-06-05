@@ -39,8 +39,10 @@ export const useSinglePageCrawl = () => {
 
       const parentSourceId = data.parentSourceId;
 
-      // Set up real-time subscription to wait for completion
+      // Set up real-time subscription to wait for completion with increased timeout
       return new Promise((resolve, reject) => {
+        let hasResolved = false;
+        
         const channel = supabase
           .channel(`single-page-crawl-${parentSourceId}`)
           .on(
@@ -52,9 +54,12 @@ export const useSinglePageCrawl = () => {
               filter: `parent_source_id=eq.${parentSourceId}`
             },
             (payload) => {
+              if (hasResolved) return;
+              
               const updatedPage = payload.new as any;
               
               if (updatedPage.status === 'completed') {
+                hasResolved = true;
                 // Page crawling is complete
                 toast({
                   title: "Crawling Finished",
@@ -67,18 +72,22 @@ export const useSinglePageCrawl = () => {
                   pageId: updatedPage.id
                 });
               } else if (updatedPage.status === 'failed') {
+                hasResolved = true;
                 channel.unsubscribe();
-                reject(new Error('Page crawling failed'));
+                reject(new Error(`Page crawling failed: ${updatedPage.error_message || 'Unknown error'}`));
               }
             }
           )
           .subscribe();
 
-        // Cleanup after 2 minutes if no response
+        // Increased timeout to 5 minutes for single page crawls
         setTimeout(() => {
-          channel.unsubscribe();
-          reject(new Error('Crawl timeout'));
-        }, 120000);
+          if (!hasResolved) {
+            hasResolved = true;
+            channel.unsubscribe();
+            reject(new Error('Crawl timeout - the page took too long to process'));
+          }
+        }, 300000); // 5 minutes instead of 2 minutes
       });
 
     } catch (error) {
