@@ -48,6 +48,79 @@ export const useTrainingCompletion = (
     }
   };
 
+  // FIXED: Add validation to check if training is actually complete
+  const validateTrainingCompletion = async (agentId: string) => {
+    try {
+      console.log('🔍 VALIDATION: Checking actual training completion status');
+      
+      // Check if chunks exist for the agent
+      const { data: chunks, error: chunksError } = await supabase
+        .from('source_chunks')
+        .select('id')
+        .eq('agent_id', agentId)
+        .limit(1);
+
+      if (chunksError) {
+        console.error('Error checking chunks:', chunksError);
+        return false;
+      }
+
+      const hasChunks = chunks && chunks.length > 0;
+      console.log('🔍 VALIDATION: Agent has chunks:', hasChunks);
+
+      // Check if all sources are processed
+      const { data: agentSources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('id, source_type, metadata')
+        .eq('agent_id', agentId)
+        .eq('is_active', true);
+
+      if (sourcesError) {
+        console.error('Error checking sources:', sourcesError);
+        return false;
+      }
+
+      let allSourcesProcessed = true;
+      for (const source of agentSources || []) {
+        const metadata = (source.metadata as Record<string, any>) || {};
+        
+        if (source.source_type === 'website') {
+          const { data: pages } = await supabase
+            .from('source_pages')
+            .select('processing_status')
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed');
+
+          const hasUnprocessedPages = pages?.some(p => 
+            !p.processing_status || 
+            p.processing_status === 'pending' || 
+            p.processing_status === 'processing'
+          );
+
+          if (hasUnprocessedPages) {
+            allSourcesProcessed = false;
+            break;
+          }
+        } else {
+          if (metadata.processing_status !== 'completed') {
+            allSourcesProcessed = false;
+            break;
+          }
+        }
+      }
+
+      console.log('🔍 VALIDATION: All sources processed:', allSourcesProcessed);
+      
+      const isActuallyComplete = hasChunks && allSourcesProcessed;
+      console.log('🔍 VALIDATION: Training actually complete:', isActuallyComplete);
+      
+      return isActuallyComplete;
+    } catch (error) {
+      console.error('Error validating training completion:', error);
+      return false;
+    }
+  };
+
   const checkTrainingCompletion = async (agentId: string) => {
     try {
       const now = Date.now();
@@ -62,6 +135,9 @@ export const useTrainingCompletion = (
         return;
       }
       refs.lastCompletionCheckRef.current = now;
+
+      // FIXED: First validate if training is actually complete
+      const isActuallyComplete = await validateTrainingCompletion(agentId);
       
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
@@ -166,15 +242,39 @@ export const useTrainingCompletion = (
         hasFailedSources,
         totalPagesNeedingProcessing,
         totalPagesProcessed,
-        activeTrainingSession: refs.activeTrainingSessionRef.current
+        activeTrainingSession: refs.activeTrainingSessionRef.current,
+        isActuallyComplete,
+        progress
       });
-      
-      if (hasFailedSources && sourcesNeedingTraining.length === 0) {
+
+      // FIXED: Enhanced status determination with validation override
+      if (isActuallyComplete) {
+        status = 'completed';
+        console.log('✅ Status: COMPLETED (validated - has chunks and all sources processed)');
+        
+        // FIXED: Force cleanup of stuck training state
+        if (refs.activeTrainingSessionRef.current) {
+          console.log('🧹 CLEANUP: Clearing stuck training session state');
+          refs.activeTrainingSessionRef.current = '';
+          refs.trainingStartTimeRef.current = 0;
+          refs.globalTrainingActiveRef.current = false;
+        }
+      } else if (hasFailedSources && sourcesNeedingTraining.length === 0) {
         status = 'failed';
         console.log('❌ Status: FAILED (has failed sources, no pending)');
       } else if (currentlyProcessingPages.length > 0 || refs.activeTrainingSessionRef.current) {
         status = 'training';
         console.log('🔄 Status: TRAINING (pages currently processing or active session)');
+        
+        // FIXED: Recovery mechanism - if progress is 100% but still showing training, validate
+        if (progress === 100 && currentlyProcessingPages.length === 0) {
+          console.log('🔍 RECOVERY: Progress 100% but status training - validating completion');
+          const recoveryValidation = await validateTrainingCompletion(agentId);
+          if (recoveryValidation) {
+            status = 'completed';
+            console.log('✅ RECOVERY: Forced status to completed after validation');
+          }
+        }
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
         status = 'completed';
         console.log('✅ Status: COMPLETED (no sources need training, all processed)');
@@ -212,7 +312,8 @@ export const useTrainingCompletion = (
         currentState: refs.trainingStateRef.current,
         agentCompleted: refs.agentCompletionStateRef.current.isCompleted,
         lastAction: refs.lastTrainingActionRef.current,
-        activeSession: refs.activeTrainingSessionRef.current
+        activeSession: refs.activeTrainingSessionRef.current,
+        validationResult: isActuallyComplete
       });
 
       setTrainingProgress(newProgress);
