@@ -31,7 +31,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // ENHANCED: Improved status determination with priority for new sources needing training
+  // ENHANCED: Improved status determination with better training state detection
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
@@ -41,30 +41,21 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       trainingProgress
     });
 
-    // PRIORITY 1: If retraining is explicitly needed, show that state FIRST
-    if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining needed - PRIORITY)');
-      return {
-        status: 'needs_training',
-        progress: 0
-      };
-    }
-
-    // PRIORITY 2: If currently training, show training state
+    // PRIORITY 1: If currently training OR retraining flag is true, show training state
     if (isRetraining || trainingProgress?.status === 'training') {
-      // FIXED: Recovery check - if progress is 100% but status is training
-      if (trainingProgress?.progress === 100) {
-        console.log('🔍 RECOVERY: Progress 100% but status training - forcing completion');
-        return {
-          status: 'completed',
-          progress: 100
-        };
-      }
-      
-      console.log('✅ Status: training (active training)');
+      console.log('✅ Status: training (active training detected)');
       return {
         status: 'training',
         progress: trainingProgress?.progress || 0
+      };
+    }
+
+    // PRIORITY 2: If retraining is explicitly needed, show that state
+    if (retrainingNeeded?.needed) {
+      console.log('✅ Status: needs_training (retraining needed)');
+      return {
+        status: 'needs_training',
+        progress: 0
       };
     }
     
@@ -79,7 +70,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
     // PRIORITY 4: If training progress shows completed AND no retraining needed
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
-      console.log('✅ Status: completed (training progress shows completed and no retraining needed)');
+      console.log('✅ Status: completed (training completed and no retraining needed)');
       return {
         status: 'completed',
         progress: 100
@@ -202,7 +193,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
       
-      // Don't close the dialog immediately - let it show training progress
+      // FIXED: Keep dialog open to show training progress
       console.log('📊 Keeping dialog open to show training progress');
     } catch (error) {
       console.error('❌ Failed to start training:', error);
@@ -210,12 +201,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked - enhanced');
+    console.log('📱 Continue in background clicked');
     
     // Close the dialog first
     onOpenChange(false);
     
-    // FIXED: Dispatch event with better data
+    // Dispatch event to notify components
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
@@ -361,7 +352,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="w-full">
+              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="flex-1">
                 Start Training
               </Button>
             </div>
