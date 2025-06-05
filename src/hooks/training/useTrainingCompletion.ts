@@ -103,8 +103,8 @@ export const useTrainingCompletion = (
       // Store previous status before updating
       const previousStatus = refs.trainingStateRef.current;
       
-      // Update training state ref - explicitly cast to ensure type compatibility
-      refs.trainingStateRef.current = status as 'idle' | 'initializing' | 'training' | 'completed' | 'failed';
+      // Update training state ref - types now match properly
+      refs.trainingStateRef.current = status;
 
       // Handle training completion - FIXED: Only trigger completion when transitioning TO completed AND all content is processed
       if (status === 'completed' && 

@@ -21,7 +21,7 @@ export interface DatabaseSource {
 }
 
 export interface TrainingRefs {
-  // Training state management
+  // Training state management - FIXED: Include 'completed' in the type
   trainingStateRef: React.MutableRefObject<'idle' | 'initializing' | 'training' | 'completed' | 'failed'>;
   activeTrainingSessionRef: React.MutableRefObject<string>;
   currentTrainingSessionRef: React.MutableRefObject<string>;
