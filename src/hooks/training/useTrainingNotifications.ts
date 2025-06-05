@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -62,8 +61,8 @@ export const useTrainingNotifications = () => {
     addTrackedTimer
   );
 
-  // ENHANCED: Much stronger post-completion filtering
-  const shouldIgnoreUpdate = (eventType: string, payload: any) => {
+  // ENHANCED: Much stronger post-completion filtering with database validation
+  const shouldIgnoreUpdate = async (eventType: string, payload: any) => {
     const now = Date.now();
     
     // PRIORITY 1: If agent is completed, ignore ALL updates
@@ -82,7 +81,7 @@ export const useTrainingNotifications = () => {
     // PRIORITY 3: If last action was complete and recent, ignore updates
     if (refs.lastTrainingActionRef.current === 'complete') {
       const timeSinceLastAction = now - refs.lastCompletionCheckRef.current;
-      if (timeSinceLastAction < 120000) { // Extended to 2 minutes
+      if (timeSinceLastAction < 300000) { // Extended to 5 minutes
         console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - recent completion action (${timeSinceLastAction}ms ago)`);
         return true;
       }
@@ -207,10 +206,10 @@ export const useTrainingNotifications = () => {
       try {
         const { data: sources, error } = await supabase
           .from('agent_sources')
-          .select('id')
+          .select('id, source_type, metadata')
           .eq('agent_id', agentId)
-          .eq('source_type', 'website')
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .limit(1);
 
         if (error) {
           console.error('Error fetching website sources:', error);
@@ -366,7 +365,7 @@ export const useTrainingNotifications = () => {
     startTraining: async () => {
       if (!agentId) return;
       
-      // ENHANCED: STRONGEST possible check before starting
+      // ENHANCED: ABSOLUTE FINAL protection with database validation
       const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
       
       if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 300000) { // 5 minutes
@@ -381,6 +380,24 @@ export const useTrainingNotifications = () => {
       
       if (refs.completedSessionsRef.current.size > 0) {
         console.log('🚫 ULTIMATE PROTECTION: Have completed sessions, completely blocking start');
+        return;
+      }
+      
+      // DATABASE VALIDATION: Final check against actual database state
+      try {
+        const { data: sources } = await supabase
+          .from('agent_sources')
+          .select('id, source_type, metadata')
+          .eq('agent_id', agentId)
+          .eq('is_active', true)
+          .limit(1);
+
+        if (!sources || sources.length === 0) {
+          console.log('🚫 DATABASE PROTECTION: No sources found, not starting training');
+          return;
+        }
+      } catch (error) {
+        console.error('🚫 DATABASE PROTECTION: Error checking sources:', error);
         return;
       }
       
