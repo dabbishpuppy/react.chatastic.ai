@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -40,16 +41,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       trainingProgress
     });
 
-    // PRIORITY 1: If retraining is explicitly needed, show that state
-    if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining needed)');
-      return {
-        status: 'needs_training',
-        progress: 0
-      };
-    }
-    
-    // PRIORITY 2: If currently training, show training state
+    // PRIORITY 1: If currently training, show training state
     if (isRetraining || trainingProgress?.status === 'training') {
       console.log('✅ Status: training (active training)');
       return {
@@ -58,7 +50,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
     
-    // PRIORITY 3: If training failed, show failed state
+    // PRIORITY 2: If training failed, show failed state
     if (trainingProgress?.status === 'failed') {
       console.log('✅ Status: failed (training failed)');
       return {
@@ -67,12 +59,21 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
     
-    // PRIORITY 4: Only show completed if training finished AND no retraining needed
+    // PRIORITY 3: If training finished AND no retraining needed, show completed
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('✅ Status: completed (training done and no retraining needed)');
       return {
         status: 'completed',
         progress: 100
+      };
+    }
+    
+    // PRIORITY 4: If retraining is explicitly needed, show that state
+    if (retrainingNeeded?.needed) {
+      console.log('✅ Status: needs_training (retraining needed)');
+      return {
+        status: 'needs_training',
+        progress: 0
       };
     }
     
@@ -138,6 +139,14 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }
     
     return "Your agent is up to date.";
+  };
+
+  const getDialogTitle = () => {
+    if (currentStatus === 'training') return "Agent Training Status";
+    if (currentStatus === 'completed') return "Training Complete";
+    if (currentStatus === 'failed') return "Training Failed";
+    if (currentStatus === 'needs_training') return "Agent Training Status";
+    return "Agent Training Status";
   };
 
   const getSourceIcon = (type: string) => {
@@ -217,12 +226,10 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
             ) : (
               <CheckCircle className="h-5 w-5 text-green-600" />
             )}
-            Agent Training Status
+            {getDialogTitle()}
           </DialogTitle>
-          <DialogDescription asChild>
-            <div className="text-sm text-muted-foreground">
-              {getStatusMessage()}
-            </div>
+          <DialogDescription>
+            {getStatusMessage()}
           </DialogDescription>
         </DialogHeader>
 
@@ -333,7 +340,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="flex-1">
+              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="w-full">
                 Start Training
               </Button>
             </div>
