@@ -293,7 +293,6 @@ export const useTrainingNotifications = () => {
       }
       lastCompletionCheckRef.current = now;
       
-      // ... keep existing code (data fetching and processing logic)
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content, crawl_status')
@@ -494,6 +493,9 @@ export const useTrainingNotifications = () => {
         console.log('⚠️ Session already completed, aborting start:', sessionId);
         return;
       }
+
+      // Check if we're already in a completed state BEFORE updating refs
+      const wasAlreadyCompleted = lastTrainingActionRef.current === 'complete';
       
       currentTrainingSessionRef.current = sessionId;
       trainingStateRef.current = 'training';
@@ -508,7 +510,7 @@ export const useTrainingNotifications = () => {
       const startToastId = `start-${sessionId}`;
       if (!shownToastsRef.current.has(startToastId) && 
           !sessionCompletionFlagRef.current.has(sessionId) &&
-          lastTrainingActionRef.current !== 'complete') {
+          !wasAlreadyCompleted) {
         
         shownToastsRef.current.add(startToastId);
         
