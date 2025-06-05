@@ -10,7 +10,7 @@ export class RetrainingChecker {
       // Get all active sources for this agent
       const { data: sources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id, title, source_type, metadata, content, created_at')
+        .select('id, title, source_type, metadata, content, created_at, crawl_status')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -51,9 +51,8 @@ export class RetrainingChecker {
             continue;
           }
 
-          // Only include if there are truly unprocessed pages
+          // Check for truly unprocessed pages (no chunks created)
           if (unprocessedPages && unprocessedPages.length > 0) {
-            // Double-check: verify these pages don't have chunks already
             const pageIds = unprocessedPages.map(p => p.id);
             const { data: existingChunks } = await supabase
               .from('source_chunks')
@@ -61,17 +60,23 @@ export class RetrainingChecker {
               .in('source_id', pageIds)
               .limit(1);
 
-            // If no chunks exist for these pages, they truly need processing
+            // Only include if no chunks exist for these pages AND crawl was recently completed
             if (!existingChunks || existingChunks.length === 0) {
-              unprocessedSources.push({
-                id: source.id,
-                title: source.title,
-                type: 'website',
-                reason: `${unprocessedPages.length} crawled page${unprocessedPages.length > 1 ? 's' : ''} need${unprocessedPages.length === 1 ? 's' : ''} processing`,
-                status: 'Crawled - Needs Training',
-                unprocessedPagesCount: unprocessedPages.length
-              });
-              reasons.push(`Website "${source.title}" has ${unprocessedPages.length} crawled pages that need processing`);
+              // Check if this is a recently crawled source (within last hour) or has "completed" crawl_status
+              const isRecentlyCrawled = source.crawl_status === 'completed' || 
+                (new Date().getTime() - new Date(source.created_at).getTime() < 60 * 60 * 1000);
+              
+              if (isRecentlyCrawled) {
+                unprocessedSources.push({
+                  id: source.id,
+                  title: source.title,
+                  type: 'website',
+                  reason: `${unprocessedPages.length} crawled page${unprocessedPages.length > 1 ? 's' : ''} need${unprocessedPages.length === 1 ? 's' : ''} processing`,
+                  status: 'Crawled - Needs Training',
+                  unprocessedPagesCount: unprocessedPages.length
+                });
+                reasons.push(`Website "${source.title}" has ${unprocessedPages.length} crawled pages that need processing`);
+              }
             }
           }
         } else {
@@ -140,7 +145,8 @@ export class RetrainingChecker {
         needed,
         unprocessedCount: unprocessedSources.length,
         status,
-        message
+        message,
+        sourceDetails: unprocessedSources.map(s => `${s.type}: ${s.title} (${s.status})`)
       });
 
       return {
