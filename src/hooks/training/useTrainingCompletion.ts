@@ -53,11 +53,30 @@ export const useTrainingCompletion = (
     try {
       console.log('🔍 VALIDATION: Checking actual training completion status');
       
-      // Check if chunks exist for the agent
+      // FIXED: Check if chunks exist for any sources of this agent
+      const { data: agentSources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId)
+        .eq('is_active', true);
+
+      if (sourcesError) {
+        console.error('Error checking agent sources:', sourcesError);
+        return false;
+      }
+
+      if (!agentSources || agentSources.length === 0) {
+        console.log('🔍 VALIDATION: No sources found for agent');
+        return false;
+      }
+
+      const sourceIds = agentSources.map(s => s.id);
+      
+      // Check if chunks exist for these sources
       const { data: chunks, error: chunksError } = await supabase
         .from('source_chunks')
         .select('id')
-        .eq('source_id', agentId)
+        .in('source_id', sourceIds)
         .limit(1);
 
       if (chunksError) {
@@ -69,19 +88,19 @@ export const useTrainingCompletion = (
       console.log('🔍 VALIDATION: Agent has chunks:', hasChunks);
 
       // Check if all sources are processed
-      const { data: agentSources, error: sourcesError } = await supabase
+      const { data: allAgentSources, error: allSourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
-      if (sourcesError) {
-        console.error('Error checking sources:', sourcesError);
+      if (allSourcesError) {
+        console.error('Error checking sources:', allSourcesError);
         return false;
       }
 
       let allSourcesProcessed = true;
-      for (const source of agentSources || []) {
+      for (const source of allAgentSources || []) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
