@@ -44,23 +44,35 @@ export class RetrainingChecker {
             .select('id, url, status, processing_status')
             .eq('parent_source_id', source.id)
             .eq('status', 'completed') // Only completed crawled pages
-            .eq('processing_status', 'pending'); // That haven't been processed yet
+            .neq('processing_status', 'processed'); // That haven't been fully processed yet
 
           if (pagesError) {
             console.error('Error checking source pages:', pagesError);
             continue;
           }
 
+          // Only include if there are truly unprocessed pages
           if (unprocessedPages && unprocessedPages.length > 0) {
-            unprocessedSources.push({
-              id: source.id,
-              title: source.title,
-              type: 'website',
-              reason: `${unprocessedPages.length} crawled page${unprocessedPages.length > 1 ? 's' : ''} need${unprocessedPages.length === 1 ? 's' : ''} processing`,
-              status: 'Crawled - Needs Training',
-              unprocessedPagesCount: unprocessedPages.length
-            });
-            reasons.push(`Website "${source.title}" has ${unprocessedPages.length} crawled pages that need processing`);
+            // Double-check: verify these pages don't have chunks already
+            const pageIds = unprocessedPages.map(p => p.id);
+            const { data: existingChunks } = await supabase
+              .from('source_chunks')
+              .select('id')
+              .in('source_id', pageIds)
+              .limit(1);
+
+            // If no chunks exist for these pages, they truly need processing
+            if (!existingChunks || existingChunks.length === 0) {
+              unprocessedSources.push({
+                id: source.id,
+                title: source.title,
+                type: 'website',
+                reason: `${unprocessedPages.length} crawled page${unprocessedPages.length > 1 ? 's' : ''} need${unprocessedPages.length === 1 ? 's' : ''} processing`,
+                status: 'Crawled - Needs Training',
+                unprocessedPagesCount: unprocessedPages.length
+              });
+              reasons.push(`Website "${source.title}" has ${unprocessedPages.length} crawled pages that need processing`);
+            }
           }
         } else {
           // For other source types, check if they have content and haven't been processed
@@ -70,26 +82,37 @@ export class RetrainingChecker {
 
           const processingStatus = metadata?.processing_status;
 
+          // Only include if truly unprocessed and has content
           if (hasContent && processingStatus !== 'completed') {
-            let status = 'Needs Processing';
-            let reason = 'Has content but not processed yet';
+            // Double-check: verify no chunks exist for this source
+            const { data: existingChunks } = await supabase
+              .from('source_chunks')
+              .select('id')
+              .eq('source_id', source.id)
+              .limit(1);
 
-            if (processingStatus === 'failed') {
-              status = 'Needs Reprocessing';
-              reason = 'Previous processing failed, needs retry';
-            } else if (!processingStatus) {
-              status = 'Needs Processing';
-              reason = 'Has content but not processed yet';
+            // Only include if no chunks exist
+            if (!existingChunks || existingChunks.length === 0) {
+              let status = 'Needs Processing';
+              let reason = 'Has content but not processed yet';
+
+              if (processingStatus === 'failed') {
+                status = 'Needs Reprocessing';
+                reason = 'Previous processing failed, needs retry';
+              } else if (!processingStatus) {
+                status = 'Needs Processing';
+                reason = 'Has content but not processed yet';
+              }
+
+              unprocessedSources.push({
+                id: source.id,
+                title: source.title,
+                type: source.source_type,
+                reason,
+                status
+              });
+              reasons.push(`${source.source_type.toUpperCase()} "${source.title}" ${reason.toLowerCase()}`);
             }
-
-            unprocessedSources.push({
-              id: source.id,
-              title: source.title,
-              type: source.source_type,
-              reason,
-              status
-            });
-            reasons.push(`${source.source_type.toUpperCase()} "${source.title}" ${reason.toLowerCase()}`);
           }
         }
       }

@@ -8,7 +8,7 @@ export class TrainingStatusDeterminationService {
     analysisResult: SourceAnalysisResult,
     refs: TrainingRefs,
     agentId: string
-  ): Promise<'idle' | 'training' | 'completed' | 'failed'> {
+  ): Promise<'idle' | 'initializing' | 'training' | 'completed' | 'failed'> {
     const {
       sourcesNeedingTraining,
       totalPagesNeedingProcessing,
@@ -23,7 +23,7 @@ export class TrainingStatusDeterminationService {
     // Validate if training is actually complete
     const isActuallyComplete = await TrainingValidationService.validateTrainingCompletion(agentId);
 
-    let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
+    let status: 'idle' | 'initializing' | 'training' | 'completed' | 'failed' = 'idle';
     
     console.log('🔍 ENHANCED Status determination:', {
       sourcesNeedingTraining: sourcesNeedingTraining.length,

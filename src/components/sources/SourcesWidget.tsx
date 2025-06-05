@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -17,6 +18,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
+  const [dialogOpenTimestamp, setDialogOpenTimestamp] = useState<number | null>(null);
   
   // Use enhanced training hooks
   const {
@@ -36,13 +38,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     const handleTrainingStateReset = (event: CustomEvent) => {
       console.log('🔄 Training state reset event received:', event.detail);
       setIsTrainingInBackground(false);
-      // Refresh stats and check retraining status
-      refetchStats();
-      setTimeout(() => checkRetrainingNeeded(), 500);
+      // Only refresh if dialog is not open to prevent "up to date" override
+      if (!showRetrainingDialog) {
+        refetchStats();
+        setTimeout(() => checkRetrainingNeeded(), 500);
+      }
     };
 
     const handleTrainingCompleted = (event: CustomEvent) => {
       console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
+      setIsTrainingInBackground(false);
+      // Always refresh on completion
       refetchStats();
       setTimeout(() => checkRetrainingNeeded(), 1000);
     };
@@ -62,14 +68,14 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     };
-  }, [refetchStats, checkRetrainingNeeded]);
+  }, [refetchStats, checkRetrainingNeeded, showRetrainingDialog]);
 
-  // Enhanced: Check retraining status on stats changes
+  // Enhanced: Check retraining status only when dialog is closed
   useEffect(() => {
-    if (agentId && stats) {
+    if (agentId && stats && !showRetrainingDialog) {
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
+  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages, showRetrainingDialog]);
 
   // Enhanced: Handle training state transitions with immediate state checking
   useEffect(() => {
@@ -77,15 +83,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       console.log('🎯 Training completed - resetting background state');
       setIsTrainingInBackground(false);
       
-      // Refresh stats after completion
-      setTimeout(() => {
-        refetchStats();
-        checkRetrainingNeeded();
-      }, 2000);
+      // Refresh stats after completion, but only if dialog is closed
+      if (!showRetrainingDialog) {
+        setTimeout(() => {
+          refetchStats();
+          checkRetrainingNeeded();
+        }, 2000);
+      }
     }
-  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
+  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded, showRetrainingDialog]);
 
-  // ENHANCED: Source event handlers with immediate state updates
+  // ENHANCED: Source event handlers with immediate state updates (only if dialog closed)
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
       console.log('📄 Source event received:', event.type, event.detail);
@@ -93,11 +101,14 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       // Immediately reset background training state for new content
       setIsTrainingInBackground(false);
       
-      // Refresh stats immediately
-      refetchStats();
-      
-      // Check retraining status
-      setTimeout(() => checkRetrainingNeeded(), 1500);
+      // Only refresh if dialog is not open
+      if (!showRetrainingDialog) {
+        // Refresh stats immediately
+        refetchStats();
+        
+        // Check retraining status
+        setTimeout(() => checkRetrainingNeeded(), 1500);
+      }
     };
 
     const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged', 'crawlStarted'];
@@ -110,7 +121,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         window.removeEventListener(eventType, handleSourceEvent as EventListener);
       });
     };
-  }, [refetchStats, checkRetrainingNeeded]);
+  }, [refetchStats, checkRetrainingNeeded, showRetrainingDialog]);
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
@@ -119,25 +130,41 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
-  // FIXED: Remove overly protective check that was preventing dialog from opening
+  // Handle opening the retrain dialog
   const handleRetrainClick = () => {
     console.log('🔄 Retrain button clicked - opening dialog');
+    setDialogOpenTimestamp(Date.now());
     setShowRetrainingDialog(true);
+    // Force check retraining status when dialog opens to ensure fresh data
+    setTimeout(() => checkRetrainingNeeded(), 100);
   };
 
   const handleDialogClose = (open: boolean) => {
     console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
-    setShowRetrainingDialog(open);
     
-    // FIXED: Only set background training if training is actually active AND not completed
-    if (!open && isTrainingActive && trainingProgress?.status !== 'completed') {
-      console.log('📱 Setting background training state');
-      setIsTrainingInBackground(true);
+    if (!open) {
+      setShowRetrainingDialog(false);
+      setDialogOpenTimestamp(null);
+      
+      // FIXED: Only set background training if training is actually active AND not completed
+      if (isTrainingActive && trainingProgress?.status !== 'completed') {
+        console.log('📱 Setting background training state');
+        setIsTrainingInBackground(true);
+      }
+      
+      // After closing dialog, refresh retraining status
+      setTimeout(() => {
+        refetchStats();
+        checkRetrainingNeeded();
+      }, 500);
+    } else {
+      setShowRetrainingDialog(true);
+      setDialogOpenTimestamp(Date.now());
     }
   };
 
   // Check if training is active
-  const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
+  const isTrainingActive = trainingProgress?.status === 'training' || trainingProgress?.status === 'initializing' || isRetraining;
   const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
 
   if (isLoading) {

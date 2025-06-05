@@ -9,6 +9,8 @@ export const useAgentRetraining = (agentId?: string) => {
   const isTrainingActiveRef = useRef(false);
   const lastStatusUpdateRef = useRef<string>('');
   const lastLogTimeRef = useRef<number>(0);
+  const hasShownStartToastRef = useRef(false);
+  const currentSessionRef = useRef<string>('');
   
   // ALL useState calls MUST come after useRef calls
   const [progress, setProgress] = useState<RetrainingProgress | null>(null);
@@ -51,7 +53,8 @@ export const useAgentRetraining = (agentId?: string) => {
           status: trainingProgress.status,
           progress: trainingProgress.progress,
           totalChunks: trainingProgress.totalChunks,
-          processedChunks: trainingProgress.processedChunks
+          processedChunks: trainingProgress.processedChunks,
+          sessionId: trainingProgress.sessionId
         });
         lastLogTimeRef.current = now;
       }
@@ -60,6 +63,9 @@ export const useAgentRetraining = (agentId?: string) => {
         isTrainingActiveRef.current = true;
       } else if (trainingProgress.status === 'completed') {
         isTrainingActiveRef.current = false;
+        // Reset toast flag when training completes
+        hasShownStartToastRef.current = false;
+        currentSessionRef.current = '';
       }
       
       setProgress({
@@ -101,15 +107,28 @@ export const useAgentRetraining = (agentId?: string) => {
 
     try {
       await startTraining();
-      // Note: Toast is now handled in TrainingSessionManager, not here
       
-      setTimeout(() => {
-        checkRetrainingNeeded();
-      }, 3000);
+      // Show "Training Started" toast only once per session
+      const sessionId = trainingProgress?.sessionId || `${agentId}-${Date.now()}`;
+      if (!hasShownStartToastRef.current || currentSessionRef.current !== sessionId) {
+        console.log('🧠 Showing training start toast for session:', sessionId);
+        toast({
+          title: "🧠 Training Started",
+          description: "Initializing training process...",
+          duration: 3000,
+        });
+        hasShownStartToastRef.current = true;
+        currentSessionRef.current = sessionId;
+      }
+
+      // Do not immediately check retraining status to prevent "up to date" override
+      console.log('🔄 Training started - not checking retraining status to prevent premature "up to date"');
 
     } catch (error) {
       console.error('Retraining failed:', error);
       isTrainingActiveRef.current = false;
+      hasShownStartToastRef.current = false;
+      currentSessionRef.current = '';
       
       toast({
         title: "Training Failed",
@@ -117,7 +136,7 @@ export const useAgentRetraining = (agentId?: string) => {
         variant: "destructive"
       });
     }
-  }, [agentId, startTraining, toast, checkRetrainingNeeded]);
+  }, [agentId, startTraining, toast, trainingProgress?.sessionId]);
 
   return {
     isRetraining,
