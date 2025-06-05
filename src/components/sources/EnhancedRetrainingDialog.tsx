@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -24,6 +25,11 @@ interface EnhancedRetrainingDialogProps {
   trainingProgress?: any;
 }
 
+/**
+ * Phase 7: Enhanced Training Progress & Dialog Flow
+ * Phase 2: Enhanced Error Handling with retry buttons
+ * Phase 4: Cross-tab synchronization support
+ */
 export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> = ({
   open,
   onOpenChange,
@@ -34,7 +40,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
   onRetryFailedSource,
   trainingProgress
 }) => {
-  // ENHANCED: Clear state machine with proper status determination
+  // Phase 7: Clear state machine with proper status determination
   const getCurrentStatus = () => {
     console.log('🔍 EnhancedRetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
@@ -51,7 +57,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
       const status = trainingProgress.status;
       let calculatedProgress = 0;
       
-      // Calculate progress based on chunks first, then sources
+      // Phase 7: Calculate progress based on chunks first, then sources
       if (trainingProgress.totalChunks > 0 && trainingProgress.processedChunks >= 0) {
         calculatedProgress = Math.round((trainingProgress.processedChunks / trainingProgress.totalChunks) * 100);
       } else if (trainingProgress.totalSources > 0) {
@@ -64,7 +70,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
       };
     }
     
-    // Handle retraining needed states
+    // Phase 2: Handle retraining needed states including failures
     if (retrainingNeeded?.needed) {
       if (retrainingNeeded.status === 'has_failures') {
         return { status: 'has_failures', progress: 0 };
@@ -86,6 +92,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
     retrainingStatus: retrainingNeeded?.status
   });
 
+  // Phase 7: Enhanced progress tracking functions
   const getProcessedCount = () => {
     // Prioritize chunk count over source count
     if (trainingProgress?.totalChunks > 0) {
@@ -112,10 +119,11 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
     return trainingProgress?.totalChunks > 0 ? 'chunks' : 'items';
   };
 
+  // Phase 7: Enhanced status messages with error handling
   const getStatusMessage = () => {
     switch (currentStatus) {
       case 'initializing':
-        // Show initializing only when chunks haven't started yet
+        // Phase 7: Show initializing only when chunks haven't started yet
         const hasStartedChunking = trainingProgress?.processedChunks > 0 || trainingProgress?.totalChunks > 0;
         if (!hasStartedChunking) {
           return "Initializing training... Please wait while we prepare your sources.";
@@ -144,6 +152,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
         return "Training completed successfully! Your AI agent is trained and ready.";
       
       case 'has_failures':
+        // Phase 2: Enhanced error messaging for failures
         const failedCount = retrainingNeeded?.sourceDetails?.filter(s => s.canRetry)?.length || 0;
         const normalCount = (retrainingNeeded?.unprocessedSources || 0) - failedCount;
         
@@ -182,6 +191,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
     }
   };
 
+  // Phase 2: Enhanced source icon and status helpers
   const getSourceIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case 'website':
@@ -225,13 +235,14 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
     }
   };
 
+  // Phase 4: Cross-tab synchronization handler
   const handleContinueInBackground = () => {
     console.log('📱 Enhanced continue in background clicked');
     
     // Close the dialog first
     onOpenChange(false);
     
-    // Dispatch event
+    // Dispatch event for cross-tab sync
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
@@ -243,19 +254,20 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
     console.log('📱 Enhanced background training event dispatched for session:', trainingProgress?.sessionId);
   };
 
+  // Phase 2: Enhanced retry handler
   const handleRetrySource = (sourceId: string, sourceType: string) => {
     console.log('🔄 Retrying source:', sourceId, sourceType);
     onRetryFailedSource(sourceId, sourceType);
   };
 
-  // Determine if we should show initializing spinner vs progress bar
+  // Phase 7: Determine if we should show initializing spinner vs progress bar
   const shouldShowInitializingSpinner = () => {
     return currentStatus === 'initializing' && 
            (!trainingProgress?.processedChunks || trainingProgress.processedChunks === 0) &&
            (!trainingProgress?.totalChunks || trainingProgress.totalChunks === 0);
   };
 
-  // Render footer based on current status
+  // Phase 7: Render footer based on current status
   const renderFooter = () => {
     switch (currentStatus) {
       case 'pending':
@@ -283,7 +295,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
         // Fall through to training case if chunking has started
         
       case 'training':
-        // Only show "Continue in Background" if we have actual progress
+        // Phase 7: Only show "Continue in Background" if we have actual progress
         const hasProgress = getProcessedCount() > 0 || getTotalCount() > 0;
         if (hasProgress) {
           return (
@@ -352,7 +364,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4">
-          {/* Initializing State */}
+          {/* Phase 7: Initializing State */}
           {shouldShowInitializingSpinner() && (
             <div className="text-center py-8">
               <Loader2 className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin" />
@@ -363,7 +375,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
             </div>
           )}
 
-          {/* Progress Section */}
+          {/* Phase 7: Progress Section */}
           {!shouldShowInitializingSpinner() && (currentStatus === 'training' || currentStatus === 'completed' || currentStatus === 'failed') && (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -381,7 +393,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
                 {getProcessedCount()} of {getTotalCount()} {getProgressUnit()} processed
               </div>
 
-              {/* Show currently processing items */}
+              {/* Phase 7: Show currently processing items */}
               {currentStatus === 'training' && trainingProgress?.currentlyProcessing && trainingProgress.currentlyProcessing.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Currently processing:</div>
@@ -398,7 +410,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
             </div>
           )}
 
-          {/* Source Details with Enhanced Error Handling */}
+          {/* Phase 2: Source Details with Enhanced Error Handling */}
           {retrainingNeeded?.sourceDetails && retrainingNeeded.sourceDetails.length > 0 && (currentStatus === 'pending' || currentStatus === 'has_failures') && (
             <div className="space-y-4">
               <div className="border-t pt-4">
@@ -421,6 +433,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
                           <Badge variant={getStatusBadgeVariant(source.status)} className="text-xs">
                             {source.status}
                           </Badge>
+                          {/* Phase 2: Enhanced retry button for failed sources */}
                           {source.canRetry && (
                             <Button
                               size="sm"
@@ -433,6 +446,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
                             </Button>
                           )}
                         </div>
+                        {/* Phase 2: Show error messages for failed sources */}
                         {source.errorMessage && (
                           <div className="text-xs text-red-600 mt-1 italic">
                             Error: {source.errorMessage}
@@ -446,7 +460,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
             </div>
           )}
 
-          {/* Success State */}
+          {/* Phase 7: Success State */}
           {currentStatus === 'completed' && (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
@@ -460,7 +474,7 @@ export const EnhancedRetrainingDialog: React.FC<EnhancedRetrainingDialogProps> =
             </div>
           )}
 
-          {/* No Training Needed */}
+          {/* Phase 7: No Training Needed */}
           {currentStatus === 'up_to_date' && (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />

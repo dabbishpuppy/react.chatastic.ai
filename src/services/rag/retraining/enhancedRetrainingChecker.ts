@@ -21,9 +21,9 @@ export interface EnhancedRetrainingStatus {
 
 export class EnhancedRetrainingChecker {
   /**
-   * Enhanced retraining checker that focuses on chunk existence and handles errors
-   * Only sources/pages with zero chunks are considered unprocessed
-   * Failed sources are shown with retry options
+   * Enhanced retraining checker with comprehensive error handling and retry support
+   * Phase 2: Enhanced Error Handling for Failed Sources
+   * Phase 6: Enhanced Retraining Detection Logic (chunk-based)
    */
   static async checkRetrainingNeeded(agentId: string): Promise<EnhancedRetrainingStatus> {
     try {
@@ -77,12 +77,13 @@ export class EnhancedRetrainingChecker {
             let failedPagesCount = 0;
             
             for (const page of crawledPages) {
+              // Phase 2: Handle failed pages as retriable items
               if (page.status === 'failed') {
                 failedPagesCount++;
                 hasFailures = true;
                 console.log(`💥 Page ${page.url} failed - can be retried`);
               } else if (page.status === 'completed') {
-                // Check if chunks exist for this completed page
+                // Phase 6: Check if chunks exist for this completed page
                 const { data: existingChunks } = await supabase
                   .from('source_chunks')
                   .select('id')
@@ -130,13 +131,13 @@ export class EnhancedRetrainingChecker {
             }
           }
         } else {
-          // ENHANCED: Handle other source types with chunk-based detection
+          // Phase 6: Handle other source types with chunk-based detection
           const hasContent = source.source_type === 'qa' ? 
             (metadata?.question && metadata?.answer) :
             source.content && source.content.trim().length > 0;
 
           if (hasContent) {
-            // Check for processing failures first
+            // Phase 2: Check for processing failures first
             if (metadata.processing_status === 'failed') {
               hasFailures = true;
               unprocessedSources.push({
@@ -152,7 +153,7 @@ export class EnhancedRetrainingChecker {
               continue;
             }
 
-            // Check if chunks exist for this source (most important check)
+            // Phase 6: Check if chunks exist for this source (most important check)
             const { data: existingChunks } = await supabase
               .from('source_chunks')
               .select('id')
@@ -236,7 +237,7 @@ export class EnhancedRetrainingChecker {
   }
 
   /**
-   * Retry failed sources or pages
+   * Phase 2: Retry failed sources or pages
    */
   static async retryFailedSource(sourceId: string, sourceType: string): Promise<boolean> {
     try {

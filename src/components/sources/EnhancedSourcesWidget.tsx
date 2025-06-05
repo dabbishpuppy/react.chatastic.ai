@@ -13,6 +13,10 @@ interface EnhancedSourcesWidgetProps {
   currentTab?: string;
 }
 
+/**
+ * Phase 4: Enhanced Sources Widget with Dialog Polling Protection & Cross-Tab Synchronization
+ * Phase 3: Race Condition Prevention through delayed status checks
+ */
 const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTab }) => {
   const { agentId } = useParams();
   const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
@@ -35,7 +39,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // ENHANCED: Listen for training state reset events and cross-tab synchronization
+  // Phase 4: Enhanced event listeners for cross-tab synchronization and polling protection
   useEffect(() => {
     const handleTrainingStateReset = (event: CustomEvent) => {
       console.log('🔄 Training state reset event received:', event.detail);
@@ -51,7 +55,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
       console.log('🎉 Training completed event received in EnhancedSourcesWidget:', event.detail);
       setIsTrainingInBackground(false);
       
-      // If dialog is open and this is from another tab, auto-switch to completion view
+      // Phase 4: If dialog is open and this is from another tab, auto-switch to completion view
       if (showRetrainingDialog && event.detail?.sessionId !== currentSessionId) {
         console.log('📱 Cross-tab training completion detected - updating dialog');
         // The dialog will detect this status change and switch to completion view
@@ -69,11 +73,11 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
       setDialogLocked(false); // Release dialog lock when going to background
     };
 
-    // ENHANCED: Listen for crawl completion events with race condition prevention
+    // Phase 3: Listen for crawl completion events with race condition prevention
     const handleCrawlCompleted = (event: CustomEvent) => {
       console.log('🕷️ Crawl completed event received:', event.detail);
       
-      // ENHANCED: Force refresh and wait for database consistency
+      // Phase 3: Force refresh and wait for database consistency
       refetchStats();
       setTimeout(() => {
         console.log('🔄 Checking retraining status after crawl completion with delay');
@@ -94,7 +98,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
     };
   }, [refetchStats, checkRetrainingNeeded, showRetrainingDialog, currentSessionId, setDialogLocked]);
 
-  // ENHANCED: Only check retraining status when dialog is closed to prevent override
+  // Phase 4: Only check retraining status when dialog is closed to prevent override
   useEffect(() => {
     if (agentId && stats && !showRetrainingDialog) {
       // Add small delay to ensure stats are fully loaded
@@ -102,7 +106,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, showRetrainingDialog]);
 
-  // Enhanced: Handle training state transitions with cross-tab detection
+  // Phase 4: Handle training state transitions with cross-tab detection
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('🎯 Training completed - resetting background state');
@@ -118,7 +122,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
     }
   }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded, showRetrainingDialog]);
 
-  // ENHANCED: Source event handlers with immediate state updates and dialog protection
+  // Phase 3: Source event handlers with immediate state updates and dialog protection
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
       console.log('📄 Enhanced source event received:', event.type, event.detail);
@@ -131,7 +135,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
         // Refresh stats immediately
         refetchStats();
         
-        // Check retraining status after a delay to allow processing
+        // Phase 3: Check retraining status after a delay to allow processing
         setTimeout(() => checkRetrainingNeeded(true), 1500);
       }
     };
@@ -155,15 +159,15 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
-  // ENHANCED: Handle opening the retrain dialog with fresh check and dialog lock
+  // Phase 4: Handle opening the retrain dialog with fresh check and dialog lock
   const handleRetrainClick = () => {
     console.log('🔄 ENHANCED: Retrain button clicked - locking dialog and forcing fresh check');
     
-    // Lock dialog to prevent polling interference
+    // Phase 4: Lock dialog to prevent polling interference
     setDialogLocked(true);
     setShowRetrainingDialog(true);
     
-    // ENHANCED: Always force a fresh retraining check when dialog opens
+    // Always force a fresh retraining check when dialog opens
     setTimeout(() => {
       console.log('🔄 ENHANCED: Forcing immediate fresh retraining status check');
       checkRetrainingNeeded(true);
@@ -198,7 +202,7 @@ const EnhancedSourcesWidget: React.FC<EnhancedSourcesWidgetProps> = ({ currentTa
   const isTrainingActive = trainingProgress?.status === 'training' || trainingProgress?.status === 'initializing' || isRetraining;
   const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
 
-  // ENHANCED: Always use the actual retraining status, don't override it
+  // Phase 6: Always use the actual retraining status, don't override it
   const shouldShowTrainingRequired = () => {
     return retrainingNeeded?.needed || false;
   };
