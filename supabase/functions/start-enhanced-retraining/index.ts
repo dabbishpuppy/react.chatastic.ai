@@ -27,7 +27,7 @@ serve(async (req) => {
       .select('id, title, source_type, content, crawl_status, requires_manual_training')
       .eq('agent_id', agentId)
       .eq('is_active', true)
-      .or('crawl_status.eq.crawled,requires_manual_training.eq.true');
+      .or('crawl_status.eq.completed,requires_manual_training.eq.true');
 
     if (sourcesError) {
       throw new Error(`Failed to fetch sources: ${sourcesError.message}`);
@@ -68,9 +68,20 @@ serve(async (req) => {
           })
           .eq('id', source.id);
 
-        // Generate chunks based on source type
+        // For website sources, mark all child pages as training
         if (source.source_type === 'website') {
-          // For website sources, process crawled pages
+          await supabase
+            .from('source_pages')
+            .update({ 
+              processing_status: 'training',
+              metadata: {
+                training_started_at: new Date().toISOString()
+              }
+            })
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed');
+
+          // Process crawled pages
           const processingResult = await supabase.functions.invoke('process-crawled-pages', {
             body: { parentSourceId: source.id }
           });
@@ -78,6 +89,19 @@ serve(async (req) => {
           if (processingResult.error) {
             throw new Error(`Failed to process crawled pages: ${processingResult.error.message}`);
           }
+
+          // Mark child pages as trained after processing
+          await supabase
+            .from('source_pages')
+            .update({ 
+              processing_status: 'trained',
+              metadata: {
+                training_completed_at: new Date().toISOString()
+              }
+            })
+            .eq('parent_source_id', source.id)
+            .eq('processing_status', 'training');
+
         } else {
           // For other source types, generate chunks directly
           const chunkResult = await supabase.functions.invoke('generate-chunks', {
@@ -121,11 +145,11 @@ serve(async (req) => {
       } catch (error) {
         console.error(`❌ Error training source ${source.id}:`, error);
         
-        // Mark as failed
+        // Mark as failed and revert child pages if needed
         await supabase
           .from('agent_sources')
           .update({ 
-            crawl_status: source.source_type === 'website' ? 'crawled' : undefined,
+            crawl_status: source.source_type === 'website' ? 'completed' : undefined,
             requires_manual_training: true,
             metadata: {
               training_error: error.message,
@@ -133,6 +157,20 @@ serve(async (req) => {
             }
           })
           .eq('id', source.id);
+
+        if (source.source_type === 'website') {
+          await supabase
+            .from('source_pages')
+            .update({ 
+              processing_status: 'completed',
+              metadata: {
+                training_error: error.message,
+                training_failed_at: new Date().toISOString()
+              }
+            })
+            .eq('parent_source_id', source.id)
+            .eq('processing_status', 'training');
+        }
         
         errors.push(`Source ${source.title}: ${error.message}`);
       }

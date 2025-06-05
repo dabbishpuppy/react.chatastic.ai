@@ -28,11 +28,15 @@ export class SimplifiedSourceStatusService {
   }
 
   static getSourceStatus(source: any): SourceStatus {
-    // For website sources, check crawl_status
+    // For website sources, check crawl_status and child page processing status
     if (source.source_type === 'website') {
       // If crawl is completed and requires manual training, it's ready for training
       if (source.crawl_status === 'completed' && source.requires_manual_training === true) {
         return 'crawled';
+      }
+      // If crawl status is training, check child pages
+      if (source.crawl_status === 'training') {
+        return 'training';
       }
       // If crawl is completed and training has been done, it's fully completed
       if (source.crawl_status === 'completed' && source.requires_manual_training === false) {

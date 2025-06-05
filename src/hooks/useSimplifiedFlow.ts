@@ -29,6 +29,7 @@ export const useSimplifiedFlow = () => {
         .from('agent_sources')
         .update({ 
           requires_manual_training: false,
+          crawl_status: 'training',
           metadata: {
             training_started_at: new Date().toISOString(),
             training_status: 'in_progress'
@@ -42,7 +43,7 @@ export const useSimplifiedFlow = () => {
         throw updateError;
       }
 
-      // Trigger the enhanced retraining which handles chunking
+      // Trigger the enhanced retraining which handles chunking and child page status updates
       const response = await supabase.functions.invoke('start-enhanced-retraining', {
         body: { agentId }
       });
@@ -62,13 +63,14 @@ export const useSimplifiedFlow = () => {
         .from('agent_sources')
         .update({ 
           requires_manual_training: true,
+          crawl_status: 'completed',
           metadata: {
             training_failed_at: new Date().toISOString(),
             training_error: error instanceof Error ? error.message : 'Unknown error'
           }
         })
         .eq('agent_id', agentId)
-        .eq('requires_manual_training', false);
+        .eq('crawl_status', 'training');
     }
   }, [agentId, isTraining]);
 
@@ -95,7 +97,7 @@ export const useSimplifiedFlow = () => {
       // Check if training is in progress - properly type the metadata
       const hasTrainingInProgress = sources?.some(s => {
         const metadata = s.metadata as Record<string, any> | null;
-        return metadata?.training_status === 'in_progress';
+        return s.crawl_status === 'training' || metadata?.training_status === 'in_progress';
       });
 
       if (hasTrainingInProgress && !isTraining) {
@@ -160,6 +162,24 @@ export const useSimplifiedFlow = () => {
             } else {
               // For other updates, update immediately
               updateSourceStatus();
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'source_pages'
+          },
+          (payload) => {
+            console.log('📡 Source page updated:', payload);
+            const updatedPage = payload.new as any;
+            
+            // Check if processing status changed
+            if (updatedPage.processing_status) {
+              console.log(`📄 Source page processing status changed to: ${updatedPage.processing_status}`);
+              setTimeout(updateSourceStatus, 500);
             }
           }
         )
