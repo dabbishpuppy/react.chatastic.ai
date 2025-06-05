@@ -93,7 +93,7 @@ export const useTrainingCompletion = (
       const previousStatus = refs.trainingStateRef.current;
       refs.trainingStateRef.current = status;
 
-      // Handle training completion
+      // Handle training completion - FIXED: Compare against both previous status and current status properly
       if (status === 'completed' && 
           previousStatus !== 'completed' &&
           analysisResult.totalPagesNeedingProcessing > 0 &&
