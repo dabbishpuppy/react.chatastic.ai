@@ -29,19 +29,139 @@ export const useChunkProcessingProgress = () => {
     isCompleted: boolean;
     completedAt: number | null;
     sessionId: string | null;
+    lastValidationAt: number | null;
   }>({
     isCompleted: false,
     completedAt: null,
-    sessionId: null
+    sessionId: null,
+    lastValidationAt: null
   });
 
-  // Calculate progress from database state
+  // Enhanced validation function to check actual completion state
+  const validateActualCompletion = async (): Promise<boolean> => {
+    if (!agentId) return false;
+
+    try {
+      // Get all sources for this agent
+      const { data: sources } = await supabase
+        .from('agent_sources')
+        .select('id, source_type, metadata')
+        .eq('agent_id', agentId)
+        .eq('is_active', true);
+
+      if (!sources || sources.length === 0) {
+        console.log('🔍 No sources found for agent');
+        return false;
+      }
+
+      let allProcessed = true;
+      let totalChunksWithEmbeddings = 0;
+
+      for (const source of sources) {
+        if (source.source_type === 'website') {
+          // For website sources, check pages
+          const { data: pages } = await supabase
+            .from('source_pages')
+            .select('id, processing_status')
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed');
+
+          if (!pages || pages.length === 0) {
+            console.log(`🔍 Website source ${source.id} has no completed pages`);
+            allProcessed = false;
+            continue;
+          }
+
+          const unprocessedPages = pages.filter(p => p.processing_status !== 'processed');
+          if (unprocessedPages.length > 0) {
+            console.log(`🔍 Website source ${source.id} has ${unprocessedPages.length} unprocessed pages`);
+            allProcessed = false;
+            continue;
+          }
+
+          // Check if pages have chunks with embeddings
+          for (const page of pages) {
+            const { data: pageChunks } = await supabase
+              .from('source_chunks')
+              .select(`
+                id,
+                source_embeddings(id)
+              `)
+              .eq('source_id', page.id);
+
+            if (!pageChunks || pageChunks.length === 0) {
+              console.log(`🔍 Page ${page.id} has no chunks`);
+              allProcessed = false;
+              break;
+            }
+
+            const chunksWithEmbeddings = pageChunks.filter(c => c.source_embeddings && c.source_embeddings.length > 0);
+            if (chunksWithEmbeddings.length !== pageChunks.length) {
+              console.log(`🔍 Page ${page.id} has chunks without embeddings: ${pageChunks.length - chunksWithEmbeddings.length} missing`);
+              allProcessed = false;
+              break;
+            }
+
+            totalChunksWithEmbeddings += chunksWithEmbeddings.length;
+          }
+
+          if (!allProcessed) break;
+
+        } else {
+          // For non-website sources, check metadata and chunks directly
+          const metadata = source.metadata as any || {};
+          
+          if (metadata.processing_status !== 'completed') {
+            console.log(`🔍 Source ${source.id} not marked as completed in metadata`);
+            allProcessed = false;
+            continue;
+          }
+
+          // Check if source has chunks with embeddings
+          const { data: sourceChunks } = await supabase
+            .from('source_chunks')
+            .select(`
+              id,
+              source_embeddings(id)
+            `)
+            .eq('source_id', source.id);
+
+          if (!sourceChunks || sourceChunks.length === 0) {
+            console.log(`🔍 Source ${source.id} has no chunks`);
+            allProcessed = false;
+            continue;
+          }
+
+          const chunksWithEmbeddings = sourceChunks.filter(c => c.source_embeddings && c.source_embeddings.length > 0);
+          if (chunksWithEmbeddings.length !== sourceChunks.length) {
+            console.log(`🔍 Source ${source.id} has chunks without embeddings: ${sourceChunks.length - chunksWithEmbeddings.length} missing`);
+            allProcessed = false;
+            continue;
+          }
+
+          totalChunksWithEmbeddings += chunksWithEmbeddings.length;
+        }
+      }
+
+      console.log(`🔍 Validation result: allProcessed=${allProcessed}, totalChunksWithEmbeddings=${totalChunksWithEmbeddings}`);
+      return allProcessed && totalChunksWithEmbeddings > 0;
+
+    } catch (error) {
+      console.error('❌ Error validating completion:', error);
+      return false;
+    }
+  };
+
+  // Calculate progress from database state with enhanced completion detection
   const calculateProgress = async () => {
     if (!agentId) return;
     
-    // CRITICAL: Don't calculate if already completed
-    if (completionStateRef.current.isCompleted) {
-      console.log('🚫 Progress calculation blocked - training already completed');
+    // CRITICAL: Don't calculate if already completed and recently validated
+    const now = Date.now();
+    if (completionStateRef.current.isCompleted && 
+        completionStateRef.current.lastValidationAt && 
+        (now - completionStateRef.current.lastValidationAt) < 30000) { // 30 seconds
+      console.log('🚫 Progress calculation blocked - recently validated as completed');
       return;
     }
 
@@ -52,7 +172,6 @@ export const useChunkProcessingProgress = () => {
     }
 
     try {
-      const now = Date.now();
       if (now - lastUpdateRef.current < 2000) return; // Debounce
       lastUpdateRef.current = now;
 
@@ -136,56 +255,75 @@ export const useChunkProcessingProgress = () => {
         }
       }
 
-      // Determine status
+      // Calculate overall progress
+      const overallProgress = totalPages > 0 ? Math.round((processedPages / totalPages) * 100) : 0;
+
+      // Enhanced status determination with validation
       let status: 'idle' | 'processing' | 'completed' | 'failed' = 'idle';
+      
       if (hasFailures && !hasProcessing && processedPages === 0) {
         status = 'failed';
       } else if (hasProcessing || currentlyProcessing.length > 0) {
         status = 'processing';
-      } else if (totalPages > 0 && processedPages === totalPages) {
-        status = 'completed';
+      } else if (totalPages > 0 && processedPages === totalPages && overallProgress >= 100) {
+        // Potential completion - validate with actual data
+        console.log('🎯 Potential completion detected, validating...');
+        const actuallyCompleted = await validateActualCompletion();
         
-        // CRITICAL: Permanent completion lock
-        if (!completionStateRef.current.isCompleted) {
-          console.log('🎉 CHUNK PROCESSING COMPLETED - Setting permanent completion lock');
-          completionStateRef.current = {
-            isCompleted: true,
-            completedAt: Date.now(),
-            sessionId: completionStateRef.current.sessionId
-          };
+        if (actuallyCompleted) {
+          status = 'completed';
           
-          // Immediately cleanup subscriptions
-          cleanupSubscriptions();
+          // CRITICAL: Set permanent completion lock with validation timestamp
+          if (!completionStateRef.current.isCompleted) {
+            console.log('🎉 TRAINING ACTUALLY COMPLETED - Setting permanent completion lock with validation');
+            completionStateRef.current = {
+              isCompleted: true,
+              completedAt: Date.now(),
+              sessionId: completionStateRef.current.sessionId,
+              lastValidationAt: Date.now()
+            };
+            
+            // Immediately cleanup subscriptions
+            cleanupSubscriptions();
+          } else {
+            // Update validation timestamp
+            completionStateRef.current.lastValidationAt = Date.now();
+          }
+        } else {
+          console.log('🔍 Validation failed - not actually completed yet');
+          // Force processing status if validation fails
+          status = 'processing';
+          hasProcessing = true;
         }
       }
 
-      // Calculate overall progress
-      const overallProgress = totalPages > 0 ? Math.round((processedPages / totalPages) * 100) : 0;
-
-      // CRITICAL: Only update progress if not completed
-      if (!completionStateRef.current.isCompleted) {
-        setProgress({
+      // CRITICAL: Only update progress if not completed OR if this is a completion update
+      if (!completionStateRef.current.isCompleted || status === 'completed') {
+        const newProgress = {
           totalSources,
           processedSources,
           totalPages,
           processedPages,
           chunksCreated,
           status,
-          progress: overallProgress,
-          currentlyProcessing
-        });
+          progress: status === 'completed' ? 100 : overallProgress, // Force 100% on completion
+          currentlyProcessing: status === 'completed' ? [] : currentlyProcessing // Clear processing on completion
+        };
+
+        setProgress(newProgress);
 
         console.log('📊 Chunk processing progress updated:', {
           status,
-          progress: overallProgress,
+          progress: newProgress.progress,
           processedPages,
           totalPages,
           chunksCreated,
           currentlyProcessing: currentlyProcessing.length,
-          isCompleted: completionStateRef.current.isCompleted
+          isCompleted: completionStateRef.current.isCompleted,
+          hasValidation: completionStateRef.current.lastValidationAt !== null
         });
       } else {
-        console.log('🚫 Progress update blocked - training already completed');
+        console.log('🚫 Progress update blocked - training permanently completed');
       }
 
     } catch (error) {
@@ -206,7 +344,52 @@ export const useChunkProcessingProgress = () => {
     subscriptionsRef.current = [];
   };
 
-  // Set up real-time subscriptions
+  // Recovery mechanism for stuck states
+  const recoverFromStuckState = async () => {
+    if (!agentId) return;
+
+    console.log('🔧 Attempting to recover from stuck state...');
+    
+    try {
+      const actuallyCompleted = await validateActualCompletion();
+      
+      if (actuallyCompleted) {
+        console.log('🎉 Recovery: Training is actually completed! Forcing completion state.');
+        
+        // Force completion state
+        completionStateRef.current = {
+          isCompleted: true,
+          completedAt: Date.now(),
+          sessionId: completionStateRef.current.sessionId || `recovery-${Date.now()}`,
+          lastValidationAt: Date.now()
+        };
+
+        // Set final completed progress
+        setProgress({
+          totalSources: 0,
+          processedSources: 0,
+          totalPages: 0,
+          processedPages: 0,
+          chunksCreated: 0,
+          status: 'completed',
+          progress: 100,
+          currentlyProcessing: []
+        });
+
+        // Cleanup subscriptions
+        cleanupSubscriptions();
+
+        console.log('✅ Recovery completed - training state fixed');
+        return true;
+      }
+    } catch (error) {
+      console.error('❌ Recovery failed:', error);
+    }
+    
+    return false;
+  };
+
+  // Set up real-time subscriptions with recovery logic
   useEffect(() => {
     if (!agentId) return;
 
@@ -287,6 +470,16 @@ export const useChunkProcessingProgress = () => {
       // Initial calculation
       if (!completionStateRef.current.isCompleted) {
         calculateProgress();
+        
+        // Set up recovery timer for stuck states
+        const recoveryTimer = setTimeout(async () => {
+          if (!completionStateRef.current.isCompleted) {
+            console.log('🔧 Progress seems stuck, attempting recovery...');
+            await recoverFromStuckState();
+          }
+        }, 30000); // 30 seconds
+
+        return () => clearTimeout(recoveryTimer);
       }
     };
 
@@ -309,7 +502,8 @@ export const useChunkProcessingProgress = () => {
       completionStateRef.current = {
         isCompleted: false,
         completedAt: null,
-        sessionId: newSessionId
+        sessionId: newSessionId,
+        lastValidationAt: null
       };
 
       console.log('✅ New chunk processing session started with ID:', newSessionId);
@@ -368,6 +562,7 @@ export const useChunkProcessingProgress = () => {
     progress,
     isConnected,
     startChunkProcessing,
-    refreshProgress: calculateProgress
+    refreshProgress: calculateProgress,
+    recoverFromStuckState
   };
 };

@@ -19,7 +19,7 @@ export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   
   // CRITICAL: All hooks must be called in the same order every time
-  const { progress: chunkProgress, startChunkProcessing } = useChunkProcessingProgress();
+  const { progress: chunkProgress, startChunkProcessing, recoverFromStuckState } = useChunkProcessingProgress();
   
   // CRITICAL: Initialize all state hooks consistently
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -32,12 +32,16 @@ export const useTrainingNotifications = () => {
     completedSessions: Set<string>;
     permanentlyCompleted: boolean;
     completionLocked: boolean;
+    lastProgressValue: number;
+    stuckDetectionTimer: NodeJS.Timeout | null;
   }>({
     status: 'idle',
     sessionId: null,
     completedSessions: new Set(),
     permanentlyCompleted: false,
-    completionLocked: false
+    completionLocked: false,
+    lastProgressValue: 0,
+    stuckDetectionTimer: null
   });
   
   const shownToastsRef = useRef<Set<string>>(new Set());
@@ -156,7 +160,29 @@ export const useTrainingNotifications = () => {
             
             console.log('✅ "Training Started" toast shown for session:', sessionId);
           }
+
+          // Start stuck detection timer
+          if (trainingStateRef.current.stuckDetectionTimer) {
+            clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+          }
+          
+          trainingStateRef.current.stuckDetectionTimer = setTimeout(async () => {
+            if (trainingStateRef.current.status === 'training' && 
+                trainingStateRef.current.lastProgressValue === chunkProgress.progress &&
+                chunkProgress.progress > 0 && chunkProgress.progress < 100) {
+              
+              console.log('🔧 Stuck state detected, attempting recovery...');
+              const recovered = await recoverFromStuckState();
+              
+              if (recovered) {
+                console.log('✅ Successfully recovered from stuck state');
+              }
+            }
+          }, 45000); // 45 seconds
         }
+
+        // Update progress tracking for stuck detection
+        trainingStateRef.current.lastProgressValue = chunkProgress.progress;
 
         // Training completed - PERMANENTLY LOCK everything
         if (chunkProgress.status === 'completed' && 
@@ -164,6 +190,12 @@ export const useTrainingNotifications = () => {
             !trainingStateRef.current.completedSessions.has(sessionId)) {
           
           console.log('🎉 Training completed! PERMANENTLY locking all training state for session:', sessionId);
+          
+          // Clear stuck detection timer
+          if (trainingStateRef.current.stuckDetectionTimer) {
+            clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+            trainingStateRef.current.stuckDetectionTimer = null;
+          }
           
           // PERMANENTLY LOCK this session and all future training
           trainingStateRef.current.completedSessions.add(sessionId);
@@ -192,6 +224,12 @@ export const useTrainingNotifications = () => {
         if (chunkProgress.status === 'failed' && previousStatus !== 'failed') {
           console.log('❌ Training failed for session:', sessionId);
           
+          // Clear stuck detection timer
+          if (trainingStateRef.current.stuckDetectionTimer) {
+            clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+            trainingStateRef.current.stuckDetectionTimer = null;
+          }
+          
           // PERMANENTLY LOCK this session to prevent restart toasts
           trainingStateRef.current.completedSessions.add(sessionId);
           trainingStateRef.current.completionLocked = true;
@@ -212,7 +250,7 @@ export const useTrainingNotifications = () => {
     } finally {
       isProcessingStatusRef.current = false;
     }
-  }, [chunkProgress, agentId]);
+  }, [chunkProgress, agentId, recoverFromStuckState]);
 
   const startTraining = async () => {
     if (!agentId) return;
@@ -221,12 +259,18 @@ export const useTrainingNotifications = () => {
       console.log('🚀 Starting training for agent:', agentId);
 
       // CRITICAL: Reset all completion state for new training session
+      if (trainingStateRef.current.stuckDetectionTimer) {
+        clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+      }
+
       trainingStateRef.current = {
         status: 'training',
         sessionId: null, // Will be created in useEffect when status changes
         completedSessions: new Set(),
         permanentlyCompleted: false,
-        completionLocked: false
+        completionLocked: false,
+        lastProgressValue: 0,
+        stuckDetectionTimer: null
       };
 
       console.log('✅ Training state reset for new session');
@@ -285,6 +329,15 @@ export const useTrainingNotifications = () => {
   const checkTrainingCompletion = () => {
     console.log('Training completion check - delegated to chunk processing hook');
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (trainingStateRef.current.stuckDetectionTimer) {
+        clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+      }
+    };
+  }, []);
 
   // Set up basic connection monitoring
   useEffect(() => {
