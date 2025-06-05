@@ -212,7 +212,7 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up FINAL training notifications for agent:', agentId);
+    console.log('🔔 Setting up IMPROVED training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -242,7 +242,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`final-training-notifications-${agentId}`)
+        .channel(`improved-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -402,6 +402,8 @@ export const useTrainingNotifications = () => {
       let currentlyProcessingPages: string[] = [];
       let hasFailedSources = false;
 
+      console.log('🔍 IMPROVED: Checking training completion for', agentSources.length, 'sources');
+
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
@@ -413,17 +415,34 @@ export const useTrainingNotifications = () => {
             .eq('status', 'completed');
 
           if (pages && pages.length > 0) {
-            const pendingPages = pages.filter(p => !p.processing_status || p.processing_status === 'pending');
+            // FIXED: Better detection of pages needing processing
+            const pendingPages = pages.filter(p => 
+              !p.processing_status || 
+              p.processing_status === 'pending' || 
+              p.processing_status === null
+            );
             const processingPages = pages.filter(p => p.processing_status === 'processing');
             const processedPages = pages.filter(p => p.processing_status === 'processed');
             const failedPages = pages.filter(p => p.processing_status === 'failed');
+
+            console.log(`📊 Website source ${source.title}:`, {
+              totalPages: pages.length,
+              pending: pendingPages.length,
+              processing: processingPages.length,
+              processed: processedPages.length,
+              failed: failedPages.length
+            });
 
             if (failedPages.length > 0) {
               hasFailedSources = true;
             }
 
+            // FIXED: Only consider source as needing training if there are unprocessed pages
             if (pendingPages.length > 0 || processingPages.length > 0) {
               sourcesNeedingTraining.push(source);
+              console.log(`✅ NEEDS TRAINING: ${source.title} has ${pendingPages.length + processingPages.length} unprocessed pages`);
+            } else {
+              console.log(`✅ PROCESSED: ${source.title} all pages processed`);
             }
             
             totalPagesNeedingProcessing += pages.length;
@@ -445,9 +464,7 @@ export const useTrainingNotifications = () => {
               sourcesNeedingTraining.push(source);
               totalPagesNeedingProcessing += 1;
               
-              if (metadata.processing_status === 'completed') {
-                totalPagesProcessed += 1;
-              } else if (metadata.processing_status === 'processing') {
+              if (metadata.processing_status === 'processing') {
                 currentlyProcessingPages.push(source.title);
               }
             } else {
@@ -461,17 +478,29 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // Simplified status determination
+      // FIXED: Better status determination
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
+      
+      console.log('🔍 IMPROVED Status determination:', {
+        sourcesNeedingTraining: sourcesNeedingTraining.length,
+        currentlyProcessingPages: currentlyProcessingPages.length,
+        hasFailedSources,
+        totalPagesNeedingProcessing,
+        totalPagesProcessed
+      });
       
       if (hasFailedSources && sourcesNeedingTraining.length === 0) {
         status = 'failed';
+        console.log('❌ Status: FAILED (has failed sources, no pending)');
       } else if (currentlyProcessingPages.length > 0) {
         status = 'training';
+        console.log('🔄 Status: TRAINING (pages currently processing)');
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
         status = 'completed';
+        console.log('✅ Status: COMPLETED (no sources need training, all processed)');
       } else {
         status = 'idle';
+        console.log('⏸️ Status: IDLE (default state)');
       }
 
       // CRITICAL: Use existing session or create ONLY if no completion yet
@@ -481,6 +510,7 @@ export const useTrainingNotifications = () => {
       if (!sessionId && !agentCompletionStateRef.current.isCompleted) {
         sessionId = `${agentId}-${Date.now()}`;
         currentTrainingSessionRef.current = sessionId;
+        console.log('🆔 Created new session:', sessionId);
       } else if (!sessionId && agentCompletionStateRef.current.isCompleted) {
         // Use the last completed session ID to prevent new session creation
         sessionId = agentCompletionStateRef.current.lastCompletedSessionId || `${agentId}-completed`;
@@ -497,10 +527,11 @@ export const useTrainingNotifications = () => {
         sessionId
       };
 
-      console.log('📊 Training status update:', {
+      console.log('📊 IMPROVED Training status update:', {
         status,
         sessionId,
         progress,
+        sourcesNeedingTraining: sourcesNeedingTraining.length,
         currentState: trainingStateRef.current,
         agentCompleted: agentCompletionStateRef.current.isCompleted,
         lastAction: lastTrainingActionRef.current
@@ -520,7 +551,7 @@ export const useTrainingNotifications = () => {
           !completedSessionsRef.current.has(sessionId) &&
           !agentCompletionStateRef.current.isCompleted) {
         
-        console.log('🎉 FINAL COMPLETION! Processing completion for session:', sessionId);
+        console.log('🎉 IMPROVED COMPLETION! Processing completion for session:', sessionId);
         
         // CRITICAL: Mark agent-level completion IMMEDIATELY
         markAgentCompletion(sessionId);
@@ -565,7 +596,7 @@ export const useTrainingNotifications = () => {
       }
 
     } catch (error) {
-      console.error('Error in FINAL checkTrainingCompletion:', error);
+      console.error('Error in IMPROVED checkTrainingCompletion:', error);
       setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
     }
   };
@@ -574,7 +605,7 @@ export const useTrainingNotifications = () => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting FINAL training for agent:', agentId);
+      console.log('🚀 Starting IMPROVED training for agent:', agentId);
 
       // CRITICAL: Agent-level completion check FIRST
       if (shouldPreventTrainingAction('start')) {
@@ -616,7 +647,6 @@ export const useTrainingNotifications = () => {
         });
       }
 
-      // ... keep existing code (source processing logic)
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content')
@@ -695,7 +725,7 @@ export const useTrainingNotifications = () => {
       }
 
     } catch (error) {
-      console.error('Failed to start FINAL training:', error);
+      console.error('Failed to start IMPROVED training:', error);
       
       trainingStateRef.current = 'failed';
       globalTrainingActiveRef.current = false;
