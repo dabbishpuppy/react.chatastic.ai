@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -36,11 +35,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   isInBackgroundMode = false,
   backgroundSessionId = ''
 }) => {
-  // Enhanced status determination with strict background mode respect
+  // CRITICAL FIX: Enhanced status determination with proper training detection
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
+      trainingProgressProgress: trainingProgress?.progress,
       isRetraining,
       isInBackgroundMode,
       backgroundSessionId,
@@ -50,7 +50,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         progress: trainingProgress.progress,
         sessionId: trainingProgress.sessionId,
         processedSources: trainingProgress.processedSources,
-        totalSources: trainingProgress.totalSources
+        totalSources: trainingProgress.totalSources,
+        currentlyProcessing: trainingProgress.currentlyProcessing?.length || 0
       } : null
     });
 
@@ -64,9 +65,18 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
 
-    // PRIORITY 1: If currently training and dialog is open, show training state
-    if (isRetraining || trainingProgress?.status === 'training') {
-      console.log('✅ Status: training (active training detected)');
+    // PRIORITY 1: If training progress shows training status OR we have active processing
+    const isActivelyTraining = trainingProgress?.status === 'training' || 
+                              (trainingProgress?.currentlyProcessing && trainingProgress.currentlyProcessing.length > 0) ||
+                              (trainingProgress?.progress > 0 && trainingProgress?.progress < 100);
+    
+    if (isActivelyTraining || isRetraining) {
+      console.log('✅ Status: training (active training detected)', {
+        trainingProgressStatus: trainingProgress?.status,
+        currentlyProcessing: trainingProgress?.currentlyProcessing?.length || 0,
+        progress: trainingProgress?.progress,
+        isRetraining
+      });
       return {
         status: 'training',
         progress: trainingProgress?.progress || 0,
@@ -387,7 +397,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="flex-1">
+              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="w-full">
                 Start Training
               </Button>
             </div>

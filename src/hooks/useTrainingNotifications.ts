@@ -35,24 +35,35 @@ export const useTrainingNotifications = () => {
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  // Convert chunk progress to training progress format
+  // Convert chunk progress to training progress format with PROPER status mapping
   useEffect(() => {
     if (chunkProgress && agentId) {
       const sessionId = currentSessionRef.current || `${agentId}-${Date.now()}`;
       
-      // Map chunk processing status to training status
+      // CRITICAL FIX: Map chunk processing status to training status correctly
       const mapStatus = (chunkStatus: 'idle' | 'processing' | 'completed' | 'failed'): 'idle' | 'training' | 'completed' | 'failed' => {
         switch (chunkStatus) {
           case 'processing':
-            return 'training';
+            return 'training'; // This is the key fix
+          case 'completed':
+            return 'completed';
+          case 'failed':
+            return 'failed';
+          case 'idle':
           default:
-            return chunkStatus;
+            // IMPORTANT: If we have progress > 0 or currently processing items, we're training
+            if (chunkProgress.progress > 0 || chunkProgress.currentlyProcessing.length > 0) {
+              return 'training';
+            }
+            return 'idle';
         }
       };
 
+      const mappedStatus = mapStatus(chunkProgress.status);
+
       const newTrainingProgress: TrainingProgress = {
         agentId,
-        status: mapStatus(chunkProgress.status),
+        status: mappedStatus,
         progress: chunkProgress.progress,
         totalSources: chunkProgress.totalPages, // Use total pages as total items to process
         processedSources: chunkProgress.processedPages,
@@ -62,12 +73,25 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newTrainingProgress);
 
-      // Handle status changes - only process if we have real data (not initial placeholder)
+      console.log('🔄 Training progress mapped from chunk progress:', {
+        chunkStatus: chunkProgress.status,
+        mappedStatus,
+        progress: chunkProgress.progress,
+        processing: chunkProgress.currentlyProcessing.length,
+        sessionId
+      });
+
+      // Handle status changes - only process if we have real data or definitive status
       const hasRealData = chunkProgress.totalPages > 0 || chunkProgress.processedPages > 0 || chunkProgress.currentlyProcessing.length > 0;
       
       if (hasRealData || chunkProgress.status === 'completed' || chunkProgress.status === 'failed') {
         const previousStatus = trainingStateRef.current;
-        trainingStateRef.current = mapStatus(chunkProgress.status);
+        trainingStateRef.current = mappedStatus;
+
+        // Training started detection
+        if (mappedStatus === 'training' && previousStatus !== 'training') {
+          console.log('🚀 Training started detected! Session:', sessionId);
+        }
 
         // Training completed
         if (chunkProgress.status === 'completed' && 
@@ -134,10 +158,10 @@ export const useTrainingNotifications = () => {
       completedSessionsRef.current.clear();
       initialTrainingSetRef.current = true;
 
-      // IMMEDIATELY set training progress to show dialog
+      // IMMEDIATELY set training progress to show dialog in training state
       const initialTrainingProgress: TrainingProgress = {
         agentId,
-        status: 'training',
+        status: 'training', // Immediately set to training
         progress: 0,
         totalSources: 0,
         processedSources: 0,
@@ -147,7 +171,7 @@ export const useTrainingNotifications = () => {
       
       setTrainingProgress(initialTrainingProgress);
       
-      console.log('✅ Initial training state set, showing dialog');
+      console.log('✅ Initial training state set to TRAINING, dialog should show progress');
 
       // Show "Training Started" toast
       const startToastId = `start-${sessionId}`;
