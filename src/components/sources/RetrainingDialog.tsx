@@ -36,7 +36,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   isInBackgroundMode = false,
   backgroundSessionId = ''
 }) => {
-  // Enhanced status determination with background mode awareness
+  // Enhanced status determination with strict background mode respect
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
@@ -44,6 +44,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       isRetraining,
       isInBackgroundMode,
       backgroundSessionId,
+      open,
       trainingProgress: trainingProgress ? {
         status: trainingProgress.status,
         progress: trainingProgress.progress,
@@ -53,17 +54,17 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       } : null
     });
 
-    // PRIORITY 1: If in background mode, don't override the training state
+    // CRITICAL: If in background mode, don't show dialog content
     if (isInBackgroundMode && backgroundSessionId) {
-      console.log('✅ Status: background_training (background mode active)');
+      console.log('🚫 In background mode - dialog should be closed');
       return {
-        status: 'training',
-        progress: trainingProgress?.progress || 0,
+        status: 'background',
+        progress: 0,
         isBackground: true
       };
     }
 
-    // PRIORITY 2: If currently training, show training state
+    // PRIORITY 1: If currently training and dialog is open, show training state
     if (isRetraining || trainingProgress?.status === 'training') {
       console.log('✅ Status: training (active training detected)');
       return {
@@ -73,7 +74,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
     
-    // PRIORITY 3: If training failed, show failed state
+    // PRIORITY 2: If training failed, show failed state
     if (trainingProgress?.status === 'failed') {
       console.log('✅ Status: failed (training failed)');
       return {
@@ -83,8 +84,8 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
     
-    // PRIORITY 4: If training finished AND no retraining needed, show completed
-    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed && !isInBackgroundMode) {
+    // PRIORITY 3: If training finished AND no retraining needed, show completed
+    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('✅ Status: completed (training done and no retraining needed)');
       return {
         status: 'completed',
@@ -93,7 +94,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
     
-    // PRIORITY 5: If retraining is explicitly needed, show that state
+    // PRIORITY 4: If retraining is explicitly needed, show that state
     if (retrainingNeeded?.needed) {
       console.log('✅ Status: needs_training (retraining explicitly needed)');
       return {
@@ -113,6 +114,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const { status: currentStatus, progress: currentProgress, isBackground } = getCurrentStatus();
+  
+  // If in background mode, don't render the dialog content
+  if (isBackground) {
+    console.log('🚫 Background mode active - not rendering dialog content');
+    return null;
+  }
   
   console.log('🔍 RetrainingDialog render state:', {
     currentStatus,
