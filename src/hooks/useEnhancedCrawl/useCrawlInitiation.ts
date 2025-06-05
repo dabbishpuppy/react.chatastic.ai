@@ -23,9 +23,9 @@ export const useCrawlInitiation = () => {
       
       console.log('✅ Enhanced crawl initiated successfully:', result);
       
-      // Show success toast
+      // Show crawl started toast (Phase 1)
       toast({
-        title: "Crawl Started",
+        title: "Crawling Started Successfully",
         description: `Discovering and crawling ${request.url}...`,
         duration: 3000,
       });
@@ -40,12 +40,10 @@ export const useCrawlInitiation = () => {
         }
       }, 2000);
       
-      // Dispatch crawl completed event after a delay
+      // Monitor crawl completion and show completion toast (Phase 2)
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('crawlCompleted', {
-          detail: { agentId: request.agentId, parentSourceId: result.parentSourceId }
-        }));
-      }, 10000); // 10 second delay to allow initial setup to complete
+        monitorCrawlCompletion(result.parentSourceId, request.agentId);
+      }, 5000);
       
       return result;
       
@@ -57,8 +55,9 @@ export const useCrawlInitiation = () => {
         detail: { agentId: request.agentId, error: true }
       }));
       
+      // Show crawl failed toast
       toast({
-        title: "Crawl Failed",
+        title: "Crawling Failed",
         description: error instanceof Error ? error.message : "Failed to start crawl",
         variant: "destructive",
       });
@@ -67,6 +66,58 @@ export const useCrawlInitiation = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const monitorCrawlCompletion = async (parentSourceId: string, agentId: string) => {
+    const checkCompletion = async () => {
+      try {
+        const status = await CrawlApiService.checkCrawlStatus(parentSourceId);
+        
+        if (status.status === 'completed') {
+          console.log('🎉 Crawl completed successfully');
+          
+          // Show crawl completed toast (Phase 2)
+          toast({
+            title: "Crawling Completed Successfully",
+            description: `Successfully crawled ${status.completedJobs} pages`,
+            duration: 4000,
+          });
+          
+          // Dispatch crawl completed event
+          window.dispatchEvent(new CustomEvent('crawlCompleted', {
+            detail: { agentId, parentSourceId, status: 'completed' }
+          }));
+          
+          return;
+        } else if (status.status === 'failed') {
+          console.log('❌ Crawl failed');
+          
+          // Show crawl failed toast
+          toast({
+            title: "Crawling Failed",
+            description: `Crawl failed after processing ${status.completedJobs} pages`,
+            variant: "destructive",
+          });
+          
+          // Dispatch crawl completed event with error
+          window.dispatchEvent(new CustomEvent('crawlCompleted', {
+            detail: { agentId, parentSourceId, status: 'failed', error: true }
+          }));
+          
+          return;
+        }
+        
+        // Continue monitoring if still in progress
+        if (status.status === 'in_progress' || status.status === 'pending') {
+          setTimeout(checkCompletion, 5000); // Check every 5 seconds
+        }
+      } catch (error) {
+        console.error('Error checking crawl status:', error);
+        // Stop monitoring on error
+      }
+    };
+    
+    checkCompletion();
   };
 
   return {

@@ -11,15 +11,15 @@ import { useParams } from 'react-router-dom';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
 import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
 import { Globe, FileText, Map } from 'lucide-react';
+
 interface EnhancedWebsiteCrawlFormV3Props {
   onCrawlStarted?: (parentSourceId: string) => void;
 }
+
 const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   onCrawlStarted
 }) => {
-  const {
-    agentId
-  } = useParams();
+  const { agentId } = useParams();
   const [activeTab, setActiveTab] = useState('website');
   const [url, setUrl] = useState('');
   const [protocol, setProtocol] = useState('https://');
@@ -29,21 +29,15 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   const [includePaths, setIncludePaths] = useState('');
   const [excludePaths, setExcludePaths] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const {
-    initiateCrawl,
-    loading: crawlLoading
-  } = useEnhancedCrawl();
-  const {
-    infrastructureHealth,
-    systemHealth,
-    loading: infrastructureLoading,
-    loadInfrastructureHealth
-  } = useProductionInfrastructure();
+
+  const { initiateCrawl, loading: crawlLoading } = useEnhancedCrawl();
+  const { infrastructureHealth, systemHealth, loading: infrastructureLoading, loadInfrastructureHealth } = useProductionInfrastructure();
 
   // Initialize infrastructure on mount
   useEffect(() => {
     loadInfrastructureHealth();
   }, [loadInfrastructureHealth]);
+
   const getUrlPlaceholder = () => {
     switch (activeTab) {
       case 'website':
@@ -56,6 +50,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         return 'example.com';
     }
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agentId || !url.trim()) {
@@ -66,6 +61,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       });
       return;
     }
+
     setIsSubmitting(true);
     try {
       const fullUrl = url.startsWith('http') ? url : `${protocol}${url.trim()}`;
@@ -93,6 +89,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       // Parse include/exclude paths
       const includePathsArray = includePaths.split(',').map(p => p.trim()).filter(p => p.length > 0);
       const excludePathsArray = excludePaths.split(',').map(p => p.trim()).filter(p => p.length > 0);
+
       const result = await initiateCrawl({
         url: fullUrl,
         agentId,
@@ -103,11 +100,8 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         includePaths: includePathsArray,
         excludePaths: excludePathsArray
       });
+
       if (result.parentSourceId) {
-        toast({
-          title: "Enhanced Crawl Started Successfully",
-          description: `Your ${activeTab} crawl has been initiated. Monitoring ${result.parentSourceId}`
-        });
         onCrawlStarted?.(result.parentSourceId);
 
         // Reset form
@@ -119,15 +113,11 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       }
     } catch (error: any) {
       console.error('❌ Enhanced crawl submission failed:', error);
-      toast({
-        title: "Crawl Failed",
-        description: error.message || "Failed to start the enhanced crawl. Please try again.",
-        variant: "destructive"
-      });
     } finally {
       setIsSubmitting(false);
     }
   };
+
   const getTabDescription = () => {
     switch (activeTab) {
       case 'website':
@@ -140,6 +130,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         return '';
     }
   };
+
   const getButtonText = () => {
     if (isSubmitting || crawlLoading) {
       switch (activeTab) {
@@ -164,9 +155,11 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         return "Start Crawl";
     }
   };
+
   const isLoading = isSubmitting || crawlLoading;
-  return <Card>
-      
+
+  return (
+    <Card>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 my-[20px]">
@@ -311,6 +304,8 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
           </form>
         </Tabs>
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
+
 export default EnhancedWebsiteCrawlFormV3;

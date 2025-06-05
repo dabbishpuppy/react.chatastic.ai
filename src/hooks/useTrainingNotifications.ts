@@ -34,6 +34,8 @@ export const useTrainingNotifications = () => {
   const completionToastShownForSessionRef = useRef<Set<string>>(new Set());
   const crawlInitiationInProgressRef = useRef<boolean>(false);
   const crawlInitiationStartTimeRef = useRef<number>(0);
+  const trainingStartedSessionRef = useRef<string>('');
+  const trainingFailedSessionRef = useRef<Set<string>>(new Set());
   
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -314,7 +316,7 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newProgress);
 
-      // Enhanced completion notification logic with strict duplicate prevention
+      // Enhanced completion notification logic with strict duplicate prevention (Phase 4)
       if (status === 'completed' && 
           totalPagesNeedingProcessing > 0 &&
           totalPagesProcessed === totalPagesNeedingProcessing &&
@@ -327,8 +329,9 @@ export const useTrainingNotifications = () => {
         completionToastShownForSessionRef.current.add(sessionId);
         lastCompletedSessionIdRef.current = sessionId;
         
+        // Show training complete toast (Phase 4)
         toast({
-          title: "Training Complete!",
+          title: "Training Complete",
           description: "Your AI agent is trained and ready",
           duration: 5000,
         });
@@ -341,6 +344,27 @@ export const useTrainingNotifications = () => {
         if (completionToastShownForSessionRef.current.size > 5) {
           const sessionsArray = Array.from(completionToastShownForSessionRef.current);
           completionToastShownForSessionRef.current = new Set(sessionsArray.slice(-5));
+        }
+      }
+
+      // Enhanced failure detection for training (Phase 4)
+      if (status === 'failed' && !trainingFailedSessionRef.current.has(sessionId)) {
+        console.log('❌ Training failed for session:', sessionId);
+        
+        trainingFailedSessionRef.current.add(sessionId);
+        
+        // Show training failed toast
+        toast({
+          title: "Training Failed",
+          description: "Training process encountered an error. Please try again.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        
+        // Clean up failed sessions (keep only last 5)
+        if (trainingFailedSessionRef.current.size > 5) {
+          const sessionsArray = Array.from(trainingFailedSessionRef.current);
+          trainingFailedSessionRef.current = new Set(sessionsArray.slice(-5));
         }
       }
 
@@ -412,15 +436,21 @@ export const useTrainingNotifications = () => {
         return;
       }
 
+      // Generate unique session ID for this training start
+      const sessionId = `training-${agentId}-${Date.now()}`;
+      trainingStartedSessionRef.current = sessionId;
+
       setTrainingProgress({
         agentId,
         status: 'training',
         progress: 0,
         totalSources: totalPages,
         processedSources: 0,
-        currentlyProcessing: []
+        currentlyProcessing: [],
+        sessionId
       });
 
+      // Show training started toast (Phase 3)
       toast({
         title: "Training Started",
         description: `Processing ${totalPages} item${totalPages > 1 ? 's' : ''} for AI training...`,
@@ -447,6 +477,7 @@ export const useTrainingNotifications = () => {
         });
         setTrainingProgress(prev => prev ? { ...prev, status: 'training' } : null);
       } else {
+        // Show training failed toast
         toast({
           title: "Training Failed",
           description: "Failed to start training process",
