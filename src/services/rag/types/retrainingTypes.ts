@@ -1,9 +1,10 @@
+
 export interface DatabaseSource {
   id: string;
   title: string;
   content?: string;
   source_type: string;
-  metadata: Record<string, any>; // Made required to match SourceProcessor expectations
+  metadata?: Record<string, any>;
 }
 
 export interface RetrainingProgress {
