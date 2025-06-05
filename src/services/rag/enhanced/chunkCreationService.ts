@@ -73,12 +73,11 @@ export class ChunkCreationService {
       };
     }
 
-    // Use a transaction to ensure atomicity
-    const { data: insertedChunks, error: insertError } = await supabase.rpc(
-      'create_chunks_transaction',
-      {
-        p_source_id: sourceId,
-        p_chunks: chunks.map((chunk, index) => ({
+    // Use the edge function to create chunks in a transaction
+    const { data, error } = await supabase.functions.invoke('create-chunks-transaction', {
+      body: {
+        sourceId,
+        chunks: chunks.map((chunk, index) => ({
           chunk_index: index,
           content: chunk,
           token_count: Math.ceil(chunk.length / 4),
@@ -89,15 +88,19 @@ export class ChunkCreationService {
           }
         }))
       }
-    );
+    });
 
-    if (insertError) {
-      throw new Error(`Failed to insert chunks: ${insertError.message}`);
+    if (error) {
+      throw new Error(`Failed to create chunks: ${error.message}`);
+    }
+
+    if (!data?.success) {
+      throw new Error(`Chunk creation failed: ${data?.error || 'Unknown error'}`);
     }
 
     return {
       success: true,
-      chunksCreated: chunks.length,
+      chunksCreated: data.chunksCreated || chunks.length,
       sourceId
     };
   }

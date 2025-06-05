@@ -1,4 +1,5 @@
 
+import { supabase } from "@/integrations/supabase/client";
 import { ChunkCreationService } from './chunkCreationService';
 import { EmbeddingGenerationService } from './embeddingGenerationService';
 
