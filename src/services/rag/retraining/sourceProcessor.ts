@@ -70,13 +70,22 @@ export class SourceProcessor {
 
                 console.error(`❌ Failed to process page ${page.id}:`, processingError);
                 
+                // Get current retry_count and increment it
+                const { data: currentPage } = await supabase
+                  .from('source_pages')
+                  .select('retry_count')
+                  .eq('id', page.id)
+                  .single();
+
+                const newRetryCount = (currentPage?.retry_count || 0) + 1;
+                
                 // Mark as failed with retry capability
                 await supabase
                   .from('source_pages')
                   .update({ 
                     processing_status: 'failed',
                     error_message: processingError.message,
-                    retry_count: supabase.sql`COALESCE(retry_count, 0) + 1`
+                    retry_count: newRetryCount
                   })
                   .eq('id', page.id);
                 
@@ -99,13 +108,22 @@ export class SourceProcessor {
             } catch (error) {
               console.error(`❌ Error processing page ${page.id}:`, error);
               
+              // Get current retry_count and increment it
+              const { data: currentPage } = await supabase
+                .from('source_pages')
+                .select('retry_count')
+                .eq('id', page.id)
+                .single();
+
+              const newRetryCount = (currentPage?.retry_count || 0) + 1;
+              
               // Mark as failed with retry capability
               await supabase
                 .from('source_pages')
                 .update({ 
                   processing_status: 'failed',
                   error_message: error.message,
-                  retry_count: supabase.sql`COALESCE(retry_count, 0) + 1`
+                  retry_count: newRetryCount
                 })
                 .eq('id', page.id);
             }
