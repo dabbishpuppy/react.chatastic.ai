@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { CrawlApiService } from '@/services/rag/enhanced/crawlApi';
 import { EnhancedCrawlService } from '@/services/rag/enhanced/enhancedCrawlService';
+import { CrawlRecoveryService } from '@/services/rag/crawlRecoveryService';
 import type { EnhancedCrawlRequest } from '@/services/rag/enhanced/crawlTypes';
 
 export const useCrawlInitiation = () => {
@@ -69,17 +70,45 @@ export const useCrawlInitiation = () => {
   };
 
   const monitorCrawlCompletion = async (parentSourceId: string, agentId: string) => {
+    let checkCount = 0;
+    const maxChecks = 60; // 5 minutes of monitoring
+    
     const checkCompletion = async () => {
       try {
+        checkCount++;
+        
         const status = await CrawlApiService.checkCrawlStatus(parentSourceId);
         
         if (status.status === 'completed') {
           console.log('🎉 Crawl completed successfully');
           
+          // Check if recovery is needed before showing success
+          const recoveryStatus = await CrawlRecoveryService.getRecoveryStatus(parentSourceId);
+          
+          if (recoveryStatus.needsRecovery) {
+            console.log('🔄 Auto-triggering recovery for incomplete pages');
+            
+            // Auto-trigger recovery
+            setTimeout(async () => {
+              try {
+                const recoveryResult = await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
+                if (recoveryResult.success && recoveryResult.retriedCount! > 0) {
+                  toast({
+                    title: "Auto-Recovery Triggered",
+                    description: `Retrying ${recoveryResult.retriedCount} incomplete pages`,
+                    duration: 4000,
+                  });
+                }
+              } catch (recoveryError) {
+                console.warn('⚠️ Auto-recovery failed:', recoveryError);
+              }
+            }, 2000);
+          }
+          
           // Show crawl completed toast (Phase 2)
           toast({
             title: "Crawling Completed Successfully",
-            description: `Successfully crawled ${status.completedJobs} pages`,
+            description: `Successfully crawled ${status.completedJobs} pages${recoveryStatus.needsRecovery ? ' (auto-retry initiated for incomplete pages)' : ''}`,
             duration: 4000,
           });
           
@@ -107,9 +136,25 @@ export const useCrawlInitiation = () => {
           return;
         }
         
-        // Continue monitoring if still in progress
-        if (status.status === 'in_progress' || status.status === 'pending') {
+        // Continue monitoring if still in progress and under max checks
+        if ((status.status === 'in_progress' || status.status === 'pending') && checkCount < maxChecks) {
           setTimeout(checkCompletion, 5000); // Check every 5 seconds
+        } else if (checkCount >= maxChecks) {
+          console.log('⏰ Crawl monitoring timeout - triggering recovery check');
+          
+          // Trigger recovery check after timeout
+          const recoveryStatus = await CrawlRecoveryService.getRecoveryStatus(parentSourceId);
+          if (recoveryStatus.needsRecovery) {
+            toast({
+              title: "Crawl Taking Longer Than Expected",
+              description: "Auto-recovery will be triggered to complete remaining pages",
+              duration: 5000,
+            });
+            
+            setTimeout(async () => {
+              await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
+            }, 3000);
+          }
         }
       } catch (error) {
         console.error('Error checking crawl status:', error);

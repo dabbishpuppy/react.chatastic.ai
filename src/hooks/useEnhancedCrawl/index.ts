@@ -16,6 +16,7 @@ export const useEnhancedCrawl = () => {
       const result = await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
       
       if (result.success) {
+        // Trigger chunk generation after successful retry
         setTimeout(async () => {
           try {
             const { data, error } = await supabase.functions.invoke('generate-missing-chunks');
@@ -79,6 +80,47 @@ export const useEnhancedCrawl = () => {
     }
   };
 
+  const getRecoveryStatus = async (parentSourceId: string) => {
+    try {
+      const status = await CrawlRecoveryService.getRecoveryStatus(parentSourceId);
+      return status;
+    } catch (error) {
+      console.error('Error getting recovery status:', error);
+      return null;
+    }
+  };
+
+  const manualRecovery = async (parentSourceId: string) => {
+    try {
+      console.log('🛠️ Manual recovery for:', parentSourceId);
+      
+      const result = await CrawlRecoveryService.manualRecovery(parentSourceId);
+      
+      if (result.success) {
+        toast({
+          title: "Recovery Successful",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Recovery Failed",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error in manual recovery:', error);
+      toast({
+        title: "Recovery Error",
+        description: "Manual recovery encountered an issue",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const getActiveCrawlStatus = (parentSourceId: string) => {
     console.log('📊 Getting active crawl status for:', parentSourceId);
     return null;
@@ -90,6 +132,8 @@ export const useEnhancedCrawl = () => {
     isLoading,
     retryFailedJobs,
     getCrawlJobs,
-    getActiveCrawlStatus
+    getActiveCrawlStatus,
+    getRecoveryStatus,
+    manualRecovery
   };
 };

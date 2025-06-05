@@ -23,7 +23,7 @@ export class SourceProcessor {
         if (unprocessedPages && unprocessedPages.length > 0) {
           console.log(`📄 Processing ${unprocessedPages.length} crawled pages for ${source.title}`);
           
-          // Process each page individually via process-page-content
+          // Process each page individually with improved error handling
           let processedCount = 0;
           let totalChunks = 0;
           
@@ -31,27 +31,59 @@ export class SourceProcessor {
             try {
               console.log(`🔧 Processing page: ${page.url} (ID: ${page.id})`);
               
-              // Call process-page-content directly for this specific page
+              // Mark as processing to prevent conflicts
+              const { error: lockError } = await supabase
+                .from('source_pages')
+                .update({ 
+                  processing_status: 'processing',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', page.id)
+                .eq('processing_status', null); // Only update if not already processing
+
+              if (lockError) {
+                console.log(`⚠️ Page ${page.id} already being processed, skipping`);
+                continue;
+              }
+
+              // Call process-page-content for this specific page
               const { data: processingResult, error: processingError } = await supabase.functions.invoke('process-page-content', {
                 body: { pageId: page.id }
               });
 
               if (processingError) {
+                // Handle 409 conflicts gracefully
+                if (processingError.message?.includes('409') || processingError.status === 409) {
+                  console.log(`✅ Page ${page.id} already processed or processing - marking as completed`);
+                  
+                  await supabase
+                    .from('source_pages')
+                    .update({ 
+                      processing_status: 'processed',
+                      chunks_created: 0 // Unknown, but processed
+                    })
+                    .eq('id', page.id);
+                  
+                  processedCount++;
+                  continue;
+                }
+
                 console.error(`❌ Failed to process page ${page.id}:`, processingError);
                 
-                // Mark as failed directly - no intermediate processing status
+                // Mark as failed with retry capability
                 await supabase
                   .from('source_pages')
                   .update({ 
                     processing_status: 'failed',
-                    error_message: processingError.message
+                    error_message: processingError.message,
+                    retry_count: supabase.sql`COALESCE(retry_count, 0) + 1`
                   })
                   .eq('id', page.id);
                 
                 continue;
               }
 
-              // Mark as processed successfully directly - no intermediate processing status
+              // Mark as processed successfully
               await supabase
                 .from('source_pages')
                 .update({ 
@@ -67,15 +99,19 @@ export class SourceProcessor {
             } catch (error) {
               console.error(`❌ Error processing page ${page.id}:`, error);
               
-              // Mark as failed directly - no intermediate processing status
+              // Mark as failed with retry capability
               await supabase
                 .from('source_pages')
                 .update({ 
                   processing_status: 'failed',
-                  error_message: error.message
+                  error_message: error.message,
+                  retry_count: supabase.sql`COALESCE(retry_count, 0) + 1`
                 })
                 .eq('id', page.id);
             }
+
+            // Add small delay to prevent overwhelming the system
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
 
           // Update parent source metadata after processing all pages
@@ -87,7 +123,7 @@ export class SourceProcessor {
                 last_training_at: new Date().toISOString(),
                 pages_processed: processedCount,
                 total_chunks_created: totalChunks,
-                processing_method: 'direct_page_processing'
+                processing_method: 'enhanced_page_processing'
               }
             })
             .eq('id', source.id);
@@ -100,7 +136,7 @@ export class SourceProcessor {
         }
       }
 
-      // Handle other source types (text, file, qa)
+      // Handle other source types (text, file, qa) - keep existing code
       if (!source.content || source.content.trim().length === 0) {
         // Check for Q&A sources with structured content
         if (source.source_type === 'qa') {
