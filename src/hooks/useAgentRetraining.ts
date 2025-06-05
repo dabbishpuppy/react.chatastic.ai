@@ -99,10 +99,8 @@ export const useAgentRetraining = (agentId?: string) => {
     try {
       await startTraining();
 
-      toast({
-        title: "Training Started",
-        description: "Processing your sources and generating embeddings..."
-      });
+      // REMOVED: Duplicate toast notification - the training session manager handles this
+      // The startTraining() function from useTrainingNotifications already shows the proper toast
 
       setTimeout(() => {
         checkRetrainingNeeded();
