@@ -21,6 +21,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
   const [backgroundSessionId, setBackgroundSessionId] = useState<string>('');
   const [userInitiatedTraining, setUserInitiatedTraining] = useState(false);
+  const [backgroundModeLocked, setBackgroundModeLocked] = useState(false);
   
   // Use enhanced training hooks
   const {
@@ -35,21 +36,14 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Only auto-open dialog when user initiates training AND not in background
-  useEffect(() => {
-    if (userInitiatedTraining && isRetraining && !isTrainingInBackground) {
-      console.log('🔄 User-initiated training started - opening dialog');
-      setShowRetrainingDialog(true);
-    }
-  }, [userInitiatedTraining, isRetraining, isTrainingInBackground]);
-
   // Enhanced training completion listener
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
       console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
       
-      // Reset user-initiated flag
+      // Reset all training-related flags
       setUserInitiatedTraining(false);
+      setBackgroundModeLocked(false);
       
       // If training was in background, show toast and cleanup
       if (isTrainingInBackground) {
@@ -72,8 +66,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     const handleTrainingContinuesInBackground = (event: CustomEvent) => {
       console.log('📱 Training continues in background:', event.detail);
       setIsTrainingInBackground(true);
+      setBackgroundModeLocked(true); // Lock background mode
       setBackgroundSessionId(event.detail?.sessionId || '');
       setShowRetrainingDialog(false);
+      setUserInitiatedTraining(false); // Reset to prevent conflicts
     };
 
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
@@ -101,12 +97,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('🎯 Training completed - cleaning up state');
       
-      // Only reset background state if training was actually completed
-      if (isTrainingInBackground) {
+      // Only reset background state if training was actually completed and not locked
+      if (isTrainingInBackground && !backgroundModeLocked) {
         setIsTrainingInBackground(false);
         setBackgroundSessionId('');
       }
       
+      // Always reset user initiated flag on completion
       setUserInitiatedTraining(false);
       
       // Refresh stats after completion
@@ -115,7 +112,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         checkRetrainingNeeded();
       }, 2000);
     }
-  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded, isTrainingInBackground]);
+  }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded, isTrainingInBackground, backgroundModeLocked]);
 
   // Listen for source events
   useEffect(() => {
@@ -129,8 +126,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         clearTimeout(debounceTimer);
       }
       
-      // Don't reset background training state on source events during active training
-      if (!isRetraining && !isTrainingInBackground) {
+      // Don't reset background training state on source events during active training or when locked
+      if (!isRetraining && !isTrainingInBackground && !backgroundModeLocked) {
         setIsTrainingInBackground(false);
       }
       
@@ -154,7 +151,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         window.removeEventListener(eventType, handleSourceEvent as EventListener);
       });
     };
-  }, [refetchStats, checkRetrainingNeeded, isRetraining, isTrainingInBackground]);
+  }, [refetchStats, checkRetrainingNeeded, isRetraining, isTrainingInBackground, backgroundModeLocked]);
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
@@ -164,9 +161,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleRetrainClick = () => {
-    console.log('🔄 Retrain button clicked - setting user-initiated flag');
+    console.log('🔄 Retrain button clicked - setting user-initiated flag and opening dialog');
     setUserInitiatedTraining(true);
     setIsTrainingInBackground(false); // Reset background state
+    setBackgroundModeLocked(false); // Reset background lock
     setBackgroundSessionId('');
     setShowRetrainingDialog(true);
   };
@@ -176,14 +174,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       open, 
       isTraining: isTrainingActive, 
       isBackground: isTrainingInBackground,
-      userInitiated: userInitiatedTraining
+      userInitiated: userInitiatedTraining,
+      backgroundLocked: backgroundModeLocked
     });
     
-    // If closing dialog while training is active, set background mode
-    if (!open && isTrainingActive && trainingProgress?.status === 'training') {
+    // If closing dialog while training is active and not already in background mode, set background mode
+    if (!open && isTrainingActive && trainingProgress?.status === 'training' && !backgroundModeLocked) {
       console.log('📱 Setting background training state - training is active');
       setIsTrainingInBackground(true);
+      setBackgroundModeLocked(true); // Lock background mode
       setBackgroundSessionId(trainingProgress?.sessionId || '');
+      setUserInitiatedTraining(false); // Reset to prevent reopening
       
       // Dispatch background event
       window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
@@ -194,7 +195,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         }
       }));
     } else if (!open) {
-      // Normal close - reset user-initiated flag but preserve background state
+      // Normal close - reset user-initiated flag but preserve background state if locked
       setUserInitiatedTraining(false);
     }
     
@@ -227,7 +228,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         onRetrainClick={handleRetrainClick}
         retrainingNeeded={retrainingNeeded?.needed || false}
         isRetraining={isTrainingActive}
-        isTrainingInBackground={isTrainingInBackground}
+        isTrainingInBackground={isTrainingInBackground && backgroundModeLocked}
         isTrainingCompleted={isTrainingCompleted}
         requiresTraining={stats.requiresTraining}
         unprocessedCrawledPages={stats.unprocessedCrawledPages}
@@ -241,7 +242,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         retrainingNeeded={retrainingNeeded}
         onStartRetraining={startRetraining}
         trainingProgress={trainingProgress}
-        isInBackgroundMode={isTrainingInBackground}
+        isInBackgroundMode={isTrainingInBackground && backgroundModeLocked}
         backgroundSessionId={backgroundSessionId}
       />
     </>

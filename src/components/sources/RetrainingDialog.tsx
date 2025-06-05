@@ -54,9 +54,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       } : null
     });
 
-    // CRITICAL: If in background mode, don't show dialog content
+    // CRITICAL: If in background mode, completely suppress dialog content
     if (isInBackgroundMode && backgroundSessionId) {
-      console.log('🚫 In background mode - dialog should be closed');
+      console.log('🚫 In background mode - dialog content suppressed');
       return {
         status: 'background',
         progress: 0,
@@ -115,9 +115,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
   const { status: currentStatus, progress: currentProgress, isBackground } = getCurrentStatus();
   
-  // If in background mode, don't render the dialog content
+  // If in background mode, completely hide the dialog (don't render content)
   if (isBackground) {
-    console.log('🚫 Background mode active - not rendering dialog content');
+    console.log('🚫 Background mode active - completely suppressing dialog');
     return null;
   }
   
@@ -234,10 +234,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   const handleContinueInBackground = () => {
     console.log('📱 Continue in background clicked');
     
-    // Close the dialog first
-    onOpenChange(false);
-    
-    // Dispatch event
+    // Dispatch event BEFORE closing dialog to ensure proper state management
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
@@ -246,6 +243,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         timestamp: Date.now()
       }
     }));
+    
+    // Close the dialog
+    onOpenChange(false);
     
     console.log('📱 Background training event dispatched for session:', trainingProgress?.sessionId);
   };
