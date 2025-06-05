@@ -37,7 +37,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
-      trainingProgress: trainingProgress?.progress,
+      trainingProgressValue: trainingProgress?.progress,
       isRetraining,
       trainingProgress
     });

@@ -57,7 +57,7 @@ export const useTrainingCompletion = (
       const { data: chunks, error: chunksError } = await supabase
         .from('source_chunks')
         .select('id')
-        .eq('agent_id', agentId)
+        .eq('source_id', agentId)
         .limit(1);
 
       if (chunksError) {
@@ -231,7 +231,7 @@ export const useTrainingCompletion = (
         }
       }
 
-      const progress = totalPagesNeedingProcessing > 0 ? 
+      const calculatedProgress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
@@ -244,7 +244,7 @@ export const useTrainingCompletion = (
         totalPagesProcessed,
         activeTrainingSession: refs.activeTrainingSessionRef.current,
         isActuallyComplete,
-        progress
+        calculatedProgress
       });
 
       // FIXED: Enhanced status determination with validation override
@@ -267,7 +267,7 @@ export const useTrainingCompletion = (
         console.log('🔄 Status: TRAINING (pages currently processing or active session)');
         
         // FIXED: Recovery mechanism - if progress is 100% but still showing training, validate
-        if (progress === 100 && currentlyProcessingPages.length === 0) {
+        if (calculatedProgress === 100 && currentlyProcessingPages.length === 0) {
           console.log('🔍 RECOVERY: Progress 100% but status training - validating completion');
           const recoveryValidation = await validateTrainingCompletion(agentId);
           if (recoveryValidation) {
@@ -297,7 +297,7 @@ export const useTrainingCompletion = (
       const newProgress: TrainingProgress = {
         agentId,
         status,
-        progress,
+        progress: calculatedProgress,
         totalSources: totalPagesNeedingProcessing,
         processedSources: totalPagesProcessed,
         currentlyProcessing: currentlyProcessingPages,
@@ -307,7 +307,7 @@ export const useTrainingCompletion = (
       console.log('📊 IMPROVED Training status update:', {
         status,
         sessionId,
-        progress,
+        progress: calculatedProgress,
         sourcesNeedingTraining: sourcesNeedingTraining.length,
         currentState: refs.trainingStateRef.current,
         agentCompleted: refs.agentCompletionStateRef.current.isCompleted,
