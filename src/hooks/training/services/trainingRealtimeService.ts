@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { TrainingRefs } from '../types';
@@ -7,24 +6,24 @@ export class TrainingRealtimeService {
   static shouldIgnoreUpdate(eventType: string, payload: any, refs: TrainingRefs): boolean {
     const now = Date.now();
     
-    // ENHANCED: Less aggressive filtering - only ignore if recently completed AND no new content
+    // REDUCED: Much less aggressive filtering - only ignore very recent completions
     if (refs.agentCompletionStateRef.current.isCompleted) {
       const timeSinceCompletion = now - refs.agentCompletionStateRef.current.completedAt;
       
-      // Only ignore updates for first 30 seconds after completion (reduced from 2 minutes)
-      if (timeSinceCompletion < 30000) {
+      // Only ignore updates for first 10 seconds after completion (reduced from 30s)
+      if (timeSinceCompletion < 10000) {
         console.log(`🚫 BRIEF POST-COMPLETION: Ignoring ${eventType} - agent completed ${timeSinceCompletion}ms ago`);
         return true;
       }
       
-      // After 30 seconds, allow updates that might indicate new content
       console.log(`🔄 POST-COMPLETION: Allowing ${eventType} - sufficient time passed (${timeSinceCompletion}ms)`);
     }
 
-    // ENHANCED: For new content, reset completion state
+    // IMMEDIATE: For any new content, immediately reset completion state
     if (eventType === 'agent_sources_insert' || 
-        (eventType === 'agent_sources_update' && payload?.new?.created_at !== payload?.old?.created_at)) {
-      console.log(`🔄 NEW CONTENT DETECTED: Resetting completion state due to ${eventType}`);
+        (eventType === 'agent_sources_update' && payload?.new?.created_at !== payload?.old?.created_at) ||
+        (eventType === 'source_pages_insert')) {
+      console.log(`🔄 NEW CONTENT DETECTED: IMMEDIATE reset of completion state due to ${eventType}`);
       refs.agentCompletionStateRef.current = {
         isCompleted: false,
         completedAt: 0,
@@ -33,6 +32,13 @@ export class TrainingRealtimeService {
       refs.trainingStateRef.current = 'idle';
       refs.completedSessionsRef.current.clear();
       refs.lastTrainingActionRef.current = 'none';
+      refs.currentTrainingSessionRef.current = '';
+      
+      // Dispatch immediate state reset event
+      window.dispatchEvent(new CustomEvent('trainingStateReset', {
+        detail: { reason: eventType, timestamp: Date.now() }
+      }));
+      
       return false; // Allow the update to proceed
     }
 
@@ -61,7 +67,6 @@ export class TrainingRealtimeService {
           filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
         },
         (payload) => {
-          // ENHANCED: Better filtering for page updates
           if (this.shouldIgnoreUpdate('source_pages_update', payload, refs)) {
             return;
           }
@@ -79,13 +84,41 @@ export class TrainingRealtimeService {
       .on(
         'postgres_changes',
         {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'source_pages',
+          filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
+        },
+        (payload) => {
+          console.log('➕ New source page inserted - IMMEDIATE reset and check');
+          
+          // Immediate reset for new page inserts
+          refs.agentCompletionStateRef.current = {
+            isCompleted: false,
+            completedAt: 0,
+            lastCompletedSessionId: ''
+          };
+          refs.trainingStateRef.current = 'idle';
+          refs.completedSessionsRef.current.clear();
+          refs.lastTrainingActionRef.current = 'none';
+          
+          window.dispatchEvent(new CustomEvent('trainingStateReset', {
+            detail: { reason: 'source_pages_insert', timestamp: Date.now() }
+          }));
+          
+          addTrackedTimer(() => protectedCheckTrainingCompletion(agentId), 1000);
+        }
+      )
+      
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           schema: 'public',
           table: 'agent_sources',
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          // ENHANCED: Better filtering for source updates
           if (this.shouldIgnoreUpdate('agent_sources_update', payload, refs)) {
             return;
           }
@@ -111,10 +144,9 @@ export class TrainingRealtimeService {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          // ENHANCED: Always allow new source inserts and reset completion state
-          console.log('➕ New agent source added - resetting completion state and scheduling check');
+          console.log('➕ New agent source added - IMMEDIATE reset and scheduling check');
           
-          // Reset completion state for new sources
+          // Immediate reset for new sources
           refs.agentCompletionStateRef.current = {
             isCompleted: false,
             completedAt: 0,
@@ -123,6 +155,11 @@ export class TrainingRealtimeService {
           refs.trainingStateRef.current = 'idle';
           refs.completedSessionsRef.current.clear();
           refs.lastTrainingActionRef.current = 'none';
+          refs.currentTrainingSessionRef.current = '';
+          
+          window.dispatchEvent(new CustomEvent('trainingStateReset', {
+            detail: { reason: 'agent_sources_insert', timestamp: Date.now() }
+          }));
           
           addTrackedTimer(() => protectedCheckTrainingCompletion(agentId), 1000);
         }
@@ -133,7 +170,6 @@ export class TrainingRealtimeService {
           setIsConnected(true);
           refs.hasEverConnectedRef.current = true;
           
-          // Clear any existing polling and don't restart if completed
           if (pollInterval) {
             clearInterval(pollInterval);
           }
@@ -160,7 +196,7 @@ export class TrainingRealtimeService {
             });
           }
           
-          // ENHANCED: Setup polling if not recently completed
+          // Setup polling if not recently completed
           const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
           if (!refs.agentCompletionStateRef.current.isCompleted || timeSinceCompletion > 60000) {
             console.log('🔄 Setting up protected polling due to connection issue');

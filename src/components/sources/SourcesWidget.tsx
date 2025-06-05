@@ -31,14 +31,18 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Enhanced: Listen for training completion events (NO DUPLICATE TOAST)
+  // ENHANCED: Listen for training state reset events
   useEffect(() => {
+    const handleTrainingStateReset = (event: CustomEvent) => {
+      console.log('🔄 Training state reset event received:', event.detail);
+      setIsTrainingInBackground(false);
+      // Refresh stats and check retraining status
+      refetchStats();
+      setTimeout(() => checkRetrainingNeeded(), 500);
+    };
+
     const handleTrainingCompleted = (event: CustomEvent) => {
       console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
-      
-      // REMOVED: Duplicate toast notification - now handled only in useTrainingNotifications
-      
-      // Refresh stats and check status
       refetchStats();
       setTimeout(() => checkRetrainingNeeded(), 1000);
     };
@@ -46,15 +50,15 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     const handleTrainingContinuesInBackground = (event: CustomEvent) => {
       console.log('📱 Training continues in background - enhanced handler:', event.detail);
       setIsTrainingInBackground(true);
-      
-      // Also close the dialog if it's open
       setShowRetrainingDialog(false);
     };
 
+    window.addEventListener('trainingStateReset', handleTrainingStateReset as EventListener);
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     window.addEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     
     return () => {
+      window.removeEventListener('trainingStateReset', handleTrainingStateReset as EventListener);
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     };
@@ -67,7 +71,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
 
-  // Enhanced: Handle training state transitions
+  // Enhanced: Handle training state transitions with immediate state checking
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('🎯 Training completed - resetting background state');
@@ -81,24 +85,22 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
 
-  // ENHANCED: Source event handlers with completion protection
+  // ENHANCED: Source event handlers with immediate state updates
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
-      // ENHANCED: Only reset background training if not in completed state
-      if (trainingProgress?.status !== 'completed') {
-        setIsTrainingInBackground(false);
-      }
+      console.log('📄 Source event received:', event.type, event.detail);
+      
+      // Immediately reset background training state for new content
+      setIsTrainingInBackground(false);
       
       // Refresh stats immediately
       refetchStats();
       
-      // ENHANCED: Only check retraining if not completed
-      if (trainingProgress?.status !== 'completed') {
-        setTimeout(() => checkRetrainingNeeded(), 1500);
-      }
+      // Check retraining status
+      setTimeout(() => checkRetrainingNeeded(), 1500);
     };
 
-    const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged'];
+    const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged', 'crawlStarted'];
     eventTypes.forEach(eventType => {
       window.addEventListener(eventType, handleSourceEvent as EventListener);
     });
@@ -108,7 +110,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         window.removeEventListener(eventType, handleSourceEvent as EventListener);
       });
     };
-  }, [refetchStats, checkRetrainingNeeded, trainingProgress?.status]);
+  }, [refetchStats, checkRetrainingNeeded]);
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {

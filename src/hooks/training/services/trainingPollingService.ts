@@ -9,11 +9,11 @@ export class TrainingPollingService {
     checkTrainingCompletion: (agentId: string) => Promise<void>
   ) {
     return (agentId: string) => {
-      // ENHANCED: Less aggressive completion protection
+      // REDUCED: Less aggressive completion protection (10 seconds instead of 30)
       const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
       
-      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 30000) {
-        console.log('🚫 PROTECTED CHECK: Agent completed recently (within 30s), skipping check');
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 10000) {
+        console.log('🚫 PROTECTED CHECK: Agent completed recently (within 10s), skipping check');
         return;
       }
 
@@ -41,11 +41,11 @@ export class TrainingPollingService {
     const newPollInterval = setInterval(() => {
       if (!agentId) return;
       
-      // ENHANCED: Less aggressive polling protection
+      // REDUCED: Less aggressive polling protection (10 seconds instead of 30)
       const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
       
-      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 30000) {
-        console.log('🚫 POLLING: Agent completed recently (within 30s), skipping poll');
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 10000) {
+        console.log('🚫 POLLING: Agent completed recently (within 10s), skipping poll');
         return;
       }
 
