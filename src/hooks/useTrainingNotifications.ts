@@ -160,8 +160,9 @@ export const useTrainingNotifications = () => {
       if (parentSources && parentSources.length > 0) {
         // Update each parent source to mark as trained
         const updatePromises = parentSources.map(source => {
+          const existingMetadata = (source.metadata as Record<string, any>) || {};
           const updatedMetadata = {
-            ...source.metadata,
+            ...existingMetadata,
             training_completed: true,
             last_trained_at: new Date().toISOString()
           };

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
@@ -66,7 +65,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
 
         if (source) {
           // Check if this source has been trained by looking at metadata
-          const metadata = source.metadata || {};
+          const metadata = source.metadata as Record<string, any> || {};
           const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
           
           if (hasTrainingCompleted && source.crawl_status === 'completed') {
@@ -100,7 +99,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           const updatedSource = payload.new as any;
           
           // Check if training has completed for this source
-          const metadata = updatedSource.metadata || {};
+          const metadata = updatedSource.metadata as Record<string, any> || {};
           const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
           
           if (hasTrainingCompleted && updatedSource.crawl_status === 'completed') {
