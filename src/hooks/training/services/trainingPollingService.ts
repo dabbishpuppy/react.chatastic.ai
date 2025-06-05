@@ -9,14 +9,11 @@ export class TrainingPollingService {
     checkTrainingCompletion: (agentId: string) => Promise<void>
   ) {
     return (agentId: string) => {
-      // ENHANCED: Multiple layers of protection
-      if (refs.agentCompletionStateRef.current.isCompleted) {
-        console.log('🚫 PROTECTED CHECK: Agent already completed, skipping check');
-        return;
-      }
-
-      if (refs.trainingStateRef.current === 'completed') {
-        console.log('🚫 PROTECTED CHECK: Training state is completed, skipping check');
+      // ENHANCED: Less aggressive completion protection
+      const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
+      
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 30000) {
+        console.log('🚫 PROTECTED CHECK: Agent completed recently (within 30s), skipping check');
         return;
       }
 
@@ -44,18 +41,11 @@ export class TrainingPollingService {
     const newPollInterval = setInterval(() => {
       if (!agentId) return;
       
-      // ENHANCED: Check completion state before polling
-      if (refs.agentCompletionStateRef.current.isCompleted) {
-        console.log('🚫 POLLING: Agent completed, stopping polls');
-        clearInterval(newPollInterval);
-        setPollInterval(null);
-        return;
-      }
-
-      if (refs.trainingStateRef.current === 'completed') {
-        console.log('🚫 POLLING: Training completed, stopping polls');
-        clearInterval(newPollInterval);
-        setPollInterval(null);
+      // ENHANCED: Less aggressive polling protection
+      const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
+      
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 30000) {
+        console.log('🚫 POLLING: Agent completed recently (within 30s), skipping poll');
         return;
       }
 

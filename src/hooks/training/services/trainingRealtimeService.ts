@@ -7,34 +7,33 @@ export class TrainingRealtimeService {
   static shouldIgnoreUpdate(eventType: string, payload: any, refs: TrainingRefs): boolean {
     const now = Date.now();
     
-    // PRIORITY 1: If agent is completed, ignore ALL updates
+    // ENHANCED: Less aggressive filtering - only ignore if recently completed AND no new content
     if (refs.agentCompletionStateRef.current.isCompleted) {
       const timeSinceCompletion = now - refs.agentCompletionStateRef.current.completedAt;
-      console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - agent completed ${timeSinceCompletion}ms ago`);
-      return true;
-    }
-
-    // PRIORITY 2: If training state is completed, ignore processing updates
-    if (refs.trainingStateRef.current === 'completed') {
-      console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - training state is completed`);
-      return true;
-    }
-
-    // PRIORITY 3: If last action was complete and recent, ignore updates
-    if (refs.lastTrainingActionRef.current === 'complete') {
-      const timeSinceLastAction = now - refs.lastCompletionCheckRef.current;
-      if (timeSinceLastAction < 120000) { // Extended to 2 minutes
-        console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - recent completion action (${timeSinceLastAction}ms ago)`);
+      
+      // Only ignore updates for first 30 seconds after completion (reduced from 2 minutes)
+      if (timeSinceCompletion < 30000) {
+        console.log(`🚫 BRIEF POST-COMPLETION: Ignoring ${eventType} - agent completed ${timeSinceCompletion}ms ago`);
         return true;
       }
+      
+      // After 30 seconds, allow updates that might indicate new content
+      console.log(`🔄 POST-COMPLETION: Allowing ${eventType} - sufficient time passed (${timeSinceCompletion}ms)`);
     }
 
-    // PRIORITY 4: If this is a processing status update and we have completed sessions
-    if (payload?.new?.processing_status === 'processed' || payload?.new?.processing_status === 'completed') {
-      if (refs.completedSessionsRef.current.size > 0) {
-        console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring processing update - have completed sessions`);
-        return true;
-      }
+    // ENHANCED: For new content, reset completion state
+    if (eventType === 'agent_sources_insert' || 
+        (eventType === 'agent_sources_update' && payload?.new?.created_at !== payload?.old?.created_at)) {
+      console.log(`🔄 NEW CONTENT DETECTED: Resetting completion state due to ${eventType}`);
+      refs.agentCompletionStateRef.current = {
+        isCompleted: false,
+        completedAt: 0,
+        lastCompletedSessionId: ''
+      };
+      refs.trainingStateRef.current = 'idle';
+      refs.completedSessionsRef.current.clear();
+      refs.lastTrainingActionRef.current = 'none';
+      return false; // Allow the update to proceed
     }
 
     return false;
@@ -62,7 +61,7 @@ export class TrainingRealtimeService {
           filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
         },
         (payload) => {
-          // ENHANCED: Strong post-completion filtering
+          // ENHANCED: Better filtering for page updates
           if (this.shouldIgnoreUpdate('source_pages_update', payload, refs)) {
             return;
           }
@@ -86,7 +85,7 @@ export class TrainingRealtimeService {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          // ENHANCED: Strong post-completion filtering
+          // ENHANCED: Better filtering for source updates
           if (this.shouldIgnoreUpdate('agent_sources_update', payload, refs)) {
             return;
           }
@@ -112,12 +111,19 @@ export class TrainingRealtimeService {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          // ENHANCED: Strong post-completion filtering
-          if (this.shouldIgnoreUpdate('agent_sources_insert', payload, refs)) {
-            return;
-          }
-
-          console.log('➕ New agent source added, scheduling protected check');
+          // ENHANCED: Always allow new source inserts and reset completion state
+          console.log('➕ New agent source added - resetting completion state and scheduling check');
+          
+          // Reset completion state for new sources
+          refs.agentCompletionStateRef.current = {
+            isCompleted: false,
+            completedAt: 0,
+            lastCompletedSessionId: ''
+          };
+          refs.trainingStateRef.current = 'idle';
+          refs.completedSessionsRef.current.clear();
+          refs.lastTrainingActionRef.current = 'none';
+          
           addTrackedTimer(() => protectedCheckTrainingCompletion(agentId), 1000);
         }
       )
@@ -154,9 +160,9 @@ export class TrainingRealtimeService {
             });
           }
           
-          // ENHANCED: Only setup polling if not completed
-          if (!refs.agentCompletionStateRef.current.isCompleted && 
-              refs.trainingStateRef.current !== 'completed') {
+          // ENHANCED: Setup polling if not recently completed
+          const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
+          if (!refs.agentCompletionStateRef.current.isCompleted || timeSinceCompletion > 60000) {
             console.log('🔄 Setting up protected polling due to connection issue');
             setupProtectedPolling();
           }
