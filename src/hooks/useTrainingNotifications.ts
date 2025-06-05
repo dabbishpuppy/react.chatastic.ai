@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -47,9 +48,24 @@ export const useTrainingNotifications = () => {
   const completionConfirmationCountRef = useRef<number>(0);
   const trainingInitiationTimeRef = useRef<number>(0);
   
+  // NEW: Timer management and completion state tracking
+  const trainingStartTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const trainingCompletedSessionsRef = useRef<Set<string>>(new Set());
+  const hasCompletedRef = useRef<boolean>(false);
+  
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+
+  // Clean up timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (trainingStartTimerRef.current) {
+        clearTimeout(trainingStartTimerRef.current);
+        trainingStartTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Listen for crawl initiation events to suppress false connection warnings
   useEffect(() => {
@@ -363,6 +379,20 @@ export const useTrainingNotifications = () => {
         stableSessionIdRef.current = sessionId;
       } else if (status === 'completed' || status === 'failed') {
         sessionId = stableSessionIdRef.current || `${agentId}-${Date.now()}`;
+        
+        // NEW: Clean up training start timer on completion/failure
+        if (trainingStartTimerRef.current) {
+          clearTimeout(trainingStartTimerRef.current);
+          trainingStartTimerRef.current = null;
+          console.log('🧹 Cleared training start timer due to completion/failure');
+        }
+        
+        // Mark session as completed
+        if (status === 'completed' && sessionId) {
+          trainingCompletedSessionsRef.current.add(sessionId);
+          hasCompletedRef.current = true;
+        }
+        
         // Clear stable session ID after completion/failure
         setTimeout(() => {
           stableSessionIdRef.current = '';
@@ -469,6 +499,10 @@ export const useTrainingNotifications = () => {
       // Set training initiation time for delayed toast
       trainingInitiationTimeRef.current = Date.now();
 
+      // NEW: Reset completion state when starting new training
+      hasCompletedRef.current = false;
+      trainingCompletedSessionsRef.current.clear();
+
       // Set training lock and create stable session ID
       trainingLockRef.current = true;
       const sessionId = `training-${agentId}-${Date.now()}`;
@@ -547,13 +581,17 @@ export const useTrainingNotifications = () => {
         sessionId
       });
 
-      // Delayed "Training Started" toast - only show after confirming training is proceeding
-      setTimeout(() => {
-        // Only show if training is still active and hasn't been shown for this session
-        if (trainingLockRef.current && 
-            activeTrainingSessionRef.current === sessionId && 
-            !trainingStartToastShownRef.current.has(sessionId)) {
-          
+      // NEW: Enhanced "Training Started" toast with proper validation and timer management
+      trainingStartTimerRef.current = setTimeout(() => {
+        // Strong validation before showing training start toast
+        const isStillTraining = trainingLockRef.current && 
+                              activeTrainingSessionRef.current === sessionId &&
+                              !hasCompletedRef.current &&
+                              !trainingCompletedSessionsRef.current.has(sessionId) &&
+                              !trainingStartToastShownRef.current.has(sessionId);
+        
+        if (isStillTraining) {
+          console.log('📢 Showing delayed training start toast for session:', sessionId);
           trainingStartToastShownRef.current.add(sessionId);
           
           toast({
@@ -567,8 +605,13 @@ export const useTrainingNotifications = () => {
             const sessionsArray = Array.from(trainingStartToastShownRef.current);
             trainingStartToastShownRef.current = new Set(sessionsArray.slice(-3));
           }
+        } else {
+          console.log('🚫 Skipping training start toast - training no longer active or already completed');
         }
-      }, 2000); // 2 second delay to ensure training is actually proceeding
+        
+        // Clear the timer reference
+        trainingStartTimerRef.current = null;
+      }, 3000); // Increased delay to 3 seconds for better validation
 
       const processingPromises = sourcesToProcess.map(async (source) => {
         return SourceProcessor.processSource(source);
@@ -580,6 +623,12 @@ export const useTrainingNotifications = () => {
 
     } catch (error) {
       console.error('Failed to start enhanced training:', error);
+      
+      // NEW: Clean up timer on error
+      if (trainingStartTimerRef.current) {
+        clearTimeout(trainingStartTimerRef.current);
+        trainingStartTimerRef.current = null;
+      }
       
       // Release training lock on error
       trainingLockRef.current = false;
