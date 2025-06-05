@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface RecoveryResult {
@@ -68,11 +67,10 @@ export class CrawlRecoveryService {
       
       const { data: timeoutPages, error } = await supabase
         .from('source_pages')
-        .select('id, url, started_at, retry_count')
+        .select('id, url, started_at')
         .eq('parent_source_id', parentSourceId)
         .eq('status', 'processing')
-        .lt('started_at', timeoutThreshold)
-        .lt('retry_count', this.MAX_RETRIES);
+        .lt('started_at', timeoutThreshold);
 
       if (error) {
         throw new Error(`Failed to find timeout pages: ${error.message}`);
@@ -84,24 +82,37 @@ export class CrawlRecoveryService {
 
       console.log(`🕐 Found ${timeoutPages.length} pages stuck in processing state`);
 
-      // Update each page individually to increment retry_count properly
+      // Get current retry counts for these pages
+      const { data: currentRetries, error: retryError } = await supabase
+        .from('source_pages')
+        .select('id, retry_count')
+        .in('id', timeoutPages.map(p => p.id));
+
+      if (retryError) {
+        throw new Error(`Failed to get retry counts: ${retryError.message}`);
+      }
+
+      // Filter pages that haven't exceeded max retries and update them individually
       let updatedCount = 0;
       for (const page of timeoutPages) {
-        const newRetryCount = (page.retry_count || 0) + 1;
-        
-        const { error: updateError } = await supabase
-          .from('source_pages')
-          .update({
-            status: 'pending',
-            started_at: null,
-            error_message: 'Recovered from timeout - retrying',
-            retry_count: newRetryCount,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', page.id);
+        const currentPage = currentRetries?.find(r => r.id === page.id);
+        const currentRetryCount = currentPage?.retry_count || 0;
 
-        if (!updateError) {
-          updatedCount++;
+        if (currentRetryCount < this.MAX_RETRIES) {
+          const { error: updateError } = await supabase
+            .from('source_pages')
+            .update({
+              status: 'pending',
+              started_at: null,
+              error_message: 'Recovered from timeout - retrying',
+              retry_count: currentRetryCount + 1,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', page.id);
+
+          if (!updateError) {
+            updatedCount++;
+          }
         }
       }
 
@@ -151,11 +162,9 @@ export class CrawlRecoveryService {
         return { success: true, message: "No retryable pages (all were 409 conflicts)", retriedCount: 0 };
       }
 
-      // Update each page individually to increment retry_count properly
+      // Update failed pages to pending for retry individually
       let updatedCount = 0;
       for (const page of retryablePages) {
-        const newRetryCount = (page.retry_count || 0) + 1;
-        
         const { error: updateError } = await supabase
           .from('source_pages')
           .update({
@@ -163,7 +172,7 @@ export class CrawlRecoveryService {
             started_at: null,
             completed_at: null,
             error_message: null,
-            retry_count: newRetryCount,
+            retry_count: (page.retry_count || 0) + 1,
             updated_at: new Date().toISOString()
           })
           .eq('id', page.id);
