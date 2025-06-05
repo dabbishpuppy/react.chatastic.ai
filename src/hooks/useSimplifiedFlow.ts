@@ -4,6 +4,15 @@ import { useParams } from 'react-router-dom';
 import { SimplifiedSourceStatusService, SourceStatusSummary } from '@/services/SimplifiedSourceStatusService';
 import { ToastNotificationService } from '@/services/ToastNotificationService';
 
+interface SourceMetadata {
+  training_status?: string;
+  training_completed_at?: string;
+  training_started_at?: string;
+  training_error?: string;
+  last_trained_at?: string;
+  [key: string]: any;
+}
+
 export const useSimplifiedFlow = () => {
   const { agentId } = useParams();
   const [statusSummary, setStatusSummary] = useState<SourceStatusSummary>({
@@ -80,7 +89,7 @@ export const useSimplifiedFlow = () => {
       
       const { data: sources, error } = await supabase
         .from('agent_sources')
-        .select('id, source_type, crawl_status, requires_manual_training, metadata')
+        .select('id, source_type, crawl_status, requires_manual_training, metadata, parent_source_id')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -92,19 +101,21 @@ export const useSimplifiedFlow = () => {
       const summary = SimplifiedSourceStatusService.analyzeSourceStatus(sources || []);
       setStatusSummary(summary);
 
-      // Check if training is in progress
-      const hasTrainingInProgress = sources?.some(s => 
-        s.metadata?.training_status === 'in_progress'
-      );
+      // Check if training is in progress - properly type the metadata
+      const hasTrainingInProgress = sources?.some(s => {
+        const metadata = s.metadata as SourceMetadata || {};
+        return metadata.training_status === 'in_progress';
+      });
 
       if (hasTrainingInProgress && !isTraining) {
         setIsTraining(true);
       } else if (!hasTrainingInProgress && isTraining) {
         setIsTraining(false);
         // Check if training completed successfully
-        const hasTrainingCompleted = sources?.some(s => 
-          s.metadata?.training_completed_at
-        );
+        const hasTrainingCompleted = sources?.some(s => {
+          const metadata = s.metadata as SourceMetadata || {};
+          return metadata.training_completed_at || metadata.last_trained_at;
+        });
         if (hasTrainingCompleted) {
           ToastNotificationService.showTrainingCompleted();
         }

@@ -1,5 +1,5 @@
 
-export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed';
+export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained';
 
 export interface SourceStatusSummary {
   totalSources: number;
@@ -9,6 +9,14 @@ export interface SourceStatusSummary {
   isEmpty: boolean;
 }
 
+interface SourceMetadata {
+  training_status?: string;
+  training_completed_at?: string;
+  training_started_at?: string;
+  last_trained_at?: string;
+  [key: string]: any;
+}
+
 export class SimplifiedSourceStatusService {
   static analyzeSourceStatus(sources: any[]): SourceStatusSummary {
     const totalSources = sources.length;
@@ -16,6 +24,7 @@ export class SimplifiedSourceStatusService {
     
     const crawledSources = sources.filter(s => this.getSourceStatus(s) === 'crawled');
     const trainingSources = sources.filter(s => this.getSourceStatus(s) === 'training');
+    const trainedSources = sources.filter(s => this.getSourceStatus(s) === 'trained');
     const completedSources = sources.filter(s => this.getSourceStatus(s) === 'completed');
     
     return {
@@ -23,11 +32,23 @@ export class SimplifiedSourceStatusService {
       isEmpty,
       hasCrawledSources: crawledSources.length > 0,
       hasTrainingSources: trainingSources.length > 0,
-      allSourcesCompleted: totalSources > 0 && completedSources.length === totalSources
+      allSourcesCompleted: totalSources > 0 && (trainedSources.length + completedSources.length) === totalSources
     };
   }
 
   static getSourceStatus(source: any): SourceStatus {
+    const metadata = (source.metadata as SourceMetadata) || {};
+    
+    // Check if currently training
+    if (metadata.training_status === 'in_progress') {
+      return 'training';
+    }
+    
+    // Check if training completed - this takes precedence
+    if (metadata.training_completed_at || metadata.last_trained_at) {
+      return 'trained';
+    }
+    
     // For website sources, check crawl_status
     if (source.source_type === 'website') {
       // If crawl is completed and requires manual training, it's ready for training

@@ -21,13 +21,13 @@ serve(async (req) => {
 
     console.log(`🚀 Starting simplified training for agent: ${agentId}`);
 
-    // Find all sources that need training (status = 'crawled' or requires_manual_training = true)
+    // Find all sources that need training (requires_manual_training = true OR metadata.training_status = 'in_progress')
     const { data: sourcesToTrain, error: sourcesError } = await supabase
       .from('agent_sources')
-      .select('id, title, source_type, content, crawl_status, requires_manual_training')
+      .select('id, title, source_type, content, crawl_status, requires_manual_training, metadata, parent_source_id')
       .eq('agent_id', agentId)
       .eq('is_active', true)
-      .or('crawl_status.eq.crawled,requires_manual_training.eq.true');
+      .or('requires_manual_training.eq.true,metadata->>training_status.eq.in_progress');
 
     if (sourcesError) {
       throw new Error(`Failed to fetch sources: ${sourcesError.message}`);
@@ -62,7 +62,9 @@ serve(async (req) => {
             crawl_status: source.source_type === 'website' ? 'training' : undefined,
             requires_manual_training: false,
             metadata: {
+              ...((source.metadata as any) || {}),
               training_started_at: new Date().toISOString(),
+              training_status: 'in_progress',
               training_method: 'simplified_flow'
             }
           })
@@ -92,6 +94,8 @@ serve(async (req) => {
             throw new Error(`Chunk generation failed: ${chunkResult.error.message}`);
           }
 
+          console.log(`📄 Generated chunks for source: ${source.id}`);
+
           // Generate embeddings
           const embeddingResult = await supabase.functions.invoke('generate-embeddings', {
             body: { sourceId: source.id }
@@ -100,23 +104,33 @@ serve(async (req) => {
           if (embeddingResult.error) {
             throw new Error(`Embedding generation failed: ${embeddingResult.error.message}`);
           }
+
+          console.log(`🤖 Generated embeddings for source: ${source.id}`);
         }
 
-        // Mark source as completed
+        // Mark source as completed/trained
         await supabase
           .from('agent_sources')
           .update({ 
             crawl_status: source.source_type === 'website' ? 'completed' : undefined,
             requires_manual_training: false,
             metadata: {
+              ...((source.metadata as any) || {}),
               training_completed_at: new Date().toISOString(),
-              training_method: 'simplified_flow'
+              training_status: 'completed',
+              training_method: 'simplified_flow',
+              last_trained_at: new Date().toISOString()
             }
           })
           .eq('id', source.id);
 
         processedCount++;
         console.log(`✅ Successfully trained source: ${source.title}`);
+
+        // If this is a child source, check if all siblings are trained and update parent
+        if (source.parent_source_id) {
+          await this.checkAndUpdateParentStatus(supabase, source.parent_source_id);
+        }
 
       } catch (error) {
         console.error(`❌ Error training source ${source.id}:`, error);
@@ -128,8 +142,10 @@ serve(async (req) => {
             crawl_status: source.source_type === 'website' ? 'crawled' : undefined,
             requires_manual_training: true,
             metadata: {
+              ...((source.metadata as any) || {}),
               training_error: error.message,
-              training_failed_at: new Date().toISOString()
+              training_failed_at: new Date().toISOString(),
+              training_status: 'failed'
             }
           })
           .eq('id', source.id);
@@ -171,3 +187,47 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to check and update parent status
+async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string) {
+  try {
+    // Get all child sources for this parent
+    const { data: childSources, error } = await supabase
+      .from('agent_sources')
+      .select('id, metadata, requires_manual_training')
+      .eq('parent_source_id', parentSourceId)
+      .eq('is_active', true);
+
+    if (error || !childSources) {
+      console.error('Error fetching child sources:', error);
+      return;
+    }
+
+    // Check if all children are trained
+    const allChildrenTrained = childSources.every(child => {
+      const metadata = (child.metadata as any) || {};
+      return metadata.training_completed_at || metadata.last_trained_at || !child.requires_manual_training;
+    });
+
+    if (allChildrenTrained) {
+      // Update parent source status
+      await supabase
+        .from('agent_sources')
+        .update({
+          crawl_status: 'completed',
+          requires_manual_training: false,
+          metadata: {
+            training_completed_at: new Date().toISOString(),
+            training_status: 'completed',
+            last_trained_at: new Date().toISOString(),
+            children_training_completed: true
+          }
+        })
+        .eq('id', parentSourceId);
+
+      console.log(`✅ Updated parent source ${parentSourceId} - all children trained`);
+    }
+  } catch (error) {
+    console.error('Error updating parent status:', error);
+  }
+}
