@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { SourceProcessor } from '@/services/rag/retraining/sourceProcessor';
@@ -12,80 +11,13 @@ export const useTrainingStart = (
   clearAllTimers: () => void,
   addTrackedTimer: (callback: () => void, delay: number) => NodeJS.Timeout
 ) => {
-  // EMERGENCY: Check if training is actually needed by querying database
-  const emergencyCompletionCheck = async (agentId: string): Promise<boolean> => {
-    try {
-      console.log('🚨 EMERGENCY CHECK: Validating if training is actually needed');
-      
-      const { data: agentSources, error } = await supabase
-        .from('agent_sources')
-        .select('id, source_type, metadata')
-        .eq('agent_id', agentId)
-        .eq('is_active', true);
-
-      if (error || !agentSources || agentSources.length === 0) {
-        console.log('🚨 EMERGENCY CHECK: No sources found, training not needed');
-        return true; // Consider completed if no sources
-      }
-
-      let allSourcesProcessed = true;
-      for (const source of agentSources) {
-        const metadata = (source.metadata as Record<string, any>) || {};
-        
-        if (source.source_type === 'website') {
-          const { data: pages } = await supabase
-            .from('source_pages')
-            .select('processing_status')
-            .eq('parent_source_id', source.id)
-            .eq('status', 'completed');
-
-          const hasUnprocessedPages = pages?.some(p => 
-            !p.processing_status || 
-            p.processing_status === 'pending' || 
-            p.processing_status === 'processing'
-          );
-
-          if (hasUnprocessedPages) {
-            allSourcesProcessed = false;
-            break;
-          }
-        } else {
-          if (metadata.processing_status !== 'completed') {
-            allSourcesProcessed = false;
-            break;
-          }
-        }
-      }
-
-      console.log('🚨 EMERGENCY CHECK: All sources processed:', allSourcesProcessed);
-      return allSourcesProcessed;
-    } catch (error) {
-      console.error('🚨 EMERGENCY CHECK failed:', error);
-      return false;
-    }
-  };
-
   const startTraining = async (agentId: string) => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting STRONGEST PROTECTED training for agent:', agentId);
+      console.log('🚀 Starting ENHANCED training for agent:', agentId);
 
-      // LAYER 1: EMERGENCY DATABASE CHECK - Query actual state
-      const isActuallyComplete = await emergencyCompletionCheck(agentId);
-      if (isActuallyComplete) {
-        console.log('🚫 EMERGENCY PROTECTION: Database shows training is complete, blocking start');
-        // Force update completion state
-        refs.agentCompletionStateRef.current = {
-          isCompleted: true,
-          completedAt: Date.now(),
-          lastCompletedSessionId: `emergency-${agentId}`
-        };
-        refs.trainingStateRef.current = 'completed';
-        return;
-      }
-
-      // LAYER 2: STRONGEST possible completion protection - check ALL completion states
+      // ENHANCED: STRONGEST possible completion protection - check ALL completion states
       const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
       
       // CHECK 1: Agent completion state
@@ -138,28 +70,18 @@ export const useTrainingStart = (
 
       console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${refs.trainingStartTimeRef.current}`);
 
-      // LAYER 3: ABSOLUTE FINAL TOAST PROTECTION - Multiple validation layers
+      // ENHANCED: STRONGEST toast deduplication - add completion state check
       const startToastId = `start-${sessionId}`;
       const recentStartToastId = `recent-start-${agentId}`;
       const timeBasedToastId = `time-start-${Math.floor(Date.now() / 60000)}`; // One per minute max
       
-      // ABSOLUTE FINAL CHECK: Triple validation before showing toast
-      const absoluteFinalCheck = () => {
-        // Re-check completion state right before toast
-        const currentTime = Date.now();
-        const timeSinceCompletion = currentTime - refs.agentCompletionStateRef.current.completedAt;
-        
-        return !(
-          refs.agentCompletionStateRef.current.isCompleted ||
-          refs.trainingStateRef.current === 'completed' ||
-          refs.completedSessionsRef.current.size > 0 ||
-          (refs.lastTrainingActionRef.current === 'complete' && 
-           currentTime - refs.lastCompletionCheckRef.current < 300000)
-        );
-      };
+      // FINAL CHECK: Don't show toast if agent was recently completed
+      const shouldBlockToastDueToCompletion = refs.agentCompletionStateRef.current.isCompleted || 
+                                             refs.trainingStateRef.current === 'completed' ||
+                                             refs.completedSessionsRef.current.size > 0;
       
-      if (!absoluteFinalCheck()) {
-        console.log('🚫 ABSOLUTE FINAL PROTECTION: Blocking training start toast due to completion state');
+      if (shouldBlockToastDueToCompletion) {
+        console.log('🚫 STRONGEST PROTECTION: Blocking training start toast due to completion state');
         return;
       }
       
@@ -168,7 +90,7 @@ export const useTrainingStart = (
                                   !refs.shownToastsRef.current.has(recentStartToastId) &&
                                   !refs.shownToastsRef.current.has(timeBasedToastId);
       
-      if (shouldShowStartToast && absoluteFinalCheck()) {
+      if (shouldShowStartToast) {
         refs.shownToastsRef.current.add(startToastId);
         refs.shownToastsRef.current.add(recentStartToastId);
         refs.shownToastsRef.current.add(timeBasedToastId);
@@ -270,7 +192,7 @@ export const useTrainingStart = (
       }
 
     } catch (error) {
-      console.error('Failed to start STRONGEST PROTECTED training:', error);
+      console.error('Failed to start ENHANCED training:', error);
       
       refs.activeTrainingSessionRef.current = '';
       refs.trainingStartTimeRef.current = 0;

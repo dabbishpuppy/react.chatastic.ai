@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { TrainingProgress, DatabaseSource, TrainingRefs } from './types';
@@ -137,23 +138,6 @@ export const useTrainingCompletion = (
       console.error('Error validating training completion:', error);
       return false;
     }
-  };
-
-  // ENHANCED: Add toast cleanup function
-  const cleanupTrainingToasts = () => {
-    console.log('🧹 ENHANCED: Cleaning up training-related toasts');
-    
-    // Clear all training start related toasts
-    const toastsToRemove = Array.from(refs.shownToastsRef.current).filter(toastId => 
-      toastId.includes('start-') || 
-      toastId.includes('recent-start-') || 
-      toastId.includes('time-start-')
-    );
-    
-    toastsToRemove.forEach(toastId => {
-      refs.shownToastsRef.current.delete(toastId);
-      console.log('🧹 ENHANCED: Removed toast tracking:', toastId);
-    });
   };
 
   const checkTrainingCompletion = async (agentId: string) => {
@@ -383,9 +367,6 @@ export const useTrainingCompletion = (
           !refs.agentCompletionStateRef.current.isCompleted) {
         
         console.log('🎉 ENHANCED COMPLETION! Processing completion for session:', sessionId);
-        
-        // IMMEDIATE TOAST CLEANUP
-        cleanupTrainingToasts();
         
         markAgentCompletion(sessionId);
         await markParentSourcesAsTrained(agentId);
