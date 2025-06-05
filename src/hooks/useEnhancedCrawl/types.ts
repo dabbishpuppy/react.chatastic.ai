@@ -1,8 +1,8 @@
 
 export interface EnhancedCrawlRequest {
-  url: string;
   agentId: string;
-  crawlMode?: 'single-page' | 'sitemap-only' | 'full-website';
+  url: string;
+  crawlMode?: 'full-website' | 'single-page' | 'sitemap-only';
   maxPages?: number;
   maxDepth?: number;
   excludePaths?: string[];
@@ -13,8 +13,8 @@ export interface EnhancedCrawlRequest {
   priority?: 'normal' | 'high' | 'slow';
 }
 
-export interface CrawlResult {
-  parentSourceId: string;
-  totalJobs: number;
-  message: string;
+export interface CrawlProgress {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  message?: string;
 }

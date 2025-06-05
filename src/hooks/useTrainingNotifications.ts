@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -286,14 +285,18 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
+      // Fixed status determination logic: Only show 'training' when actively processing
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
       if (currentlyProcessingPages.length > 0) {
+        // Only set to 'training' when there are actively processing pages/sources
         status = 'training';
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
+        // All content has been processed
         status = 'completed';
-      } else if (totalPagesProcessed > 0 && totalPagesProcessed < totalPagesNeedingProcessing) {
-        status = 'training';
+      } else {
+        // Content exists but no active processing - keep as 'idle'
+        status = 'idle';
       }
 
       // Create a unique session ID for this training session
