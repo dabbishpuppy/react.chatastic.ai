@@ -31,7 +31,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // ENHANCED: Improved status determination with better training state detection
+  // FIXED: Improved status determination with strict priority for training state
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
@@ -41,25 +41,17 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       trainingProgress
     });
 
-    // PRIORITY 1: If currently training OR retraining flag is true, show training state
+    // PRIORITY 1: If currently training OR retraining flag is true, ALWAYS show training state
+    // This prevents jumping back to "needs_training" during active training
     if (isRetraining || trainingProgress?.status === 'training') {
-      console.log('✅ Status: training (active training detected)');
+      console.log('✅ Status: training (active training detected - LOCKED IN)');
       return {
         status: 'training',
         progress: trainingProgress?.progress || 0
       };
     }
 
-    // PRIORITY 2: If retraining is explicitly needed, show that state
-    if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining needed)');
-      return {
-        status: 'needs_training',
-        progress: 0
-      };
-    }
-    
-    // PRIORITY 3: If training failed, show failed state
+    // PRIORITY 2: If training failed, show failed state
     if (trainingProgress?.status === 'failed') {
       console.log('✅ Status: failed (training failed)');
       return {
@@ -68,25 +60,25 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
 
-    // PRIORITY 4: If training progress shows completed AND no retraining needed
-    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
-      console.log('✅ Status: completed (training completed and no retraining needed)');
+    // PRIORITY 3: If training progress shows completed AND progress is 100%
+    if (trainingProgress?.status === 'completed' || trainingProgress?.progress === 100) {
+      console.log('✅ Status: completed (training completed with 100% progress)');
       return {
         status: 'completed',
         progress: 100
       };
     }
 
-    // PRIORITY 5: If progress is 100% AND no retraining needed, consider complete
-    if (trainingProgress?.progress === 100 && !retrainingNeeded?.needed) {
-      console.log('✅ Status: completed (progress 100% and no retraining needed)');
+    // PRIORITY 4: If retraining is explicitly needed (only when not training)
+    if (retrainingNeeded?.needed) {
+      console.log('✅ Status: needs_training (retraining needed)');
       return {
-        status: 'completed',
-        progress: 100
+        status: 'needs_training',
+        progress: 0
       };
     }
     
-    // DEFAULT: Up to date state (only if no retraining needed)
+    // DEFAULT: Up to date state
     console.log('✅ Status: up_to_date (default)');
     return {
       status: 'up_to_date',
@@ -193,7 +185,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
       
-      // FIXED: Keep dialog open to show training progress
+      // Keep dialog open to show training progress
       console.log('📊 Keeping dialog open to show training progress');
     } catch (error) {
       console.error('❌ Failed to start training:', error);
