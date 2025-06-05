@@ -18,10 +18,22 @@ export const useTrainingStart = (
     try {
       console.log('🚀 Starting ENHANCED training for agent:', agentId);
 
-      // ENHANCED: Prevent starting if already completed within recent time
+      // ENHANCED: Multiple layers of completion protection
       const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
-      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 60000) {
-        console.log('🚫 ENHANCED: Preventing training start - completed recently');
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 120000) { // Extended to 2 minutes
+        console.log('🚫 ENHANCED: Preventing training start - completed recently (within 2 minutes)');
+        return;
+      }
+
+      // ENHANCED: Check if training state is already completed
+      if (refs.trainingStateRef.current === 'completed') {
+        console.log('🚫 ENHANCED: Preventing training start - training state is completed');
+        return;
+      }
+
+      // ENHANCED: Check for active sessions in completion state
+      if (refs.completedSessionsRef.current.size > 0) {
+        console.log('🚫 ENHANCED: Preventing training start - have completed sessions');
         return;
       }
 
@@ -41,28 +53,37 @@ export const useTrainingStart = (
       refs.globalTrainingActiveRef.current = true;
       refs.lastTrainingActionRef.current = 'start';
 
+      // ENHANCED: Complete reset of completion tracking
       refs.completedSessionsRef.current.clear();
       refs.sessionCompletionFlagRef.current.clear();
       clearAllTimers();
 
       console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${refs.trainingStartTimeRef.current}`);
 
-      // ENHANCED: Improved toast deduplication with session tracking
+      // ENHANCED: Much stronger toast deduplication with session and time-based tracking
       const startToastId = `start-${sessionId}`;
       const recentStartToastId = `recent-start-${agentId}`;
+      const timeBasedToastId = `time-start-${Math.floor(Date.now() / 60000)}`; // One per minute max
       
-      // Check if we've shown a start toast recently for this agent
+      // Check multiple conditions for showing toast
       const shouldShowStartToast = !refs.shownToastsRef.current.has(startToastId) && 
-                                  !refs.shownToastsRef.current.has(recentStartToastId);
+                                  !refs.shownToastsRef.current.has(recentStartToastId) &&
+                                  !refs.shownToastsRef.current.has(timeBasedToastId);
       
       if (shouldShowStartToast) {
         refs.shownToastsRef.current.add(startToastId);
         refs.shownToastsRef.current.add(recentStartToastId);
+        refs.shownToastsRef.current.add(timeBasedToastId);
         
         // Clear the recent start toast flag after 30 seconds
         addTrackedTimer(() => {
           refs.shownToastsRef.current.delete(recentStartToastId);
         }, 30000);
+        
+        // Clear the time-based toast flag after 2 minutes
+        addTrackedTimer(() => {
+          refs.shownToastsRef.current.delete(timeBasedToastId);
+        }, 120000);
         
         console.log('🧠 Showing training start toast for session:', sessionId);
         toast({
@@ -144,7 +165,9 @@ export const useTrainingStart = (
 
       await Promise.allSettled(processingPromises);
 
-      if (!refs.agentCompletionStateRef.current.isCompleted) {
+      // ENHANCED: Only check completion if not already completed
+      if (!refs.agentCompletionStateRef.current.isCompleted && 
+          refs.trainingStateRef.current !== 'completed') {
         addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
       }
 

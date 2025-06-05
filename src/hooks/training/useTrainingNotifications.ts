@@ -14,12 +14,22 @@ export const useTrainingNotifications = () => {
   const refs = useTrainingState();
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // ENHANCED: Track polling interval for proper cleanup
+  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Helper functions for timer management
   const clearAllTimers = () => {
     console.log(`🧹 Clearing ${refs.pendingTimersRef.current.size} pending timers`);
     refs.pendingTimersRef.current.forEach(timer => clearTimeout(timer));
     refs.pendingTimersRef.current.clear();
+    
+    // ENHANCED: Clear polling interval too
+    if (pollInterval) {
+      console.log('🧹 Clearing polling interval');
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
   };
 
   const addTrackedTimer = (callback: () => void, delay: number) => {
@@ -52,30 +62,95 @@ export const useTrainingNotifications = () => {
     addTrackedTimer
   );
 
-  // ENHANCED: Filter post-completion updates
+  // ENHANCED: Much stronger post-completion filtering
   const shouldIgnoreUpdate = (eventType: string, payload: any) => {
-    // If agent is already completed, ignore most updates
+    const now = Date.now();
+    
+    // PRIORITY 1: If agent is completed, ignore ALL updates
     if (refs.agentCompletionStateRef.current.isCompleted) {
-      console.log('🚫 POST-COMPLETION: Ignoring update for completed agent:', eventType);
+      const timeSinceCompletion = now - refs.agentCompletionStateRef.current.completedAt;
+      console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - agent completed ${timeSinceCompletion}ms ago`);
       return true;
     }
 
-    // If this is a processing_status update to 'processed' and we're in a completion state
-    if (payload?.new?.processing_status === 'processed' && 
-        refs.trainingStateRef.current === 'completed') {
-      console.log('🚫 POST-COMPLETION: Ignoring processed status update after completion');
+    // PRIORITY 2: If training state is completed, ignore processing updates
+    if (refs.trainingStateRef.current === 'completed') {
+      console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - training state is completed`);
       return true;
     }
 
-    // If this is a page being marked as processed and training was recently completed
-    const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
-    if (payload?.new?.processing_status === 'processed' && 
-        timeSinceCompletion < 30000) {
-      console.log('🚫 POST-COMPLETION: Ignoring late processing update within 30s of completion');
-      return true;
+    // PRIORITY 3: If last action was complete and recent, ignore updates
+    if (refs.lastTrainingActionRef.current === 'complete') {
+      const timeSinceLastAction = now - refs.lastCompletionCheckRef.current;
+      if (timeSinceLastAction < 120000) { // Extended to 2 minutes
+        console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring ${eventType} - recent completion action (${timeSinceLastAction}ms ago)`);
+        return true;
+      }
+    }
+
+    // PRIORITY 4: If this is a processing status update and we have completed sessions
+    if (payload?.new?.processing_status === 'processed' || payload?.new?.processing_status === 'completed') {
+      if (refs.completedSessionsRef.current.size > 0) {
+        console.log(`🚫 ENHANCED POST-COMPLETION: Ignoring processing update - have completed sessions`);
+        return true;
+      }
     }
 
     return false;
+  };
+
+  // ENHANCED: Protected check function that respects completion state
+  const protectedCheckTrainingCompletion = (agentId: string) => {
+    // ENHANCED: Multiple layers of protection
+    if (refs.agentCompletionStateRef.current.isCompleted) {
+      console.log('🚫 PROTECTED CHECK: Agent already completed, skipping check');
+      return;
+    }
+
+    if (refs.trainingStateRef.current === 'completed') {
+      console.log('🚫 PROTECTED CHECK: Training state is completed, skipping check');
+      return;
+    }
+
+    if (shouldPreventTrainingAction('check')) {
+      console.log('🚫 PROTECTED CHECK: Prevention logic blocked check');
+      return;
+    }
+
+    console.log('✅ PROTECTED CHECK: Proceeding with training completion check');
+    checkTrainingCompletion(agentId);
+  };
+
+  // ENHANCED: Protected polling with completion awareness
+  const setupProtectedPolling = () => {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+    }
+
+    const newPollInterval = setInterval(() => {
+      if (!agentId) return;
+      
+      // ENHANCED: Check completion state before polling
+      if (refs.agentCompletionStateRef.current.isCompleted) {
+        console.log('🚫 POLLING: Agent completed, stopping polls');
+        clearInterval(newPollInterval);
+        setPollInterval(null);
+        return;
+      }
+
+      if (refs.trainingStateRef.current === 'completed') {
+        console.log('🚫 POLLING: Training completed, stopping polls');
+        clearInterval(newPollInterval);
+        setPollInterval(null);
+        return;
+      }
+
+      console.log('🔄 POLLING: Running protected completion check');
+      protectedCheckTrainingCompletion(agentId);
+    }, 15000);
+
+    setPollInterval(newPollInterval);
+    return newPollInterval;
   };
 
   // Listen for crawl initiation events
@@ -96,12 +171,26 @@ export const useTrainingNotifications = () => {
       refs.crawlInitiationInProgressRef.current = false;
     };
 
+    // ENHANCED: Listen for training completion to clear all active processes
+    const handleTrainingCompleted = () => {
+      console.log('🎉 ENHANCED: Training completed event - clearing all processes');
+      clearAllTimers();
+      
+      // Force clear any remaining polling
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        setPollInterval(null);
+      }
+    };
+
     window.addEventListener('crawlStarted', handleCrawlStarted);
     window.addEventListener('crawlCompleted', handleCrawlCompleted);
+    window.addEventListener('trainingCompleted', handleTrainingCompleted);
     
     return () => {
       window.removeEventListener('crawlStarted', handleCrawlStarted);
       window.removeEventListener('crawlCompleted', handleCrawlCompleted);
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted);
       clearAllTimers();
     };
   }, []);
@@ -112,7 +201,6 @@ export const useTrainingNotifications = () => {
 
     console.log('🔔 Setting up ENHANCED training notifications for agent:', agentId);
 
-    let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
 
     const initializeSubscriptions = async () => {
@@ -151,7 +239,7 @@ export const useTrainingNotifications = () => {
             filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
           },
           (payload) => {
-            // ENHANCED: Check if we should ignore this update
+            // ENHANCED: Strong post-completion filtering
             if (shouldIgnoreUpdate('source_pages_update', payload)) {
               return;
             }
@@ -160,12 +248,8 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from source_pages update');
-                return;
-              }
-              
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+              console.log('📄 Source page processing status changed, scheduling protected check');
+              addTrackedTimer(() => protectedCheckTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -179,7 +263,7 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
-            // ENHANCED: Check if we should ignore this update
+            // ENHANCED: Strong post-completion filtering
             if (shouldIgnoreUpdate('agent_sources_update', payload)) {
               return;
             }
@@ -190,12 +274,8 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from agent_sources update');
-                return;
-              }
-              
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+              console.log('🗂️ Agent source processing status changed, scheduling protected check');
+              addTrackedTimer(() => protectedCheckTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -209,7 +289,7 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
-            // ENHANCED: Check if we should ignore this update
+            // ENHANCED: Strong post-completion filtering
             if (shouldIgnoreUpdate('agent_sources_insert', payload)) {
               return;
             }
@@ -218,9 +298,8 @@ export const useTrainingNotifications = () => {
               addTrackedTimer(initializeSubscriptions, 500);
             }
             
-            if (!shouldPreventTrainingAction('check')) {
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
-            }
+            console.log('➕ New agent source added, scheduling protected check');
+            addTrackedTimer(() => protectedCheckTrainingCompletion(agentId), 1000);
           }
         )
         
@@ -228,7 +307,12 @@ export const useTrainingNotifications = () => {
           if (status === 'SUBSCRIBED') {
             setIsConnected(true);
             refs.hasEverConnectedRef.current = true;
-            if (pollInterval) clearInterval(pollInterval);
+            
+            // Clear any existing polling and don't restart if completed
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              setPollInterval(null);
+            }
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
             
@@ -252,16 +336,20 @@ export const useTrainingNotifications = () => {
               });
             }
             
-            pollInterval = setInterval(() => {
-              if (!shouldPreventTrainingAction('check')) {
-                checkTrainingCompletion(agentId);
-              }
-            }, 15000);
+            // ENHANCED: Only setup polling if not completed
+            if (!refs.agentCompletionStateRef.current.isCompleted && 
+                refs.trainingStateRef.current !== 'completed') {
+              console.log('🔄 Setting up protected polling due to connection issue');
+              setupProtectedPolling();
+            }
           }
         });
 
       return () => {
-        if (pollInterval) clearInterval(pollInterval);
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          setPollInterval(null);
+        }
         supabase.removeChannel(channel);
       };
     };
@@ -269,7 +357,6 @@ export const useTrainingNotifications = () => {
     initializeSubscriptions();
 
     return () => {
-      if (pollInterval) clearInterval(pollInterval);
       clearAllTimers();
     };
   }, [agentId]);
@@ -278,9 +365,16 @@ export const useTrainingNotifications = () => {
     trainingProgress,
     startTraining: async () => {
       if (!agentId) return;
+      
+      // ENHANCED: Final check before starting
+      if (refs.agentCompletionStateRef.current.isCompleted) {
+        console.log('🚫 START TRAINING: Agent already completed, blocking start');
+        return;
+      }
+      
       await startTraining(agentId);
     },
-    checkTrainingCompletion: () => agentId && !shouldPreventTrainingAction('check') && checkTrainingCompletion(agentId),
+    checkTrainingCompletion: () => agentId && protectedCheckTrainingCompletion(agentId),
     isConnected
   };
 };

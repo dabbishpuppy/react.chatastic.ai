@@ -144,25 +144,33 @@ export const useTrainingCompletion = (
     try {
       const now = Date.now();
       
+      // ENHANCED: Multiple early exit conditions
       if (shouldPreventTrainingAction('check')) {
         console.log('🚫 AGENT-LEVEL: Prevented checkTrainingCompletion');
         return;
       }
       
-      if (now - refs.lastCompletionCheckRef.current < 3000) {
-        console.log('🚫 Debounced checkTrainingCompletion call');
-        return;
-      }
-      refs.lastCompletionCheckRef.current = now;
-
       // ENHANCED: Stronger completion state protection
       if (refs.agentCompletionStateRef.current.isCompleted) {
         const timeSinceCompletion = now - refs.agentCompletionStateRef.current.completedAt;
-        if (timeSinceCompletion < 60000) {
-          console.log('🚫 ENHANCED: Ignoring completion check - agent completed recently');
+        if (timeSinceCompletion < 120000) { // Extended to 2 minutes
+          console.log('🚫 ENHANCED: Ignoring completion check - agent completed recently (within 2 minutes)');
           return;
         }
       }
+
+      // ENHANCED: Check training state
+      if (refs.trainingStateRef.current === 'completed') {
+        console.log('🚫 ENHANCED: Ignoring completion check - training state is completed');
+        return;
+      }
+
+      // ENHANCED: Debounce with longer window
+      if (now - refs.lastCompletionCheckRef.current < 5000) { // Increased from 3s to 5s
+        console.log('🚫 Enhanced debounced checkTrainingCompletion call');
+        return;
+      }
+      refs.lastCompletionCheckRef.current = now;
 
       // First validate if training is actually complete
       const isActuallyComplete = await validateTrainingCompletion(agentId);
@@ -363,9 +371,14 @@ export const useTrainingCompletion = (
         markAgentCompletion(sessionId);
         await markParentSourcesAsTrained(agentId);
         
+        // ENHANCED: Stronger completion toast deduplication
         const completionToastId = `completion-${sessionId}`;
-        if (!refs.shownToastsRef.current.has(completionToastId)) {
+        const timeBasedCompletionToastId = `time-completion-${Math.floor(Date.now() / 300000)}`; // One per 5 minutes max
+        
+        if (!refs.shownToastsRef.current.has(completionToastId) && 
+            !refs.shownToastsRef.current.has(timeBasedCompletionToastId)) {
           refs.shownToastsRef.current.add(completionToastId);
+          refs.shownToastsRef.current.add(timeBasedCompletionToastId);
           
           console.log('🧠 Showing training completion toast for session:', sessionId);
           toast({
@@ -377,6 +390,8 @@ export const useTrainingCompletion = (
           window.dispatchEvent(new CustomEvent('trainingCompleted', {
             detail: { agentId, progress: newProgress }
           }));
+        } else {
+          console.log('🚫 ENHANCED: Prevented duplicate completion toast');
         }
       }
 

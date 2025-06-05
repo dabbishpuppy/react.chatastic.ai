@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -81,17 +82,21 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
 
-  // Enhanced: Listen for source events with better debouncing
+  // ENHANCED: Source event handlers with completion protection
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
-      // Reset background training state when sources change
-      setIsTrainingInBackground(false);
+      // ENHANCED: Only reset background training if not in completed state
+      if (trainingProgress?.status !== 'completed') {
+        setIsTrainingInBackground(false);
+      }
       
       // Refresh stats immediately
       refetchStats();
       
-      // Check retraining status after a delay
-      setTimeout(() => checkRetrainingNeeded(), 1500);
+      // ENHANCED: Only check retraining if not completed
+      if (trainingProgress?.status !== 'completed') {
+        setTimeout(() => checkRetrainingNeeded(), 1500);
+      }
     };
 
     const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged'];
@@ -104,7 +109,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         window.removeEventListener(eventType, handleSourceEvent as EventListener);
       });
     };
-  }, [refetchStats, checkRetrainingNeeded]);
+  }, [refetchStats, checkRetrainingNeeded, trainingProgress?.status]);
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
@@ -113,7 +118,14 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
+  // ENHANCED: Protected retrain click handler
   const handleRetrainClick = () => {
+    // ENHANCED: Check if training is already completed
+    if (trainingProgress?.status === 'completed') {
+      console.log('🚫 PROTECTED: Training already completed, not showing dialog');
+      return;
+    }
+    
     setShowRetrainingDialog(true);
   };
 
@@ -121,8 +133,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
     setShowRetrainingDialog(open);
     
-    // FIXED: Only set background training if training is actually active
-    if (!open && isTrainingActive) {
+    // FIXED: Only set background training if training is actually active AND not completed
+    if (!open && isTrainingActive && trainingProgress?.status !== 'completed') {
       console.log('📱 Setting background training state');
       setIsTrainingInBackground(true);
     }
