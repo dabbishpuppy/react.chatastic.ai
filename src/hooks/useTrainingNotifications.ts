@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -32,7 +31,7 @@ export const useTrainingNotifications = () => {
   const crawlInitiationInProgressRef = useRef<boolean>(false);
   const crawlInitiationStartTimeRef = useRef<number>(0);
   
-  // Training state management - simplified
+  // Training state management - STRENGTHENED
   const currentTrainingSessionRef = useRef<string>('');
   const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
   const completedSessionsRef = useRef<Set<string>>(new Set());
@@ -41,23 +40,25 @@ export const useTrainingNotifications = () => {
   // Toast tracking - prevent duplicates
   const shownToastsRef = useRef<Set<string>>(new Set());
   
-  // NEW: Timer tracking for cleanup
+  // Timer tracking for cleanup
   const pendingTimersRef = useRef<Set<NodeJS.Timeout>>(new Set());
   
-  // NEW: Completion flag to prevent restart logic
+  // CRITICAL: Completion and session isolation flags
   const sessionCompletionFlagRef = useRef<Set<string>>(new Set());
+  const globalTrainingActiveRef = useRef<boolean>(false);
+  const lastTrainingActionRef = useRef<'start' | 'complete' | 'none'>('none');
   
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  // NEW: Helper function to clear all pending timers
+  // Helper function to clear all pending timers
   const clearAllTimers = () => {
     console.log(`🧹 Clearing ${pendingTimersRef.current.size} pending timers`);
     pendingTimersRef.current.forEach(timer => clearTimeout(timer));
     pendingTimersRef.current.clear();
   };
 
-  // NEW: Helper function to add tracked timer
+  // Helper function to add tracked timer
   const addTrackedTimer = (callback: () => void, delay: number) => {
     const timer = setTimeout(() => {
       pendingTimersRef.current.delete(timer);
@@ -65,6 +66,33 @@ export const useTrainingNotifications = () => {
     }, delay);
     pendingTimersRef.current.add(timer);
     return timer;
+  };
+
+  // CRITICAL: Check if we should prevent any training action
+  const shouldPreventTrainingAction = (action: 'start' | 'check', sessionId?: string): boolean => {
+    const now = Date.now();
+    const recentActionThreshold = 2000; // 2 seconds
+    
+    // If we just completed training, block all actions for a short period
+    if (lastTrainingActionRef.current === 'complete' && 
+        now - lastCompletionCheckRef.current < recentActionThreshold) {
+      console.log(`🚫 Preventing ${action} - recently completed training`);
+      return true;
+    }
+    
+    // If this specific session has completed, block all actions for it
+    if (sessionId && sessionCompletionFlagRef.current.has(sessionId)) {
+      console.log(`🚫 Preventing ${action} for completed session: ${sessionId}`);
+      return true;
+    }
+    
+    // If global training is completed state, prevent start actions
+    if (action === 'start' && trainingStateRef.current === 'completed') {
+      console.log(`🚫 Preventing start - global training state is completed`);
+      return true;
+    }
+    
+    return false;
   };
 
   // Listen for crawl initiation events to suppress false connection warnings
@@ -98,7 +126,7 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up simplified training notifications for agent:', agentId);
+    console.log('🔔 Setting up strengthened training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -128,7 +156,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`simplified-training-notifications-${agentId}`)
+        .channel(`strengthened-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -143,7 +171,12 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // NEW: Use tracked timer for debounced check
+              // CRITICAL: Check if we should prevent this action
+              if (shouldPreventTrainingAction('check')) {
+                console.log('🚫 Prevented check from source_pages update');
+                return;
+              }
+              
               addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
@@ -164,7 +197,12 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              // NEW: Use tracked timer for debounced check
+              // CRITICAL: Check if we should prevent this action
+              if (shouldPreventTrainingAction('check')) {
+                console.log('🚫 Prevented check from agent_sources update');
+                return;
+              }
+              
               addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
@@ -182,7 +220,11 @@ export const useTrainingNotifications = () => {
             if ((payload.new as any)?.source_type === 'website') {
               addTrackedTimer(initializeSubscriptions, 500);
             }
-            addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
+            
+            // CRITICAL: Check if we should prevent this action
+            if (!shouldPreventTrainingAction('check')) {
+              addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
+            }
           }
         )
         
@@ -214,7 +256,11 @@ export const useTrainingNotifications = () => {
               });
             }
             
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 15000);
+            pollInterval = setInterval(() => {
+              if (!shouldPreventTrainingAction('check')) {
+                checkTrainingCompletion(agentId);
+              }
+            }, 15000);
           }
         });
 
@@ -236,12 +282,18 @@ export const useTrainingNotifications = () => {
     try {
       const now = Date.now();
       
+      // CRITICAL: Prevent if we should not perform this action
+      if (shouldPreventTrainingAction('check')) {
+        return;
+      }
+      
       // Debounce to prevent excessive calls
       if (now - lastCompletionCheckRef.current < 3000) {
         return;
       }
       lastCompletionCheckRef.current = now;
       
+      // ... keep existing code (data fetching and processing logic)
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content, crawl_status')
@@ -352,27 +404,32 @@ export const useTrainingNotifications = () => {
         status,
         sessionId,
         progress,
-        currentState: trainingStateRef.current
+        currentState: trainingStateRef.current,
+        globalActive: globalTrainingActiveRef.current,
+        lastAction: lastTrainingActionRef.current
       });
 
       setTrainingProgress(newProgress);
 
-      // Handle status transitions with proper toast management
+      // Handle status transitions with strengthened toast management
       const previousStatus = trainingStateRef.current;
       trainingStateRef.current = status;
 
-      // Training completed - show toast only once and clear timers
+      // Training completed - STRENGTHENED completion handling
       if (status === 'completed' && 
           previousStatus !== 'completed' &&
           totalPagesNeedingProcessing > 0 &&
           totalPagesProcessed === totalPagesNeedingProcessing &&
           !completedSessionsRef.current.has(sessionId)) {
         
-        console.log('🎉 Training completed! Showing success notification for session:', sessionId);
+        console.log('🎉 Training completed! Processing completion for session:', sessionId);
         
-        // NEW: Mark session as completed and clear timers
+        // CRITICAL: Mark completion immediately and clear all timers
         completedSessionsRef.current.add(sessionId);
         sessionCompletionFlagRef.current.add(sessionId);
+        globalTrainingActiveRef.current = false;
+        lastTrainingActionRef.current = 'complete';
+        lastCompletionCheckRef.current = Date.now();
         clearAllTimers();
         
         const completionToastId = `completion-${sessionId}`;
@@ -391,12 +448,12 @@ export const useTrainingNotifications = () => {
         }
       }
 
-      // Training failed - show toast only once and clear timers
+      // Training failed - clear timers on failure
       if (status === 'failed' && previousStatus !== 'failed') {
         console.log('❌ Training failed for session:', sessionId);
         
-        // NEW: Clear timers on failure
         clearAllTimers();
+        globalTrainingActiveRef.current = false;
         
         const failureToastId = `failure-${sessionId}`;
         if (!shownToastsRef.current.has(failureToastId)) {
@@ -412,7 +469,7 @@ export const useTrainingNotifications = () => {
       }
 
     } catch (error) {
-      console.error('Error in simplified checkTrainingCompletion:', error);
+      console.error('Error in strengthened checkTrainingCompletion:', error);
       setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
     }
   };
@@ -421,39 +478,51 @@ export const useTrainingNotifications = () => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting simplified training for agent:', agentId);
+      console.log('🚀 Starting STRENGTHENED training for agent:', agentId);
+
+      // CRITICAL: Prevent start if we should not perform this action
+      if (shouldPreventTrainingAction('start')) {
+        console.log('🚫 PREVENTED training start - conditions not met');
+        return;
+      }
 
       // Create new session
       const sessionId = `training-${agentId}-${Date.now()}`;
       
-      // NEW: Check if this session has already completed (prevent restart after completion)
+      // CRITICAL: Check one more time if this session has already completed
       if (sessionCompletionFlagRef.current.has(sessionId)) {
-        console.log('⚠️ Session already completed, preventing restart:', sessionId);
+        console.log('⚠️ Session already completed, aborting start:', sessionId);
         return;
       }
       
       currentTrainingSessionRef.current = sessionId;
       trainingStateRef.current = 'training';
+      globalTrainingActiveRef.current = true;
+      lastTrainingActionRef.current = 'start';
 
       // Clear previous completion state
       completedSessionsRef.current.clear();
-      
-      // NEW: Clear any pending timers to prevent delayed logic
       clearAllTimers();
 
-      // Show "Training Started" toast immediately - no delays
+      // Show "Training Started" toast immediately - ONLY if not completed
       const startToastId = `start-${sessionId}`;
-      if (!shownToastsRef.current.has(startToastId)) {
+      if (!shownToastsRef.current.has(startToastId) && 
+          !sessionCompletionFlagRef.current.has(sessionId) &&
+          lastTrainingActionRef.current !== 'complete') {
+        
         shownToastsRef.current.add(startToastId);
         
-        console.log('📢 Showing training start toast immediately for session:', sessionId);
+        console.log('📢 Showing training start toast for session:', sessionId);
         toast({
           title: "Training Started",
           description: "Processing sources for AI training...",
           duration: 3000,
         });
+      } else {
+        console.log('🚫 Skipped training start toast - already shown or completed');
       }
 
+      // ... keep existing code (source processing logic)
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id, source_type, metadata, title, content')
@@ -495,6 +564,7 @@ export const useTrainingNotifications = () => {
 
       if (sourcesToProcess.length === 0) {
         trainingStateRef.current = 'completed';
+        globalTrainingActiveRef.current = false;
         setTrainingProgress({
           agentId,
           status: 'completed',
@@ -524,15 +594,16 @@ export const useTrainingNotifications = () => {
 
       await Promise.allSettled(processingPromises);
 
-      // Check completion after processing
-      addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+      // Check completion after processing - only if not already completed
+      if (!sessionCompletionFlagRef.current.has(sessionId)) {
+        addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+      }
 
     } catch (error) {
-      console.error('Failed to start simplified training:', error);
+      console.error('Failed to start strengthened training:', error);
       
       trainingStateRef.current = 'failed';
-      
-      // NEW: Clear timers on error
+      globalTrainingActiveRef.current = false;
       clearAllTimers();
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
@@ -560,7 +631,7 @@ export const useTrainingNotifications = () => {
       if (!agentId) return;
       await startTraining();
     },
-    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId),
+    checkTrainingCompletion: () => agentId && !shouldPreventTrainingAction('check') && checkTrainingCompletion(agentId),
     isConnected
   };
 };
