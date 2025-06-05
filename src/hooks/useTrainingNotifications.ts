@@ -84,7 +84,13 @@ export const useTrainingNotifications = () => {
     const now = Date.now();
     const recentActionThreshold = 5000; // Increased to 5 seconds
     
-    // AGENT-LEVEL COMPLETION CHECK - HIGHEST PRIORITY
+    // MODIFIED: Don't prevent start actions - allow explicit training starts
+    if (action === 'start') {
+      console.log('✅ Allowing explicit training start action');
+      return false;
+    }
+    
+    // AGENT-LEVEL COMPLETION CHECK - ONLY FOR CHECK ACTIONS
     if (agentCompletionStateRef.current.isCompleted) {
       const timeSinceCompletion = now - agentCompletionStateRef.current.completedAt;
       if (timeSinceCompletion < 30000) { // 30 second grace period
@@ -93,22 +99,16 @@ export const useTrainingNotifications = () => {
       }
     }
     
-    // If we just completed training, block all actions for a period
+    // If we just completed training, block check actions for a period
     if (lastTrainingActionRef.current === 'complete' && 
         now - lastCompletionCheckRef.current < recentActionThreshold) {
       console.log(`🚫 Preventing ${action} - recently completed training`);
       return true;
     }
     
-    // If this specific session has completed, block all actions for it
+    // If this specific session has completed, block check actions for it
     if (sessionId && sessionCompletionFlagRef.current.has(sessionId)) {
       console.log(`🚫 Preventing ${action} for completed session: ${sessionId}`);
-      return true;
-    }
-    
-    // If global training is completed state, prevent start actions
-    if (action === 'start' && trainingStateRef.current === 'completed') {
-      console.log(`🚫 Preventing start - global training state is completed`);
       return true;
     }
     
@@ -607,14 +607,8 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting IMPROVED training for agent:', agentId);
 
-      // CRITICAL: Agent-level completion check FIRST
-      if (shouldPreventTrainingAction('start')) {
-        console.log('🚫 AGENT-LEVEL: PREVENTED training start - conditions not met');
-        return;
-      }
-
-      // Reset agent-level completion state when explicitly starting training
-      console.log('🔄 Resetting agent-level completion state for new training');
+      // CRITICAL: Reset agent-level completion state when explicitly starting training
+      console.log('🔄 Resetting agent-level completion state for explicit training start');
       agentCompletionStateRef.current = {
         isCompleted: false,
         completedAt: 0,

@@ -183,6 +183,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     try {
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
+      
+      // Don't close the dialog immediately - let it show training progress
+      console.log('📊 Keeping dialog open to show training progress');
     } catch (error) {
       console.error('❌ Failed to start training:', error);
     }
