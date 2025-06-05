@@ -6,8 +6,13 @@ export const useEmbeddedResizeObserver = (
   agentId?: string
 ) => {
   useEffect(() => {
-    // Only run this in an iframe context and ensure we have the necessary objects
-    if (window.self === window.top || !window.parent || !containerRef.current) {
+    // Only run this in an iframe context - completely exit if not
+    if (window.self === window.top) {
+      return;
+    }
+
+    // Additional safety checks
+    if (!window.parent || !containerRef.current) {
       return;
     }
     
