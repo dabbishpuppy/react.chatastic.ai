@@ -1,10 +1,8 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Loader2, AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react';
-import ConnectionStatusIndicator from '@/components/ConnectionStatusIndicator';
-import { useRobustCrawlStatus } from '@/hooks/useRobustCrawlStatus';
+import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WebsiteSourceStatusRobustProps {
   sourceId: string;
@@ -17,33 +15,120 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
   initialStatus,
   showConnectionStatus = true
 }) => {
-  const { statusData, isPolling, refreshStatus, isConnected } = useRobustCrawlStatus(sourceId);
-  const [lastStatus, setLastStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState(initialStatus || 'pending');
+  const [progress, setProgress] = useState(0);
+  const [linksCount, setLinksCount] = useState(0);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  
+  const statusRef = useRef(status);
+  const progressRef = useRef(progress);
+  const linksCountRef = useRef(linksCount);
 
-  // ENHANCED: Emit custom events when status changes to completed
+  // Update refs when state changes
   useEffect(() => {
-    if (statusData.status !== lastStatus) {
-      console.log(`📊 Status changed for source ${sourceId}: ${lastStatus} -> ${statusData.status}`);
-      
-      if (statusData.status === 'completed' && lastStatus === 'in_progress') {
-        console.log('🎉 Crawl completed, emitting completion event');
-        
-        // Emit custom events for other components to listen to
-        window.dispatchEvent(new CustomEvent('crawlCompleted', {
-          detail: { sourceId, status: statusData.status }
-        }));
-        
-        window.dispatchEvent(new CustomEvent('sourceStatusChanged', {
-          detail: { sourceId, oldStatus: lastStatus, newStatus: statusData.status }
-        }));
-      }
-      
-      setLastStatus(statusData.status);
-    }
-  }, [statusData.status, lastStatus, sourceId]);
+    statusRef.current = status;
+    progressRef.current = progress;
+    linksCountRef.current = linksCount;
+  }, [status, progress, linksCount]);
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
+  // Listen for training completion events to update status to "trained"
+  useEffect(() => {
+    const handleTrainingCompleted = (event: CustomEvent) => {
+      console.log('🎓 Training completed event received, updating source status to trained');
+      setStatus('trained');
+      setLastUpdateTime(new Date());
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+    };
+  }, []);
+
+  // Real-time subscription for source updates
+  useEffect(() => {
+    if (!sourceId) return;
+
+    const fetchInitialData = async () => {
+      try {
+        const { data: source, error } = await supabase
+          .from('agent_sources')
+          .select('crawl_status, progress, links_count, metadata')
+          .eq('id', sourceId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching source data:', error);
+          return;
+        }
+
+        if (source) {
+          // Check if this source has been trained by looking at metadata
+          const metadata = source.metadata || {};
+          const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
+          
+          if (hasTrainingCompleted && source.crawl_status === 'completed') {
+            setStatus('trained');
+          } else {
+            setStatus(source.crawl_status || 'pending');
+          }
+          
+          setProgress(source.progress || 0);
+          setLinksCount(source.links_count || 0);
+          setLastUpdateTime(new Date());
+        }
+      } catch (error) {
+        console.error('Error in fetchInitialData:', error);
+      }
+    };
+
+    fetchInitialData();
+
+    const channel = supabase
+      .channel(`source-status-${sourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `id=eq.${sourceId}`
+        },
+        (payload) => {
+          const updatedSource = payload.new as any;
+          
+          // Check if training has completed for this source
+          const metadata = updatedSource.metadata || {};
+          const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
+          
+          if (hasTrainingCompleted && updatedSource.crawl_status === 'completed') {
+            setStatus('trained');
+          } else {
+            setStatus(updatedSource.crawl_status || 'pending');
+          }
+          
+          setProgress(updatedSource.progress || 0);
+          setLinksCount(updatedSource.links_count || 0);
+          setLastUpdateTime(new Date());
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+          setIsConnected(false);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sourceId]);
+
+  const getStatusConfig = (currentStatus: string) => {
+    switch (currentStatus) {
       case 'pending':
         return {
           icon: <Clock size={14} className="mr-1" />,
@@ -62,6 +147,12 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           text: 'Completed',
           className: 'bg-green-100 text-green-800 border-green-200'
         };
+      case 'trained':
+        return {
+          icon: <GraduationCap size={14} className="mr-1" />,
+          text: 'Trained',
+          className: 'bg-purple-100 text-purple-800 border-purple-200'
+        };
       case 'failed':
         return {
           icon: <AlertTriangle size={14} className="mr-1" />,
@@ -77,54 +168,28 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
     }
   };
 
-  const statusConfig = getStatusConfig(statusData.status);
-  const showProgress = statusData.status === 'in_progress' && statusData.totalPages > 0;
-  const progressPercentage = showProgress 
-    ? Math.round((statusData.completedPages / statusData.totalPages) * 100)
-    : 0;
+  const statusConfig = getStatusConfig(status);
 
   return (
     <div className="flex items-center gap-3">
       <Badge className={`${statusConfig.className} border flex-shrink-0`}>
         {statusConfig.icon}
         {statusConfig.text}
-        {showProgress && (
-          <span className="ml-1 text-xs">
-            ({statusData.completedPages}/{statusData.totalPages})
-          </span>
-        )}
       </Badge>
-
-      {showProgress && (
-        <div className="flex-1 max-w-20">
-          <div className="w-full bg-gray-200 rounded-full h-1.5">
-            <div 
-              className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
+      
+      {status === 'in_progress' && (
+        <div className="text-xs text-gray-500">
+          {progress > 0 && `${progress}% • `}
+          {linksCount > 0 && `${linksCount} links`}
         </div>
       )}
-
+      
       {showConnectionStatus && (
-        <div className="flex items-center gap-2">
-          <ConnectionStatusIndicator 
-            isConnected={isConnected}
-            isPolling={isPolling}
-            showText={false}
-            size="sm"
-          />
-          
-          {(!isConnected || isPolling) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={refreshStatus}
-              className="h-6 px-2 text-xs"
-            >
-              <RefreshCw size={12} className="mr-1" />
-              Refresh
-            </Button>
+        <div className="flex items-center">
+          {isConnected ? (
+            <Wifi size={12} className="text-green-500" />
+          ) : (
+            <WifiOff size={12} className="text-red-500" />
           )}
         </div>
       )}

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Clock, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import WebsiteSourceStatusRobust from './WebsiteSourceStatusRobust';
 
@@ -53,6 +53,12 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
           icon: <CheckCircle size={14} className="mr-1" />,
           text: 'Completed',
           className: 'bg-green-100 text-green-800 border-green-200'
+        };
+      case 'trained':
+        return {
+          icon: <GraduationCap size={14} className="mr-1" />,
+          text: 'Trained',
+          className: 'bg-purple-100 text-purple-800 border-purple-200'
         };
       case 'failed':
         return {

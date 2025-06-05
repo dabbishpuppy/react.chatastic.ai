@@ -139,6 +139,47 @@ export const useTrainingNotifications = () => {
     sessionCompletionFlagRef.current.add(sessionId);
   };
 
+  // New function to mark parent sources as trained
+  const markParentSourcesAsTrained = async (agentId: string) => {
+    try {
+      console.log('🎓 Marking parent sources as trained for agent:', agentId);
+      
+      // Get all parent sources (sources without parent_source_id)
+      const { data: parentSources, error } = await supabase
+        .from('agent_sources')
+        .select('id, metadata')
+        .eq('agent_id', agentId)
+        .eq('is_active', true)
+        .is('parent_source_id', null);
+
+      if (error) {
+        console.error('Error fetching parent sources:', error);
+        return;
+      }
+
+      if (parentSources && parentSources.length > 0) {
+        // Update each parent source to mark as trained
+        const updatePromises = parentSources.map(source => {
+          const updatedMetadata = {
+            ...source.metadata,
+            training_completed: true,
+            last_trained_at: new Date().toISOString()
+          };
+
+          return supabase
+            .from('agent_sources')
+            .update({ metadata: updatedMetadata })
+            .eq('id', source.id);
+        });
+
+        await Promise.all(updatePromises);
+        console.log('✅ Marked all parent sources as trained');
+      }
+    } catch (error) {
+      console.error('Error marking parent sources as trained:', error);
+    }
+  };
+
   // Listen for crawl initiation events to suppress false connection warnings
   useEffect(() => {
     const handleCrawlStarted = () => {
@@ -482,6 +523,9 @@ export const useTrainingNotifications = () => {
         
         // CRITICAL: Mark agent-level completion IMMEDIATELY
         markAgentCompletion(sessionId);
+        
+        // Mark all parent sources as trained
+        await markParentSourcesAsTrained(agentId);
         
         const completionToastId = `completion-${sessionId}`;
         if (!shownToastsRef.current.has(completionToastId)) {
