@@ -30,6 +30,19 @@ export class SimplifiedSourceStatusService {
   static getSourceStatus(source: any): SourceStatus {
     // For website sources, check crawl_status
     if (source.source_type === 'website') {
+      // If crawl is completed and requires manual training, it's ready for training
+      if (source.crawl_status === 'completed' && source.requires_manual_training === true) {
+        return 'crawled';
+      }
+      // If crawl is completed and training has been done, it's fully completed
+      if (source.crawl_status === 'completed' && source.requires_manual_training === false) {
+        return 'completed';
+      }
+      // If currently crawling
+      if (source.crawl_status === 'in_progress') {
+        return 'crawling';
+      }
+      // Default to pending
       return source.crawl_status || 'pending';
     }
     

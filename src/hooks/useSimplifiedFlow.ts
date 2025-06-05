@@ -24,6 +24,25 @@ export const useSimplifiedFlow = () => {
 
       const { supabase } = await import('@/integrations/supabase/client');
       
+      // First, mark all sources that require manual training as training
+      const { error: updateError } = await supabase
+        .from('agent_sources')
+        .update({ 
+          requires_manual_training: false,
+          metadata: {
+            training_started_at: new Date().toISOString(),
+            training_status: 'in_progress'
+          }
+        })
+        .eq('agent_id', agentId)
+        .eq('requires_manual_training', true);
+
+      if (updateError) {
+        console.error('Error updating sources for training:', updateError);
+        throw updateError;
+      }
+
+      // Trigger the enhanced retraining which handles chunking
       const response = await supabase.functions.invoke('start-enhanced-retraining', {
         body: { agentId }
       });
@@ -32,10 +51,24 @@ export const useSimplifiedFlow = () => {
         throw response.error;
       }
 
-      console.log('Training started successfully');
+      console.log('✅ Training started successfully - chunking process initiated');
     } catch (error) {
       console.error('Failed to start training:', error);
       setIsTraining(false);
+      
+      // Revert the training status on error
+      const { supabase } = await import('@/integrations/supabase/client');
+      await supabase
+        .from('agent_sources')
+        .update({ 
+          requires_manual_training: true,
+          metadata: {
+            training_failed_at: new Date().toISOString(),
+            training_error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        })
+        .eq('agent_id', agentId)
+        .eq('requires_manual_training', false);
     }
   }, [agentId, isTraining]);
 
@@ -47,7 +80,7 @@ export const useSimplifiedFlow = () => {
       
       const { data: sources, error } = await supabase
         .from('agent_sources')
-        .select('id, source_type, crawl_status, requires_manual_training')
+        .select('id, source_type, crawl_status, requires_manual_training, metadata')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -59,12 +92,22 @@ export const useSimplifiedFlow = () => {
       const summary = SimplifiedSourceStatusService.analyzeSourceStatus(sources || []);
       setStatusSummary(summary);
 
-      // Handle automatic toast notifications based on status changes
-      if (summary.hasTrainingSources && !isTraining) {
+      // Check if training is in progress
+      const hasTrainingInProgress = sources?.some(s => 
+        s.metadata?.training_status === 'in_progress'
+      );
+
+      if (hasTrainingInProgress && !isTraining) {
         setIsTraining(true);
-      } else if (summary.allSourcesCompleted && isTraining) {
+      } else if (!hasTrainingInProgress && isTraining) {
         setIsTraining(false);
-        ToastNotificationService.showTrainingCompleted();
+        // Check if training completed successfully
+        const hasTrainingCompleted = sources?.some(s => 
+          s.metadata?.training_completed_at
+        );
+        if (hasTrainingCompleted) {
+          ToastNotificationService.showTrainingCompleted();
+        }
       }
     } catch (error) {
       console.error('Error updating source status:', error);
@@ -89,15 +132,22 @@ export const useSimplifiedFlow = () => {
       setTimeout(updateSourceStatus, 1000);
     };
     const handleSourceUpdated = () => setTimeout(updateSourceStatus, 1000);
+    const handleTrainingCompleted = () => {
+      setIsTraining(false);
+      ToastNotificationService.showTrainingCompleted();
+      setTimeout(updateSourceStatus, 1000);
+    };
 
     window.addEventListener('crawlStarted', handleCrawlStarted);
     window.addEventListener('crawlCompleted', handleCrawlCompleted);
     window.addEventListener('sourceUpdated', handleSourceUpdated);
+    window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
 
     return () => {
       window.removeEventListener('crawlStarted', handleCrawlStarted);
       window.removeEventListener('crawlCompleted', handleCrawlCompleted);
       window.removeEventListener('sourceUpdated', handleSourceUpdated);
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     };
   }, [updateSourceStatus]);
 
