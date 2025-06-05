@@ -7,6 +7,8 @@ interface ChunkingStatus {
   totalPages: number;
   isComplete: boolean;
   progressPercentage: number;
+  error?: string;
+  isLoading: boolean;
 }
 
 export const useChunkingStatus = (parentSourceId: string | null) => {
@@ -14,41 +16,49 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
     pagesProcessed: 0,
     totalPages: 0,
     isComplete: false,
-    progressPercentage: 0
+    progressPercentage: 0,
+    isLoading: false
   });
 
   const calculateProgress = useCallback(async () => {
     if (!parentSourceId) return;
 
     try {
+      setStatus(prev => ({ ...prev, isLoading: true, error: undefined }));
+
       // Get total pages that need processing
       const { data: totalPagesData, error: totalError } = await supabase
         .from('source_pages')
-        .select('id', { count: 'exact' })
+        .select('id')
         .eq('parent_source_id', parentSourceId)
         .eq('status', 'completed');
 
       if (totalError) {
         console.error('Error fetching total pages:', totalError);
+        setStatus(prev => ({ ...prev, error: totalError.message, isLoading: false }));
         return;
       }
 
       const totalPages = totalPagesData?.length || 0;
+      console.log(`📊 Found ${totalPages} completed pages for chunking status`);
 
       // Get pages that have been processed (have chunks)
-      const { data: processedPagesData, error: processedError } = await supabase
+      const { data: chunksData, error: chunksError } = await supabase
         .from('source_chunks')
-        .select('source_id', { count: 'exact' })
+        .select('source_id')
         .in('source_id', totalPagesData?.map(p => p.id) || []);
 
-      if (processedError) {
-        console.error('Error fetching processed pages:', processedError);
+      if (chunksError) {
+        console.error('Error fetching processed chunks:', chunksError);
+        setStatus(prev => ({ ...prev, error: chunksError.message, isLoading: false }));
         return;
       }
 
       // Count unique source_ids that have chunks
-      const uniqueProcessedSources = new Set(processedPagesData?.map(c => c.source_id) || []);
+      const uniqueProcessedSources = new Set(chunksData?.map(c => c.source_id) || []);
       const pagesProcessed = uniqueProcessedSources.size;
+
+      console.log(`📝 Processed pages: ${pagesProcessed}/${totalPages}`);
 
       const progressPercentage = totalPages > 0 ? Math.round((pagesProcessed / totalPages) * 100) : 0;
       const isComplete = pagesProcessed >= totalPages && totalPages > 0;
@@ -57,11 +67,17 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
         pagesProcessed,
         totalPages,
         isComplete,
-        progressPercentage
+        progressPercentage,
+        isLoading: false
       });
 
     } catch (error) {
       console.error('Error calculating chunking progress:', error);
+      setStatus(prev => ({ 
+        ...prev, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isLoading: false 
+      }));
     }
   }, [parentSourceId]);
 
@@ -71,7 +87,7 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
     // Initial calculation
     calculateProgress();
 
-    // Set up real-time subscription for source_chunks
+    // Set up real-time subscription for source_chunks with better error handling
     const channel = supabase
       .channel(`chunking-progress-${parentSourceId}`)
       .on(
@@ -81,8 +97,8 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
           schema: 'public',
           table: 'source_chunks'
         },
-        () => {
-          // Recalculate when new chunks are created
+        (payload) => {
+          console.log('📡 New chunk created:', payload);
           calculateProgress();
         }
       )
@@ -94,14 +110,21 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
           table: 'source_pages',
           filter: `parent_source_id=eq.${parentSourceId}`
         },
-        () => {
-          // Recalculate when page status changes
+        (payload) => {
+          console.log('📡 Page status updated:', payload);
           calculateProgress();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('📡 Chunking subscription status:', status);
+        if (err) {
+          console.error('📡 Subscription error:', err);
+          setStatus(prev => ({ ...prev, error: `Subscription error: ${err.message}` }));
+        }
+      });
 
     return () => {
+      console.log('🧹 Cleaning up chunking subscription');
       supabase.removeChannel(channel);
     };
   }, [parentSourceId, calculateProgress]);

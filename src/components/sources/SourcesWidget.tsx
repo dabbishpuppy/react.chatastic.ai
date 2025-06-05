@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -290,6 +289,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
             progressPercentage={chunkingStatus.progressPercentage}
             pagesProcessed={chunkingStatus.pagesProcessed}
             totalPages={chunkingStatus.totalPages}
+            error={chunkingStatus.error}
+            isLoading={chunkingStatus.isLoading}
           />
 
           <DoneModal

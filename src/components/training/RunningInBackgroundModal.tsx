@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface RunningInBackgroundModalProps {
   open: boolean;
@@ -16,6 +16,8 @@ interface RunningInBackgroundModalProps {
   progressPercentage: number;
   pagesProcessed: number;
   totalPages: number;
+  error?: string;
+  isLoading?: boolean;
 }
 
 export const RunningInBackgroundModal: React.FC<RunningInBackgroundModalProps> = ({
@@ -23,22 +25,34 @@ export const RunningInBackgroundModal: React.FC<RunningInBackgroundModalProps> =
   onOpenChange,
   progressPercentage,
   pagesProcessed,
-  totalPages
+  totalPages,
+  error,
+  isLoading
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+            {error ? (
+              <AlertCircle className="h-5 w-5 text-red-600" />
+            ) : (
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+            )}
             Agent Training Status
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
-          <div className="text-sm text-gray-600">
-            Training in progress...
-          </div>
+          {error ? (
+            <div className="text-sm text-red-600">
+              Training error: {error}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-600">
+              {isLoading ? 'Loading training status...' : 'Training in progress...'}
+            </div>
+          )}
           
           <div className="space-y-2">
             <div className="flex justify-between text-sm">

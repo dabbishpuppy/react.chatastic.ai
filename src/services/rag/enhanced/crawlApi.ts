@@ -124,17 +124,51 @@ export class CrawlApiService {
     try {
       console.log('🚀 Starting chunking for parent source:', parentSourceId);
 
+      // First, check if there are actually pages to process
+      const { data: pages, error: pagesError } = await supabase
+        .from('source_pages')
+        .select('id, url, status, processing_status')
+        .eq('parent_source_id', parentSourceId)
+        .eq('status', 'completed');
+
+      if (pagesError) {
+        console.error('❌ Error checking pages:', pagesError);
+        throw new Error(`Failed to check pages: ${pagesError.message}`);
+      }
+
+      if (!pages || pages.length === 0) {
+        console.warn('⚠️ No completed pages found for chunking');
+        return {
+          success: false,
+          message: 'No completed pages found for processing'
+        };
+      }
+
+      console.log(`📄 Found ${pages.length} completed pages to process`);
+
+      // Check if pages already have chunks
+      const { data: existingChunks, error: chunksError } = await supabase
+        .from('source_chunks')
+        .select('source_id')
+        .in('source_id', pages.map(p => p.id));
+
+      if (!chunksError) {
+        const pagesWithChunks = new Set(existingChunks?.map(c => c.source_id) || []);
+        const pagesNeedingChunks = pages.filter(p => !pagesWithChunks.has(p.id));
+        console.log(`🔍 Pages needing chunks: ${pagesNeedingChunks.length}/${pages.length}`);
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-missing-chunks', {
         body: { parentSourceId }
       });
 
       if (error) {
-        console.error('Chunking error:', error);
+        console.error('❌ Chunking error:', error);
         throw new Error(`Chunking failed: ${error.message}`);
       }
 
       if (!data || !data.success) {
-        console.error('Chunking failed:', data);
+        console.error('❌ Chunking failed:', data);
         throw new Error(data?.error || 'Unknown error occurred during chunking');
       }
 
