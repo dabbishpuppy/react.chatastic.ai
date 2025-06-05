@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -12,6 +13,8 @@ import { RunningInBackgroundModal } from '@/components/training/RunningInBackgro
 import { DoneModal } from '@/components/training/DoneModal';
 import { useChunkingStatus } from '@/hooks/useChunkingStatus';
 import { CrawlApiService } from '@/services/rag/enhanced/crawlApi';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SourcesWidgetProps {
   currentTab?: string;
@@ -222,6 +225,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const handleCloseDoneModal = () => {
     setShowDoneModal(false);
     setCurrentTrainingSource(null);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setShowRetrainingDialog(open);
   };
 
   // Check if training is active

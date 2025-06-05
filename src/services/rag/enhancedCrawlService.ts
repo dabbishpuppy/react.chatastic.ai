@@ -1,3 +1,4 @@
+
 // Re-export types and services for backward compatibility
 export * from './enhanced/crawlTypes';
 export { CrawlApiService } from './enhanced/crawlApi';
@@ -27,7 +28,7 @@ export class EnhancedCrawlService {
     return CrawlJobManager.retryFailedJobs(parentSourceId);
   }
 
-  static startChunking(parentSourceId: string) {
+  static async startChunking(parentSourceId: string) {
     const { CrawlApiService } = await import('./enhanced/crawlApi');
     return CrawlApiService.startChunking(parentSourceId);
   }
