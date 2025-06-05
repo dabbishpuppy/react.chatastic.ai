@@ -30,6 +30,7 @@ export const useTrainingNotifications = () => {
   const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
   const trainingInitiatedByUserRef = useRef<boolean>(false);
   const completedSessionsRef = useRef<Set<string>>(new Set());
+  const initialTrainingSetRef = useRef<boolean>(false);
   
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -61,51 +62,55 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newTrainingProgress);
 
-      // Handle status changes
-      const previousStatus = trainingStateRef.current;
-      trainingStateRef.current = mapStatus(chunkProgress.status);
+      // Handle status changes - only process if we have real data (not initial placeholder)
+      const hasRealData = chunkProgress.totalPages > 0 || chunkProgress.processedPages > 0 || chunkProgress.currentlyProcessing.length > 0;
+      
+      if (hasRealData || chunkProgress.status === 'completed' || chunkProgress.status === 'failed') {
+        const previousStatus = trainingStateRef.current;
+        trainingStateRef.current = mapStatus(chunkProgress.status);
 
-      // Training completed
-      if (chunkProgress.status === 'completed' && 
-          previousStatus !== 'completed' &&
-          !completedSessionsRef.current.has(sessionId)) {
-        
-        console.log('🎉 Training completed! Session:', sessionId);
-        completedSessionsRef.current.add(sessionId);
-        trainingInitiatedByUserRef.current = false;
-        
-        const completionToastId = `completion-${sessionId}`;
-        if (!shownToastsRef.current.has(completionToastId)) {
-          shownToastsRef.current.add(completionToastId);
+        // Training completed
+        if (chunkProgress.status === 'completed' && 
+            previousStatus !== 'completed' &&
+            !completedSessionsRef.current.has(sessionId)) {
           
-          toast({
-            title: "Training Complete",
-            description: `Successfully processed ${chunkProgress.chunksCreated} chunks from ${chunkProgress.processedPages} pages`,
-            duration: 5000,
-          });
+          console.log('🎉 Training completed! Session:', sessionId);
+          completedSessionsRef.current.add(sessionId);
+          trainingInitiatedByUserRef.current = false;
+          
+          const completionToastId = `completion-${sessionId}`;
+          if (!shownToastsRef.current.has(completionToastId)) {
+            shownToastsRef.current.add(completionToastId);
+            
+            toast({
+              title: "Training Complete",
+              description: `Successfully processed ${chunkProgress.chunksCreated} chunks from ${chunkProgress.processedPages} pages`,
+              duration: 5000,
+            });
 
-          window.dispatchEvent(new CustomEvent('trainingCompleted', {
-            detail: { agentId, progress: newTrainingProgress }
-          }));
+            window.dispatchEvent(new CustomEvent('trainingCompleted', {
+              detail: { agentId, progress: newTrainingProgress }
+            }));
+          }
         }
-      }
 
-      // Training failed
-      if (chunkProgress.status === 'failed' && previousStatus !== 'failed') {
-        console.log('❌ Training failed for session:', sessionId);
-        
-        trainingInitiatedByUserRef.current = false;
-        
-        const failureToastId = `failure-${sessionId}`;
-        if (!shownToastsRef.current.has(failureToastId)) {
-          shownToastsRef.current.add(failureToastId);
+        // Training failed
+        if (chunkProgress.status === 'failed' && previousStatus !== 'failed') {
+          console.log('❌ Training failed for session:', sessionId);
           
-          toast({
-            title: "Training Failed",
-            description: "Some sources failed to process. Please check your sources and try again.",
-            variant: "destructive",
-            duration: 5000,
-          });
+          trainingInitiatedByUserRef.current = false;
+          
+          const failureToastId = `failure-${sessionId}`;
+          if (!shownToastsRef.current.has(failureToastId)) {
+            shownToastsRef.current.add(failureToastId);
+            
+            toast({
+              title: "Training Failed",
+              description: "Some sources failed to process. Please check your sources and try again.",
+              variant: "destructive",
+              duration: 5000,
+            });
+          }
         }
       }
     }
@@ -127,6 +132,7 @@ export const useTrainingNotifications = () => {
 
       // Clear previous completion state
       completedSessionsRef.current.clear();
+      initialTrainingSetRef.current = true;
 
       // IMMEDIATELY set training progress to show dialog
       const initialTrainingProgress: TrainingProgress = {

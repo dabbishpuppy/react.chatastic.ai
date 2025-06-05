@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -20,6 +21,8 @@ interface RetrainingDialogProps {
   retrainingNeeded: any;
   onStartRetraining: () => void;
   trainingProgress?: any;
+  isInBackgroundMode?: boolean;
+  backgroundSessionId?: string;
 }
 
 export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
@@ -29,14 +32,18 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   progress,
   retrainingNeeded,
   onStartRetraining,
-  trainingProgress
+  trainingProgress,
+  isInBackgroundMode = false,
+  backgroundSessionId = ''
 }) => {
-  // Enhanced status determination with better logging
+  // Enhanced status determination with background mode awareness
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
       isRetraining,
+      isInBackgroundMode,
+      backgroundSessionId,
       trainingProgress: trainingProgress ? {
         status: trainingProgress.status,
         progress: trainingProgress.progress,
@@ -46,39 +53,53 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       } : null
     });
 
-    // PRIORITY 1: If currently training, show training state
+    // PRIORITY 1: If in background mode, don't override the training state
+    if (isInBackgroundMode && backgroundSessionId) {
+      console.log('✅ Status: background_training (background mode active)');
+      return {
+        status: 'training',
+        progress: trainingProgress?.progress || 0,
+        isBackground: true
+      };
+    }
+
+    // PRIORITY 2: If currently training, show training state
     if (isRetraining || trainingProgress?.status === 'training') {
       console.log('✅ Status: training (active training detected)');
       return {
         status: 'training',
-        progress: trainingProgress?.progress || 0
+        progress: trainingProgress?.progress || 0,
+        isBackground: false
       };
     }
     
-    // PRIORITY 2: If training failed, show failed state
+    // PRIORITY 3: If training failed, show failed state
     if (trainingProgress?.status === 'failed') {
       console.log('✅ Status: failed (training failed)');
       return {
         status: 'failed',
-        progress: trainingProgress?.progress || 0
+        progress: trainingProgress?.progress || 0,
+        isBackground: false
       };
     }
     
-    // PRIORITY 3: If training finished AND no retraining needed, show completed
-    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
+    // PRIORITY 4: If training finished AND no retraining needed, show completed
+    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed && !isInBackgroundMode) {
       console.log('✅ Status: completed (training done and no retraining needed)');
       return {
         status: 'completed',
-        progress: 100
+        progress: 100,
+        isBackground: false
       };
     }
     
-    // PRIORITY 4: If retraining is explicitly needed, show that state
+    // PRIORITY 5: If retraining is explicitly needed, show that state
     if (retrainingNeeded?.needed) {
       console.log('✅ Status: needs_training (retraining explicitly needed)');
       return {
         status: 'needs_training',
-        progress: 0
+        progress: 0,
+        isBackground: false
       };
     }
     
@@ -86,11 +107,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     console.log('✅ Status: up_to_date (default - no issues detected)');
     return {
       status: 'up_to_date',
-      progress: 0
+      progress: 0,
+      isBackground: false
     };
   };
 
-  const { status: currentStatus, progress: currentProgress } = getCurrentStatus();
+  const { status: currentStatus, progress: currentProgress, isBackground } = getCurrentStatus();
   
   console.log('🔍 RetrainingDialog render state:', {
     currentStatus,
@@ -98,6 +120,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     trainingProgressStatus: trainingProgress?.status,
     retrainingNeeded: retrainingNeeded?.needed,
     currentProgress,
+    isBackground,
     open
   });
 

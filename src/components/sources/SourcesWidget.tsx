@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -8,6 +7,7 @@ import SourcesLoadingState from "./SourcesLoadingState";
 import SourcesErrorState from "./SourcesErrorState";
 import SourcesContent from "./SourcesContent";
 import { RetrainingDialog } from "./RetrainingDialog";
+import { toast } from "@/hooks/use-toast";
 
 interface SourcesWidgetProps {
   currentTab?: string;
@@ -18,6 +18,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const { data: stats, isLoading, error, refetch: refetchStats } = useAgentSourceStats();
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
+  const [backgroundSessionId, setBackgroundSessionId] = useState<string>('');
   
   // Use enhanced training hooks
   const {
@@ -32,7 +33,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Auto-open dialog when training starts
+  // Auto-open dialog when training starts (only if not in background)
   useEffect(() => {
     if (isRetraining && !showRetrainingDialog && !isTrainingInBackground) {
       console.log('🔄 Training started - opening dialog');
@@ -45,17 +46,27 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     const handleTrainingCompleted = (event: CustomEvent) => {
       console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
       
+      // If training was in background, show toast instead of reopening dialog
+      if (isTrainingInBackground) {
+        console.log('🎉 Training completed in background - showing toast');
+        toast({
+          title: "Training Complete",
+          description: "Your AI agent has been successfully trained and is ready to use.",
+          duration: 5000,
+        });
+        setIsTrainingInBackground(false);
+        setBackgroundSessionId('');
+      }
+      
       // Refresh stats and check status
       refetchStats();
       setTimeout(() => checkRetrainingNeeded(), 1000);
-      
-      // Clear background training state
-      setIsTrainingInBackground(false);
     };
 
     const handleTrainingContinuesInBackground = (event: CustomEvent) => {
       console.log('📱 Training continues in background:', event.detail);
       setIsTrainingInBackground(true);
+      setBackgroundSessionId(event.detail?.sessionId || '');
       setShowRetrainingDialog(false);
     };
 
@@ -66,7 +77,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     };
-  }, [refetchStats, checkRetrainingNeeded]);
+  }, [refetchStats, checkRetrainingNeeded, isTrainingInBackground]);
 
   // Check retraining status when stats change
   useEffect(() => {
@@ -139,17 +150,19 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
 
   const handleRetrainClick = () => {
     console.log('🔄 Retrain button clicked');
+    setIsTrainingInBackground(false); // Reset background state
+    setBackgroundSessionId('');
     setShowRetrainingDialog(true);
   };
 
   const handleDialogClose = (open: boolean) => {
     console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
-    setShowRetrainingDialog(open);
     
     // If closing dialog while training is active, set background mode
     if (!open && isTrainingActive && trainingProgress?.status === 'training') {
       console.log('📱 Setting background training state - training is active');
       setIsTrainingInBackground(true);
+      setBackgroundSessionId(trainingProgress?.sessionId || '');
       
       // Dispatch background event
       window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
@@ -159,7 +172,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
           status: 'background'
         }
       }));
+    } else {
+      // Normal close - reset background state
+      setIsTrainingInBackground(false);
+      setBackgroundSessionId('');
     }
+    
+    setShowRetrainingDialog(open);
   };
 
   // Better training state determination
@@ -202,6 +221,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         retrainingNeeded={retrainingNeeded}
         onStartRetraining={startRetraining}
         trainingProgress={trainingProgress}
+        isInBackgroundMode={isTrainingInBackground}
+        backgroundSessionId={backgroundSessionId}
       />
     </>
   );
