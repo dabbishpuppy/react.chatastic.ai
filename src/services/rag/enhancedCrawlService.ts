@@ -28,11 +28,6 @@ export class EnhancedCrawlService {
     return CrawlJobManager.retryFailedJobs(parentSourceId);
   }
 
-  static async startChunking(parentSourceId: string) {
-    const { CrawlApiService } = await import('./enhanced/crawlApi');
-    return CrawlApiService.startChunking(parentSourceId);
-  }
-
   static subscribeToCrawlUpdates(
     parentSourceId: string,
     onUpdate: (status: import('./enhanced/crawlTypes').CrawlStatus) => void

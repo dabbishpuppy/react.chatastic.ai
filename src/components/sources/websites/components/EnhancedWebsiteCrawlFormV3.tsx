@@ -11,7 +11,6 @@ import { useParams } from 'react-router-dom';
 import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
 import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
 import { Globe, FileText, Map } from 'lucide-react';
-import { useSinglePageCrawl } from '@/hooks/useSinglePageCrawl';
 
 interface EnhancedWebsiteCrawlFormV3Props {
   onCrawlStarted?: (parentSourceId: string) => void;
@@ -33,7 +32,6 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
 
   const { initiateCrawl, loading: crawlLoading } = useEnhancedCrawl();
   const { infrastructureHealth, systemHealth, loading: infrastructureLoading, loadInfrastructureHealth } = useProductionInfrastructure();
-  const { startSinglePageCrawl, isLoading: singlePageLoading } = useSinglePageCrawl();
 
   // Initialize infrastructure on mount
   useEffect(() => {
@@ -78,19 +76,11 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         agentId
       });
 
-      // Handle single page differently
-      if (activeTab === 'single-site') {
-        const result = await startSinglePageCrawl(fullUrl);
-        onCrawlStarted?.(result.parentSourceId);
-        
-        // Reset form
-        setUrl('');
-        return;
-      }
-
-      // Convert tab to the expected crawl mode format for other modes
+      // Convert tab to the expected crawl mode format
       let finalCrawlMode: 'single-page' | 'sitemap-only' | 'full-website' = 'full-website';
-      if (activeTab === 'sitemap') {
+      if (activeTab === 'single-site') {
+        finalCrawlMode = 'single-page';
+      } else if (activeTab === 'sitemap') {
         finalCrawlMode = 'sitemap-only';
       } else {
         finalCrawlMode = 'full-website';
@@ -142,7 +132,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   };
 
   const getButtonText = () => {
-    if (isSubmitting || crawlLoading || singlePageLoading) {
+    if (isSubmitting || crawlLoading) {
       switch (activeTab) {
         case 'website':
           return "Starting Website Crawl...";
@@ -166,7 +156,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
     }
   };
 
-  const isLoading = isSubmitting || crawlLoading || singlePageLoading;
+  const isLoading = isSubmitting || crawlLoading;
 
   return (
     <Card>
