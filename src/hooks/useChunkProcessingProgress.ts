@@ -20,18 +20,42 @@ export const useChunkProcessingProgress = () => {
   const [isConnected, setIsConnected] = useState(false);
   const lastUpdateRef = useRef<number>(0);
   
-  // NEW: Add completion state management
-  const isCompletedRef = useRef<boolean>(false);
+  // CRITICAL: Enhanced completion state management
+  const completionStateRef = useRef<{
+    isCompleted: boolean;
+    completedAt: number | null;
+    sessionId: string | null;
+  }>({
+    isCompleted: false,
+    completedAt: null,
+    sessionId: null
+  });
+  
   const subscriptionsRef = useRef<any[]>([]);
+  const isProcessingStatusChangeRef = useRef<boolean>(false);
 
   // Calculate progress from database state
   const calculateProgress = async () => {
-    if (!agentId || isCompletedRef.current) return; // Don't calculate if already completed
+    if (!agentId) return;
+    
+    // CRITICAL: Don't calculate if already completed
+    if (completionStateRef.current.isCompleted) {
+      console.log('🚫 Progress calculation blocked - training already completed');
+      return;
+    }
+
+    // CRITICAL: Prevent concurrent status changes
+    if (isProcessingStatusChangeRef.current) {
+      console.log('🚫 Progress calculation blocked - already processing status change');
+      return;
+    }
 
     try {
       const now = Date.now();
       if (now - lastUpdateRef.current < 2000) return; // Debounce
       lastUpdateRef.current = now;
+
+      isProcessingStatusChangeRef.current = true;
 
       // Get all agent sources
       const { data: sources } = await supabase
@@ -40,7 +64,10 @@ export const useChunkProcessingProgress = () => {
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
-      if (!sources) return;
+      if (!sources) {
+        isProcessingStatusChangeRef.current = false;
+        return;
+      }
 
       let totalSources = 0;
       let processedSources = 0;
@@ -116,41 +143,58 @@ export const useChunkProcessingProgress = () => {
         status = 'processing';
       } else if (totalPages > 0 && processedPages === totalPages) {
         status = 'completed';
-        // CRITICAL: Set completion flag and stop subscriptions
-        isCompletedRef.current = true;
-        cleanupSubscriptions();
+        
+        // CRITICAL: Permanent completion lock
+        if (!completionStateRef.current.isCompleted) {
+          console.log('🎉 CHUNK PROCESSING COMPLETED - Setting permanent completion lock');
+          completionStateRef.current = {
+            isCompleted: true,
+            completedAt: Date.now(),
+            sessionId: completionStateRef.current.sessionId
+          };
+          
+          // Immediately cleanup subscriptions
+          cleanupSubscriptions();
+        }
       }
 
       // Calculate overall progress
       const overallProgress = totalPages > 0 ? Math.round((processedPages / totalPages) * 100) : 0;
 
-      setProgress({
-        totalSources,
-        processedSources,
-        totalPages,
-        processedPages,
-        chunksCreated,
-        status,
-        progress: overallProgress,
-        currentlyProcessing
-      });
+      // CRITICAL: Only update progress if not completed
+      if (!completionStateRef.current.isCompleted) {
+        setProgress({
+          totalSources,
+          processedSources,
+          totalPages,
+          processedPages,
+          chunksCreated,
+          status,
+          progress: overallProgress,
+          currentlyProcessing
+        });
 
-      console.log('📊 Chunk processing progress updated:', {
-        status,
-        progress: overallProgress,
-        processedPages,
-        totalPages,
-        chunksCreated,
-        currentlyProcessing: currentlyProcessing.length,
-        isCompleted: isCompletedRef.current
-      });
+        console.log('📊 Chunk processing progress updated:', {
+          status,
+          progress: overallProgress,
+          processedPages,
+          totalPages,
+          chunksCreated,
+          currentlyProcessing: currentlyProcessing.length,
+          isCompleted: completionStateRef.current.isCompleted
+        });
+      } else {
+        console.log('🚫 Progress update blocked - training already completed');
+      }
 
     } catch (error) {
       console.error('Error calculating chunk processing progress:', error);
+    } finally {
+      isProcessingStatusChangeRef.current = false;
     }
   };
 
-  // NEW: Function to cleanup subscriptions
+  // Function to cleanup subscriptions
   const cleanupSubscriptions = () => {
     console.log('🧹 Cleaning up chunk processing subscriptions after completion');
     subscriptionsRef.current.forEach(channel => {
@@ -165,10 +209,13 @@ export const useChunkProcessingProgress = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔄 Setting up chunk processing progress tracking for agent:', agentId);
+    // CRITICAL: Don't setup subscriptions if already completed
+    if (completionStateRef.current.isCompleted) {
+      console.log('🚫 Subscriptions blocked - training already completed');
+      return;
+    }
 
-    // Reset completion state for new agent
-    isCompletedRef.current = false;
+    console.log('🔄 Setting up chunk processing progress tracking for agent:', agentId);
 
     const setupSubscriptions = async () => {
       // Subscribe to source_pages changes
@@ -182,9 +229,11 @@ export const useChunkProcessingProgress = () => {
             table: 'source_pages'
           },
           () => {
-            if (!isCompletedRef.current) {
+            if (!completionStateRef.current.isCompleted) {
               console.log('📄 Source page updated, recalculating progress');
               setTimeout(calculateProgress, 1000);
+            } else {
+              console.log('🚫 Source page update ignored - training completed');
             }
           }
         )
@@ -196,9 +245,11 @@ export const useChunkProcessingProgress = () => {
             table: 'source_chunks'
           },
           () => {
-            if (!isCompletedRef.current) {
+            if (!completionStateRef.current.isCompleted) {
               console.log('🧩 Source chunk updated, recalculating progress');
               setTimeout(calculateProgress, 1000);
+            } else {
+              console.log('🚫 Source chunk update ignored - training completed');
             }
           }
         )
@@ -219,9 +270,11 @@ export const useChunkProcessingProgress = () => {
             filter: `agent_id=eq.${agentId}`
           },
           () => {
-            if (!isCompletedRef.current) {
+            if (!completionStateRef.current.isCompleted) {
               console.log('📚 Agent source updated, recalculating progress');
               setTimeout(calculateProgress, 1000);
+            } else {
+              console.log('🚫 Agent source update ignored - training completed');
             }
           }
         )
@@ -231,7 +284,9 @@ export const useChunkProcessingProgress = () => {
       subscriptionsRef.current = [pageChannel, sourceChannel];
 
       // Initial calculation
-      calculateProgress();
+      if (!completionStateRef.current.isCompleted) {
+        calculateProgress();
+      }
     };
 
     setupSubscriptions();
@@ -248,8 +303,15 @@ export const useChunkProcessingProgress = () => {
     try {
       console.log('🚀 Starting chunk processing for agent:', agentId);
 
-      // Reset completion state for new training session
-      isCompletedRef.current = false;
+      // CRITICAL: Reset completion state and create stable session ID
+      const newSessionId = `training-${agentId}-${Date.now()}`;
+      completionStateRef.current = {
+        isCompleted: false,
+        completedAt: null,
+        sessionId: newSessionId
+      };
+
+      console.log('✅ New chunk processing session started with ID:', newSessionId);
 
       // Get all agent sources that need processing
       const { data: sources } = await supabase
