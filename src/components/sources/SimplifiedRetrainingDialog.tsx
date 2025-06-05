@@ -12,7 +12,7 @@ interface SimplifiedRetrainingDialogProps {
   onOpenChange: (open: boolean) => void;
   onStartTraining: () => Promise<void>;
   trainingProgress?: {
-    status: 'idle' | 'training' | 'completed' | 'error';
+    status: 'idle' | 'training' | 'completed' | 'failed';
     progress: number;
     totalSources?: number;
     processedSources?: number;

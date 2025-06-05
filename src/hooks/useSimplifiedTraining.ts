@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
 
