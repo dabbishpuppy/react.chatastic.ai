@@ -17,10 +17,10 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
   sourcesByType = {},
   totalSize = "0 B"
 }) => {
-  const { statusSummary, buttonState, startTraining } = useSimplifiedFlow();
+  const { statusSummary, buttonState, isTraining, startTraining } = useSimplifiedFlow();
 
   const getButtonIcon = () => {
-    if (buttonState.buttonText === 'Training Agent...') {
+    if (isTraining || buttonState.buttonText === 'Training Agent...') {
       return <Loader2 className="h-4 w-4 animate-spin" />;
     }
     if (buttonState.buttonText === 'Agent Trained') {
@@ -30,13 +30,26 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
   };
 
   const getButtonClassName = () => {
-    if (buttonState.buttonText === 'Training Agent...') {
-      return "bg-blue-50 border-blue-200 text-blue-700 w-full";
+    if (isTraining || buttonState.buttonText === 'Training Agent...') {
+      return "bg-orange-500 hover:bg-orange-600 text-white w-full";
     }
     if (buttonState.buttonText === 'Agent Trained') {
       return "bg-green-50 border-green-200 text-green-700 w-full";
     }
     return "bg-black hover:bg-gray-800 text-white w-full";
+  };
+
+  const getButtonText = () => {
+    if (isTraining) {
+      return "Training Agent...";
+    }
+    return buttonState.buttonText;
+  };
+
+  const handleTrainClick = () => {
+    if (!isTraining && !buttonState.disabled) {
+      startTraining();
+    }
   };
 
   return (
@@ -90,12 +103,12 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
                 <Button
                   size="sm"
                   variant={buttonState.variant}
-                  onClick={startTraining}
-                  disabled={buttonState.disabled}
+                  onClick={handleTrainClick}
+                  disabled={buttonState.disabled || isTraining}
                   className={getButtonClassName()}
                 >
                   {getButtonIcon()}
-                  {buttonState.buttonText}
+                  {getButtonText()}
                 </Button>
               )}
             </>
