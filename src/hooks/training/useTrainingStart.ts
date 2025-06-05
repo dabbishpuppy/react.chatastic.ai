@@ -16,7 +16,14 @@ export const useTrainingStart = (
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting IMPROVED training for agent:', agentId);
+      console.log('🚀 Starting ENHANCED training for agent:', agentId);
+
+      // ENHANCED: Prevent starting if already completed within recent time
+      const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 60000) {
+        console.log('🚫 ENHANCED: Preventing training start - completed recently');
+        return;
+      }
 
       console.log('🔄 Resetting agent-level completion state for explicit training start');
       refs.agentCompletionStateRef.current = {
@@ -40,16 +47,31 @@ export const useTrainingStart = (
 
       console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${refs.trainingStartTimeRef.current}`);
 
+      // ENHANCED: Improved toast deduplication with session tracking
       const startToastId = `start-${sessionId}`;
-      if (!refs.shownToastsRef.current.has(startToastId)) {
+      const recentStartToastId = `recent-start-${agentId}`;
+      
+      // Check if we've shown a start toast recently for this agent
+      const shouldShowStartToast = !refs.shownToastsRef.current.has(startToastId) && 
+                                  !refs.shownToastsRef.current.has(recentStartToastId);
+      
+      if (shouldShowStartToast) {
         refs.shownToastsRef.current.add(startToastId);
+        refs.shownToastsRef.current.add(recentStartToastId);
         
-        console.log('📢 Showing training start toast for session:', sessionId);
+        // Clear the recent start toast flag after 30 seconds
+        addTrackedTimer(() => {
+          refs.shownToastsRef.current.delete(recentStartToastId);
+        }, 30000);
+        
+        console.log('🧠 Showing training start toast for session:', sessionId);
         toast({
-          title: "Training Started",
+          title: "🧠 Training Started",
           description: "Processing sources for AI training...",
           duration: 3000,
         });
+      } else {
+        console.log('🚫 ENHANCED: Prevented duplicate training start toast');
       }
 
       const { data: agentSources, error: sourcesError } = await supabase
@@ -127,7 +149,7 @@ export const useTrainingStart = (
       }
 
     } catch (error) {
-      console.error('Failed to start IMPROVED training:', error);
+      console.error('Failed to start ENHANCED training:', error);
       
       refs.activeTrainingSessionRef.current = '';
       refs.trainingStartTimeRef.current = 0;

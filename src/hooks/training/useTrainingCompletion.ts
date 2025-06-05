@@ -48,12 +48,12 @@ export const useTrainingCompletion = (
     }
   };
 
-  // FIXED: Add validation to check if training is actually complete
+  // ENHANCED: Add validation to check if training is actually complete
   const validateTrainingCompletion = async (agentId: string) => {
     try {
-      console.log('🔍 VALIDATION: Checking actual training completion status');
+      console.log('🔍 ENHANCED VALIDATION: Checking actual training completion status');
       
-      // FIXED: Check if chunks exist for any sources of this agent
+      // Check if chunks exist for any sources of this agent
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
         .select('id')
@@ -66,7 +66,7 @@ export const useTrainingCompletion = (
       }
 
       if (!agentSources || agentSources.length === 0) {
-        console.log('🔍 VALIDATION: No sources found for agent');
+        console.log('🔍 ENHANCED VALIDATION: No sources found for agent');
         return false;
       }
 
@@ -85,7 +85,7 @@ export const useTrainingCompletion = (
       }
 
       const hasChunks = chunks && chunks.length > 0;
-      console.log('🔍 VALIDATION: Agent has chunks:', hasChunks);
+      console.log('🔍 ENHANCED VALIDATION: Agent has chunks:', hasChunks);
 
       // Check if all sources are processed
       const { data: allAgentSources, error: allSourcesError } = await supabase
@@ -128,10 +128,10 @@ export const useTrainingCompletion = (
         }
       }
 
-      console.log('🔍 VALIDATION: All sources processed:', allSourcesProcessed);
+      console.log('🔍 ENHANCED VALIDATION: All sources processed:', allSourcesProcessed);
       
       const isActuallyComplete = hasChunks && allSourcesProcessed;
-      console.log('🔍 VALIDATION: Training actually complete:', isActuallyComplete);
+      console.log('🔍 ENHANCED VALIDATION: Training actually complete:', isActuallyComplete);
       
       return isActuallyComplete;
     } catch (error) {
@@ -155,7 +155,16 @@ export const useTrainingCompletion = (
       }
       refs.lastCompletionCheckRef.current = now;
 
-      // FIXED: First validate if training is actually complete
+      // ENHANCED: Stronger completion state protection
+      if (refs.agentCompletionStateRef.current.isCompleted) {
+        const timeSinceCompletion = now - refs.agentCompletionStateRef.current.completedAt;
+        if (timeSinceCompletion < 60000) {
+          console.log('🚫 ENHANCED: Ignoring completion check - agent completed recently');
+          return;
+        }
+      }
+
+      // First validate if training is actually complete
       const isActuallyComplete = await validateTrainingCompletion(agentId);
       
       const { data: agentSources, error: sourcesError } = await supabase
@@ -179,7 +188,7 @@ export const useTrainingCompletion = (
       let currentlyProcessingPages: string[] = [];
       let hasFailedSources = false;
 
-      console.log('🔍 IMPROVED: Checking training completion for', agentSources.length, 'sources');
+      console.log('🔍 ENHANCED: Checking training completion for', agentSources.length, 'sources');
 
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
@@ -255,7 +264,7 @@ export const useTrainingCompletion = (
 
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
-      console.log('🔍 IMPROVED Status determination:', {
+      console.log('🔍 ENHANCED Status determination:', {
         sourcesNeedingTraining: sourcesNeedingTraining.length,
         currentlyProcessingPages: currentlyProcessingPages.length,
         hasFailedSources,
@@ -263,17 +272,18 @@ export const useTrainingCompletion = (
         totalPagesProcessed,
         activeTrainingSession: refs.activeTrainingSessionRef.current,
         isActuallyComplete,
-        calculatedProgress
+        calculatedProgress,
+        agentAlreadyCompleted: refs.agentCompletionStateRef.current.isCompleted
       });
 
-      // FIXED: Enhanced status determination with validation override
+      // ENHANCED: Status determination with stronger completion protection
       if (isActuallyComplete) {
         status = 'completed';
         console.log('✅ Status: COMPLETED (validated - has chunks and all sources processed)');
         
-        // FIXED: Force cleanup of stuck training state
+        // Force cleanup of stuck training state
         if (refs.activeTrainingSessionRef.current) {
-          console.log('🧹 CLEANUP: Clearing stuck training session state');
+          console.log('🧹 ENHANCED CLEANUP: Clearing stuck training session state');
           refs.activeTrainingSessionRef.current = '';
           refs.trainingStartTimeRef.current = 0;
           refs.globalTrainingActiveRef.current = false;
@@ -285,13 +295,13 @@ export const useTrainingCompletion = (
         status = 'training';
         console.log('🔄 Status: TRAINING (pages currently processing or active session)');
         
-        // FIXED: Recovery mechanism - if progress is 100% but still showing training, validate
+        // Recovery mechanism - if progress is 100% but still showing training, validate
         if (calculatedProgress === 100 && currentlyProcessingPages.length === 0) {
-          console.log('🔍 RECOVERY: Progress 100% but status training - validating completion');
+          console.log('🔍 ENHANCED RECOVERY: Progress 100% but status training - validating completion');
           const recoveryValidation = await validateTrainingCompletion(agentId);
           if (recoveryValidation) {
             status = 'completed';
-            console.log('✅ RECOVERY: Forced status to completed after validation');
+            console.log('✅ ENHANCED RECOVERY: Forced status to completed after validation');
           }
         }
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
@@ -323,7 +333,7 @@ export const useTrainingCompletion = (
         sessionId
       };
 
-      console.log('📊 IMPROVED Training status update:', {
+      console.log('📊 ENHANCED Training status update:', {
         status,
         sessionId,
         progress: calculatedProgress,
@@ -340,6 +350,7 @@ export const useTrainingCompletion = (
       const previousStatus = refs.trainingStateRef.current;
       refs.trainingStateRef.current = status;
 
+      // ENHANCED: Stronger completion detection and duplicate prevention
       if (status === 'completed' && 
           previousStatus !== 'completed' &&
           totalPagesNeedingProcessing > 0 &&
@@ -347,7 +358,7 @@ export const useTrainingCompletion = (
           !refs.completedSessionsRef.current.has(sessionId) &&
           !refs.agentCompletionStateRef.current.isCompleted) {
         
-        console.log('🎉 IMPROVED COMPLETION! Processing completion for session:', sessionId);
+        console.log('🎉 ENHANCED COMPLETION! Processing completion for session:', sessionId);
         
         markAgentCompletion(sessionId);
         await markParentSourcesAsTrained(agentId);
@@ -356,8 +367,9 @@ export const useTrainingCompletion = (
         if (!refs.shownToastsRef.current.has(completionToastId)) {
           refs.shownToastsRef.current.add(completionToastId);
           
+          console.log('🧠 Showing training completion toast for session:', sessionId);
           toast({
-            title: "Training Complete",
+            title: "🧠 Training Complete",
             description: "Your AI agent is trained and ready",
             duration: 5000,
           });
@@ -373,6 +385,7 @@ export const useTrainingCompletion = (
         
         refs.activeTrainingSessionRef.current = '';
         refs.trainingStartTimeRef.current = 0;
+        refs.trainingStateRef.current = 'failed';
         refs.globalTrainingActiveRef.current = false;
         
         const failureToastId = `failure-${sessionId}`;
@@ -389,7 +402,7 @@ export const useTrainingCompletion = (
       }
 
     } catch (error) {
-      console.error('Error in IMPROVED checkTrainingCompletion:', error);
+      console.error('Error in ENHANCED checkTrainingCompletion:', error);
       setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
     }
   };

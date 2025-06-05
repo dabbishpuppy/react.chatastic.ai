@@ -52,6 +52,32 @@ export const useTrainingNotifications = () => {
     addTrackedTimer
   );
 
+  // ENHANCED: Filter post-completion updates
+  const shouldIgnoreUpdate = (eventType: string, payload: any) => {
+    // If agent is already completed, ignore most updates
+    if (refs.agentCompletionStateRef.current.isCompleted) {
+      console.log('🚫 POST-COMPLETION: Ignoring update for completed agent:', eventType);
+      return true;
+    }
+
+    // If this is a processing_status update to 'processed' and we're in a completion state
+    if (payload?.new?.processing_status === 'processed' && 
+        refs.trainingStateRef.current === 'completed') {
+      console.log('🚫 POST-COMPLETION: Ignoring processed status update after completion');
+      return true;
+    }
+
+    // If this is a page being marked as processed and training was recently completed
+    const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
+    if (payload?.new?.processing_status === 'processed' && 
+        timeSinceCompletion < 30000) {
+      console.log('🚫 POST-COMPLETION: Ignoring late processing update within 30s of completion');
+      return true;
+    }
+
+    return false;
+  };
+
   // Listen for crawl initiation events
   useEffect(() => {
     const handleCrawlStarted = () => {
@@ -84,7 +110,7 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up IMPROVED training notifications for agent:', agentId);
+    console.log('🔔 Setting up ENHANCED training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -114,7 +140,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`improved-training-notifications-${agentId}`)
+        .channel(`enhanced-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -125,6 +151,11 @@ export const useTrainingNotifications = () => {
             filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
           },
           (payload) => {
+            // ENHANCED: Check if we should ignore this update
+            if (shouldIgnoreUpdate('source_pages_update', payload)) {
+              return;
+            }
+
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
@@ -148,6 +179,11 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
+            // ENHANCED: Check if we should ignore this update
+            if (shouldIgnoreUpdate('agent_sources_update', payload)) {
+              return;
+            }
+
             const updatedSource = payload.new as any;
             const oldSource = payload.old as any;
             const metadata = updatedSource.metadata || {};
@@ -173,6 +209,11 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
+            // ENHANCED: Check if we should ignore this update
+            if (shouldIgnoreUpdate('agent_sources_insert', payload)) {
+              return;
+            }
+
             if ((payload.new as any)?.source_type === 'website') {
               addTrackedTimer(initializeSubscriptions, 500);
             }
