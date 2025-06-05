@@ -19,24 +19,22 @@ serve(async (req) => {
       throw new Error('agentId is required');
     }
 
-    console.log(`🚀 Starting enhanced retraining for agent: ${agentId}`);
+    console.log(`🚀 Starting simplified training for agent: ${agentId}`);
 
-    // Find all website sources that have completed crawling but need processing
-    const { data: websiteSources, error: sourcesError } = await supabase
+    // Find all sources that need training (status = 'crawled' or requires_manual_training = true)
+    const { data: sourcesToTrain, error: sourcesError } = await supabase
       .from('agent_sources')
-      .select('id, title, url, crawl_status')
+      .select('id, title, source_type, content, crawl_status, requires_manual_training')
       .eq('agent_id', agentId)
-      .eq('source_type', 'website')
-      .eq('crawl_status', 'completed')
-      .eq('requires_manual_training', true)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .or('crawl_status.eq.crawled,requires_manual_training.eq.true');
 
     if (sourcesError) {
-      throw new Error(`Failed to fetch website sources: ${sourcesError.message}`);
+      throw new Error(`Failed to fetch sources: ${sourcesError.message}`);
     }
 
-    if (!websiteSources || websiteSources.length === 0) {
-      console.log('No website sources requiring training found');
+    if (!sourcesToTrain || sourcesToTrain.length === 0) {
+      console.log('No sources requiring training found');
       return new Response(
         JSON.stringify({
           success: true,
@@ -47,103 +45,41 @@ serve(async (req) => {
       );
     }
 
-    console.log(`📋 Found ${websiteSources.length} website sources to process`);
+    console.log(`📋 Found ${sourcesToTrain.length} sources to train`);
 
     let processedCount = 0;
     let errors = [];
 
-    // Process each website source
-    for (const source of websiteSources) {
+    // Process each source
+    for (const source of sourcesToTrain) {
       try {
-        console.log(`🔄 Processing website source: ${source.title} (${source.id})`);
+        console.log(`🔄 Training source: ${source.title} (${source.id})`);
 
-        // Mark source as training started
+        // Mark source as training
         await supabase
           .from('agent_sources')
           .update({ 
+            crawl_status: source.source_type === 'website' ? 'training' : undefined,
             requires_manual_training: false,
             metadata: {
               training_started_at: new Date().toISOString(),
-              training_method: 'enhanced_retraining'
+              training_method: 'simplified_flow'
             }
           })
           .eq('id', source.id);
 
-        // Call process-crawled-pages to handle chunk creation
-        const processingResult = await supabase.functions.invoke('process-crawled-pages', {
-          body: { parentSourceId: source.id }
-        });
+        // Generate chunks based on source type
+        if (source.source_type === 'website') {
+          // For website sources, process crawled pages
+          const processingResult = await supabase.functions.invoke('process-crawled-pages', {
+            body: { parentSourceId: source.id }
+          });
 
-        if (processingResult.error) {
-          console.error(`❌ Failed to process source ${source.id}:`, processingResult.error);
-          
-          // Mark as failed
-          await supabase
-            .from('agent_sources')
-            .update({ 
-              requires_manual_training: true,
-              metadata: {
-                training_error: processingResult.error.message,
-                training_failed_at: new Date().toISOString()
-              }
-            })
-            .eq('id', source.id);
-          
-          errors.push(`Source ${source.title}: ${processingResult.error.message}`);
-          continue;
-        }
-
-        processedCount++;
-        console.log(`✅ Successfully processed source: ${source.title}`);
-
-      } catch (error) {
-        console.error(`❌ Error processing source ${source.id}:`, error);
-        
-        // Mark as failed
-        await supabase
-          .from('agent_sources')
-          .update({ 
-            requires_manual_training: true,
-            metadata: {
-              training_error: error.message,
-              training_failed_at: new Date().toISOString()
-            }
-          })
-          .eq('id', source.id);
-        
-        errors.push(`Source ${source.title}: ${error.message}`);
-      }
-    }
-
-    // Also process other source types (text, file, qa)
-    const { data: otherSources, error: otherSourcesError } = await supabase
-      .from('agent_sources')
-      .select('id, title, content, source_type, metadata')
-      .eq('agent_id', agentId)
-      .in('source_type', ['text', 'file', 'qa'])
-      .eq('requires_manual_training', true)
-      .eq('is_active', true);
-
-    if (otherSourcesError) {
-      console.warn('Failed to fetch other source types:', otherSourcesError);
-    } else if (otherSources && otherSources.length > 0) {
-      console.log(`📄 Processing ${otherSources.length} other sources`);
-      
-      for (const source of otherSources) {
-        try {
-          // Mark as processing
-          await supabase
-            .from('agent_sources')
-            .update({ 
-              requires_manual_training: false,
-              metadata: {
-                training_started_at: new Date().toISOString(),
-                training_method: 'enhanced_retraining'
-              }
-            })
-            .eq('id', source.id);
-
-          // Generate chunks
+          if (processingResult.error) {
+            throw new Error(`Failed to process crawled pages: ${processingResult.error.message}`);
+          }
+        } else {
+          // For other source types, generate chunks directly
           const chunkResult = await supabase.functions.invoke('generate-chunks', {
             body: { 
               sourceId: source.id,
@@ -164,41 +100,56 @@ serve(async (req) => {
           if (embeddingResult.error) {
             throw new Error(`Embedding generation failed: ${embeddingResult.error.message}`);
           }
-
-          processedCount++;
-          console.log(`✅ Successfully processed other source: ${source.title}`);
-
-        } catch (error) {
-          console.error(`❌ Error processing other source ${source.id}:`, error);
-          
-          await supabase
-            .from('agent_sources')
-            .update({ 
-              requires_manual_training: true,
-              metadata: {
-                training_error: error.message,
-                training_failed_at: new Date().toISOString()
-              }
-            })
-            .eq('id', source.id);
-          
-          errors.push(`Source ${source.title}: ${error.message}`);
         }
+
+        // Mark source as completed
+        await supabase
+          .from('agent_sources')
+          .update({ 
+            crawl_status: source.source_type === 'website' ? 'completed' : undefined,
+            requires_manual_training: false,
+            metadata: {
+              training_completed_at: new Date().toISOString(),
+              training_method: 'simplified_flow'
+            }
+          })
+          .eq('id', source.id);
+
+        processedCount++;
+        console.log(`✅ Successfully trained source: ${source.title}`);
+
+      } catch (error) {
+        console.error(`❌ Error training source ${source.id}:`, error);
+        
+        // Mark as failed
+        await supabase
+          .from('agent_sources')
+          .update({ 
+            crawl_status: source.source_type === 'website' ? 'crawled' : undefined,
+            requires_manual_training: true,
+            metadata: {
+              training_error: error.message,
+              training_failed_at: new Date().toISOString()
+            }
+          })
+          .eq('id', source.id);
+        
+        errors.push(`Source ${source.title}: ${error.message}`);
       }
     }
 
-    console.log(`✅ Enhanced retraining completed: ${processedCount} sources processed`);
+    console.log(`✅ Simplified training completed: ${processedCount} sources processed`);
 
     const result = {
       success: true,
       processedSources: processedCount,
-      totalSources: (websiteSources?.length || 0) + (otherSources?.length || 0),
+      totalSources: sourcesToTrain.length,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully processed ${processedCount} sources`
+      message: `Successfully trained ${processedCount} sources`
     };
 
     if (errors.length > 0) {
-      console.warn(`⚠️ Retraining completed with ${errors.length} errors:`, errors);
+      console.warn(`⚠️ Training completed with ${errors.length} errors:`, errors);
     }
 
     return new Response(
@@ -207,7 +158,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Enhanced retraining error:', error);
+    console.error('❌ Simplified training error:', error);
     return new Response(
       JSON.stringify({
         success: false,
