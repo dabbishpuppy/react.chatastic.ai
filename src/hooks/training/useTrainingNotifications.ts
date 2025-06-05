@@ -1,15 +1,31 @@
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ToastNotificationService } from '@/services/ToastNotificationService';
 
 export interface TrainingProgress {
   status: 'pending' | 'training' | 'completed' | 'failed';
   progress: number;
   message?: string;
+  totalChunks?: number;
+  processedChunks?: number;
+  totalSources?: number;
+  processedSources?: number;
+  sessionId?: string;
 }
 
 export const useTrainingNotifications = () => {
   const lastStatusRef = useRef<string | null>(null);
+  const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
+
+  const startTraining = async () => {
+    // Implementation for starting training
+    console.log('Starting training...');
+  };
+
+  const checkTrainingCompletion = () => {
+    // Implementation for checking completion
+    console.log('Checking training completion...');
+  };
 
   useEffect(() => {
     const handleTrainingStatusChange = (event: CustomEvent) => {
@@ -35,4 +51,10 @@ export const useTrainingNotifications = () => {
       window.removeEventListener('trainingStatusChanged', handleTrainingStatusChange as EventListener);
     };
   }, []);
+
+  return {
+    trainingProgress,
+    startTraining,
+    checkTrainingCompletion
+  };
 };

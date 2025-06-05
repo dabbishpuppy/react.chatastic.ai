@@ -50,14 +50,13 @@ export const useWebsiteSubmission = () => {
         crawl_status: 'crawling'
       });
 
-      // Start the enhanced crawl process - use the correct interface properties
+      // Start the enhanced crawl process - use only valid properties
       const crawlResult = await EnhancedCrawlService.initiateCrawl({
         url: data.url,
         agentId,
         excludePaths: data.excludePaths,
         includePaths: data.includePaths,
-        respectRobots: data.respectRobots,
-        maxConcurrentJobs: data.maxConcurrentJobs
+        respectRobots: data.respectRobots
       });
 
       // Update status to crawled when complete
