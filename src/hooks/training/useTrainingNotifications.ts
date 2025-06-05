@@ -52,6 +52,30 @@ export const useTrainingNotifications = () => {
     addTrackedTimer
   );
 
+  // ENHANCED: Helper to detect if this is a post-completion page processing event
+  const isPostCompletionProcessing = (payload: any): boolean => {
+    const updatedPage = payload.new;
+    const oldPage = payload.old;
+    
+    // If agent is in completion state, ignore all page processing updates
+    if (refs.agentCompletionStateRef.current.isCompleted) {
+      console.log('🚫 ENHANCED: Ignoring page update - agent in completion state');
+      return true;
+    }
+    
+    // If this is just a processing status update after completion
+    if (oldPage?.processing_status !== updatedPage?.processing_status && 
+        updatedPage?.processing_status === 'processed') {
+      const timeSinceLastCompletion = Date.now() - refs.lastCompletionCheckRef.current;
+      if (timeSinceLastCompletion < 60000) { // 1 minute protection
+        console.log('🚫 ENHANCED: Ignoring post-completion page processing update');
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   // Listen for crawl initiation events
   useEffect(() => {
     const handleCrawlStarted = () => {
@@ -128,15 +152,27 @@ export const useTrainingNotifications = () => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
-            // ENHANCED: Filter out completion-related updates
+            // ENHANCED: Filter out completion-related and post-completion updates
             if (isCompletionRelatedUpdate(oldPage, updatedPage)) {
               console.log('🚫 ENHANCED: Ignoring completion-related source_pages update');
+              return;
+            }
+            
+            if (isPostCompletionProcessing(payload)) {
+              console.log('🚫 ENHANCED: Ignoring post-completion page processing');
               return;
             }
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
               if (shouldPreventTrainingAction('check')) {
                 console.log('🚫 ENHANCED AGENT-LEVEL: Prevented check from source_pages update');
+                return;
+              }
+              
+              // ADDITIONAL CHECK: Don't trigger for pages that just completed processing
+              if (updatedPage?.processing_status === 'processed' && 
+                  refs.agentCompletionStateRef.current.isCompleted) {
+                console.log('🚫 ENHANCED: Ignoring processed page update - agent already completed');
                 return;
               }
               
@@ -169,6 +205,13 @@ export const useTrainingNotifications = () => {
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
               if (shouldPreventTrainingAction('check')) {
                 console.log('🚫 ENHANCED AGENT-LEVEL: Prevented check from agent_sources update');
+                return;
+              }
+              
+              // ADDITIONAL CHECK: Don't trigger for completed sources when agent is completed
+              if (metadata?.processing_status === 'completed' && 
+                  refs.agentCompletionStateRef.current.isCompleted) {
+                console.log('🚫 ENHANCED: Ignoring completed source update - agent already completed');
                 return;
               }
               
@@ -226,11 +269,14 @@ export const useTrainingNotifications = () => {
               });
             }
             
-            pollInterval = setInterval(() => {
-              if (!shouldPreventTrainingAction('check')) {
-                checkTrainingCompletion(agentId);
-              }
-            }, 15000);
+            // ENHANCED: Don't poll if agent is completed
+            if (!refs.agentCompletionStateRef.current.isCompleted) {
+              pollInterval = setInterval(() => {
+                if (!shouldPreventTrainingAction('check')) {
+                  checkTrainingCompletion(agentId);
+                }
+              }, 15000);
+            }
           }
         });
 

@@ -4,7 +4,7 @@ export const useTrainingPrevention = (refs: TrainingRefs) => {
   const shouldPreventTrainingAction = (action: 'start' | 'check', sessionId?: string): boolean => {
     const now = Date.now();
     const recentActionThreshold = 5000;
-    const completionCooldownThreshold = 45000; // Extended from 30s to 45s
+    const completionCooldownThreshold = 60000; // Extended from 45s to 60s
     
     if (action === 'start') {
       console.log('✅ Allowing explicit training start action');
@@ -61,9 +61,20 @@ export const useTrainingPrevention = (refs: TrainingRefs) => {
     const hasNoProcessingStatusChange = 
       oldMetadata.processing_status === newMetadata.processing_status;
     
+    // ENHANCED: Also check for chunk processing after completion
+    const isPostCompletionChunkUpdate = 
+      refs.agentCompletionStateRef.current.isCompleted &&
+      (newData.processing_status === 'processed' || newData.processing_status === 'completed');
+    
     // If only completion bookkeeping changed, consider it completion-related
     if ((isTrainingCompletedUpdate || isLastTrainedAtUpdate) && hasNoProcessingStatusChange) {
       console.log('🔍 ENHANCED: Detected completion-related database update, ignoring');
+      return true;
+    }
+    
+    // If this is chunk processing after agent completion, ignore it
+    if (isPostCompletionChunkUpdate) {
+      console.log('🔍 ENHANCED: Detected post-completion chunk processing, ignoring');
       return true;
     }
     
@@ -92,7 +103,7 @@ export const useTrainingPrevention = (refs: TrainingRefs) => {
     // ENHANCED: Set a longer protection period
     setTimeout(() => {
       console.log('🔓 ENHANCED: Completion protection period ended, allowing new training checks');
-    }, 45000);
+    }, 60000); // Extended to 60 seconds
   };
 
   return {
