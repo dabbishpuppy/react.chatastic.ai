@@ -42,6 +42,18 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
       const totalPages = totalPagesData?.length || 0;
       console.log(`📊 Found ${totalPages} completed pages for chunking status`);
 
+      if (totalPages === 0) {
+        setStatus({
+          pagesProcessed: 0,
+          totalPages: 0,
+          isComplete: false,
+          progressPercentage: 0,
+          error: 'No completed pages found',
+          isLoading: false
+        });
+        return;
+      }
+
       // Get pages that have been processed (have chunks)
       const { data: chunksData, error: chunksError } = await supabase
         .from('source_chunks')
@@ -87,7 +99,7 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
     // Initial calculation
     calculateProgress();
 
-    // Set up real-time subscription for source_chunks with better error handling
+    // Set up real-time subscription without prevention blocks
     const channel = supabase
       .channel(`chunking-progress-${parentSourceId}`)
       .on(
@@ -99,7 +111,8 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
         },
         (payload) => {
           console.log('📡 New chunk created:', payload);
-          calculateProgress();
+          // Force immediate recalculation without delays
+          setTimeout(calculateProgress, 100);
         }
       )
       .on(
@@ -112,7 +125,8 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
         },
         (payload) => {
           console.log('📡 Page status updated:', payload);
-          calculateProgress();
+          // Force immediate recalculation without delays
+          setTimeout(calculateProgress, 100);
         }
       )
       .subscribe((status, err) => {
@@ -123,8 +137,14 @@ export const useChunkingStatus = (parentSourceId: string | null) => {
         }
       });
 
+    // Set up a polling mechanism as backup in case real-time fails
+    const pollInterval = setInterval(() => {
+      calculateProgress();
+    }, 5000); // Poll every 5 seconds
+
     return () => {
       console.log('🧹 Cleaning up chunking subscription');
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [parentSourceId, calculateProgress]);

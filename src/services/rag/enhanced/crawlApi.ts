@@ -156,6 +156,20 @@ export class CrawlApiService {
         const pagesWithChunks = new Set(existingChunks?.map(c => c.source_id) || []);
         const pagesNeedingChunks = pages.filter(p => !pagesWithChunks.has(p.id));
         console.log(`🔍 Pages needing chunks: ${pagesNeedingChunks.length}/${pages.length}`);
+        
+        if (pagesNeedingChunks.length === 0) {
+          console.log('✅ All pages already have chunks');
+          return {
+            success: true,
+            message: 'All pages already processed'
+          };
+        }
+      }
+
+      // Clear any prevention flags before starting
+      const agentId = pages[0]?.agent_id; // Get agent ID from pages if available
+      if (agentId) {
+        localStorage.removeItem(`training_completed_${agentId}`);
       }
 
       const { data, error } = await supabase.functions.invoke('generate-missing-chunks', {

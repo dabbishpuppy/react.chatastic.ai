@@ -129,6 +129,11 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Handle training completion
   useEffect(() => {
     if (chunkingStatus.isComplete && currentTrainingSource && showBackgroundModal) {
+      console.log('🎉 Training completed successfully!');
+      
+      // Clear any prevention flags
+      localStorage.removeItem(`training_completed_${agentId}`);
+      
       toast({
         title: "Training Complete",
         description: "Your AI agent has been successfully trained and is ready to use.",
@@ -137,8 +142,14 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       
       setShowBackgroundModal(false);
       setShowDoneModal(true);
+      
+      // Refresh stats after completion
+      setTimeout(() => {
+        refetchStats();
+        checkRetrainingNeeded();
+      }, 1000);
     }
-  }, [chunkingStatus.isComplete, currentTrainingSource, showBackgroundModal]);
+  }, [chunkingStatus.isComplete, currentTrainingSource, showBackgroundModal, agentId, refetchStats, checkRetrainingNeeded]);
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
@@ -195,14 +206,25 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     if (!currentTrainingSource) return;
 
     try {
+      console.log('🚀 Starting training for source:', currentTrainingSource.parentSourceId);
+      
+      // Clear any existing prevention flags
+      localStorage.removeItem(`training_completed_${agentId}`);
+      
       // Fire "Training Started" toast
       toast({
         title: "Training Started",
         duration: 3000,
       });
 
-      // Start chunking process
-      await CrawlApiService.startChunking(currentTrainingSource.parentSourceId);
+      // Start chunking process with retry logic
+      const result = await CrawlApiService.startChunking(currentTrainingSource.parentSourceId);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to start chunking');
+      }
+
+      console.log('✅ Chunking started successfully:', result);
 
       // Close start modal and open background modal
       setShowStartModal(false);
@@ -211,9 +233,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       console.error('Error starting training:', error);
       toast({
         title: "Training Failed",
-        description: "Failed to start training. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to start training. Please try again.",
         variant: "destructive"
       });
+      
+      // Reset modals on error
+      setShowStartModal(false);
+      setShowBackgroundModal(false);
     }
   };
 
