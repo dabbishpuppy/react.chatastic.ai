@@ -4,6 +4,7 @@ export interface EnhancedCrawlRequest {
   url: string;
   crawlMode?: 'full-website' | 'single-page' | 'sitemap-only';
   maxPages?: number;
+  maxDepth?: number;
   excludePaths?: string[];
   includePaths?: string[];
   respectRobots?: boolean;
