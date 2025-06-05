@@ -1,131 +1,106 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { RetrainingService, type RetrainingProgress } from '@/services/rag/retrainingService';
-import { useToast } from '@/hooks/use-toast';
-import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
+import { useState, useCallback, useEffect } from 'react';
+import { useTrainingNotifications } from './useTrainingNotifications';
+import { RetrainingService, RetrainingStatus } from '@/services/rag/retrainingService';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useAgentRetraining = (agentId?: string) => {
-  // ALL useRef calls MUST be at the top to maintain consistent hook order
-  const isTrainingActiveRef = useRef(false);
-  const lastStatusUpdateRef = useRef<string>('');
-  const lastLogTimeRef = useRef<number>(0);
+  const [retrainingNeeded, setRetrainingNeeded] = useState<RetrainingStatus | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   
-  // ALL useState calls MUST come after useRef calls
-  const [progress, setProgress] = useState<RetrainingProgress | null>(null);
-  const [retrainingNeeded, setRetrainingNeeded] = useState<{
-    needed: boolean;
-    unprocessedSources: number;
-    reasons: string[];
-    status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'no_sources';
-    message: string;
-    sourceDetails?: Array<{
-      id: string;
-      title: string;
-      type: string;
-      reason: string;
-      status: string;
-    }>;
-  } | null>(null);
-  
-  // ALL custom hooks MUST come after useState calls
-  const { toast } = useToast();
-  const { trainingProgress, startTraining } = useTrainingNotifications();
-
-  const isRetraining = trainingProgress?.status === 'training';
-
-  // ALL useEffect calls MUST come after custom hooks
-  useEffect(() => {
-    if (trainingProgress) {
-      const statusKey = `${trainingProgress.status}-${trainingProgress.progress}`;
-      
-      if (lastStatusUpdateRef.current === statusKey) {
-        return;
-      }
-      lastStatusUpdateRef.current = statusKey;
-      
-      const now = Date.now();
-      const shouldLog = now - lastLogTimeRef.current > 10000;
-      
-      if (shouldLog) {
-        console.log('🔄 Training status update:', {
-          status: trainingProgress.status,
-          progress: trainingProgress.progress
-        });
-        lastLogTimeRef.current = now;
-      }
-      
-      if (trainingProgress.status === 'training') {
-        isTrainingActiveRef.current = true;
-      } else if (trainingProgress.status === 'completed') {
-        isTrainingActiveRef.current = false;
-      }
-      
-      setProgress({
-        totalSources: trainingProgress.totalSources,
-        processedSources: trainingProgress.processedSources,
-        totalChunks: 0,
-        processedChunks: 0,
-        status: trainingProgress.status === 'training' ? 'processing' : 
-               trainingProgress.status === 'completed' ? 'completed' : 'pending'
-      });
-    }
-  }, [trainingProgress]);
+  const {
+    trainingProgress,
+    startTraining,
+    isConnected
+  } = useTrainingNotifications();
 
   const checkRetrainingNeeded = useCallback(async () => {
-    if (!agentId) return;
-
+    if (!agentId || isCheckingStatus) return;
+    
+    setIsCheckingStatus(true);
     try {
-      const result = await RetrainingService.checkRetrainingNeeded(agentId);
-      setRetrainingNeeded(result);
-      return result;
+      console.log('🔍 Checking if retraining is needed for agent:', agentId);
+      const status = await RetrainingService.checkRetrainingNeeded(agentId);
+      console.log('📊 Retraining status:', status);
+      setRetrainingNeeded(status);
     } catch (error) {
-      console.error('Failed to check retraining status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to check retraining status",
-        variant: "destructive"
+      console.error('❌ Error checking retraining status:', error);
+      setRetrainingNeeded({
+        needed: false,
+        unprocessedSources: 0,
+        reasons: [],
+        status: 'up_to_date',
+        message: 'Unable to check training status'
       });
+    } finally {
+      setIsCheckingStatus(false);
     }
-  }, [agentId, toast]);
+  }, [agentId, isCheckingStatus]);
 
   const startRetraining = useCallback(async () => {
-    if (!agentId || isTrainingActiveRef.current) {
+    if (!agentId) {
+      console.error('❌ No agent ID provided for retraining');
       return;
     }
 
-    console.log('🚀 Starting retraining...');
-    isTrainingActiveRef.current = true;
-
+    console.log('🚀 Starting retraining for agent:', agentId);
+    
     try {
+      // Call the training notifications hook to start the process
       await startTraining();
-
-      toast({
-        title: "Training Started",
-        description: "Processing your sources and generating embeddings..."
-      });
-
+      console.log('✅ Training started successfully');
+      
+      // Refresh the status after a delay
       setTimeout(() => {
         checkRetrainingNeeded();
-      }, 3000);
-
-    } catch (error) {
-      console.error('Retraining failed:', error);
-      isTrainingActiveRef.current = false;
+      }, 2000);
       
-      toast({
-        title: "Training Failed",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive"
-      });
+    } catch (error) {
+      console.error('❌ Failed to start retraining:', error);
+      throw error;
     }
-  }, [agentId, startTraining, toast, checkRetrainingNeeded]);
+  }, [agentId, startTraining, checkRetrainingNeeded]);
+
+  // Check status when agent changes
+  useEffect(() => {
+    if (agentId) {
+      checkRetrainingNeeded();
+    }
+  }, [agentId, checkRetrainingNeeded]);
+
+  // Listen for training completion events
+  useEffect(() => {
+    const handleTrainingCompleted = () => {
+      console.log('🎉 Training completed event received in useAgentRetraining');
+      setTimeout(() => {
+        checkRetrainingNeeded();
+      }, 1000);
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted);
+    
+    return () => {
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted);
+    };
+  }, [checkRetrainingNeeded]);
 
   return {
-    isRetraining,
-    progress,
     retrainingNeeded,
+    isRetraining: trainingProgress?.status === 'training',
+    progress: trainingProgress ? {
+      totalSources: trainingProgress.totalSources,
+      processedSources: trainingProgress.processedSources,
+      totalChunks: 0,
+      processedChunks: 0,
+      status: trainingProgress.status === 'training' ? 'processing' as const : 
+              trainingProgress.status === 'completed' ? 'completed' as const :
+              trainingProgress.status === 'failed' ? 'failed' as const : 'pending' as const,
+      currentSource: undefined,
+      errorMessage: undefined
+    } : null,
     startRetraining,
     checkRetrainingNeeded,
-    trainingProgress
+    trainingProgress,
+    isConnected
   };
 };
