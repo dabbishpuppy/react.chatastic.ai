@@ -27,10 +27,11 @@ export const useTrainingNotifications = () => {
   
   // ALL useRef calls MUST be at the top to maintain consistent hook order
   const hasShownCompletionNotificationRef = useRef<boolean>(false);
-  const currentSessionIdRef = useRef<string>('');
+  const lastCompletedSessionIdRef = useRef<string>('');
   const lastCompletionCheckRef = useRef<number>(0);
   const pageLoadTimestampRef = useRef<number>(Date.now());
   const hasEverConnectedRef = useRef<boolean>(false);
+  const completionToastShownForSessionRef = useRef<Set<string>>(new Set());
   
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -250,7 +251,8 @@ export const useTrainingNotifications = () => {
         status = 'training';
       }
 
-      const sessionId = `${agentId}-${totalPagesNeedingProcessing}-${Date.now()}`;
+      // Create a unique session ID for this training session
+      const sessionId = `${agentId}-${totalPagesNeedingProcessing}-${totalPagesProcessed}`;
 
       const newProgress: TrainingProgress = {
         agentId,
@@ -264,17 +266,18 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newProgress);
 
-      // Handle completion notification with strict guards
+      // Enhanced completion notification logic with strict duplicate prevention
       if (status === 'completed' && 
-          trainingProgress?.status !== 'completed' && 
           totalPagesNeedingProcessing > 0 &&
-          !hasShownCompletionNotificationRef.current &&
-          currentSessionIdRef.current !== sessionId) {
+          totalPagesProcessed === totalPagesNeedingProcessing &&
+          !completionToastShownForSessionRef.current.has(sessionId) &&
+          lastCompletedSessionIdRef.current !== sessionId) {
         
-        console.log('🎉 Training completed! Showing success notification');
+        console.log('🎉 Training completed! Showing success notification for session:', sessionId);
         
-        hasShownCompletionNotificationRef.current = true;
-        currentSessionIdRef.current = sessionId;
+        // Mark this session as completed
+        completionToastShownForSessionRef.current.add(sessionId);
+        lastCompletedSessionIdRef.current = sessionId;
         
         toast({
           title: "Training Complete!",
@@ -286,9 +289,11 @@ export const useTrainingNotifications = () => {
           detail: { agentId, progress: newProgress }
         }));
         
-        setTimeout(() => {
-          hasShownCompletionNotificationRef.current = false;
-        }, 10000);
+        // Clean up old session IDs to prevent memory leaks (keep only last 5)
+        if (completionToastShownForSessionRef.current.size > 5) {
+          const sessionsArray = Array.from(completionToastShownForSessionRef.current);
+          completionToastShownForSessionRef.current = new Set(sessionsArray.slice(-5));
+        }
       }
 
     } catch (error) {
@@ -303,8 +308,9 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting enhanced training for agent:', agentId);
 
+      // Reset completion tracking for new training session
       hasShownCompletionNotificationRef.current = false;
-      currentSessionIdRef.current = '';
+      lastCompletedSessionIdRef.current = '';
 
       setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
 
