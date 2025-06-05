@@ -11,6 +11,15 @@ export interface TrainingProgress {
   sessionId: string;
 }
 
+export interface DatabaseSource {
+  id: string;
+  source_type: string;
+  metadata: any;
+  title: string;
+  content?: string;
+  crawl_status?: string;
+}
+
 export interface TrainingRefs {
   trainingStateRef: React.MutableRefObject<'idle' | 'training' | 'completed' | 'failed'>;
   agentCompletionStateRef: React.MutableRefObject<{
@@ -19,13 +28,14 @@ export interface TrainingRefs {
     lastCompletedSessionId: string;
   }>;
   completedSessionsRef: React.MutableRefObject<Set<string>>;
-  sessionCompletionFlagRef: React.MutableRefObject<Map<string, boolean>>;
+  sessionCompletionFlagRef: React.MutableRefObject<Set<string>>;
   lastCompletionCheckRef: React.MutableRefObject<number>;
   currentTrainingSessionRef: React.MutableRefObject<string>;
   activeTrainingSessionRef: React.MutableRefObject<string>;
   trainingStartTimeRef: React.MutableRefObject<number>;
+  minTrainingDurationRef: React.MutableRefObject<number>;
   globalTrainingActiveRef: React.MutableRefObject<boolean>;
-  lastTrainingActionRef: React.MutableRefObject<'none' | 'start' | 'check'>;
+  lastTrainingActionRef: React.MutableRefObject<'none' | 'start' | 'check' | 'complete'>;
   shownToastsRef: React.MutableRefObject<Set<string>>;
   pendingTimersRef: React.MutableRefObject<Set<NodeJS.Timeout>>;
   pageLoadTimestampRef: React.MutableRefObject<number>;
