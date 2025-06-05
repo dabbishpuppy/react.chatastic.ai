@@ -7,6 +7,11 @@ import SourcesLoadingState from "./SourcesLoadingState";
 import SourcesErrorState from "./SourcesErrorState";
 import SourcesContent from "./SourcesContent";
 import { RetrainingDialog } from "./RetrainingDialog";
+import { StartTrainingModal } from '@/components/training/StartTrainingModal';
+import { RunningInBackgroundModal } from '@/components/training/RunningInBackgroundModal';
+import { DoneModal } from '@/components/training/DoneModal';
+import { useChunkingStatus } from '@/hooks/useChunkingStatus';
+import { CrawlApiService } from '@/services/rag/enhanced/crawlApi';
 
 interface SourcesWidgetProps {
   currentTab?: string;
@@ -30,6 +35,19 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
+
+  // New state for training modals
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [showBackgroundModal, setShowBackgroundModal] = useState(false);
+  const [showDoneModal, setShowDoneModal] = useState(false);
+  const [currentTrainingSource, setCurrentTrainingSource] = useState<{
+    parentSourceId: string;
+    url: string;
+    pageCount: number;
+  } | null>(null);
+
+  // Chunking status tracking
+  const chunkingStatus = useChunkingStatus(currentTrainingSource?.parentSourceId || null);
 
   // Enhanced: Listen for training completion events (NO DUPLICATE TOAST)
   useEffect(() => {
@@ -106,6 +124,20 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [refetchStats, checkRetrainingNeeded]);
 
+  // Handle training completion
+  useEffect(() => {
+    if (chunkingStatus.isComplete && currentTrainingSource && showBackgroundModal) {
+      toast({
+        title: "Training Complete",
+        description: "Your AI agent has been successfully trained and is ready to use.",
+        duration: 5000,
+      });
+      
+      setShowBackgroundModal(false);
+      setShowDoneModal(true);
+    }
+  }, [chunkingStatus.isComplete, currentTrainingSource, showBackgroundModal]);
+
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -113,19 +145,83 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
-  const handleRetrainClick = () => {
-    setShowRetrainingDialog(true);
+  const handleRetrainClick = async () => {
+    if (!agentId) return;
+
+    try {
+      // Get the first website source that needs training
+      const { data: websiteSources, error } = await supabase
+        .from('agent_sources')
+        .select('id, url, title')
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .eq('is_active', true)
+        .limit(1);
+
+      if (error || !websiteSources?.length) {
+        console.error('No website sources found for training');
+        return;
+      }
+
+      const source = websiteSources[0];
+      
+      // Get page count for this source
+      const { data: pages, error: pagesError } = await supabase
+        .from('source_pages')
+        .select('id', { count: 'exact' })
+        .eq('parent_source_id', source.id)
+        .eq('status', 'completed');
+
+      if (pagesError) {
+        console.error('Error fetching page count:', pagesError);
+        return;
+      }
+
+      setCurrentTrainingSource({
+        parentSourceId: source.id,
+        url: source.url || source.title || 'Unknown source',
+        pageCount: pages?.length || 0
+      });
+      
+      setShowStartModal(true);
+    } catch (error) {
+      console.error('Error preparing training:', error);
+    }
   };
 
-  const handleDialogClose = (open: boolean) => {
-    console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
-    setShowRetrainingDialog(open);
-    
-    // FIXED: Only set background training if training is actually active
-    if (!open && isTrainingActive) {
-      console.log('📱 Setting background training state');
-      setIsTrainingInBackground(true);
+  const handleStartTraining = async () => {
+    if (!currentTrainingSource) return;
+
+    try {
+      // Fire "Training Started" toast
+      toast({
+        title: "Training Started",
+        duration: 3000,
+      });
+
+      // Start chunking process
+      await CrawlApiService.startChunking(currentTrainingSource.parentSourceId);
+
+      // Close start modal and open background modal
+      setShowStartModal(false);
+      setShowBackgroundModal(true);
+    } catch (error) {
+      console.error('Error starting training:', error);
+      toast({
+        title: "Training Failed",
+        description: "Failed to start training. Please try again.",
+        variant: "destructive"
+      });
     }
+  };
+
+  const handleCloseBackgroundModal = () => {
+    setShowBackgroundModal(false);
+  };
+
+  const handleCloseDoneModal = () => {
+    setShowDoneModal(false);
+    setCurrentTrainingSource(null);
   };
 
   // Check if training is active
@@ -169,6 +265,34 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         onStartRetraining={startRetraining}
         trainingProgress={trainingProgress}
       />
+
+      {/* New Training Modals */}
+      {currentTrainingSource && (
+        <>
+          <StartTrainingModal
+            open={showStartModal}
+            onOpenChange={setShowStartModal}
+            onStartTraining={handleStartTraining}
+            sourceUrl={currentTrainingSource.url}
+            pageCount={currentTrainingSource.pageCount}
+          />
+
+          <RunningInBackgroundModal
+            open={showBackgroundModal}
+            onOpenChange={handleCloseBackgroundModal}
+            progressPercentage={chunkingStatus.progressPercentage}
+            pagesProcessed={chunkingStatus.pagesProcessed}
+            totalPages={chunkingStatus.totalPages}
+          />
+
+          <DoneModal
+            open={showDoneModal}
+            onOpenChange={handleCloseDoneModal}
+            pagesProcessed={chunkingStatus.pagesProcessed}
+            totalPages={chunkingStatus.totalPages}
+          />
+        </>
+      )}
     </>
   );
 };

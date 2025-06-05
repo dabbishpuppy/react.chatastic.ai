@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedCrawlRequest, CrawlStatus } from "./crawlTypes";
 
@@ -118,6 +117,36 @@ export class CrawlApiService {
     } catch (error: any) {
       console.error('❌ Get crawl jobs error:', error);
       throw new Error(`Failed to get crawl jobs: ${error.message || 'Unknown error'}`);
+    }
+  }
+
+  static async startChunking(parentSourceId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('🚀 Starting chunking for parent source:', parentSourceId);
+
+      const { data, error } = await supabase.functions.invoke('generate-missing-chunks', {
+        body: { parentSourceId }
+      });
+
+      if (error) {
+        console.error('Chunking error:', error);
+        throw new Error(`Chunking failed: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        console.error('Chunking failed:', data);
+        throw new Error(data?.error || 'Unknown error occurred during chunking');
+      }
+
+      console.log('✅ Chunking initiated successfully:', data);
+      return {
+        success: true,
+        message: data.message || 'Chunking started successfully'
+      };
+
+    } catch (error: any) {
+      console.error('❌ Chunking API error:', error);
+      throw new Error(`Chunking failed: ${error.message || 'Unknown error'}`);
     }
   }
 }
