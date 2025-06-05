@@ -34,9 +34,9 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
       return "bg-orange-500 hover:bg-orange-600 text-white w-full";
     }
     if (buttonState.buttonText === 'Agent Trained') {
-      return "bg-green-50 border-green-200 text-green-700 w-full";
+      return "bg-green-500 hover:bg-green-600 text-white w-full";
     }
-    return "bg-black hover:bg-gray-800 text-white w-full";
+    return "bg-blue-500 hover:bg-blue-600 text-white w-full";
   };
 
   const getButtonText = () => {

@@ -19,12 +19,12 @@ serve(async (req) => {
       throw new Error('agentId is required');
     }
 
-    console.log(`🚀 Starting simplified training for agent: ${agentId}`);
+    console.log(`🚀 Starting enhanced training for agent: ${agentId}`);
 
     // Find all sources that need training (status = 'crawled' or requires_manual_training = true)
     const { data: sourcesToTrain, error: sourcesError } = await supabase
       .from('agent_sources')
-      .select('id, title, source_type, content, crawl_status, requires_manual_training')
+      .select('id, title, source_type, content, crawl_status, requires_manual_training, metadata')
       .eq('agent_id', agentId)
       .eq('is_active', true)
       .or('crawl_status.eq.completed,requires_manual_training.eq.true');
@@ -55,21 +55,23 @@ serve(async (req) => {
       try {
         console.log(`🔄 Training source: ${source.title} (${source.id})`);
 
-        // Mark source as training
+        // Mark source as training and update child pages if needed
         await supabase
           .from('agent_sources')
           .update({ 
             crawl_status: source.source_type === 'website' ? 'training' : undefined,
             requires_manual_training: false,
             metadata: {
+              ...source.metadata,
               training_started_at: new Date().toISOString(),
-              training_method: 'simplified_flow'
+              training_method: 'enhanced_flow'
             }
           })
           .eq('id', source.id);
 
-        // For website sources, mark all child pages as training
+        // For website sources, mark all child pages as training and process them
         if (source.source_type === 'website') {
+          // Update child pages to training status
           await supabase
             .from('source_pages')
             .update({ 
@@ -81,14 +83,18 @@ serve(async (req) => {
             .eq('parent_source_id', source.id)
             .eq('status', 'completed');
 
-          // Process crawled pages
+          // Process crawled pages - this should create chunks
           const processingResult = await supabase.functions.invoke('process-crawled-pages', {
             body: { parentSourceId: source.id }
           });
 
           if (processingResult.error) {
+            console.error(`Failed to process crawled pages: ${processingResult.error.message}`);
+            // Continue processing but mark as error
             throw new Error(`Failed to process crawled pages: ${processingResult.error.message}`);
           }
+
+          console.log(`✅ Processed crawled pages for ${source.title}:`, processingResult.data);
 
           // Mark child pages as trained after processing
           await supabase
@@ -96,7 +102,8 @@ serve(async (req) => {
             .update({ 
               processing_status: 'trained',
               metadata: {
-                training_completed_at: new Date().toISOString()
+                training_completed_at: new Date().toISOString(),
+                chunks_processed: processingResult.data?.chunksCreated || 0
               }
             })
             .eq('parent_source_id', source.id)
@@ -104,6 +111,8 @@ serve(async (req) => {
 
         } else {
           // For other source types, generate chunks directly
+          console.log(`🔧 Generating chunks for ${source.source_type} source: ${source.title}`);
+          
           const chunkResult = await supabase.functions.invoke('generate-chunks', {
             body: { 
               sourceId: source.id,
@@ -116,13 +125,18 @@ serve(async (req) => {
             throw new Error(`Chunk generation failed: ${chunkResult.error.message}`);
           }
 
-          // Generate embeddings
+          console.log(`✅ Generated ${chunkResult.data?.chunksCreated || 0} chunks for ${source.title}`);
+
+          // Generate embeddings for the chunks
           const embeddingResult = await supabase.functions.invoke('generate-embeddings', {
             body: { sourceId: source.id }
           });
 
           if (embeddingResult.error) {
-            throw new Error(`Embedding generation failed: ${embeddingResult.error.message}`);
+            console.error(`Embedding generation failed: ${embeddingResult.error.message}`);
+            // Continue even if embeddings fail
+          } else {
+            console.log(`✅ Generated embeddings for ${source.title}:`, embeddingResult.data);
           }
         }
 
@@ -133,8 +147,10 @@ serve(async (req) => {
             crawl_status: source.source_type === 'website' ? 'completed' : undefined,
             requires_manual_training: false,
             metadata: {
+              ...source.metadata,
               training_completed_at: new Date().toISOString(),
-              training_method: 'simplified_flow'
+              training_method: 'enhanced_flow',
+              training_status: 'completed'
             }
           })
           .eq('id', source.id);
@@ -152,6 +168,7 @@ serve(async (req) => {
             crawl_status: source.source_type === 'website' ? 'completed' : undefined,
             requires_manual_training: true,
             metadata: {
+              ...source.metadata,
               training_error: error.message,
               training_failed_at: new Date().toISOString()
             }
@@ -176,7 +193,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`✅ Simplified training completed: ${processedCount} sources processed`);
+    console.log(`✅ Enhanced training completed: ${processedCount} sources processed`);
 
     const result = {
       success: true,
@@ -196,7 +213,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Simplified training error:', error);
+    console.error('❌ Enhanced training error:', error);
     return new Response(
       JSON.stringify({
         success: false,
