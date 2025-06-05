@@ -90,7 +90,7 @@ export const useTrainingCompletion = (
 
       setTrainingProgress(newProgress);
 
-      const previousStatus = refs.trainingStateRef.current;
+      const previousStatus: 'idle' | 'training' | 'completed' | 'failed' = refs.trainingStateRef.current;
       refs.trainingStateRef.current = status;
 
       // Handle training completion - FIXED: Compare against both previous status and current status properly
