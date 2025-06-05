@@ -6,52 +6,34 @@ export const useEmbeddedResizeObserver = (
   agentId?: string
 ) => {
   useEffect(() => {
-    // Only run this in an iframe context - completely exit if not
-    if (window.self === window.top) {
-      return;
-    }
-
-    // Additional safety checks
-    if (!window.parent || !containerRef.current) {
-      return;
-    }
+    // Only run this in an iframe context
+    if (window.self === window.top) return;
     
     const sendHeightToParent = () => {
-      try {
-        if (containerRef.current && window.parent && window.parent !== window) {
-          const height = containerRef.current.scrollHeight;
-          // Send message to parent with new height
-          window.parent.postMessage({ 
-            type: 'resize-iframe', 
-            height: height,
-            agentId: agentId 
-          }, '*');
-        }
-      } catch (error) {
-        // Silently handle cross-origin errors
-        console.debug('Could not send message to parent:', error);
+      if (containerRef.current) {
+        const height = containerRef.current.scrollHeight;
+        // Send message to parent with new height
+        window.parent.postMessage({ 
+          type: 'resize-iframe', 
+          height: height,
+          agentId: agentId 
+        }, '*');
       }
     };
     
-    // Send initial height after render with a small delay
-    const timeoutId = setTimeout(sendHeightToParent, 100);
+    // Send initial height after render
+    setTimeout(sendHeightToParent, 100);
     
     // Listen for chat events that might change height
     const handleMessage = (event: MessageEvent) => {
-      try {
-        if (event.data?.type === 'message-sent') {
-          setTimeout(sendHeightToParent, 100);
-        }
-      } catch (error) {
-        // Silently handle any message handling errors
-        console.debug('Error handling message:', error);
+      if (event.data?.type === 'message-sent') {
+        setTimeout(sendHeightToParent, 100);
       }
     };
     
     window.addEventListener('message', handleMessage);
     
     return () => {
-      clearTimeout(timeoutId);
       window.removeEventListener('message', handleMessage);
     };
   }, [agentId, containerRef]);
