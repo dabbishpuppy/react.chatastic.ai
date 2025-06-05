@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -32,10 +31,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // ENHANCED: Listen for training completion events with better cleanup
+  // Enhanced: Listen for training completion events (NO DUPLICATE TOAST)
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
-      console.log('🎉 ENHANCED: Training completed event received in SourcesWidget:', event.detail);
+      console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
+      
+      // REMOVED: Duplicate toast notification - now handled only in useTrainingNotifications
       
       // Refresh stats and check status
       refetchStats();
@@ -43,35 +44,19 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
 
     const handleTrainingContinuesInBackground = (event: CustomEvent) => {
-      console.log('📱 ENHANCED: Training continues in background:', event.detail);
+      console.log('📱 Training continues in background - enhanced handler:', event.detail);
       setIsTrainingInBackground(true);
+      
+      // Also close the dialog if it's open
       setShowRetrainingDialog(false);
     };
 
-    // ENHANCED: Listen for new source creation to reset completion state
-    const handleSourceCreated = (event: CustomEvent) => {
-      console.log('🆕 ENHANCED: Source created event received:', event.detail);
-      
-      // Reset training background state when new sources are added
-      setIsTrainingInBackground(false);
-      
-      // Refresh stats immediately
-      refetchStats();
-      
-      // Check retraining status after a delay
-      setTimeout(() => checkRetrainingNeeded(), 1500);
-    };
-
-    // ENHANCED: Add event listener cleanup tracking
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     window.addEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
-    window.addEventListener('sourceCreated', handleSourceCreated as EventListener);
     
     return () => {
-      console.log('🧹 ENHANCED: Cleaning up SourcesWidget event listeners');
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
-      window.removeEventListener('sourceCreated', handleSourceCreated as EventListener);
     };
   }, [refetchStats, checkRetrainingNeeded]);
 
@@ -82,13 +67,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
 
-  // Enhanced: Handle training state transitions with better protection
+  // Enhanced: Handle training state transitions
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
-      console.log('🎯 ENHANCED: Training completed - resetting background state');
+      console.log('🎯 Training completed - resetting background state');
       setIsTrainingInBackground(false);
       
-      // Refresh stats after completion with delay to avoid race conditions
+      // Refresh stats after completion
       setTimeout(() => {
         refetchStats();
         checkRetrainingNeeded();
@@ -99,8 +84,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Enhanced: Listen for source events with better debouncing
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
-      console.log('🔄 ENHANCED: Source event received:', event.type);
-      
       // Reset background training state when sources change
       setIsTrainingInBackground(false);
       
@@ -111,13 +94,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       setTimeout(() => checkRetrainingNeeded(), 1500);
     };
 
-    const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged'];
+    const eventTypes = ['fileUploaded', 'sourceDeleted', 'sourceCreated', 'sourceUpdated', 'crawlCompleted', 'sourceStatusChanged'];
     eventTypes.forEach(eventType => {
       window.addEventListener(eventType, handleSourceEvent as EventListener);
     });
     
     return () => {
-      console.log('🧹 ENHANCED: Cleaning up source event listeners');
       eventTypes.forEach(eventType => {
         window.removeEventListener(eventType, handleSourceEvent as EventListener);
       });
@@ -136,12 +118,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleDialogClose = (open: boolean) => {
-    console.log('🔄 ENHANCED: Dialog close requested:', { open, isTraining: isTrainingActive });
+    console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
     setShowRetrainingDialog(open);
     
-    // Only set background training if training is actually active
+    // FIXED: Only set background training if training is actually active
     if (!open && isTrainingActive) {
-      console.log('📱 ENHANCED: Setting background training state');
+      console.log('📱 Setting background training state');
       setIsTrainingInBackground(true);
     }
   };

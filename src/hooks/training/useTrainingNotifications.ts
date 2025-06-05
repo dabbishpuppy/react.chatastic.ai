@@ -31,22 +31,8 @@ export const useTrainingNotifications = () => {
     return timer;
   };
 
-  // ENHANCED: Helper to reset completion state when new sources are added
-  const resetCompletionState = (reason: string) => {
-    console.log(`🔄 RESET COMPLETION STATE: ${reason}`);
-    refs.agentCompletionStateRef.current = {
-      isCompleted: false,
-      completedAt: 0,
-      lastCompletedSessionId: ''
-    };
-    refs.sessionCompletionFlagRef.current.clear();
-    refs.completedSessionsRef.current.clear();
-    refs.lastTrainingActionRef.current = 'reset';
-    refs.lastCompletionCheckRef.current = 0;
-  };
-
-  // Initialize prevention logic with enhanced filtering
-  const { shouldPreventTrainingAction, markAgentCompletion, isCompletionRelatedUpdate } = useTrainingPrevention(refs);
+  // Initialize prevention logic
+  const { shouldPreventTrainingAction, markAgentCompletion } = useTrainingPrevention(refs);
 
   // Initialize completion logic
   const { checkTrainingCompletion } = useTrainingCompletion(
@@ -65,30 +51,6 @@ export const useTrainingNotifications = () => {
     clearAllTimers,
     addTrackedTimer
   );
-
-  // ENHANCED: Helper to detect if this is a post-completion page processing event
-  const isPostCompletionProcessing = (payload: any): boolean => {
-    const updatedPage = payload.new;
-    const oldPage = payload.old;
-    
-    // If agent is in completion state, ignore all page processing updates
-    if (refs.agentCompletionStateRef.current.isCompleted) {
-      console.log('🚫 ENHANCED: Ignoring page update - agent in completion state');
-      return true;
-    }
-    
-    // If this is just a processing status update after completion
-    if (oldPage?.processing_status !== updatedPage?.processing_status && 
-        updatedPage?.processing_status === 'processed') {
-      const timeSinceLastCompletion = Date.now() - refs.lastCompletionCheckRef.current;
-      if (timeSinceLastCompletion < 60000) { // 1 minute protection
-        console.log('🚫 ENHANCED: Ignoring post-completion page processing update');
-        return true;
-      }
-    }
-    
-    return false;
-  };
 
   // Listen for crawl initiation events
   useEffect(() => {
@@ -122,7 +84,7 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up ENHANCED training notifications for agent:', agentId);
+    console.log('🔔 Setting up IMPROVED training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -152,7 +114,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`enhanced-training-notifications-${agentId}`)
+        .channel(`improved-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -166,31 +128,12 @@ export const useTrainingNotifications = () => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
-            // ENHANCED: Filter out completion-related and post-completion updates
-            if (isCompletionRelatedUpdate(oldPage, updatedPage)) {
-              console.log('🚫 ENHANCED: Ignoring completion-related source_pages update');
-              return;
-            }
-            
-            if (isPostCompletionProcessing(payload)) {
-              console.log('🚫 ENHANCED: Ignoring post-completion page processing');
-              return;
-            }
-            
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
               if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 ENHANCED AGENT-LEVEL: Prevented check from source_pages update');
+                console.log('🚫 AGENT-LEVEL: Prevented check from source_pages update');
                 return;
               }
               
-              // ADDITIONAL CHECK: Don't trigger for pages that just completed processing
-              if (updatedPage?.processing_status === 'processed' && 
-                  refs.agentCompletionStateRef.current.isCompleted) {
-                console.log('🚫 ENHANCED: Ignoring processed page update - agent already completed');
-                return;
-              }
-              
-              console.log('✅ ENHANCED: Legitimate source_pages update, checking completion');
               addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
@@ -210,26 +153,12 @@ export const useTrainingNotifications = () => {
             const metadata = updatedSource.metadata || {};
             const oldMetadata = oldSource?.metadata || {};
             
-            // ENHANCED: Filter out completion-related updates
-            if (isCompletionRelatedUpdate(oldSource, updatedSource)) {
-              console.log('🚫 ENHANCED: Ignoring completion-related agent_sources update');
-              return;
-            }
-            
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
               if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 ENHANCED AGENT-LEVEL: Prevented check from agent_sources update');
+                console.log('🚫 AGENT-LEVEL: Prevented check from agent_sources update');
                 return;
               }
               
-              // ADDITIONAL CHECK: Don't trigger for completed sources when agent is completed
-              if (metadata?.processing_status === 'completed' && 
-                  refs.agentCompletionStateRef.current.isCompleted) {
-                console.log('🚫 ENHANCED: Ignoring completed source update - agent already completed');
-                return;
-              }
-              
-              console.log('✅ ENHANCED: Legitimate agent_sources update, checking completion');
               addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
@@ -244,23 +173,11 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
-            const newSource = payload.new as any;
-            
-            // RESET COMPLETION STATE: New source added - agent needs retraining
-            console.log('🆕 NEW SOURCE DETECTED - Resetting completion state');
-            resetCompletionState(`New source added: ${newSource.title || newSource.id}`);
-            
-            // Dispatch event to notify components about new source
-            window.dispatchEvent(new CustomEvent('sourceCreated', {
-              detail: { source: newSource, requiresTraining: true }
-            }));
-            
-            if (newSource?.source_type === 'website') {
+            if ((payload.new as any)?.source_type === 'website') {
               addTrackedTimer(initializeSubscriptions, 500);
             }
             
             if (!shouldPreventTrainingAction('check')) {
-              console.log('✅ ENHANCED: New source added, checking completion');
               addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
             }
           }
@@ -294,14 +211,11 @@ export const useTrainingNotifications = () => {
               });
             }
             
-            // ENHANCED: Don't poll if agent is completed
-            if (!refs.agentCompletionStateRef.current.isCompleted) {
-              pollInterval = setInterval(() => {
-                if (!shouldPreventTrainingAction('check')) {
-                  checkTrainingCompletion(agentId);
-                }
-              }, 15000);
-            }
+            pollInterval = setInterval(() => {
+              if (!shouldPreventTrainingAction('check')) {
+                checkTrainingCompletion(agentId);
+              }
+            }, 15000);
           }
         });
 
