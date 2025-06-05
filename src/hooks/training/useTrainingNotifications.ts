@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ToastNotificationService } from '@/services/ToastNotificationService';
 
 export interface TrainingProgress {
-  status: 'pending' | 'training' | 'completed' | 'failed';
+  status: 'pending' | 'initializing' | 'training' | 'completed' | 'failed';
   progress: number;
   message?: string;
   totalChunks?: number;
