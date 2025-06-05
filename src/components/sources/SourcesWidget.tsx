@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -44,9 +43,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       setTimeout(() => checkRetrainingNeeded(), 1000);
     };
 
-    const handleTrainingContinuesInBackground = () => {
-      console.log('📱 Training continues in background');
+    const handleTrainingContinuesInBackground = (event: CustomEvent) => {
+      console.log('📱 Training continues in background - enhanced handler:', event.detail);
       setIsTrainingInBackground(true);
+      
+      // Also close the dialog if it's open
+      setShowRetrainingDialog(false);
     };
 
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
@@ -68,6 +70,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Enhanced: Handle training state transitions
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
+      console.log('🎯 Training completed - resetting background state');
       setIsTrainingInBackground(false);
       
       // Refresh stats after completion
@@ -115,10 +118,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleDialogClose = (open: boolean) => {
+    console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
     setShowRetrainingDialog(open);
     
-    // If training is active and dialog is closed, set background training state
-    if (!open && (trainingProgress?.status === 'training' || isRetraining)) {
+    // FIXED: Only set background training if training is actually active
+    if (!open && isTrainingActive) {
+      console.log('📱 Setting background training state');
       setIsTrainingInBackground(true);
     }
   };

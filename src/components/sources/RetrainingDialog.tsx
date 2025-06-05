@@ -31,7 +31,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // FIXED: Check retraining needed FIRST, then training progress status
+  // FIXED: Enhanced status determination with better precedence
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
@@ -180,12 +180,21 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked');
+    console.log('📱 Continue in background clicked - enhanced');
+    
+    // Close the dialog first
     onOpenChange(false);
     
+    // FIXED: Dispatch event with better data
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
-      detail: { agentId: trainingProgress?.agentId }
+      detail: { 
+        agentId: trainingProgress?.agentId,
+        sessionId: trainingProgress?.sessionId,
+        status: 'background'
+      }
     }));
+    
+    console.log('📱 Background training event dispatched for session:', trainingProgress?.sessionId);
   };
 
   const isTrainingActive = currentStatus === 'training';
