@@ -1,81 +1,54 @@
 
-import { supabase } from '@/integrations/supabase/client';
-
-interface DatabaseSource {
-  id: string;
-  source_type: string;
-  metadata: any;
-  title: string;
-  content?: string;
-}
+import { SequentialProcessingService } from '../enhanced/sequentialProcessingService';
+import { DatabaseSource } from '../types/retrainingTypes';
 
 export class SourceProcessor {
   static async processSource(source: DatabaseSource): Promise<boolean> {
+    console.log(`🔄 Processing source: ${source.title} (${source.source_type})`);
+
     try {
-      console.log(`🔄 Processing source: ${source.title} (${source.source_type})`);
+      // Determine content to process
+      let content = '';
       
-      if (source.source_type === 'website') {
-        // For website sources, trigger processing of unprocessed pages
-        const { error } = await supabase.functions.invoke('process-source-pages', {
-          body: { sourceId: source.id }
-        });
-        
-        if (error) {
-          console.error(`❌ Failed to process website source ${source.id}:`, error);
-          return false;
+      if (source.source_type === 'qa') {
+        const metadata = source.metadata as any;
+        if (metadata?.question && metadata?.answer) {
+          content = `Question: ${metadata.question}\n\nAnswer: ${metadata.answer}`;
+        } else if (source.content) {
+          content = source.content;
+        } else {
+          throw new Error('Q&A source has no question/answer or content');
         }
-        
-        console.log(`✅ Website source processing initiated: ${source.title}`);
-        return true;
       } else {
-        // For non-website sources, update metadata to mark as processing
-        const metadata = (source.metadata as Record<string, any>) || {};
-        const updatedMetadata = {
-          ...metadata,
-          processing_status: 'processing',
-          last_processing_attempt: new Date().toISOString()
-        };
-
-        const { error } = await supabase
-          .from('agent_sources')
-          .update({ metadata: updatedMetadata })
-          .eq('id', source.id);
-
-        if (error) {
-          console.error(`❌ Failed to update source ${source.id}:`, error);
-          return false;
-        }
-
-        // Trigger actual processing via edge function
-        const { error: processingError } = await supabase.functions.invoke('process-page-content', {
-          body: { sourceId: source.id }
-        });
-
-        if (processingError) {
-          console.error(`❌ Failed to process content for source ${source.id}:`, processingError);
-          
-          // Mark as failed
-          const failedMetadata = {
-            ...metadata,
-            processing_status: 'failed',
-            error_message: processingError.message,
-            failed_at: new Date().toISOString()
-          };
-
-          await supabase
-            .from('agent_sources')
-            .update({ metadata: failedMetadata })
-            .eq('id', source.id);
-          
-          return false;
-        }
-
-        console.log(`✅ Non-website source processing initiated: ${source.title}`);
-        return true;
+        content = source.content || '';
       }
+
+      if (!content || content.trim().length === 0) {
+        throw new Error('Source has no content to process');
+      }
+
+      // Use sequential processing to avoid race conditions
+      const result = await SequentialProcessingService.processSourceSequentially(
+        source.id,
+        content,
+        {
+          source_type: source.source_type,
+          source_title: source.title,
+          processing_method: 'retraining_sequential',
+          ...source.metadata
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Sequential processing failed');
+      }
+
+      console.log(`✅ Successfully processed source ${source.title}: ${result.chunksCreated} chunks, ${result.embeddingsGenerated} embeddings`);
+      return true;
+
     } catch (error) {
-      console.error(`❌ Error processing source ${source.id}:`, error);
-      return false;
+      console.error(`❌ Failed to process source ${source.title}:`, error);
+      throw error;
     }
   }
 }
