@@ -24,9 +24,25 @@ export const useSimplifiedFlow = () => {
 
       const { supabase } = await import('@/integrations/supabase/client');
       
-      console.log('🚀 Starting training process...');
+      // First, mark all sources that require manual training as training
+      const { error: updateError } = await supabase
+        .from('agent_sources')
+        .update({ 
+          requires_manual_training: false,
+          metadata: {
+            training_started_at: new Date().toISOString(),
+            training_status: 'in_progress'
+          }
+        })
+        .eq('agent_id', agentId)
+        .eq('requires_manual_training', true);
 
-      // Trigger the enhanced retraining which handles chunking and status updates
+      if (updateError) {
+        console.error('Error updating sources for training:', updateError);
+        throw updateError;
+      }
+
+      // Trigger the enhanced retraining which handles chunking
       const response = await supabase.functions.invoke('start-enhanced-retraining', {
         body: { agentId }
       });
@@ -35,14 +51,24 @@ export const useSimplifiedFlow = () => {
         throw response.error;
       }
 
-      console.log('✅ Training initiated successfully:', response.data);
-      
-      // The real-time subscriptions will handle the UI updates
-      
+      console.log('✅ Training started successfully - chunking process initiated');
     } catch (error) {
       console.error('Failed to start training:', error);
       setIsTraining(false);
-      ToastNotificationService.showError('Failed to start training');
+      
+      // Revert the training status on error
+      const { supabase } = await import('@/integrations/supabase/client');
+      await supabase
+        .from('agent_sources')
+        .update({ 
+          requires_manual_training: true,
+          metadata: {
+            training_failed_at: new Date().toISOString(),
+            training_error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        })
+        .eq('agent_id', agentId)
+        .eq('requires_manual_training', false);
     }
   }, [agentId, isTraining]);
 
@@ -66,31 +92,25 @@ export const useSimplifiedFlow = () => {
       const summary = SimplifiedSourceStatusService.analyzeSourceStatus(sources || []);
       setStatusSummary(summary);
 
-      // Check if training is in progress
+      // Check if training is in progress - properly type the metadata
       const hasTrainingInProgress = sources?.some(s => {
         const metadata = s.metadata as Record<string, any> | null;
-        return s.crawl_status === 'training' || 
-               metadata?.training_status === 'in_progress' ||
-               (metadata?.training_started_at && !metadata?.training_completed_at);
-      });
-
-      // Check if training just completed
-      const hasTrainingCompleted = sources?.some(s => {
-        const metadata = s.metadata as Record<string, any> | null;
-        return metadata?.training_completed_at && metadata?.training_status === 'completed';
+        return metadata?.training_status === 'in_progress';
       });
 
       if (hasTrainingInProgress && !isTraining) {
-        console.log('📊 Training detected in progress, updating UI...');
         setIsTraining(true);
       } else if (!hasTrainingInProgress && isTraining) {
-        console.log('📊 Training completed, updating UI...');
         setIsTraining(false);
+        // Check if training completed successfully
+        const hasTrainingCompleted = sources?.some(s => {
+          const metadata = s.metadata as Record<string, any> | null;
+          return metadata?.training_completed_at;
+        });
         if (hasTrainingCompleted) {
           ToastNotificationService.showTrainingCompleted();
         }
       }
-
     } catch (error) {
       console.error('Error updating source status:', error);
     }
@@ -130,36 +150,16 @@ export const useSimplifiedFlow = () => {
             
             const updatedSource = payload.new as any;
             
-            // Check for training status changes
-            if (updatedSource.crawl_status === 'training' || 
-                updatedSource.metadata?.training_started_at) {
-              console.log('🔄 Training started detected via real-time');
-              setTimeout(updateSourceStatus, 500);
-            } else if (updatedSource.crawl_status === 'completed' && 
-                       !updatedSource.requires_manual_training) {
-              console.log('✅ Training completed detected via real-time');
+            // Check if this is a parent source status change from crawling to completed
+            if (updatedSource.crawl_status === 'completed' && 
+                updatedSource.requires_manual_training === true &&
+                updatedSource.parent_source_id === null) {
+              console.log('🎉 Parent source completed - updating status');
+              // Delay slightly to ensure all real-time updates are processed
               setTimeout(updateSourceStatus, 500);
             } else {
+              // For other updates, update immediately
               updateSourceStatus();
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'source_pages'
-          },
-          (payload) => {
-            console.log('📡 Source page updated:', payload);
-            const updatedPage = payload.new as any;
-            
-            // Check if processing status changed to training or trained
-            if (updatedPage.processing_status === 'training' || 
-                updatedPage.processing_status === 'trained') {
-              console.log(`📄 Source page ${updatedPage.processing_status} detected`);
-              setTimeout(updateSourceStatus, 500);
             }
           }
         )
@@ -184,6 +184,7 @@ export const useSimplifiedFlow = () => {
     const handleCrawlStarted = () => ToastNotificationService.showCrawlingStarted();
     const handleCrawlCompleted = () => {
       ToastNotificationService.showCrawlingCompleted();
+      // When crawling is completed, check status after a short delay to allow aggregation
       setTimeout(updateSourceStatus, 1000);
     };
     const handleSourceUpdated = () => setTimeout(updateSourceStatus, 1000);

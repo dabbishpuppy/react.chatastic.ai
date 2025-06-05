@@ -28,50 +28,27 @@ export class SimplifiedSourceStatusService {
   }
 
   static getSourceStatus(source: any): SourceStatus {
-    const metadata = source.metadata as Record<string, any> | null;
-    
-    // Check metadata for training status first
-    if (metadata?.training_status === 'in_progress' || metadata?.training_started_at) {
-      if (metadata?.training_completed_at) {
-        return 'completed';
-      }
-      return 'training';
-    }
-
-    // For website sources, check crawl_status and child page processing status
+    // For website sources, check crawl_status
     if (source.source_type === 'website') {
-      // If crawl status is training, it's being trained
-      if (source.crawl_status === 'training') {
-        return 'training';
-      }
-      
       // If crawl is completed and requires manual training, it's ready for training
       if (source.crawl_status === 'completed' && source.requires_manual_training === true) {
         return 'crawled';
       }
-      
       // If crawl is completed and training has been done, it's fully completed
       if (source.crawl_status === 'completed' && source.requires_manual_training === false) {
         return 'completed';
       }
-      
       // If currently crawling
       if (source.crawl_status === 'in_progress') {
         return 'crawling';
       }
-      
       // Default to pending
       return source.crawl_status || 'pending';
     }
     
-    // For other sources, derive status from requires_manual_training and metadata
+    // For other sources, derive status from requires_manual_training
     if (source.requires_manual_training === true) {
       return 'crawled'; // Needs training
-    }
-    
-    // Check if training was completed
-    if (metadata?.training_completed_at) {
-      return 'completed';
     }
     
     return 'completed'; // Already trained
