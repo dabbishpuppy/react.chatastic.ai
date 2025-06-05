@@ -14,12 +14,10 @@ import { Globe, FileText, Map } from 'lucide-react';
 
 interface EnhancedWebsiteCrawlFormV3Props {
   onCrawlStarted?: (parentSourceId: string) => void;
-  onCrawlCompleted?: (parentSourceId: string) => void; // NEW: Added crawl completion callback
 }
 
 const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
-  onCrawlStarted,
-  onCrawlCompleted // NEW: Added to props
+  onCrawlStarted
 }) => {
   const { agentId } = useParams();
   const [activeTab, setActiveTab] = useState('website');
@@ -34,24 +32,6 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
 
   const { initiateCrawl, loading: crawlLoading } = useEnhancedCrawl();
   const { infrastructureHealth, systemHealth, loading: infrastructureLoading, loadInfrastructureHealth } = useProductionInfrastructure();
-
-  // NEW: Listen for crawl completion events to trigger training
-  useEffect(() => {
-    const handleCrawlCompleted = (event: CustomEvent) => {
-      const { parentSourceId, status } = event.detail;
-      
-      if (status === 'completed' && parentSourceId && onCrawlCompleted) {
-        console.log('🎉 Crawl completed event received, triggering training:', parentSourceId);
-        onCrawlCompleted(parentSourceId);
-      }
-    };
-
-    window.addEventListener('crawlCompleted', handleCrawlCompleted as EventListener);
-    
-    return () => {
-      window.removeEventListener('crawlCompleted', handleCrawlCompleted as EventListener);
-    };
-  }, [onCrawlCompleted]);
 
   // Initialize infrastructure on mount
   useEffect(() => {
