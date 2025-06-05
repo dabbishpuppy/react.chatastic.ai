@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { SourceProcessor } from '@/services/rag/retraining/sourceProcessor';
@@ -18,23 +17,34 @@ export const useTrainingStart = (
     try {
       console.log('🚀 Starting ENHANCED training for agent:', agentId);
 
-      // ENHANCED: Multiple layers of completion protection
+      // ENHANCED: STRONGEST possible completion protection - check ALL completion states
       const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
-      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 120000) { // Extended to 2 minutes
-        console.log('🚫 ENHANCED: Preventing training start - completed recently (within 2 minutes)');
+      
+      // CHECK 1: Agent completion state
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 300000) { // 5 minutes
+        console.log('🚫 STRONGEST PROTECTION: Agent completed recently, blocking training start');
         return;
       }
 
-      // ENHANCED: Check if training state is already completed
+      // CHECK 2: Training state
       if (refs.trainingStateRef.current === 'completed') {
-        console.log('🚫 ENHANCED: Preventing training start - training state is completed');
+        console.log('🚫 STRONGEST PROTECTION: Training state is completed, blocking training start');
         return;
       }
 
-      // ENHANCED: Check for active sessions in completion state
+      // CHECK 3: Completed sessions exist
       if (refs.completedSessionsRef.current.size > 0) {
-        console.log('🚫 ENHANCED: Preventing training start - have completed sessions');
+        console.log('🚫 STRONGEST PROTECTION: Have completed sessions, blocking training start');
         return;
+      }
+
+      // CHECK 4: Last action was complete and recent
+      if (refs.lastTrainingActionRef.current === 'complete') {
+        const timeSinceLastAction = Date.now() - refs.lastCompletionCheckRef.current;
+        if (timeSinceLastAction < 300000) { // 5 minutes
+          console.log('🚫 STRONGEST PROTECTION: Recent completion action, blocking training start');
+          return;
+        }
       }
 
       console.log('🔄 Resetting agent-level completion state for explicit training start');
@@ -60,10 +70,20 @@ export const useTrainingStart = (
 
       console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${refs.trainingStartTimeRef.current}`);
 
-      // ENHANCED: Much stronger toast deduplication with session and time-based tracking
+      // ENHANCED: STRONGEST toast deduplication - add completion state check
       const startToastId = `start-${sessionId}`;
       const recentStartToastId = `recent-start-${agentId}`;
       const timeBasedToastId = `time-start-${Math.floor(Date.now() / 60000)}`; // One per minute max
+      
+      // FINAL CHECK: Don't show toast if agent was recently completed
+      const shouldBlockToastDueToCompletion = refs.agentCompletionStateRef.current.isCompleted || 
+                                             refs.trainingStateRef.current === 'completed' ||
+                                             refs.completedSessionsRef.current.size > 0;
+      
+      if (shouldBlockToastDueToCompletion) {
+        console.log('🚫 STRONGEST PROTECTION: Blocking training start toast due to completion state');
+        return;
+      }
       
       // Check multiple conditions for showing toast
       const shouldShowStartToast = !refs.shownToastsRef.current.has(startToastId) && 

@@ -366,9 +366,21 @@ export const useTrainingNotifications = () => {
     startTraining: async () => {
       if (!agentId) return;
       
-      // ENHANCED: Final check before starting
-      if (refs.agentCompletionStateRef.current.isCompleted) {
-        console.log('🚫 START TRAINING: Agent already completed, blocking start');
+      // ENHANCED: STRONGEST possible check before starting
+      const timeSinceCompletion = Date.now() - refs.agentCompletionStateRef.current.completedAt;
+      
+      if (refs.agentCompletionStateRef.current.isCompleted && timeSinceCompletion < 300000) { // 5 minutes
+        console.log('🚫 ULTIMATE PROTECTION: Agent completed recently, completely blocking start');
+        return;
+      }
+      
+      if (refs.trainingStateRef.current === 'completed') {
+        console.log('🚫 ULTIMATE PROTECTION: Training state completed, completely blocking start');
+        return;
+      }
+      
+      if (refs.completedSessionsRef.current.size > 0) {
+        console.log('🚫 ULTIMATE PROTECTION: Have completed sessions, completely blocking start');
         return;
       }
       
