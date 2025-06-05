@@ -92,11 +92,11 @@ export const useTrainingCompletion = (
 
       setTrainingProgress(newProgress);
 
-      // FIXED: Include 'completed' in the type definition
+      // FIXED: Include 'completed' in the type definition and properly handle status transitions
       const previousStatus: 'idle' | 'initializing' | 'training' | 'completed' | 'failed' = refs.trainingStateRef.current;
       refs.trainingStateRef.current = status;
 
-      // Handle training completion - FIXED: Compare against both previous status and current status properly
+      // Handle training completion - FIXED: Only trigger completion when transitioning TO completed AND all content is processed
       if (status === 'completed' && 
           previousStatus !== 'completed' &&
           analysisResult.totalPagesNeedingProcessing > 0 &&

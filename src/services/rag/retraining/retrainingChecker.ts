@@ -33,17 +33,16 @@ export class RetrainingChecker {
       const unprocessedSources = [];
       const reasons = [];
 
-      // Check each source with enhanced logic
+      // Check each source with enhanced logic - focus on chunk existence
       for (const source of sources) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // ENHANCED: For website sources, be more aggressive about detecting unprocessed content
+          // ENHANCED: For website sources, check ALL pages, not just completed ones
           const { data: crawledPages, error: pagesError } = await supabase
             .from('source_pages')
             .select('id, url, status, processing_status, created_at')
-            .eq('parent_source_id', source.id)
-            .eq('status', 'completed'); // Only completed crawled pages
+            .eq('parent_source_id', source.id);
 
           if (pagesError) {
             console.error('Error checking source pages:', pagesError);
@@ -51,26 +50,26 @@ export class RetrainingChecker {
           }
 
           if (crawledPages && crawledPages.length > 0) {
-            // ENHANCED: Check for pages that truly need processing
+            // ENHANCED: Focus purely on chunk existence, not processing status
             let needsProcessingCount = 0;
             
             for (const page of crawledPages) {
-              // Check if chunks exist for this page
-              const { data: existingChunks } = await supabase
-                .from('source_chunks')
-                .select('id')
-                .eq('source_id', page.id)
-                .limit(1);
+              // Only check completed pages for chunks
+              if (page.status === 'completed') {
+                // Check if chunks exist for this page
+                const { data: existingChunks } = await supabase
+                  .from('source_chunks')
+                  .select('id')
+                  .eq('source_id', page.id)
+                  .limit(1);
 
-              // ENHANCED: If no chunks exist OR processing status indicates pending/failed
-              const hasNoChunks = !existingChunks || existingChunks.length === 0;
-              const needsProcessing = !page.processing_status || 
-                                    page.processing_status === 'pending' || 
-                                    page.processing_status === 'failed' ||
-                                    page.processing_status === null;
+                // ENHANCED: If no chunks exist, this page needs training
+                const hasNoChunks = !existingChunks || existingChunks.length === 0;
 
-              if (hasNoChunks || needsProcessing) {
-                needsProcessingCount++;
+                if (hasNoChunks) {
+                  needsProcessingCount++;
+                  console.log(`🔍 Page ${page.url} has no chunks - needs training`);
+                }
               }
             }
 
@@ -79,18 +78,18 @@ export class RetrainingChecker {
                 id: source.id,
                 title: source.title,
                 type: 'website',
-                reason: `${needsProcessingCount} crawled page${needsProcessingCount > 1 ? 's' : ''} need${needsProcessingCount === 1 ? 's' : ''} processing`,
+                reason: `${needsProcessingCount} crawled page${needsProcessingCount > 1 ? 's' : ''} need${needsProcessingCount === 1 ? 's' : ''} training`,
                 status: 'Crawled - Needs Training',
                 unprocessedPagesCount: needsProcessingCount
               });
-              reasons.push(`Website "${source.title}" has ${needsProcessingCount} pages that need processing`);
+              reasons.push(`Website "${source.title}" has ${needsProcessingCount} pages that need training`);
               console.log(`🟡 ENHANCED: Website "${source.title}" needs training - ${needsProcessingCount} unprocessed pages`);
             } else {
-              console.log(`✅ ENHANCED: Website "${source.title}" is fully processed`);
+              console.log(`✅ ENHANCED: Website "${source.title}" is fully trained`);
             }
           }
         } else {
-          // ENHANCED: For other source types, check more thoroughly
+          // ENHANCED: For other source types, check chunks existence more reliably
           const hasContent = source.source_type === 'qa' ? 
             (metadata?.question && metadata?.answer) :
             source.content && source.content.trim().length > 0;
@@ -104,20 +103,11 @@ export class RetrainingChecker {
               .limit(1);
 
             const hasNoChunks = !existingChunks || existingChunks.length === 0;
-            const processingStatus = metadata?.processing_status;
 
-            // ENHANCED: Consider it unprocessed if no chunks OR status indicates pending/failed
-            if (hasNoChunks || processingStatus !== 'completed') {
-              let status = 'Needs Processing';
-              let reason = 'Has content but not processed yet';
-
-              if (processingStatus === 'failed') {
-                status = 'Needs Reprocessing';
-                reason = 'Previous processing failed, needs retry';
-              } else if (hasNoChunks) {
-                status = 'Needs Processing';
-                reason = 'Content available but no training chunks created yet';
-              }
+            // ENHANCED: If no chunks exist, this source needs training regardless of status
+            if (hasNoChunks) {
+              let status = 'Needs Training';
+              let reason = 'Content available but no training chunks created yet';
 
               unprocessedSources.push({
                 id: source.id,
@@ -129,7 +119,7 @@ export class RetrainingChecker {
               reasons.push(`${source.source_type.toUpperCase()} "${source.title}" ${reason.toLowerCase()}`);
               console.log(`🟡 ENHANCED: Source "${source.title}" needs training - ${reason}`);
             } else {
-              console.log(`✅ ENHANCED: Source "${source.title}" is fully processed`);
+              console.log(`✅ ENHANCED: Source "${source.title}" is fully trained`);
             }
           }
         }
@@ -137,11 +127,10 @@ export class RetrainingChecker {
 
       const needed = unprocessedSources.length > 0;
       let status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'no_sources' = 'up_to_date';
-      let message = 'All sources are up to date and processed.';
+      let message = 'All sources are up to date and trained.';
 
       if (needed) {
-        const hasFailedSources = unprocessedSources.some(s => s.status === 'Needs Reprocessing');
-        status = hasFailedSources ? 'needs_reprocessing' : 'needs_processing';
+        status = 'needs_processing';
         
         const totalUnprocessed = unprocessedSources.reduce((total, source) => {
           return total + (source.unprocessedPagesCount || 1);

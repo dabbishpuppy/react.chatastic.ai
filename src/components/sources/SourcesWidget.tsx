@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -184,14 +185,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const isTrainingActive = trainingProgress?.status === 'training' || trainingProgress?.status === 'initializing' || isRetraining;
   const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
 
-  // ENHANCED: Simplified logic - always trust retrainingNeeded?.needed when dialog is open
+  // ENHANCED: Always use the actual retraining status, don't override it
   const shouldShowTrainingRequired = () => {
-    // When dialog is open, always show fresh retraining status
-    if (showRetrainingDialog) {
-      return retrainingNeeded?.needed || false;
-    }
-    
-    // When dialog is closed, use current retraining status
     return retrainingNeeded?.needed || false;
   };
 
