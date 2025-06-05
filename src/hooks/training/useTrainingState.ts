@@ -25,6 +25,8 @@ export const useTrainingState = (): TrainingRefs => {
   const globalTrainingActiveRef = useRef(false);
   const lastTrainingActionRef = useRef<'start' | 'check' | 'complete' | 'none'>('none');
   const trainingToastShownRef = useRef(new Set<string>());
+  const dialogLockedRef = useRef(false);
+  const currentSessionIdRef = useRef('');
 
   return {
     pageLoadTimestampRef,
@@ -44,6 +46,8 @@ export const useTrainingState = (): TrainingRefs => {
     sessionCompletionFlagRef,
     globalTrainingActiveRef,
     lastTrainingActionRef,
-    trainingToastShownRef
+    trainingToastShownRef,
+    dialogLockedRef,
+    currentSessionIdRef
   };
 };

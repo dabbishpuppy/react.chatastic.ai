@@ -47,4 +47,6 @@ export interface TrainingRefs {
   crawlInitiationInProgressRef: React.MutableRefObject<boolean>;
   crawlInitiationStartTimeRef: React.MutableRefObject<number>;
   trainingToastShownRef: React.MutableRefObject<Set<string>>;
+  dialogLockedRef: React.MutableRefObject<boolean>;
+  currentSessionIdRef: React.MutableRefObject<string>;
 }

@@ -36,6 +36,12 @@ export const useTrainingCompletion = (
         return;
       }
 
+      // ENHANCED: Dialog protection - skip polling if dialog is locked
+      if (refs.dialogLockedRef.current) {
+        console.log('🚫 ENHANCED: Ignoring completion check - dialog is locked');
+        return;
+      }
+
       // ENHANCED: Debounce with longer window
       if (now - refs.lastCompletionCheckRef.current < 5000) { // Increased from 3s to 5s
         console.log('🚫 Enhanced debounced checkTrainingCompletion call');
@@ -61,6 +67,7 @@ export const useTrainingCompletion = (
       if (!sessionId && !refs.agentCompletionStateRef.current.isCompleted) {
         sessionId = `${agentId}-${Date.now()}`;
         refs.currentTrainingSessionRef.current = sessionId;
+        refs.currentSessionIdRef.current = sessionId;
         console.log('🆔 Created new session:', sessionId);
       } else if (!sessionId && refs.agentCompletionStateRef.current.isCompleted) {
         sessionId = refs.agentCompletionStateRef.current.lastCompletedSessionId || `${agentId}-completed`;
@@ -87,7 +94,8 @@ export const useTrainingCompletion = (
         currentState: refs.trainingStateRef.current,
         agentCompleted: refs.agentCompletionStateRef.current.isCompleted,
         lastAction: refs.lastTrainingActionRef.current,
-        activeSession: refs.activeTrainingSessionRef.current
+        activeSession: refs.activeTrainingSessionRef.current,
+        dialogLocked: refs.dialogLockedRef.current
       });
 
       setTrainingProgress(newProgress);
