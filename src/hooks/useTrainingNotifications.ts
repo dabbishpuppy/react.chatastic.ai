@@ -41,8 +41,31 @@ export const useTrainingNotifications = () => {
   // Toast tracking - prevent duplicates
   const shownToastsRef = useRef<Set<string>>(new Set());
   
+  // NEW: Timer tracking for cleanup
+  const pendingTimersRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  
+  // NEW: Completion flag to prevent restart logic
+  const sessionCompletionFlagRef = useRef<Set<string>>(new Set());
+  
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+
+  // NEW: Helper function to clear all pending timers
+  const clearAllTimers = () => {
+    console.log(`🧹 Clearing ${pendingTimersRef.current.size} pending timers`);
+    pendingTimersRef.current.forEach(timer => clearTimeout(timer));
+    pendingTimersRef.current.clear();
+  };
+
+  // NEW: Helper function to add tracked timer
+  const addTrackedTimer = (callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      pendingTimersRef.current.delete(timer);
+      callback();
+    }, delay);
+    pendingTimersRef.current.add(timer);
+    return timer;
+  };
 
   // Listen for crawl initiation events to suppress false connection warnings
   useEffect(() => {
@@ -51,7 +74,7 @@ export const useTrainingNotifications = () => {
       crawlInitiationInProgressRef.current = true;
       crawlInitiationStartTimeRef.current = Date.now();
       
-      setTimeout(() => {
+      addTrackedTimer(() => {
         crawlInitiationInProgressRef.current = false;
         console.log('✅ Crawl initiation grace period ended');
       }, 45000);
@@ -68,6 +91,7 @@ export const useTrainingNotifications = () => {
     return () => {
       window.removeEventListener('crawlStarted', handleCrawlStarted);
       window.removeEventListener('crawlCompleted', handleCrawlCompleted);
+      clearAllTimers();
     };
   }, []);
 
@@ -119,8 +143,8 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // Debounced check to prevent spam
-              setTimeout(() => checkTrainingCompletion(agentId), 2000);
+              // NEW: Use tracked timer for debounced check
+              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -140,8 +164,8 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              // Debounced check to prevent spam
-              setTimeout(() => checkTrainingCompletion(agentId), 2000);
+              // NEW: Use tracked timer for debounced check
+              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -156,9 +180,9 @@ export const useTrainingNotifications = () => {
           },
           (payload) => {
             if ((payload.new as any)?.source_type === 'website') {
-              setTimeout(initializeSubscriptions, 500);
+              addTrackedTimer(initializeSubscriptions, 500);
             }
-            setTimeout(() => checkTrainingCompletion(agentId), 1000);
+            addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
           }
         )
         
@@ -204,6 +228,7 @@ export const useTrainingNotifications = () => {
 
     return () => {
       if (pollInterval) clearInterval(pollInterval);
+      clearAllTimers();
     };
   }, [agentId]);
 
@@ -336,7 +361,7 @@ export const useTrainingNotifications = () => {
       const previousStatus = trainingStateRef.current;
       trainingStateRef.current = status;
 
-      // Training completed - show toast only once
+      // Training completed - show toast only once and clear timers
       if (status === 'completed' && 
           previousStatus !== 'completed' &&
           totalPagesNeedingProcessing > 0 &&
@@ -345,7 +370,10 @@ export const useTrainingNotifications = () => {
         
         console.log('🎉 Training completed! Showing success notification for session:', sessionId);
         
+        // NEW: Mark session as completed and clear timers
         completedSessionsRef.current.add(sessionId);
+        sessionCompletionFlagRef.current.add(sessionId);
+        clearAllTimers();
         
         const completionToastId = `completion-${sessionId}`;
         if (!shownToastsRef.current.has(completionToastId)) {
@@ -363,9 +391,12 @@ export const useTrainingNotifications = () => {
         }
       }
 
-      // Training failed - show toast only once
+      // Training failed - show toast only once and clear timers
       if (status === 'failed' && previousStatus !== 'failed') {
         console.log('❌ Training failed for session:', sessionId);
+        
+        // NEW: Clear timers on failure
+        clearAllTimers();
         
         const failureToastId = `failure-${sessionId}`;
         if (!shownToastsRef.current.has(failureToastId)) {
@@ -394,11 +425,21 @@ export const useTrainingNotifications = () => {
 
       // Create new session
       const sessionId = `training-${agentId}-${Date.now()}`;
+      
+      // NEW: Check if this session has already completed (prevent restart after completion)
+      if (sessionCompletionFlagRef.current.has(sessionId)) {
+        console.log('⚠️ Session already completed, preventing restart:', sessionId);
+        return;
+      }
+      
       currentTrainingSessionRef.current = sessionId;
       trainingStateRef.current = 'training';
 
       // Clear previous completion state
       completedSessionsRef.current.clear();
+      
+      // NEW: Clear any pending timers to prevent delayed logic
+      clearAllTimers();
 
       // Show "Training Started" toast immediately - no delays
       const startToastId = `start-${sessionId}`;
@@ -484,12 +525,15 @@ export const useTrainingNotifications = () => {
       await Promise.allSettled(processingPromises);
 
       // Check completion after processing
-      setTimeout(() => checkTrainingCompletion(agentId), 2000);
+      addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
 
     } catch (error) {
       console.error('Failed to start simplified training:', error);
       
       trainingStateRef.current = 'failed';
+      
+      // NEW: Clear timers on error
+      clearAllTimers();
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
       
