@@ -20,8 +20,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Check if retraining is needed based on stats
-  const retrainingNeeded = stats ? (stats.requiresTraining || stats.unprocessedCrawledPages > 0) : false;
+  // Enhanced logic to check if retraining is needed
+  const retrainingNeeded = React.useMemo(() => {
+    if (!stats) return false;
+    
+    // Check if there are sources requiring training OR unprocessed crawled pages
+    return stats.requiresTraining || stats.unprocessedCrawledPages > 0;
+  }, [stats]);
 
   // Format total size from stats
   const formatTotalSize = (bytes: number) => {
@@ -31,7 +36,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleRetrainClick = () => {
-    console.log('Simple retrain button clicked');
+    console.log('Enhanced retrain button clicked - starting training for agent:', agentId);
     startTraining();
   };
 

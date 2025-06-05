@@ -1,9 +1,9 @@
 
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useParams } from 'react-router-dom';
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useParams } from "react-router-dom";
 
-interface SourceStats {
+interface AgentSourceStats {
   totalSources: number;
   totalBytes: number;
   sourcesByType: Record<string, { count: number; size: number }>;
@@ -11,93 +11,96 @@ interface SourceStats {
   unprocessedCrawledPages: number;
 }
 
+const fetchAgentSourceStats = async (agentId: string): Promise<AgentSourceStats> => {
+  // Get all active sources for this agent
+  const { data: sources, error: sourcesError } = await supabase
+    .from('agent_sources')
+    .select('id, source_type, metadata, requires_manual_training')
+    .eq('agent_id', agentId)
+    .eq('is_active', true);
+
+  if (sourcesError) {
+    throw new Error(`Failed to fetch sources: ${sourcesError.message}`);
+  }
+
+  // Check for unprocessed crawled pages
+  const { data: unprocessedPages, error: pagesError } = await supabase
+    .from('source_pages')
+    .select('id')
+    .eq('status', 'completed')
+    .in('processing_status', ['pending', null]);
+
+  if (pagesError) {
+    console.warn('Failed to fetch unprocessed pages:', pagesError);
+  }
+
+  const unprocessedCrawledPages = unprocessedPages?.length || 0;
+
+  // Check if any source requires manual training
+  const requiresTraining = sources?.some(source => source.requires_manual_training === true) || unprocessedCrawledPages > 0;
+
+  // Calculate stats by type
+  const sourcesByType: Record<string, { count: number; size: number }> = {
+    text: { count: 0, size: 0 },
+    file: { count: 0, size: 0 },
+    website: { count: 0, size: 0 },
+    qa: { count: 0, size: 0 }
+  };
+
+  let totalBytes = 0;
+
+  sources?.forEach(source => {
+    const type = source.source_type;
+    if (sourcesByType[type]) {
+      sourcesByType[type].count++;
+      
+      // Get size from metadata if available
+      const metadata = source.metadata as any;
+      const size = metadata?.file_size || metadata?.content_size || 0;
+      sourcesByType[type].size += size;
+      totalBytes += size;
+    }
+  });
+
+  // For website sources, also get size from completed pages
+  if (sourcesByType.website.count > 0) {
+    const { data: websitePages, error: websitePagesError } = await supabase
+      .from('source_pages')
+      .select('content_size, compression_ratio')
+      .eq('status', 'completed')
+      .not('content_size', 'is', null);
+
+    if (!websitePagesError && websitePages) {
+      let websiteSize = 0;
+      websitePages.forEach(page => {
+        const size = page.compression_ratio ? 
+          Math.round(page.content_size * page.compression_ratio) : 
+          page.content_size;
+        websiteSize += size || 0;
+      });
+      
+      sourcesByType.website.size = websiteSize;
+      // Recalculate total bytes
+      totalBytes = Object.values(sourcesByType).reduce((sum, type) => sum + type.size, 0);
+    }
+  }
+
+  return {
+    totalSources: sources?.length || 0,
+    totalBytes,
+    sourcesByType,
+    requiresTraining,
+    unprocessedCrawledPages
+  };
+};
+
 export const useAgentSourceStats = () => {
   const { agentId } = useParams();
-
+  
   return useQuery({
     queryKey: ['agent-source-stats', agentId],
-    queryFn: async (): Promise<SourceStats> => {
-      if (!agentId) {
-        throw new Error('Agent ID is required');
-      }
-
-      // Get source stats using the existing function
-      const { data: stats, error: statsError } = await supabase
-        .rpc('get_agent_source_stats', { target_agent_id: agentId });
-
-      if (statsError) {
-        console.error('Error fetching source stats:', statsError);
-        throw statsError;
-      }
-
-      const result = stats?.[0];
-      if (!result) {
-        return {
-          totalSources: 0,
-          totalBytes: 0,
-          sourcesByType: {},
-          requiresTraining: false,
-          unprocessedCrawledPages: 0
-        };
-      }
-
-      // Check if any sources require manual training
-      const { data: sourcesNeedingTraining, error: trainingError } = await supabase
-        .from('agent_sources')
-        .select('id, requires_manual_training')
-        .eq('agent_id', agentId)
-        .eq('is_active', true)
-        .eq('requires_manual_training', true);
-
-      if (trainingError) {
-        console.error('Error checking training requirements:', trainingError);
-      }
-
-      // Count unprocessed crawled pages
-      const { data: unprocessedPages, error: pagesError } = await supabase
-        .from('source_pages')
-        .select('id, parent_source_id')
-        .eq('status', 'completed')
-        .eq('processing_status', 'pending')
-        .in('parent_source_id', 
-          sourcesNeedingTraining?.map(s => s.id) || []
-        );
-
-      if (pagesError) {
-        console.error('Error counting unprocessed pages:', pagesError);
-      }
-
-      const requiresTraining = (sourcesNeedingTraining?.length || 0) > 0;
-      const unprocessedCrawledPages = unprocessedPages?.length || 0;
-
-      // Parse sources_by_type JSON safely
-      let sourcesByType = {};
-      try {
-        if (result.sources_by_type && typeof result.sources_by_type === 'object') {
-          sourcesByType = result.sources_by_type as Record<string, { count: number; size: number }>;
-        }
-      } catch (error) {
-        console.error('Error parsing sources_by_type:', error);
-      }
-
-      console.log('📊 Source stats calculated:', {
-        totalSources: result.total_sources,
-        totalBytes: result.total_bytes,
-        sourcesByType,
-        requiresTraining,
-        unprocessedCrawledPages
-      });
-
-      return {
-        totalSources: result.total_sources,
-        totalBytes: result.total_bytes,
-        sourcesByType,
-        requiresTraining,
-        unprocessedCrawledPages
-      };
-    },
+    queryFn: () => fetchAgentSourceStats(agentId!),
     enabled: !!agentId,
-    staleTime: 30000, // Cache for 30 seconds
-    refetchOnWindowFocus: false,
+    refetchInterval: 5000, // Refetch every 5 seconds to catch updates
   });
 };
