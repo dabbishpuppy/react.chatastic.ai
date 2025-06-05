@@ -253,7 +253,10 @@ export const useTrainingNotifications = () => {
   }, [chunkProgress, agentId, recoverFromStuckState]);
 
   const startTraining = async () => {
-    if (!agentId) return;
+    if (!agentId) {
+      console.error('❌ No agent ID found for training');
+      return;
+    }
 
     try {
       console.log('🚀 Starting training for agent:', agentId);
@@ -264,7 +267,7 @@ export const useTrainingNotifications = () => {
       }
 
       trainingStateRef.current = {
-        status: 'training',
+        status: 'idle', // Start as idle, will change to training when chunk processing starts
         sessionId: null, // Will be created in useEffect when status changes
         completedSessions: new Set(),
         permanentlyCompleted: false,
@@ -275,26 +278,13 @@ export const useTrainingNotifications = () => {
 
       console.log('✅ Training state reset for new session');
 
-      // IMMEDIATELY set training progress to show dialog in training state
-      const initialTrainingProgress: TrainingProgress = {
-        agentId,
-        status: 'training',
-        progress: 0,
-        totalSources: 0,
-        processedSources: 0,
-        currentlyProcessing: [],
-        sessionId: 'initializing'
-      };
-      
-      setTrainingProgress(initialTrainingProgress);
-      
-      console.log('✅ Initial training state set to TRAINING');
-
-      // Start the actual chunk processing
+      // Start the actual chunk processing which will trigger training state
+      console.log('🔄 Calling startChunkProcessing...');
       await startChunkProcessing();
+      console.log('✅ startChunkProcessing completed successfully');
 
     } catch (error) {
-      console.error('Failed to start training:', error);
+      console.error('❌ Failed to start training:', error);
       
       trainingStateRef.current.status = 'failed';
       trainingStateRef.current.completionLocked = true;
@@ -319,7 +309,7 @@ export const useTrainingNotifications = () => {
       } else {
         toast({
           title: "Training Failed",
-          description: "Failed to start training process",
+          description: `Failed to start training process: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: "destructive",
         });
       }

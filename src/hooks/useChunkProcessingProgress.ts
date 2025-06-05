@@ -492,7 +492,9 @@ export const useChunkProcessingProgress = () => {
 
   // Start chunk processing for an agent
   const startChunkProcessing = async () => {
-    if (!agentId) return;
+    if (!agentId) {
+      throw new Error('No agent ID provided');
+    }
 
     try {
       console.log('🚀 Starting chunk processing for agent:', agentId);
@@ -508,52 +510,37 @@ export const useChunkProcessingProgress = () => {
 
       console.log('✅ New chunk processing session started with ID:', newSessionId);
 
-      // Get all agent sources that need processing
-      const { data: sources } = await supabase
-        .from('agent_sources')
-        .select('id, source_type, metadata')
-        .eq('agent_id', agentId)
-        .eq('is_active', true);
+      // First, call the edge function to process any unprocessed crawled pages
+      console.log('🔄 Processing crawled pages...');
+      const processResult = await supabase.functions.invoke('process-crawled-pages', {
+        body: { parentSourceId: null } // Process all pending pages
+      });
 
-      if (!sources || sources.length === 0) {
-        console.log('No sources found for processing');
-        return;
+      if (processResult.error) {
+        console.warn('⚠️ Warning processing crawled pages:', processResult.error);
+        // Continue anyway as this might not be critical
+      } else {
+        console.log('✅ Crawled pages processing result:', processResult.data);
       }
 
-      // Process each source
-      const processingPromises = sources.map(async (source) => {
-        if (source.source_type === 'website') {
-          // For website sources, trigger page processing
-          console.log(`🌐 Triggering page processing for website source: ${source.id}`);
-          return supabase.functions.invoke('process-crawled-pages', {
-            body: { parentSourceId: source.id }
-          });
-        } else {
-          // For non-website sources, process directly
-          console.log(`📄 Processing non-website source: ${source.id}`);
-          return supabase.functions.invoke('process-page-content', {
-            body: { sourceId: source.id }
-          });
-        }
-      });
+      // Then, generate any missing chunks and embeddings
+      console.log('🔄 Generating missing chunks and embeddings...');
+      const generateResult = await supabase.functions.invoke('generate-missing-chunks');
 
-      // Start all processing in parallel
-      const results = await Promise.allSettled(processingPromises);
-      
-      // Log results
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          console.log(`✅ Processing started for source ${sources[index].id}`);
-        } else {
-          console.error(`❌ Failed to start processing for source ${sources[index].id}:`, result.reason);
-        }
-      });
+      if (generateResult.error) {
+        console.error('❌ Error generating missing chunks:', generateResult.error);
+        throw new Error(`Failed to generate missing chunks: ${generateResult.error.message}`);
+      }
 
-      // Start monitoring progress
-      setTimeout(calculateProgress, 2000);
+      console.log('✅ Missing chunks generation result:', generateResult.data);
+
+      // Start monitoring progress immediately
+      setTimeout(calculateProgress, 1000);
+
+      console.log('🎯 Chunk processing initiated successfully');
 
     } catch (error) {
-      console.error('Failed to start chunk processing:', error);
+      console.error('❌ Failed to start chunk processing:', error);
       throw error;
     }
   };
