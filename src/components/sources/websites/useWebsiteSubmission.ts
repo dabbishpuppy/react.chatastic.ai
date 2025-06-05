@@ -50,11 +50,11 @@ export const useWebsiteSubmission = () => {
         crawl_status: 'crawling'
       });
 
-      // Start the enhanced crawl process
+      // Start the enhanced crawl process - fix: use correct property name
       const crawlResult = await EnhancedCrawlService.initiateCrawl({
         url: data.url,
         agentId,
-        parentSourceId: source.id,
+        parentSourceId: source.id, // This was causing the error
         excludePaths: data.excludePaths,
         includePaths: data.includePaths,
         respectRobots: data.respectRobots,
