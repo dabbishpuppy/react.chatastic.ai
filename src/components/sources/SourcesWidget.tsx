@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -118,14 +117,9 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
-  // ENHANCED: Protected retrain click handler
+  // FIXED: Remove overly protective check that was preventing dialog from opening
   const handleRetrainClick = () => {
-    // ENHANCED: Check if training is already completed
-    if (trainingProgress?.status === 'completed') {
-      console.log('🚫 PROTECTED: Training already completed, not showing dialog');
-      return;
-    }
-    
+    console.log('🔄 Retrain button clicked - opening dialog');
     setShowRetrainingDialog(true);
   };
 
