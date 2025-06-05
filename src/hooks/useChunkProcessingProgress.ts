@@ -16,11 +16,15 @@ interface ChunkProcessingProgress {
 
 export const useChunkProcessingProgress = () => {
   const { agentId } = useParams();
+  
+  // CRITICAL: All hooks must be called consistently - no conditional hooks
   const [progress, setProgress] = useState<ChunkProcessingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const lastUpdateRef = useRef<number>(0);
+  const subscriptionsRef = useRef<any[]>([]);
+  const isProcessingStatusChangeRef = useRef<boolean>(false);
   
-  // CRITICAL: Enhanced completion state management
+  // CRITICAL: Enhanced completion state management - always initialize
   const completionStateRef = useRef<{
     isCompleted: boolean;
     completedAt: number | null;
@@ -30,9 +34,6 @@ export const useChunkProcessingProgress = () => {
     completedAt: null,
     sessionId: null
   });
-  
-  const subscriptionsRef = useRef<any[]>([]);
-  const isProcessingStatusChangeRef = useRef<boolean>(false);
 
   // Calculate progress from database state
   const calculateProgress = async () => {
