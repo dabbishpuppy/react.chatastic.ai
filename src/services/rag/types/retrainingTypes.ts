@@ -27,7 +27,7 @@ export interface RetrainingStatus {
   needed: boolean;
   unprocessedSources: number;
   reasons: string[];
-  status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'no_sources';
+  status: 'up_to_date' | 'needs_processing' | 'needs_reprocessing' | 'has_failures' | 'no_sources';
   message: string;
   sourceDetails?: Array<{
     id: string;

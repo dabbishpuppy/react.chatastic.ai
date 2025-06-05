@@ -30,7 +30,7 @@ export const useTrainingCompletion = (
         }
       }
 
-      // ENHANCED: Check training state
+      // ENHANCED: Check training state - Fixed type issue
       if (refs.trainingStateRef.current === 'completed') {
         console.log('🚫 ENHANCED: Ignoring completion check - training state is completed');
         return;
@@ -100,9 +100,11 @@ export const useTrainingCompletion = (
 
       setTrainingProgress(newProgress);
 
-      // FIXED: Include 'completed' in the type definition and properly handle status transitions
+      // Store previous status before updating
       const previousStatus = refs.trainingStateRef.current;
-      refs.trainingStateRef.current = status;
+      
+      // Update training state ref with proper type casting
+      refs.trainingStateRef.current = status as 'idle' | 'initializing' | 'training' | 'completed' | 'failed';
 
       // Handle training completion - FIXED: Only trigger completion when transitioning TO completed AND all content is processed
       if (status === 'completed' && 
