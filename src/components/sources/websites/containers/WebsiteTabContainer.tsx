@@ -1,65 +1,22 @@
 
-import React from "react";
-import { useParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
 import WebsiteSourcesList from "../components/WebsiteSourcesList";
-import WebsiteCrawlForm from "../components/WebsiteCrawlForm";
+import EnhancedWebsiteCrawlFormV3 from "../components/EnhancedWebsiteCrawlFormV3";
+import TrainingProgressModal from "../components/TrainingProgressModal";
 import { useWebsiteSourceOperations } from "../hooks/useWebsiteSourceOperations";
+import { useTrainingNotificationsSimplified } from "@/hooks/useTrainingNotificationsSimplified";
+import { Button } from "@/components/ui/button";
+import { GraduationCap } from "lucide-react";
 
 const WebsiteTabContainer: React.FC = () => {
-  const { agentId } = useParams();
-  const queryClient = useQueryClient();
+  const [isTrainingModalOpen, setIsTrainingModalOpen] = useState(false);
   
   const handleRefetch = () => {
     console.log('Refetch triggered');
-    // Invalidate both stats and paginated sources
-    if (agentId) {
-      queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
-      queryClient.invalidateQueries({ queryKey: ['agent-sources-paginated', agentId, 'website'] });
-    }
   };
   
   const handleRemoveFromState = (sourceId: string) => {
     console.log('Remove from state:', sourceId);
-  };
-
-  const handleCrawlStarted = (parentSourceId: string) => {
-    console.log('🚀 Crawl started for parent source:', parentSourceId);
-    
-    // Immediately invalidate and refetch both stats and paginated data
-    if (agentId) {
-      console.log('🔄 Invalidating queries for immediate update');
-      
-      // Invalidate stats query
-      queryClient.invalidateQueries({ 
-        queryKey: ['agent-source-stats', agentId] 
-      });
-      
-      // Invalidate paginated sources query
-      queryClient.invalidateQueries({ 
-        queryKey: ['agent-sources-paginated', agentId, 'website'] 
-      });
-      
-      // Force immediate refetch
-      setTimeout(() => {
-        queryClient.refetchQueries({
-          queryKey: ['agent-source-stats', agentId]
-        });
-        queryClient.refetchQueries({
-          queryKey: ['agent-sources-paginated', agentId, 'website']
-        });
-      }, 100);
-      
-      // Additional refetch after a short delay to catch any async updates
-      setTimeout(() => {
-        queryClient.refetchQueries({
-          queryKey: ['agent-source-stats', agentId]
-        });
-        queryClient.refetchQueries({
-          queryKey: ['agent-sources-paginated', agentId, 'website']
-        });
-      }, 1000);
-    }
   };
 
   const {
@@ -69,9 +26,52 @@ const WebsiteTabContainer: React.FC = () => {
     handleRecrawl
   } = useWebsiteSourceOperations(handleRefetch, handleRemoveFromState);
 
+  const { trainingProgress, startTraining, isConnected } = useTrainingNotificationsSimplified();
+
+  // Handle crawl completion - automatically start training
+  const handleCrawlCompleted = async (parentSourceId: string) => {
+    console.log('🎉 Crawl completed, starting training for:', parentSourceId);
+    
+    // Start training and open progress modal
+    const sessionId = await startTraining();
+    if (sessionId) {
+      setIsTrainingModalOpen(true);
+    }
+  };
+
+  // Handle manual training start
+  const handleStartTraining = async () => {
+    const sessionId = await startTraining();
+    if (sessionId) {
+      setIsTrainingModalOpen(true);
+    }
+  };
+
+  // Close training modal
+  const handleCloseTrainingModal = () => {
+    setIsTrainingModalOpen(false);
+  };
+
   return (
     <div className="space-y-6 mt-4">
-      <WebsiteCrawlForm onCrawlStarted={handleCrawlStarted} />
+      <EnhancedWebsiteCrawlFormV3 
+        onCrawlStarted={(parentSourceId) => {
+          console.log('Crawl started for:', parentSourceId);
+        }}
+        onCrawlCompleted={handleCrawlCompleted}
+      />
+      
+      {/* Manual Training Button */}
+      <div className="flex justify-end">
+        <Button 
+          onClick={handleStartTraining}
+          className="flex items-center gap-2"
+          disabled={!isConnected}
+        >
+          <GraduationCap className="h-4 w-4" />
+          Start Training
+        </Button>
+      </div>
       
       <WebsiteSourcesList
         onEdit={handleEdit}
@@ -80,6 +80,13 @@ const WebsiteTabContainer: React.FC = () => {
         onRecrawl={handleRecrawl}
         loading={false}
         error={null}
+      />
+
+      {/* Training Progress Modal */}
+      <TrainingProgressModal
+        isOpen={isTrainingModalOpen}
+        onClose={handleCloseTrainingModal}
+        progress={trainingProgress}
       />
     </div>
   );
