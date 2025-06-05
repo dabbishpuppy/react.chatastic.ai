@@ -1,8 +1,6 @@
 
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { formatFileSize, isShowingCompressedSize, getCompressionSavings } from '@/components/sources/components/SourceSizeFormatter';
-import { Badge } from '@/components/ui/badge';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -78,31 +76,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     return null;
   };
 
-  // Create a mock source object for the formatter using database aggregated fields
-  const sourceForSizeCalculation = {
-    source_type: 'website',
-    total_content_size: totalContentSize,
-    compressed_content_size: compressedContentSize,
-    original_size: originalSize,
-    compressed_size: compressedSize,
-    metadata: metadata,
-    content: content
-  };
-
-  const shouldShowSize = () => {
-    // For parent sources, show size if we have aggregated database fields
-    if (!isChild) {
-      return (totalContentSize && totalContentSize > 0) || 
-             (compressedContentSize && compressedContentSize > 0) ||
-             (originalSize && originalSize > 0);
-    }
-    // For child sources, show size if we have content
-    return content && content.length > 0;
-  };
-
-  const showingCompressed = isShowingCompressedSize(sourceForSizeCalculation as any);
-  const compressionSavings = getCompressionSavings(sourceForSizeCalculation as any);
-
   return (
     <div className="flex items-center">
       <div className="flex-1 min-w-0">
@@ -120,23 +93,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <>
               <span>•</span>
               <span>{displayLinksCount} links</span>
-            </>
-          )}
-          
-          {shouldShowSize() && (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <span>{formatFileSize(sourceForSizeCalculation as any)}</span>
-                {showingCompressed && (
-                  <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
-                    Compressed
-                  </Badge>
-                )}
-                {compressionSavings && compressionSavings > 0 && (
-                  <span className="text-green-600">({compressionSavings}% smaller)</span>
-                )}
-              </div>
             </>
           )}
           
