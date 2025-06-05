@@ -60,7 +60,7 @@ const TrainingProgressModal: React.FC<TrainingProgressModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={canClose ? onClose : undefined}>
-      <DialogContent className="sm:max-w-md" hideCloseButton={!canClose}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>AI Training Progress</DialogTitle>
@@ -76,6 +76,13 @@ const TrainingProgressModal: React.FC<TrainingProgressModalProps> = ({
             )}
           </div>
         </DialogHeader>
+        
+        {/* Hide the default close button when training is in progress */}
+        <style jsx>{`
+          .dialog-content button[aria-label="Close"] {
+            display: ${canClose ? 'block' : 'none'};
+          }
+        `}</style>
         
         <div className="space-y-6">
           {/* Status Badge */}
