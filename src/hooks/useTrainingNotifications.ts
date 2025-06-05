@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -38,11 +37,15 @@ export const useTrainingNotifications = () => {
   const trainingStartedSessionRef = useRef<string>('');
   const trainingFailedSessionRef = useRef<Set<string>>(new Set());
   
-  // NEW: Training state management refs
+  // Enhanced tracking refs for better toast management
   const activeTrainingSessionRef = useRef<string | null>(null);
   const trainingLockRef = useRef<boolean>(false);
   const lastStatusUpdateTimeRef = useRef<number>(0);
   const stableSessionIdRef = useRef<string>('');
+  const trainingStartToastShownRef = useRef<Set<string>>(new Set());
+  const lastCompletionNotificationTimeRef = useRef<number>(0);
+  const completionConfirmationCountRef = useRef<number>(0);
+  const trainingInitiationTimeRef = useRef<number>(0);
   
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
@@ -126,7 +129,8 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              setTimeout(() => checkTrainingCompletion(agentId, false), 100);
+              // Reduce frequency of completion checks during real-time updates
+              setTimeout(() => checkTrainingCompletion(agentId, false), 500);
             }
           }
         )
@@ -146,7 +150,8 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              setTimeout(() => checkTrainingCompletion(agentId, false), 100);
+              // Reduce frequency of completion checks during real-time updates
+              setTimeout(() => checkTrainingCompletion(agentId, false), 500);
             }
           }
         )
@@ -204,7 +209,8 @@ export const useTrainingNotifications = () => {
               console.log('🔄 Connection disruption during crawl initiation - suppressing warning toast');
             }
             
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId, false), 8000);
+            // Reduced polling frequency to prevent spam
+            pollInterval = setInterval(() => checkTrainingCompletion(agentId, false), 12000);
           }
         });
 
@@ -225,14 +231,15 @@ export const useTrainingNotifications = () => {
     try {
       const now = Date.now();
       
-      // Enhanced debouncing with training lock awareness
-      if (now - lastCompletionCheckRef.current < 2000 && !trainingLockRef.current) {
+      // Enhanced debouncing with stricter limits during training
+      const debounceTime = trainingLockRef.current ? 5000 : 3000;
+      if (now - lastCompletionCheckRef.current < debounceTime) {
         return;
       }
       lastCompletionCheckRef.current = now;
       
       // If training is locked and status update is too frequent, skip
-      if (trainingLockRef.current && now - lastStatusUpdateTimeRef.current < 5000) {
+      if (trainingLockRef.current && now - lastStatusUpdateTimeRef.current < 8000) {
         console.log('🔒 Training locked, skipping frequent status update');
         return;
       }
@@ -359,7 +366,7 @@ export const useTrainingNotifications = () => {
         // Clear stable session ID after completion/failure
         setTimeout(() => {
           stableSessionIdRef.current = '';
-        }, 1000);
+        }, 2000);
       } else {
         sessionId = `${agentId}-${totalPagesNeedingProcessing}-${totalPagesProcessed}`;
       }
@@ -390,28 +397,40 @@ export const useTrainingNotifications = () => {
           !completionToastShownForSessionRef.current.has(sessionId) &&
           lastCompletedSessionIdRef.current !== sessionId) {
         
-        console.log('🎉 Training completed! Showing success notification for session:', sessionId);
+        // Additional confirmation to prevent false positives
+        completionConfirmationCountRef.current += 1;
         
-        // Mark this session as completed
-        completionToastShownForSessionRef.current.add(sessionId);
-        lastCompletedSessionIdRef.current = sessionId;
-        
-        // Show training complete toast
-        toast({
-          title: "Training Complete",
-          description: "Your AI agent is trained and ready",
-          duration: 5000,
-        });
+        // Only show toast after at least 2 confirmations and minimum time gap
+        const timeSinceLastNotification = now - lastCompletionNotificationTimeRef.current;
+        if (completionConfirmationCountRef.current >= 2 && timeSinceLastNotification > 10000) {
+          console.log('🎉 Training completed! Showing success notification for session:', sessionId);
+          
+          // Mark this session as completed
+          completionToastShownForSessionRef.current.add(sessionId);
+          lastCompletedSessionIdRef.current = sessionId;
+          lastCompletionNotificationTimeRef.current = now;
+          completionConfirmationCountRef.current = 0; // Reset confirmation counter
+          
+          // Show training complete toast
+          toast({
+            title: "Training Complete",
+            description: "Your AI agent is trained and ready",
+            duration: 5000,
+          });
 
-        window.dispatchEvent(new CustomEvent('trainingCompleted', {
-          detail: { agentId, progress: newProgress }
-        }));
-        
-        // Clean up old session IDs to prevent memory leaks (keep only last 5)
-        if (completionToastShownForSessionRef.current.size > 5) {
-          const sessionsArray = Array.from(completionToastShownForSessionRef.current);
-          completionToastShownForSessionRef.current = new Set(sessionsArray.slice(-5));
+          window.dispatchEvent(new CustomEvent('trainingCompleted', {
+            detail: { agentId, progress: newProgress }
+          }));
+          
+          // Clean up old session IDs to prevent memory leaks (keep only last 3)
+          if (completionToastShownForSessionRef.current.size > 3) {
+            const sessionsArray = Array.from(completionToastShownForSessionRef.current);
+            completionToastShownForSessionRef.current = new Set(sessionsArray.slice(-3));
+          }
         }
+      } else if (status !== 'completed') {
+        // Reset confirmation counter if status changes
+        completionConfirmationCountRef.current = 0;
       }
 
       // Enhanced failure detection for training
@@ -428,10 +447,10 @@ export const useTrainingNotifications = () => {
           duration: 5000,
         });
         
-        // Clean up failed sessions (keep only last 5)
-        if (trainingFailedSessionRef.current.size > 5) {
+        // Clean up failed sessions (keep only last 3)
+        if (trainingFailedSessionRef.current.size > 3) {
           const sessionsArray = Array.from(trainingFailedSessionRef.current);
-          trainingFailedSessionRef.current = new Set(sessionsArray.slice(-5));
+          trainingFailedSessionRef.current = new Set(sessionsArray.slice(-3));
         }
       }
 
@@ -447,6 +466,9 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting enhanced training for agent:', agentId);
 
+      // Set training initiation time for delayed toast
+      trainingInitiationTimeRef.current = Date.now();
+
       // Set training lock and create stable session ID
       trainingLockRef.current = true;
       const sessionId = `training-${agentId}-${Date.now()}`;
@@ -456,6 +478,7 @@ export const useTrainingNotifications = () => {
       // Reset completion tracking for new training session
       hasShownCompletionNotificationRef.current = false;
       lastCompletedSessionIdRef.current = '';
+      completionConfirmationCountRef.current = 0;
 
       setTrainingProgress(prev => prev ? { ...prev, status: 'idle' } : null);
 
@@ -524,12 +547,28 @@ export const useTrainingNotifications = () => {
         sessionId
       });
 
-      // Show training started toast
-      toast({
-        title: "Training Started",
-        description: `Processing ${totalPages} item${totalPages > 1 ? 's' : ''} for AI training...`,
-        duration: 3000,
-      });
+      // Delayed "Training Started" toast - only show after confirming training is proceeding
+      setTimeout(() => {
+        // Only show if training is still active and hasn't been shown for this session
+        if (trainingLockRef.current && 
+            activeTrainingSessionRef.current === sessionId && 
+            !trainingStartToastShownRef.current.has(sessionId)) {
+          
+          trainingStartToastShownRef.current.add(sessionId);
+          
+          toast({
+            title: "Training Started",
+            description: `Processing ${totalPages} item${totalPages > 1 ? 's' : ''} for AI training...`,
+            duration: 3000,
+          });
+          
+          // Clean up old start toast sessions (keep only last 3)
+          if (trainingStartToastShownRef.current.size > 3) {
+            const sessionsArray = Array.from(trainingStartToastShownRef.current);
+            trainingStartToastShownRef.current = new Set(sessionsArray.slice(-3));
+          }
+        }
+      }, 2000); // 2 second delay to ensure training is actually proceeding
 
       const processingPromises = sourcesToProcess.map(async (source) => {
         return SourceProcessor.processSource(source);
@@ -537,7 +576,7 @@ export const useTrainingNotifications = () => {
 
       await Promise.allSettled(processingPromises);
 
-      setTimeout(() => checkTrainingCompletion(agentId, true), 1000);
+      setTimeout(() => checkTrainingCompletion(agentId, true), 2000);
 
     } catch (error) {
       console.error('Failed to start enhanced training:', error);
