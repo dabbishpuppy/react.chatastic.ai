@@ -11,19 +11,13 @@ export const useRetrainingDialogState = (
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
       isRetraining,
-      trainingProgress
+      trainingProgress,
+      progress: trainingProgress?.progress,
+      processedSources: trainingProgress?.processedSources,
+      totalSources: trainingProgress?.totalSources
     });
 
-    // PRIORITY 1: If currently training, show training state
-    if (isRetraining || trainingProgress?.status === 'training') {
-      console.log('✅ Status: training (active training)');
-      return {
-        status: 'training',
-        progress: trainingProgress?.progress || 0
-      };
-    }
-    
-    // PRIORITY 2: If training failed, show failed state
+    // PRIORITY 1: If training failed, show failed state
     if (trainingProgress?.status === 'failed') {
       console.log('✅ Status: failed (training failed)');
       return {
@@ -32,12 +26,25 @@ export const useRetrainingDialogState = (
       };
     }
     
-    // PRIORITY 3: If training finished AND no retraining needed, show completed
-    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
-      console.log('✅ Status: completed (training done and no retraining needed)');
+    // PRIORITY 2: Check if training is actually completed (100% progress AND all sources processed)
+    const isTrainingActuallyComplete = trainingProgress?.progress === 100 && 
+      trainingProgress?.processedSources >= trainingProgress?.totalSources &&
+      trainingProgress?.totalSources > 0;
+    
+    if (isTrainingActuallyComplete || trainingProgress?.status === 'completed') {
+      console.log('✅ Status: completed (training actually finished)');
       return {
         status: 'completed',
         progress: 100
+      };
+    }
+    
+    // PRIORITY 3: If currently training (but not completed), show training state
+    if (isRetraining || trainingProgress?.status === 'training') {
+      console.log('✅ Status: training (active training)');
+      return {
+        status: 'training',
+        progress: trainingProgress?.progress || 0
       };
     }
     
