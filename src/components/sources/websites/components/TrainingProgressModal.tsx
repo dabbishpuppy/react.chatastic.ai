@@ -77,13 +77,6 @@ const TrainingProgressModal: React.FC<TrainingProgressModalProps> = ({
           </div>
         </DialogHeader>
         
-        {/* Hide the default close button when training is in progress */}
-        <style jsx>{`
-          .dialog-content button[aria-label="Close"] {
-            display: ${canClose ? 'block' : 'none'};
-          }
-        `}</style>
-        
         <div className="space-y-6">
           {/* Status Badge */}
           <div className="flex justify-center">
