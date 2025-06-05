@@ -73,6 +73,8 @@ export const useTrainingCompletion = (
         progress: calculatedProgress,
         totalSources: analysisResult.totalPagesNeedingProcessing,
         processedSources: analysisResult.totalPagesProcessed,
+        totalChunks: 0, // Will be populated by backend
+        processedChunks: 0, // Will be populated by backend
         currentlyProcessing: analysisResult.currentlyProcessingPages,
         sessionId
       };
@@ -90,7 +92,7 @@ export const useTrainingCompletion = (
 
       setTrainingProgress(newProgress);
 
-      const previousStatus: 'idle' | 'training' | 'completed' | 'failed' = refs.trainingStateRef.current;
+      const previousStatus: 'idle' | 'initializing' | 'training' | 'completed' | 'failed' = refs.trainingStateRef.current;
       refs.trainingStateRef.current = status;
 
       // Handle training completion - FIXED: Compare against both previous status and current status properly

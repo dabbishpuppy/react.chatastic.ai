@@ -3,12 +3,16 @@ import React from 'react';
 
 export interface TrainingProgress {
   agentId: string;
-  status: 'idle' | 'training' | 'completed' | 'failed';
+  status: 'idle' | 'initializing' | 'training' | 'completed' | 'failed';
   progress: number;
   totalSources: number;
   processedSources: number;
+  totalChunks: number;
+  processedChunks: number;
   currentlyProcessing: string[];
   sessionId: string;
+  currentSource?: string;
+  errorMessage?: string;
 }
 
 export interface DatabaseSource {
@@ -21,7 +25,7 @@ export interface DatabaseSource {
 }
 
 export interface TrainingRefs {
-  trainingStateRef: React.MutableRefObject<'idle' | 'training' | 'completed' | 'failed'>;
+  trainingStateRef: React.MutableRefObject<'idle' | 'initializing' | 'training' | 'completed' | 'failed'>;
   agentCompletionStateRef: React.MutableRefObject<{
     isCompleted: boolean;
     completedAt: number;
@@ -42,4 +46,5 @@ export interface TrainingRefs {
   hasEverConnectedRef: React.MutableRefObject<boolean>;
   crawlInitiationInProgressRef: React.MutableRefObject<boolean>;
   crawlInitiationStartTimeRef: React.MutableRefObject<number>;
+  trainingToastShownRef: React.MutableRefObject<Set<string>>;
 }

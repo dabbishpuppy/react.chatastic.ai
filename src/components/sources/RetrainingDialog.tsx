@@ -32,76 +32,41 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // FIXED: Enhanced status determination with proper completion detection
+  // ENHANCED: Clear state machine with proper status determination
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
       trainingProgressValue: trainingProgress?.progress,
       isRetraining,
-      trainingProgress
+      totalChunks: trainingProgress?.totalChunks,
+      processedChunks: trainingProgress?.processedChunks
     });
 
-    // PRIORITY 1: If training progress shows completed, prioritize that
-    if (trainingProgress?.status === 'completed') {
-      console.log('✅ Status: completed (training progress shows completed)');
-      return {
-        status: 'completed',
-        progress: 100
-      };
-    }
-
-    // PRIORITY 2: If progress is 100% AND no retraining needed, consider complete
-    if (trainingProgress?.progress === 100 && !retrainingNeeded?.needed) {
-      console.log('✅ Status: completed (progress 100% and no retraining needed)');
-      return {
-        status: 'completed',
-        progress: 100
-      };
-    }
-    
-    // PRIORITY 3: If training failed, show failed state
-    if (trainingProgress?.status === 'failed') {
-      console.log('✅ Status: failed (training failed)');
-      return {
-        status: 'failed',
-        progress: trainingProgress?.progress || 0
-      };
-    }
-    
-    // PRIORITY 4: If currently training, show training state
-    if (isRetraining || trainingProgress?.status === 'training') {
-      // FIXED: Recovery check - if progress is 100% but status is training
-      if (trainingProgress?.progress === 100) {
-        console.log('🔍 RECOVERY: Progress 100% but status training - forcing completion');
-        return {
-          status: 'completed',
-          progress: 100
-        };
+    // Use training progress status directly if available
+    if (trainingProgress?.status) {
+      const status = trainingProgress.status;
+      let calculatedProgress = 0;
+      
+      // Calculate progress based on chunks first, then sources
+      if (trainingProgress.totalChunks > 0 && trainingProgress.processedChunks >= 0) {
+        calculatedProgress = Math.round((trainingProgress.processedChunks / trainingProgress.totalChunks) * 100);
+      } else if (trainingProgress.totalSources > 0) {
+        calculatedProgress = Math.round((trainingProgress.processedSources / trainingProgress.totalSources) * 100);
       }
       
-      console.log('✅ Status: training (active training)');
       return {
-        status: 'training',
-        progress: trainingProgress?.progress || 0
+        status,
+        progress: Math.min(calculatedProgress, 100)
       };
     }
     
-    // PRIORITY 5: If retraining is explicitly needed, show that state
+    // Fallback logic
     if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining needed)');
-      return {
-        status: 'needs_training',
-        progress: 0
-      };
+      return { status: 'pending', progress: 0 };
     }
     
-    // DEFAULT: Up to date state
-    console.log('✅ Status: up_to_date (default)');
-    return {
-      status: 'up_to_date',
-      progress: 0
-    };
+    return { status: 'up_to_date', progress: 0 };
   };
 
   const { status: currentStatus, progress: currentProgress } = getCurrentStatus();
@@ -115,10 +80,18 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   });
 
   const getProcessedCount = () => {
+    // Prioritize chunk count over source count
+    if (trainingProgress?.totalChunks > 0) {
+      return trainingProgress.processedChunks || 0;
+    }
     return trainingProgress?.processedSources || 0;
   };
 
   const getTotalCount = () => {
+    // Prioritize chunk count over source count
+    if (trainingProgress?.totalChunks > 0) {
+      return trainingProgress.totalChunks;
+    }
     if (trainingProgress?.totalSources > 0) {
       return trainingProgress.totalSources;
     }
@@ -128,44 +101,59 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     return 0;
   };
 
+  const getProgressUnit = () => {
+    return trainingProgress?.totalChunks > 0 ? 'chunks' : 'items';
+  };
+
   const getStatusMessage = () => {
-    if (currentStatus === 'training') {
-      const processed = getProcessedCount();
-      const total = getTotalCount();
-      const currentlyProcessing = trainingProgress?.currentlyProcessing || [];
+    switch (currentStatus) {
+      case 'initializing':
+        return "Initializing training... Please wait while we prepare your sources.";
       
-      if (currentlyProcessing.length > 0) {
-        return `Training in progress... (${processed}/${total} processed, ${currentlyProcessing.length} currently processing)`;
-      }
+      case 'training':
+        const processed = getProcessedCount();
+        const total = getTotalCount();
+        const unit = getProgressUnit();
+        const currentlyProcessing = trainingProgress?.currentlyProcessing || [];
+        
+        if (currentlyProcessing.length > 0) {
+          return `Training in progress... (${processed}/${total} ${unit} processed, ${currentlyProcessing.length} currently processing)`;
+        }
+        
+        if (total > 0) {
+          return `Training in progress... (${processed}/${total} ${unit} processed)`;
+        }
+        return "Training in progress...";
       
-      if (total > 0) {
-        return `Training in progress... (${processed}/${total} items processed)`;
-      }
-      return "Training in progress...";
+      case 'failed':
+        return trainingProgress?.errorMessage || "Training failed. Please try again or check your sources.";
+      
+      case 'completed':
+        return "Training completed successfully! Your AI agent is trained and ready.";
+      
+      case 'pending':
+        return retrainingNeeded?.message || `${retrainingNeeded?.unprocessedSources || 0} sources need to be processed for training.`;
+      
+      default:
+        return "Your agent is up to date.";
     }
-    
-    if (currentStatus === 'failed') {
-      return "Training failed. Please try again or check your sources.";
-    }
-    
-    if (currentStatus === 'completed') {
-      return "Training completed successfully! Your AI agent is trained and ready.";
-    }
-    
-    // Show sources that need training
-    if (retrainingNeeded?.needed) {
-      return retrainingNeeded.message || `${retrainingNeeded.unprocessedSources} sources need to be processed for training.`;
-    }
-    
-    return "Your agent is up to date.";
   };
 
   const getDialogTitle = () => {
-    if (currentStatus === 'training') return "Agent Training Status";
-    if (currentStatus === 'completed') return "Training Complete";
-    if (currentStatus === 'failed') return "Training Failed";
-    if (currentStatus === 'needs_training') return "Agent Training Status";
-    return "Agent Training Status";
+    switch (currentStatus) {
+      case 'initializing':
+        return "Initializing Training";
+      case 'training':
+        return "Agent Training in Progress";
+      case 'completed':
+        return "Training Complete";
+      case 'failed':
+        return "Training Failed";
+      case 'pending':
+        return "Agent Training Required";
+      default:
+        return "Agent Training Status";
+    }
   };
 
   const getSourceIcon = (type: string) => {
@@ -211,12 +199,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked - enhanced');
+    console.log('📱 Continue in background clicked');
     
     // Close the dialog first
     onOpenChange(false);
     
-    // FIXED: Dispatch event with better data
+    // Dispatch event
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
@@ -228,22 +216,87 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     console.log('📱 Background training event dispatched for session:', trainingProgress?.sessionId);
   };
 
-  const isTrainingActive = currentStatus === 'training';
-  const isTrainingCompleted = currentStatus === 'completed';
-  const isTrainingFailed = currentStatus === 'failed';
+  // Render footer based on current status - one button per status
+  const renderFooter = () => {
+    switch (currentStatus) {
+      case 'pending':
+        return (
+          <div className="flex gap-2 w-full">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button onClick={handleStartTraining} className="flex-1">
+              Start Training
+            </Button>
+          </div>
+        );
+      
+      case 'initializing':
+        return (
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full" disabled>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Initializing...
+          </Button>
+        );
+      
+      case 'training':
+        // Only show "Continue in Background" if we have actual progress
+        const hasProgress = getProcessedCount() > 0 || getTotalCount() > 0;
+        if (hasProgress) {
+          return (
+            <Button variant="outline" onClick={handleContinueInBackground} className="w-full">
+              Continue in Background
+            </Button>
+          );
+        } else {
+          return (
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full" disabled>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Starting...
+            </Button>
+          );
+        }
+      
+      case 'completed':
+        return (
+          <Button onClick={() => onOpenChange(false)} className="w-full">
+            Done
+          </Button>
+        );
+      
+      case 'failed':
+        return (
+          <div className="flex gap-2 w-full">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+              Close
+            </Button>
+            <Button onClick={handleStartTraining} className="flex-1">
+              Retry Training
+            </Button>
+          </div>
+        );
+      
+      default:
+        return (
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
+            Close
+          </Button>
+        );
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isTrainingCompleted ? (
+            {currentStatus === 'completed' ? (
               <CheckCircle className="h-5 w-5 text-green-600" />
-            ) : isTrainingFailed ? (
+            ) : currentStatus === 'failed' ? (
               <AlertCircle className="h-5 w-5 text-red-600" />
-            ) : isTrainingActive ? (
+            ) : (currentStatus === 'training' || currentStatus === 'initializing') ? (
               <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-            ) : retrainingNeeded?.needed ? (
+            ) : currentStatus === 'pending' ? (
               <AlertCircle className="h-5 w-5 text-orange-600" />
             ) : (
               <CheckCircle className="h-5 w-5 text-green-600" />
@@ -257,7 +310,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
         <div className="flex-1 overflow-y-auto space-y-4">
           {/* Progress Section */}
-          {(isTrainingActive || isTrainingCompleted || isTrainingFailed) && (
+          {(currentStatus === 'training' || currentStatus === 'completed' || currentStatus === 'failed') && (
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -266,30 +319,44 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 </div>
                 <Progress 
                   value={currentProgress} 
-                  className={`w-full ${isTrainingFailed ? 'bg-red-100' : ''}`}
+                  className={`w-full ${currentStatus === 'failed' ? 'bg-red-100' : ''}`}
                 />
               </div>
 
               <div className="text-sm text-muted-foreground">
-                {getProcessedCount()} of {getTotalCount()} items processed
+                {getProcessedCount()} of {getTotalCount()} {getProgressUnit()} processed
               </div>
 
               {/* Show currently processing items */}
-              {isTrainingActive && trainingProgress?.currentlyProcessing && trainingProgress.currentlyProcessing.length > 0 && (
+              {currentStatus === 'training' && trainingProgress?.currentlyProcessing && trainingProgress.currentlyProcessing.length > 0 && (
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Currently processing:</div>
                   <div className="text-xs text-gray-600 max-h-20 overflow-y-auto">
-                    {trainingProgress.currentlyProcessing.map((item: string, index: number) => (
+                    {trainingProgress.currentlyProcessing.slice(0, 5).map((item: string, index: number) => (
                       <div key={index} className="truncate">• {item}</div>
                     ))}
+                    {trainingProgress.currentlyProcessing.length > 5 && (
+                      <div className="text-xs text-gray-500">... and {trainingProgress.currentlyProcessing.length - 5} more</div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           )}
 
+          {/* Initializing State */}
+          {currentStatus === 'initializing' && (
+            <div className="text-center py-8">
+              <Loader2 className="h-12 w-12 text-blue-600 mx-auto mb-4 animate-spin" />
+              <h3 className="font-medium text-lg mb-2">Preparing Training</h3>
+              <div className="text-sm text-gray-600">
+                Setting up sources and initializing training process...
+              </div>
+            </div>
+          )}
+
           {/* Source Details */}
-          {retrainingNeeded?.sourceDetails && retrainingNeeded.sourceDetails.length > 0 && !isTrainingCompleted && (
+          {retrainingNeeded?.sourceDetails && retrainingNeeded.sourceDetails.length > 0 && currentStatus === 'pending' && (
             <div className="space-y-4">
               <div className="border-t pt-4">
                 <h4 className="font-medium text-sm mb-3">Sources requiring processing:</h4>
@@ -317,7 +384,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
           )}
 
           {/* Success State */}
-          {isTrainingCompleted && (
+          {currentStatus === 'completed' && (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="font-medium text-lg mb-2">Training Complete!</h3>
@@ -328,7 +395,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
           )}
 
           {/* No Training Needed */}
-          {!retrainingNeeded?.needed && !isTrainingActive && !isTrainingCompleted && !isTrainingFailed && (
+          {currentStatus === 'up_to_date' && (
             <div className="text-center py-8">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="font-medium text-lg mb-2">Everything is ready!</h3>
@@ -340,37 +407,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
         </div>
 
         <DialogFooter className="border-t pt-4">
-          {isTrainingCompleted ? (
-            <Button onClick={() => onOpenChange(false)} className="w-full">
-              Done
-            </Button>
-          ) : isTrainingFailed ? (
-            <div className="flex gap-2 w-full">
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Close
-              </Button>
-              <Button onClick={handleStartTraining} className="flex-1">
-                Retry Training
-              </Button>
-            </div>
-          ) : isTrainingActive ? (
-            <Button variant="outline" onClick={handleContinueInBackground} className="w-full">
-              Continue in Background
-            </Button>
-          ) : retrainingNeeded?.needed ? (
-            <div className="flex gap-2 w-full">
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="w-full">
-                Start Training
-              </Button>
-            </div>
-          ) : (
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
-              Close
-            </Button>
-          )}
+          {renderFooter()}
         </DialogFooter>
       </DialogContent>
     </Dialog>

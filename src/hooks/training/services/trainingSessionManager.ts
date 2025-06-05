@@ -20,7 +20,7 @@ export class TrainingSessionManager {
     refs.currentTrainingSessionRef.current = sessionId;
     refs.activeTrainingSessionRef.current = sessionId;
     refs.trainingStartTimeRef.current = Date.now();
-    refs.trainingStateRef.current = 'training';
+    refs.trainingStateRef.current = 'initializing'; // Set to initializing first
     refs.globalTrainingActiveRef.current = true;
     refs.lastTrainingActionRef.current = 'start';
 
@@ -28,7 +28,7 @@ export class TrainingSessionManager {
     refs.completedSessionsRef.current.clear();
     refs.sessionCompletionFlagRef.current.clear();
 
-    console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${refs.trainingStartTimeRef.current}`);
+    console.log(`🎯 TRAINING SESSION INITIALIZED: ${sessionId} at ${refs.trainingStartTimeRef.current}`);
 
     return sessionId;
   }
@@ -39,38 +39,26 @@ export class TrainingSessionManager {
     refs: TrainingRefs,
     addTrackedTimer: (callback: () => void, delay: number) => NodeJS.Timeout
   ): void {
-    const startToastId = `start-${sessionId}`;
-    const recentStartToastId = `recent-start-${agentId}`;
-    const timeBasedToastId = `time-start-${Math.floor(Date.now() / 60000)}`; // One per minute max
+    // Create unique toast ID for this specific training session
+    const toastId = `training-start-${sessionId}`;
     
-    // Check multiple conditions for showing toast
-    const shouldShowStartToast = !refs.shownToastsRef.current.has(startToastId) && 
-                                !refs.shownToastsRef.current.has(recentStartToastId) &&
-                                !refs.shownToastsRef.current.has(timeBasedToastId);
-    
-    if (shouldShowStartToast) {
-      refs.shownToastsRef.current.add(startToastId);
-      refs.shownToastsRef.current.add(recentStartToastId);
-      refs.shownToastsRef.current.add(timeBasedToastId);
-      
-      // Clear the recent start toast flag after 30 seconds
-      addTrackedTimer(() => {
-        refs.shownToastsRef.current.delete(recentStartToastId);
-      }, 30000);
-      
-      // Clear the time-based toast flag after 2 minutes
-      addTrackedTimer(() => {
-        refs.shownToastsRef.current.delete(timeBasedToastId);
-      }, 120000);
+    // Only show toast if we haven't shown it for this specific session
+    if (!refs.trainingToastShownRef.current.has(toastId)) {
+      refs.trainingToastShownRef.current.add(toastId);
       
       console.log('🧠 Showing training start toast for session:', sessionId);
       toast({
         title: "🧠 Training Started",
-        description: "Processing sources for AI training...",
+        description: "Initializing training process...",
         duration: 3000,
       });
+      
+      // Clean up the toast flag after 2 minutes to allow future sessions
+      addTrackedTimer(() => {
+        refs.trainingToastShownRef.current.delete(toastId);
+      }, 120000);
     } else {
-      console.log('🚫 ENHANCED: Prevented duplicate training start toast');
+      console.log('🚫 Training start toast already shown for session:', sessionId);
     }
   }
 

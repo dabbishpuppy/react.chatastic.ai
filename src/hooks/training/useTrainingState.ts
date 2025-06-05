@@ -13,7 +13,7 @@ export const useTrainingState = (): TrainingRefs => {
     lastCompletedSessionId: ''
   });
   const currentTrainingSessionRef = useRef('');
-  const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
+  const trainingStateRef = useRef<'idle' | 'initializing' | 'training' | 'completed' | 'failed'>('idle');
   const completedSessionsRef = useRef(new Set<string>());
   const lastCompletionCheckRef = useRef(0);
   const activeTrainingSessionRef = useRef('');
@@ -24,6 +24,7 @@ export const useTrainingState = (): TrainingRefs => {
   const sessionCompletionFlagRef = useRef(new Set<string>());
   const globalTrainingActiveRef = useRef(false);
   const lastTrainingActionRef = useRef<'start' | 'check' | 'complete' | 'none'>('none');
+  const trainingToastShownRef = useRef(new Set<string>());
 
   return {
     pageLoadTimestampRef,
@@ -42,6 +43,7 @@ export const useTrainingState = (): TrainingRefs => {
     pendingTimersRef,
     sessionCompletionFlagRef,
     globalTrainingActiveRef,
-    lastTrainingActionRef
+    lastTrainingActionRef,
+    trainingToastShownRef
   };
 };

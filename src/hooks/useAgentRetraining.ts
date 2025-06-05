@@ -31,7 +31,7 @@ export const useAgentRetraining = (agentId?: string) => {
   const { toast } = useToast();
   const { trainingProgress, startTraining } = useTrainingNotifications();
 
-  const isRetraining = trainingProgress?.status === 'training';
+  const isRetraining = trainingProgress?.status === 'training' || trainingProgress?.status === 'initializing';
 
   // ALL useEffect calls MUST come after custom hooks
   useEffect(() => {
@@ -49,12 +49,14 @@ export const useAgentRetraining = (agentId?: string) => {
       if (shouldLog) {
         console.log('🔄 Training status update:', {
           status: trainingProgress.status,
-          progress: trainingProgress.progress
+          progress: trainingProgress.progress,
+          totalChunks: trainingProgress.totalChunks,
+          processedChunks: trainingProgress.processedChunks
         });
         lastLogTimeRef.current = now;
       }
       
-      if (trainingProgress.status === 'training') {
+      if (trainingProgress.status === 'training' || trainingProgress.status === 'initializing') {
         isTrainingActiveRef.current = true;
       } else if (trainingProgress.status === 'completed') {
         isTrainingActiveRef.current = false;
@@ -63,10 +65,11 @@ export const useAgentRetraining = (agentId?: string) => {
       setProgress({
         totalSources: trainingProgress.totalSources,
         processedSources: trainingProgress.processedSources,
-        totalChunks: 0,
-        processedChunks: 0,
+        totalChunks: trainingProgress.totalChunks || 0,
+        processedChunks: trainingProgress.processedChunks || 0,
         status: trainingProgress.status === 'training' ? 'processing' : 
-               trainingProgress.status === 'completed' ? 'completed' : 'pending'
+               trainingProgress.status === 'completed' ? 'completed' : 
+               trainingProgress.status === 'initializing' ? 'pending' : 'pending'
       });
     }
   }, [trainingProgress]);
@@ -98,10 +101,8 @@ export const useAgentRetraining = (agentId?: string) => {
 
     try {
       await startTraining();
-
-      // REMOVED: Duplicate toast notification - the training session manager handles this
-      // The startTraining() function from useTrainingNotifications already shows the proper toast
-
+      // Note: Toast is now handled in TrainingSessionManager, not here
+      
       setTimeout(() => {
         checkRetrainingNeeded();
       }, 3000);
