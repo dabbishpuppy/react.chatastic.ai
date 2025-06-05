@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -48,6 +49,11 @@ export const useTrainingNotifications = () => {
   const completedSessionsRef = useRef<Set<string>>(new Set());
   const lastCompletionCheckRef = useRef<number>(0);
   
+  // CRITICAL: Add training session tracking to prevent premature reversion
+  const activeTrainingSessionRef = useRef<string>('');
+  const trainingStartTimeRef = useRef<number>(0);
+  const minTrainingDurationRef = useRef<number>(10000); // Minimum 10 seconds of training display
+  
   // Toast tracking - prevent duplicates
   const shownToastsRef = useRef<Set<string>>(new Set());
   
@@ -84,10 +90,17 @@ export const useTrainingNotifications = () => {
     const now = Date.now();
     const recentActionThreshold = 5000; // Increased to 5 seconds
     
-    // MODIFIED: Don't prevent start actions - allow explicit training starts
+    // NEVER prevent explicit start actions - always allow user-initiated training
     if (action === 'start') {
       console.log('✅ Allowing explicit training start action');
       return false;
+    }
+    
+    // CRITICAL: If we have an active training session, don't check for completion too early
+    if (activeTrainingSessionRef.current && 
+        now - trainingStartTimeRef.current < minTrainingDurationRef.current) {
+      console.log(`🚫 Preventing ${action} - training session ${activeTrainingSessionRef.current} still active (${now - trainingStartTimeRef.current}ms elapsed)`);
+      return true;
     }
     
     // AGENT-LEVEL COMPLETION CHECK - ONLY FOR CHECK ACTIONS
@@ -125,6 +138,10 @@ export const useTrainingNotifications = () => {
       completedAt: now,
       lastCompletedSessionId: sessionId
     };
+    
+    // Clear active training session
+    activeTrainingSessionRef.current = '';
+    trainingStartTimeRef.current = 0;
     
     // Clear all timers immediately
     clearAllTimers();
@@ -486,15 +503,16 @@ export const useTrainingNotifications = () => {
         currentlyProcessingPages: currentlyProcessingPages.length,
         hasFailedSources,
         totalPagesNeedingProcessing,
-        totalPagesProcessed
+        totalPagesProcessed,
+        activeTrainingSession: activeTrainingSessionRef.current
       });
       
       if (hasFailedSources && sourcesNeedingTraining.length === 0) {
         status = 'failed';
         console.log('❌ Status: FAILED (has failed sources, no pending)');
-      } else if (currentlyProcessingPages.length > 0) {
+      } else if (currentlyProcessingPages.length > 0 || activeTrainingSessionRef.current) {
         status = 'training';
-        console.log('🔄 Status: TRAINING (pages currently processing)');
+        console.log('🔄 Status: TRAINING (pages currently processing or active session)');
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
         status = 'completed';
         console.log('✅ Status: COMPLETED (no sources need training, all processed)');
@@ -534,7 +552,8 @@ export const useTrainingNotifications = () => {
         sourcesNeedingTraining: sourcesNeedingTraining.length,
         currentState: trainingStateRef.current,
         agentCompleted: agentCompletionStateRef.current.isCompleted,
-        lastAction: lastTrainingActionRef.current
+        lastAction: lastTrainingActionRef.current,
+        activeSession: activeTrainingSessionRef.current
       });
 
       setTrainingProgress(newProgress);
@@ -579,6 +598,8 @@ export const useTrainingNotifications = () => {
       if (status === 'failed' && previousStatus !== 'failed') {
         console.log('❌ Training failed for session:', sessionId);
         
+        activeTrainingSessionRef.current = '';
+        trainingStartTimeRef.current = 0;
         clearAllTimers();
         globalTrainingActiveRef.current = false;
         
@@ -615,10 +636,12 @@ export const useTrainingNotifications = () => {
         lastCompletedSessionId: ''
       };
 
-      // Create new session
+      // Create new session and set active training state
       const sessionId = `training-${agentId}-${Date.now()}`;
       
       currentTrainingSessionRef.current = sessionId;
+      activeTrainingSessionRef.current = sessionId;
+      trainingStartTimeRef.current = Date.now();
       trainingStateRef.current = 'training';
       globalTrainingActiveRef.current = true;
       lastTrainingActionRef.current = 'start';
@@ -627,6 +650,8 @@ export const useTrainingNotifications = () => {
       completedSessionsRef.current.clear();
       sessionCompletionFlagRef.current.clear();
       clearAllTimers();
+
+      console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${trainingStartTimeRef.current}`);
 
       // Show "Training Started" toast immediately
       const startToastId = `start-${sessionId}`;
@@ -721,6 +746,8 @@ export const useTrainingNotifications = () => {
     } catch (error) {
       console.error('Failed to start IMPROVED training:', error);
       
+      activeTrainingSessionRef.current = '';
+      trainingStartTimeRef.current = 0;
       trainingStateRef.current = 'failed';
       globalTrainingActiveRef.current = false;
       clearAllTimers();
