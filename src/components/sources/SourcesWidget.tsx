@@ -32,6 +32,14 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
+  // Auto-open dialog when training starts
+  useEffect(() => {
+    if (isRetraining && !showRetrainingDialog && !isTrainingInBackground) {
+      console.log('🔄 Training started - opening dialog');
+      setShowRetrainingDialog(true);
+    }
+  }, [isRetraining, showRetrainingDialog, isTrainingInBackground]);
+
   // Enhanced training completion listener
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {

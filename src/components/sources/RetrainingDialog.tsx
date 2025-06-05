@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -121,6 +120,11 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       const processed = getProcessedCount();
       const total = getTotalCount();
       const currentlyProcessing = trainingProgress?.currentlyProcessing || [];
+      
+      // Show "Starting..." for initial state
+      if (total === 0 && processed === 0 && currentlyProcessing.length === 0) {
+        return "Starting training process...";
+      }
       
       if (currentlyProcessing.length > 0) {
         return `Processing sources... (${processed}/${total} completed, ${currentlyProcessing.length} in progress)`;

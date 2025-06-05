@@ -128,6 +128,21 @@ export const useTrainingNotifications = () => {
       // Clear previous completion state
       completedSessionsRef.current.clear();
 
+      // IMMEDIATELY set training progress to show dialog
+      const initialTrainingProgress: TrainingProgress = {
+        agentId,
+        status: 'training',
+        progress: 0,
+        totalSources: 0,
+        processedSources: 0,
+        currentlyProcessing: [],
+        sessionId
+      };
+      
+      setTrainingProgress(initialTrainingProgress);
+      
+      console.log('✅ Initial training state set, showing dialog');
+
       // Show "Training Started" toast
       const startToastId = `start-${sessionId}`;
       if (!shownToastsRef.current.has(startToastId)) {
@@ -140,7 +155,7 @@ export const useTrainingNotifications = () => {
         });
       }
 
-      // Start the actual chunk processing
+      // Start the actual chunk processing (this will update the progress as it goes)
       await startChunkProcessing();
 
     } catch (error) {
@@ -148,6 +163,18 @@ export const useTrainingNotifications = () => {
       
       trainingStateRef.current = 'failed';
       trainingInitiatedByUserRef.current = false;
+      
+      // Update training progress to failed state
+      if (currentSessionRef.current) {
+        setTrainingProgress({
+          agentId: agentId!,
+          status: 'failed',
+          progress: 0,
+          totalSources: 0,
+          processedSources: 0,
+          sessionId: currentSessionRef.current
+        });
+      }
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
       
