@@ -31,6 +31,20 @@ export const useTrainingNotifications = () => {
     return timer;
   };
 
+  // ENHANCED: Helper to reset completion state when new sources are added
+  const resetCompletionState = (reason: string) => {
+    console.log(`🔄 RESET COMPLETION STATE: ${reason}`);
+    refs.agentCompletionStateRef.current = {
+      isCompleted: false,
+      completedAt: 0,
+      lastCompletedSessionId: ''
+    };
+    refs.sessionCompletionFlagRef.current.clear();
+    refs.completedSessionsRef.current.clear();
+    refs.lastTrainingActionRef.current = 'reset';
+    refs.lastCompletionCheckRef.current = 0;
+  };
+
   // Initialize prevention logic with enhanced filtering
   const { shouldPreventTrainingAction, markAgentCompletion, isCompletionRelatedUpdate } = useTrainingPrevention(refs);
 
@@ -230,7 +244,18 @@ export const useTrainingNotifications = () => {
             filter: `agent_id=eq.${agentId}`
           },
           (payload) => {
-            if ((payload.new as any)?.source_type === 'website') {
+            const newSource = payload.new as any;
+            
+            // RESET COMPLETION STATE: New source added - agent needs retraining
+            console.log('🆕 NEW SOURCE DETECTED - Resetting completion state');
+            resetCompletionState(`New source added: ${newSource.title || newSource.id}`);
+            
+            // Dispatch event to notify components about new source
+            window.dispatchEvent(new CustomEvent('sourceCreated', {
+              detail: { source: newSource, requiresTraining: true }
+            }));
+            
+            if (newSource?.source_type === 'website') {
               addTrackedTimer(initializeSubscriptions, 500);
             }
             
