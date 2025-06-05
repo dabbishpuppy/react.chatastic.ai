@@ -26,24 +26,33 @@ export const useTrainingNotifications = () => {
   const hasEverConnectedRef = useRef<boolean>(false);
   const lastCompletionCheckRef = useRef<number>(0);
   const shownToastsRef = useRef<Set<string>>(new Set());
-  const currentSessionRef = useRef<string>('');
   const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
   const trainingInitiatedByUserRef = useRef<boolean>(false);
   const completedSessionsRef = useRef<Set<string>>(new Set());
   const initialTrainingSetRef = useRef<boolean>(false);
   
-  // NEW: Add completion lock to prevent any toasts after completion
+  // NEW: Enhanced completion tracking
   const completionLockRef = useRef<Set<string>>(new Set());
   const sessionCompletedRef = useRef<boolean>(false);
+  const stableSessionIdRef = useRef<string>('');
+  const lastStatusRef = useRef<string>('');
   
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  // Convert chunk progress to training progress format with PROPER status mapping
+  // Convert chunk progress to training progress format with enhanced session management
   useEffect(() => {
     if (chunkProgress && agentId) {
-      const sessionId = currentSessionRef.current || `${agentId}-${Date.now()}`;
+      // CRITICAL: Ensure stable session ID throughout the training cycle
+      if (!stableSessionIdRef.current || chunkProgress.status === 'processing') {
+        if (!stableSessionIdRef.current) {
+          stableSessionIdRef.current = `training-${agentId}-${Date.now()}`;
+          console.log('🆔 Created stable session ID:', stableSessionIdRef.current);
+        }
+      }
       
+      const sessionId = stableSessionIdRef.current;
+
       // CRITICAL FIX: Map chunk processing status to training status correctly
       const mapStatus = (chunkStatus: 'idle' | 'processing' | 'completed' | 'failed'): 'idle' | 'training' | 'completed' | 'failed' => {
         switch (chunkStatus) {
@@ -63,6 +72,13 @@ export const useTrainingNotifications = () => {
       };
 
       const mappedStatus = mapStatus(chunkProgress.status);
+      const statusKey = `${mappedStatus}-${chunkProgress.progress}-${sessionId}`;
+
+      // Prevent duplicate status processing
+      if (lastStatusRef.current === statusKey) {
+        return;
+      }
+      lastStatusRef.current = statusKey;
 
       const newTrainingProgress: TrainingProgress = {
         agentId,
@@ -82,26 +98,27 @@ export const useTrainingNotifications = () => {
         progress: chunkProgress.progress,
         processing: chunkProgress.currentlyProcessing.length,
         sessionId,
-        isCompleted: completionLockRef.current.has(sessionId)
+        isSessionCompleted: completionLockRef.current.has(sessionId),
+        previousStatus: trainingStateRef.current
       });
 
-      // Handle status changes - only process if we have real data or definitive status
+      // Handle status changes - with enhanced completion checks
       const hasRealData = chunkProgress.totalPages > 0 || chunkProgress.processedPages > 0 || chunkProgress.currentlyProcessing.length > 0;
       
       if (hasRealData || chunkProgress.status === 'completed' || chunkProgress.status === 'failed') {
         const previousStatus = trainingStateRef.current;
         trainingStateRef.current = mappedStatus;
 
-        // CRITICAL FIX: Check completion lock before showing any "Training Started" toast
+        // CRITICAL: Check if session is already completed
         const isSessionCompleted = completionLockRef.current.has(sessionId);
         
-        // Training started detection - ONLY if not already completed
+        // Training started detection - ONLY if not already completed and session not locked
         if (mappedStatus === 'training' && 
             previousStatus !== 'training' && 
             !isSessionCompleted && 
             !sessionCompletedRef.current) {
           
-          console.log('🚀 Training started detected! Session:', sessionId);
+          console.log('🚀 Training started detected! Session:', sessionId, 'Previous status:', previousStatus);
           
           // Show "Training Started" toast only if session hasn't completed
           const startToastId = `start-${sessionId}`;
@@ -113,21 +130,26 @@ export const useTrainingNotifications = () => {
               description: "Processing sources and creating chunks for AI training...",
               duration: 3000,
             });
+            
+            console.log('✅ "Training Started" toast shown for session:', sessionId);
           }
         }
 
-        // Training completed - LOCK the session to prevent further "Training Started" toasts
+        // Training completed - PERMANENTLY LOCK the session
         if (chunkProgress.status === 'completed' && 
             previousStatus !== 'completed' &&
             !completedSessionsRef.current.has(sessionId)) {
           
-          console.log('🎉 Training completed! Locking session:', sessionId);
+          console.log('🎉 Training completed! PERMANENTLY locking session:', sessionId);
           
-          // LOCK this session from showing any more "Training Started" toasts
+          // PERMANENTLY LOCK this session from showing any more toasts
           completionLockRef.current.add(sessionId);
           sessionCompletedRef.current = true;
           completedSessionsRef.current.add(sessionId);
           trainingInitiatedByUserRef.current = false;
+          
+          // Clear the stable session ID to prevent reuse
+          stableSessionIdRef.current = '';
           
           const completionToastId = `completion-${sessionId}`;
           if (!shownToastsRef.current.has(completionToastId)) {
@@ -139,19 +161,24 @@ export const useTrainingNotifications = () => {
               duration: 5000,
             });
 
+            console.log('✅ "Training Complete" toast shown for session:', sessionId);
+
             window.dispatchEvent(new CustomEvent('trainingCompleted', {
               detail: { agentId, progress: newTrainingProgress }
             }));
           }
         }
 
-        // Training failed
+        // Training failed - PERMANENTLY LOCK the session
         if (chunkProgress.status === 'failed' && previousStatus !== 'failed') {
           console.log('❌ Training failed for session:', sessionId);
           
-          // LOCK this session to prevent restart toasts
+          // PERMANENTLY LOCK this session to prevent restart toasts
           completionLockRef.current.add(sessionId);
           trainingInitiatedByUserRef.current = false;
+          
+          // Clear the stable session ID
+          stableSessionIdRef.current = '';
           
           const failureToastId = `failure-${sessionId}`;
           if (!shownToastsRef.current.has(failureToastId)) {
@@ -178,11 +205,14 @@ export const useTrainingNotifications = () => {
       // Set user-initiated flag
       trainingInitiatedByUserRef.current = true;
       
-      // Create new session and reset completion state
-      const sessionId = `training-${agentId}-${Date.now()}`;
-      currentSessionRef.current = sessionId;
+      // Reset completion state for new training session
+      sessionCompletedRef.current = false;
+      
+      // Create new stable session ID for this training session
+      stableSessionIdRef.current = `training-${agentId}-${Date.now()}`;
       trainingStateRef.current = 'training';
-      sessionCompletedRef.current = false; // Reset completion flag for new session
+
+      console.log('✅ New training session started with ID:', stableSessionIdRef.current);
 
       // Clear previous completion state for new training
       completedSessionsRef.current.clear();
@@ -196,12 +226,12 @@ export const useTrainingNotifications = () => {
         totalSources: 0,
         processedSources: 0,
         currentlyProcessing: [],
-        sessionId
+        sessionId: stableSessionIdRef.current
       };
       
       setTrainingProgress(initialTrainingProgress);
       
-      console.log('✅ Initial training state set to TRAINING for session:', sessionId);
+      console.log('✅ Initial training state set to TRAINING for session:', stableSessionIdRef.current);
 
       // Start the actual chunk processing
       await startChunkProcessing();
@@ -213,14 +243,14 @@ export const useTrainingNotifications = () => {
       trainingInitiatedByUserRef.current = false;
       
       // Update training progress to failed state
-      if (currentSessionRef.current) {
+      if (stableSessionIdRef.current) {
         setTrainingProgress({
           agentId: agentId!,
           status: 'failed',
           progress: 0,
           totalSources: 0,
           processedSources: 0,
-          sessionId: currentSessionRef.current
+          sessionId: stableSessionIdRef.current
         });
       }
       
