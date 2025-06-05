@@ -39,9 +39,19 @@ export const useTrainingNotifications = () => {
     if (chunkProgress && agentId) {
       const sessionId = currentSessionRef.current || `${agentId}-${Date.now()}`;
       
+      // Map chunk processing status to training status
+      const mapStatus = (chunkStatus: 'idle' | 'processing' | 'completed' | 'failed'): 'idle' | 'training' | 'completed' | 'failed' => {
+        switch (chunkStatus) {
+          case 'processing':
+            return 'training';
+          default:
+            return chunkStatus;
+        }
+      };
+
       const newTrainingProgress: TrainingProgress = {
         agentId,
-        status: chunkProgress.status,
+        status: mapStatus(chunkProgress.status),
         progress: chunkProgress.progress,
         totalSources: chunkProgress.totalPages, // Use total pages as total items to process
         processedSources: chunkProgress.processedPages,
@@ -53,7 +63,7 @@ export const useTrainingNotifications = () => {
 
       // Handle status changes
       const previousStatus = trainingStateRef.current;
-      trainingStateRef.current = chunkProgress.status;
+      trainingStateRef.current = mapStatus(chunkProgress.status);
 
       // Training completed
       if (chunkProgress.status === 'completed' && 
