@@ -40,5 +40,5 @@ export interface TrainingRefs {
   pendingTimersRef: React.MutableRefObject<Set<NodeJS.Timeout>>;
   sessionCompletionFlagRef: React.MutableRefObject<Set<string>>;
   globalTrainingActiveRef: React.MutableRefObject<boolean>;
-  lastTrainingActionRef: React.MutableRefObject<'start' | 'complete' | 'none' | 'reset'>;
+  lastTrainingActionRef: React.MutableRefObject<'start' | 'complete' | 'none'>;
 }

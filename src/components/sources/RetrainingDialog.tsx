@@ -31,7 +31,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // FIXED: Improved status determination with strict priority for training state
+  // ENHANCED: Improved status determination with priority for new sources needing training
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
@@ -41,17 +41,34 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       trainingProgress
     });
 
-    // PRIORITY 1: If currently training OR retraining flag is true, ALWAYS show training state
-    // This prevents jumping back to "needs_training" during active training
+    // PRIORITY 1: If retraining is explicitly needed, show that state FIRST
+    if (retrainingNeeded?.needed) {
+      console.log('✅ Status: needs_training (retraining needed - PRIORITY)');
+      return {
+        status: 'needs_training',
+        progress: 0
+      };
+    }
+
+    // PRIORITY 2: If currently training, show training state
     if (isRetraining || trainingProgress?.status === 'training') {
-      console.log('✅ Status: training (active training detected - LOCKED IN)');
+      // FIXED: Recovery check - if progress is 100% but status is training
+      if (trainingProgress?.progress === 100) {
+        console.log('🔍 RECOVERY: Progress 100% but status training - forcing completion');
+        return {
+          status: 'completed',
+          progress: 100
+        };
+      }
+      
+      console.log('✅ Status: training (active training)');
       return {
         status: 'training',
         progress: trainingProgress?.progress || 0
       };
     }
-
-    // PRIORITY 2: If training failed, show failed state
+    
+    // PRIORITY 3: If training failed, show failed state
     if (trainingProgress?.status === 'failed') {
       console.log('✅ Status: failed (training failed)');
       return {
@@ -60,25 +77,25 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       };
     }
 
-    // PRIORITY 3: If training progress shows completed AND progress is 100%
-    if (trainingProgress?.status === 'completed' || trainingProgress?.progress === 100) {
-      console.log('✅ Status: completed (training completed with 100% progress)');
+    // PRIORITY 4: If training progress shows completed AND no retraining needed
+    if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
+      console.log('✅ Status: completed (training progress shows completed and no retraining needed)');
       return {
         status: 'completed',
         progress: 100
       };
     }
 
-    // PRIORITY 4: If retraining is explicitly needed (only when not training)
-    if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining needed)');
+    // PRIORITY 5: If progress is 100% AND no retraining needed, consider complete
+    if (trainingProgress?.progress === 100 && !retrainingNeeded?.needed) {
+      console.log('✅ Status: completed (progress 100% and no retraining needed)');
       return {
-        status: 'needs_training',
-        progress: 0
+        status: 'completed',
+        progress: 100
       };
     }
     
-    // DEFAULT: Up to date state
+    // DEFAULT: Up to date state (only if no retraining needed)
     console.log('✅ Status: up_to_date (default)');
     return {
       status: 'up_to_date',
@@ -185,7 +202,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
       
-      // Keep dialog open to show training progress
+      // Don't close the dialog immediately - let it show training progress
       console.log('📊 Keeping dialog open to show training progress');
     } catch (error) {
       console.error('❌ Failed to start training:', error);
@@ -193,12 +210,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked');
+    console.log('📱 Continue in background clicked - enhanced');
     
     // Close the dialog first
     onOpenChange(false);
     
-    // Dispatch event to notify components
+    // FIXED: Dispatch event with better data
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
@@ -344,7 +361,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="flex-1">
+              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="w-full">
                 Start Training
               </Button>
             </div>
