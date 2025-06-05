@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -141,6 +142,16 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+
+  // 🧠 DEBUG: Log toast trigger with brain emoji
+  console.log('🧠 TOAST TRIGGERED:', {
+    id,
+    title: props.title,
+    description: props.description,
+    variant: props.variant,
+    duration: props.duration,
+    stackTrace: new Error().stack
+  });
 
   const update = (props: ToasterToast) =>
     dispatch({
