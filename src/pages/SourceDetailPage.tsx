@@ -4,7 +4,7 @@ import AgentPageLayout from './AgentPageLayout';
 import SourceDetailHeader from '@/components/sources/source-detail/SourceDetailHeader';
 import SourceDetailContent from '@/components/sources/source-detail/SourceDetailContent';
 import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
-import SourcesWidget from '@/components/sources/SourcesWidget';
+import SimplifiedSourcesWidget from '@/components/sources/SimplifiedSourcesWidget';
 import { useSourceDetail } from '@/components/sources/source-detail/useSourceDetail';
 
 const SourceDetailPage: React.FC = () => {
@@ -79,7 +79,7 @@ const SourceDetailPage: React.FC = () => {
           </div>
 
           <div className="w-80 flex-shrink-0">
-            <SourcesWidget />
+            <SimplifiedSourcesWidget />
           </div>
         </div>
 
