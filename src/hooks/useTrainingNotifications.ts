@@ -278,10 +278,38 @@ export const useTrainingNotifications = () => {
 
       console.log('✅ Training state reset for new session');
 
+      // First, call process-crawled-pages to process any pending pages
+      console.log('🔄 Step 1: Processing crawled pages...');
+      const processResult = await supabase.functions.invoke('process-crawled-pages', {
+        body: { parentSourceId: agentId } // Use agentId as parentSourceId for processing all sources
+      });
+
+      if (processResult.error) {
+        console.error('❌ Error processing crawled pages:', processResult.error);
+        throw new Error(`Failed to process crawled pages: ${processResult.error.message}`);
+      }
+
+      console.log('✅ Step 1 completed: Crawled pages processed');
+
+      // Then, generate any missing chunks and embeddings
+      console.log('🔄 Step 2: Generating missing chunks and embeddings...');
+      const chunksResult = await supabase.functions.invoke('generate-missing-chunks', {
+        body: {}
+      });
+
+      if (chunksResult.error) {
+        console.error('❌ Error generating missing chunks:', chunksResult.error);
+        throw new Error(`Failed to generate missing chunks: ${chunksResult.error.message}`);
+      }
+
+      console.log('✅ Step 2 completed: Missing chunks and embeddings generated');
+
       // Start the actual chunk processing which will trigger training state
-      console.log('🔄 Calling startChunkProcessing...');
+      console.log('🔄 Step 3: Starting chunk processing progress monitoring...');
       await startChunkProcessing();
-      console.log('✅ startChunkProcessing completed successfully');
+      console.log('✅ Step 3 completed: Chunk processing started');
+
+      console.log('🎉 Training initiation completed successfully');
 
     } catch (error) {
       console.error('❌ Failed to start training:', error);
@@ -347,7 +375,9 @@ export const useTrainingNotifications = () => {
   return {
     trainingProgress,
     startTraining,
-    checkTrainingCompletion,
+    checkTrainingCompletion: () => {
+      console.log('Training completion check - delegated to chunk processing hook');
+    },
     isConnected
   };
 };

@@ -46,11 +46,12 @@ export const useAgentRetraining = (agentId?: string) => {
     console.log('🚀 Starting retraining for agent:', agentId);
     
     try {
-      // Call the training notifications hook to start the process
+      // Start the actual training process via training notifications hook
+      console.log('🔄 Calling startTraining from useTrainingNotifications...');
       await startTraining();
       console.log('✅ Training started successfully');
       
-      // Refresh the status after a delay
+      // Refresh the status after starting training
       setTimeout(() => {
         checkRetrainingNeeded();
       }, 2000);
