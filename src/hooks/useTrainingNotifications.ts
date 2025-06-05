@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -241,6 +242,7 @@ export const useTrainingNotifications = () => {
       let totalPagesNeedingProcessing = 0;
       let totalPagesProcessed = 0;
       let currentlyProcessingPages: string[] = [];
+      let hasFailedSources = false;
 
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
@@ -256,6 +258,11 @@ export const useTrainingNotifications = () => {
             const pendingPages = pages.filter(p => !p.processing_status || p.processing_status === 'pending');
             const processingPages = pages.filter(p => p.processing_status === 'processing');
             const processedPages = pages.filter(p => p.processing_status === 'processed');
+            const failedPages = pages.filter(p => p.processing_status === 'failed');
+
+            if (failedPages.length > 0) {
+              hasFailedSources = true;
+            }
 
             if (pendingPages.length > 0 || processingPages.length > 0) {
               sourcesNeedingTraining.push(source);
@@ -271,14 +278,23 @@ export const useTrainingNotifications = () => {
             (metadata?.question && metadata?.answer) :
             source.content && source.content.trim().length > 0;
 
-          if (hasContent && metadata.processing_status !== 'completed') {
-            sourcesNeedingTraining.push(source);
-            totalPagesNeedingProcessing += 1;
+          if (hasContent) {
+            if (metadata.processing_status === 'failed') {
+              hasFailedSources = true;
+            }
             
-            if (metadata.processing_status === 'completed') {
+            if (metadata.processing_status !== 'completed') {
+              sourcesNeedingTraining.push(source);
+              totalPagesNeedingProcessing += 1;
+              
+              if (metadata.processing_status === 'completed') {
+                totalPagesProcessed += 1;
+              } else if (metadata.processing_status === 'processing') {
+                currentlyProcessingPages.push(source.title);
+              }
+            } else {
+              totalPagesNeedingProcessing += 1;
               totalPagesProcessed += 1;
-            } else if (metadata.processing_status === 'processing') {
-              currentlyProcessingPages.push(source.title);
             }
           }
         }
@@ -287,14 +303,17 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // Fixed status determination logic: Only show 'training' when actively processing
+      // Fixed status determination logic: Include 'failed' as a possible status
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
-      if (currentlyProcessingPages.length > 0) {
+      if (hasFailedSources && sourcesNeedingTraining.length === 0) {
+        // Some sources failed and no more training needed
+        status = 'failed';
+      } else if (currentlyProcessingPages.length > 0) {
         // Only set to 'training' when there are actively processing pages/sources
         status = 'training';
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-        // All content has been processed
+        // All content has been processed successfully
         status = 'completed';
       } else {
         // Content exists but no active processing - keep as 'idle'
@@ -316,7 +335,7 @@ export const useTrainingNotifications = () => {
 
       setTrainingProgress(newProgress);
 
-      // Enhanced completion notification logic with strict duplicate prevention (Phase 4)
+      // Enhanced completion notification logic with strict duplicate prevention
       if (status === 'completed' && 
           totalPagesNeedingProcessing > 0 &&
           totalPagesProcessed === totalPagesNeedingProcessing &&
@@ -329,7 +348,7 @@ export const useTrainingNotifications = () => {
         completionToastShownForSessionRef.current.add(sessionId);
         lastCompletedSessionIdRef.current = sessionId;
         
-        // Show training complete toast (Phase 4)
+        // Show training complete toast
         toast({
           title: "Training Complete",
           description: "Your AI agent is trained and ready",
@@ -347,7 +366,7 @@ export const useTrainingNotifications = () => {
         }
       }
 
-      // Enhanced failure detection for training (Phase 4)
+      // Enhanced failure detection for training
       if (status === 'failed' && !trainingFailedSessionRef.current.has(sessionId)) {
         console.log('❌ Training failed for session:', sessionId);
         
@@ -450,7 +469,7 @@ export const useTrainingNotifications = () => {
         sessionId
       });
 
-      // Show training started toast (Phase 3)
+      // Show training started toast
       toast({
         title: "Training Started",
         description: `Processing ${totalPages} item${totalPages > 1 ? 's' : ''} for AI training...`,
