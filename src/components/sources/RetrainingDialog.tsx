@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -20,8 +21,6 @@ interface RetrainingDialogProps {
   retrainingNeeded: any;
   onStartRetraining: () => void;
   trainingProgress?: any;
-  isInBackgroundMode?: boolean;
-  backgroundSessionId?: string;
 }
 
 export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
@@ -31,56 +30,23 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   progress,
   retrainingNeeded,
   onStartRetraining,
-  trainingProgress,
-  isInBackgroundMode = false,
-  backgroundSessionId = ''
+  trainingProgress
 }) => {
-  // CRITICAL FIX: Enhanced status determination with proper training detection
+  // FIXED: Enhanced status determination with better precedence
   const getCurrentStatus = () => {
     console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
-      trainingProgressProgress: trainingProgress?.progress,
       isRetraining,
-      isInBackgroundMode,
-      backgroundSessionId,
-      open,
-      trainingProgress: trainingProgress ? {
-        status: trainingProgress.status,
-        progress: trainingProgress.progress,
-        sessionId: trainingProgress.sessionId,
-        processedSources: trainingProgress.processedSources,
-        totalSources: trainingProgress.totalSources,
-        currentlyProcessing: trainingProgress.currentlyProcessing?.length || 0
-      } : null
+      trainingProgress
     });
 
-    // CRITICAL: If in background mode, completely suppress dialog content
-    if (isInBackgroundMode && backgroundSessionId) {
-      console.log('🚫 In background mode - dialog content suppressed');
-      return {
-        status: 'background',
-        progress: 0,
-        isBackground: true
-      };
-    }
-
-    // PRIORITY 1: If training progress shows training status OR we have active processing
-    const isActivelyTraining = trainingProgress?.status === 'training' || 
-                              (trainingProgress?.currentlyProcessing && trainingProgress.currentlyProcessing.length > 0) ||
-                              (trainingProgress?.progress > 0 && trainingProgress?.progress < 100);
-    
-    if (isActivelyTraining || isRetraining) {
-      console.log('✅ Status: training (active training detected)', {
-        trainingProgressStatus: trainingProgress?.status,
-        currentlyProcessing: trainingProgress?.currentlyProcessing?.length || 0,
-        progress: trainingProgress?.progress,
-        isRetraining
-      });
+    // PRIORITY 1: If currently training, show training state
+    if (isRetraining || trainingProgress?.status === 'training') {
+      console.log('✅ Status: training (active training)');
       return {
         status: 'training',
-        progress: trainingProgress?.progress || 0,
-        isBackground: false
+        progress: trainingProgress?.progress || 0
       };
     }
     
@@ -89,8 +55,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       console.log('✅ Status: failed (training failed)');
       return {
         status: 'failed',
-        progress: trainingProgress?.progress || 0,
-        isBackground: false
+        progress: trainingProgress?.progress || 0
       };
     }
     
@@ -99,46 +64,35 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       console.log('✅ Status: completed (training done and no retraining needed)');
       return {
         status: 'completed',
-        progress: 100,
-        isBackground: false
+        progress: 100
       };
     }
     
     // PRIORITY 4: If retraining is explicitly needed, show that state
     if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining explicitly needed)');
+      console.log('✅ Status: needs_training (retraining needed)');
       return {
         status: 'needs_training',
-        progress: 0,
-        isBackground: false
+        progress: 0
       };
     }
     
     // DEFAULT: Up to date state
-    console.log('✅ Status: up_to_date (default - no issues detected)');
+    console.log('✅ Status: up_to_date (default)');
     return {
       status: 'up_to_date',
-      progress: 0,
-      isBackground: false
+      progress: 0
     };
   };
 
-  const { status: currentStatus, progress: currentProgress, isBackground } = getCurrentStatus();
-  
-  // If in background mode, completely hide the dialog (don't render content)
-  if (isBackground) {
-    console.log('🚫 Background mode active - completely suppressing dialog');
-    return null;
-  }
+  const { status: currentStatus, progress: currentProgress } = getCurrentStatus();
   
   console.log('🔍 RetrainingDialog render state:', {
     currentStatus,
     isRetraining,
     trainingProgressStatus: trainingProgress?.status,
     retrainingNeeded: retrainingNeeded?.needed,
-    currentProgress,
-    isBackground,
-    open
+    currentProgress
   });
 
   const getProcessedCount = () => {
@@ -161,29 +115,22 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       const total = getTotalCount();
       const currentlyProcessing = trainingProgress?.currentlyProcessing || [];
       
-      // Show "Starting..." for initial state
-      if (total === 0 && processed === 0 && currentlyProcessing.length === 0) {
-        return "Starting training process...";
-      }
-      
       if (currentlyProcessing.length > 0) {
-        return `Processing sources... (${processed}/${total} completed, ${currentlyProcessing.length} in progress)`;
+        return `Training in progress... (${processed}/${total} processed, ${currentlyProcessing.length} currently processing)`;
       }
       
       if (total > 0) {
-        return `Processing sources... (${processed}/${total} completed)`;
+        return `Training in progress... (${processed}/${total} items processed)`;
       }
-      return "Processing sources...";
+      return "Training in progress...";
     }
     
     if (currentStatus === 'failed') {
-      return "Training failed. Please check your sources and try again.";
+      return "Training failed. Please try again or check your sources.";
     }
     
     if (currentStatus === 'completed') {
-      const total = getTotalCount();
-      const processed = getProcessedCount();
-      return `Training completed successfully! Processed ${processed} items and your AI agent is ready.`;
+      return "Training completed successfully! Your AI agent is trained and ready.";
     }
     
     // Show sources that need training
@@ -195,10 +142,10 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const getDialogTitle = () => {
-    if (currentStatus === 'training') return "Processing Sources";
+    if (currentStatus === 'training') return "Agent Training Status";
     if (currentStatus === 'completed') return "Training Complete";
     if (currentStatus === 'failed') return "Training Failed";
-    if (currentStatus === 'needs_training') return "Training Required";
+    if (currentStatus === 'needs_training') return "Agent Training Status";
     return "Agent Training Status";
   };
 
@@ -236,26 +183,28 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     try {
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
+      
+      // Don't close the dialog immediately - let it show training progress
+      console.log('📊 Keeping dialog open to show training progress');
     } catch (error) {
       console.error('❌ Failed to start training:', error);
     }
   };
 
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked');
+    console.log('📱 Continue in background clicked - enhanced');
     
-    // Dispatch event BEFORE closing dialog to ensure proper state management
+    // Close the dialog first
+    onOpenChange(false);
+    
+    // FIXED: Dispatch event with better data
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
         sessionId: trainingProgress?.sessionId,
-        status: 'background',
-        timestamp: Date.now()
+        status: 'background'
       }
     }));
-    
-    // Close the dialog
-    onOpenChange(false);
     
     console.log('📱 Background training event dispatched for session:', trainingProgress?.sessionId);
   };
@@ -311,12 +260,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Currently processing:</div>
                   <div className="text-xs text-gray-600 max-h-20 overflow-y-auto">
-                    {trainingProgress.currentlyProcessing.slice(0, 5).map((item: string, index: number) => (
+                    {trainingProgress.currentlyProcessing.map((item: string, index: number) => (
                       <div key={index} className="truncate">• {item}</div>
                     ))}
-                    {trainingProgress.currentlyProcessing.length > 5 && (
-                      <div className="text-gray-500">... and {trainingProgress.currentlyProcessing.length - 5} more</div>
-                    )}
                   </div>
                 </div>
               )}
