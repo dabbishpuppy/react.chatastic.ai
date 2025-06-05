@@ -23,7 +23,7 @@ export const useTrainingState = (): TrainingRefs => {
   const pendingTimersRef = useRef(new Set<NodeJS.Timeout>());
   const sessionCompletionFlagRef = useRef(new Set<string>());
   const globalTrainingActiveRef = useRef(false);
-  const lastTrainingActionRef = useRef<'start' | 'check' | 'complete' | 'none'>('none');
+  const lastTrainingActionRef = useRef('none');
   const trainingToastShownRef = useRef(new Set<string>());
   const dialogLockedRef = useRef(false);
   const currentSessionIdRef = useRef('');
