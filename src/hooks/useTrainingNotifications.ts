@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -32,10 +33,41 @@ export const useTrainingNotifications = () => {
   const pageLoadTimestampRef = useRef<number>(Date.now());
   const hasEverConnectedRef = useRef<boolean>(false);
   const completionToastShownForSessionRef = useRef<Set<string>>(new Set());
+  const crawlInitiationInProgressRef = useRef<boolean>(false);
+  const crawlInitiationStartTimeRef = useRef<number>(0);
   
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+
+  // Listen for crawl initiation events to suppress false connection warnings
+  useEffect(() => {
+    const handleCrawlStarted = () => {
+      console.log('🚀 Crawl initiation detected - extending connection grace period');
+      crawlInitiationInProgressRef.current = true;
+      crawlInitiationStartTimeRef.current = Date.now();
+      
+      // Clear the flag after 45 seconds (extended grace period for crawls)
+      setTimeout(() => {
+        crawlInitiationInProgressRef.current = false;
+        console.log('✅ Crawl initiation grace period ended');
+      }, 45000);
+    };
+
+    const handleCrawlCompleted = () => {
+      console.log('✅ Crawl completed - clearing initiation flags');
+      crawlInitiationInProgressRef.current = false;
+    };
+
+    // Listen for custom crawl events
+    window.addEventListener('crawlStarted', handleCrawlStarted);
+    window.addEventListener('crawlCompleted', handleCrawlCompleted);
+    
+    return () => {
+      window.removeEventListener('crawlStarted', handleCrawlStarted);
+      window.removeEventListener('crawlCompleted', handleCrawlCompleted);
+    };
+  }, []);
 
   // ALL useEffect calls MUST come after useState calls
   useEffect(() => {
@@ -137,18 +169,31 @@ export const useTrainingNotifications = () => {
           } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
             setIsConnected(false);
             
+            // Enhanced connection issue detection with crawl awareness
+            const timeSincePageLoad = Date.now() - pageLoadTimestampRef.current;
+            const timeSinceCrawlStart = Date.now() - crawlInitiationStartTimeRef.current;
+            const isAfterPageLoadGracePeriod = timeSincePageLoad > 10000; // 10 seconds
+            const isCrawlInitiationActive = crawlInitiationInProgressRef.current;
+            const isCrawlRecentlyStarted = timeSinceCrawlStart < 45000; // 45 seconds
+            
             // Only show connection issue toast if:
             // 1. We've had a successful connection before
-            // 2. We're past the initial page load grace period (10 seconds)
-            const timeSincePageLoad = Date.now() - pageLoadTimestampRef.current;
-            const isAfterGracePeriod = timeSincePageLoad > 10000; // 10 seconds
+            // 2. We're past the initial page load grace period
+            // 3. No crawl initiation is in progress or recently started
+            const shouldShowConnectionWarning = hasEverConnectedRef.current && 
+              isAfterPageLoadGracePeriod && 
+              !isCrawlInitiationActive && 
+              !isCrawlRecentlyStarted;
             
-            if (hasEverConnectedRef.current && isAfterGracePeriod) {
+            if (shouldShowConnectionWarning) {
+              console.log('⚠️ Showing connection issue toast - not related to crawl initiation');
               toast({
                 title: "Connection Issue",
                 description: "Training updates may be delayed. We're working on it.",
                 duration: 3000,
               });
+            } else if (isCrawlInitiationActive || isCrawlRecentlyStarted) {
+              console.log('🔄 Connection disruption during crawl initiation - suppressing warning toast');
             }
             
             pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000);
