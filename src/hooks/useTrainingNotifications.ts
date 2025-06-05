@@ -38,6 +38,12 @@ export const useTrainingNotifications = () => {
   const trainingStartedSessionRef = useRef<string>('');
   const trainingFailedSessionRef = useRef<Set<string>>(new Set());
   
+  // NEW: Training state management refs
+  const activeTrainingSessionRef = useRef<string | null>(null);
+  const trainingLockRef = useRef<boolean>(false);
+  const lastStatusUpdateTimeRef = useRef<number>(0);
+  const stableSessionIdRef = useRef<string>('');
+  
   // ALL useState calls MUST come after useRef calls
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -218,10 +224,19 @@ export const useTrainingNotifications = () => {
   const checkTrainingCompletion = async (agentId: string, allowAutoStart: boolean = false) => {
     try {
       const now = Date.now();
-      if (now - lastCompletionCheckRef.current < 2000) {
+      
+      // Enhanced debouncing with training lock awareness
+      if (now - lastCompletionCheckRef.current < 2000 && !trainingLockRef.current) {
         return;
       }
       lastCompletionCheckRef.current = now;
+      
+      // If training is locked and status update is too frequent, skip
+      if (trainingLockRef.current && now - lastStatusUpdateTimeRef.current < 5000) {
+        console.log('🔒 Training locked, skipping frequent status update');
+        return;
+      }
+      lastStatusUpdateTimeRef.current = now;
       
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
@@ -303,25 +318,51 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // Fixed status determination logic: Include 'failed' as a possible status
+      // Enhanced status determination with training lock awareness
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
-      if (hasFailedSources && sourcesNeedingTraining.length === 0) {
-        // Some sources failed and no more training needed
-        status = 'failed';
-      } else if (currentlyProcessingPages.length > 0) {
-        // Only set to 'training' when there are actively processing pages/sources
-        status = 'training';
-      } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-        // All content has been processed successfully
-        status = 'completed';
+      // If training is locked, only allow transition to completed or failed
+      if (trainingLockRef.current) {
+        if (hasFailedSources && sourcesNeedingTraining.length === 0) {
+          status = 'failed';
+          trainingLockRef.current = false; // Release lock on failure
+        } else if (currentlyProcessingPages.length > 0) {
+          status = 'training'; // Keep training status
+        } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
+          status = 'completed';
+          trainingLockRef.current = false; // Release lock on completion
+        } else {
+          status = 'training'; // Keep training until completion
+        }
       } else {
-        // Content exists but no active processing - keep as 'idle'
-        status = 'idle';
+        // Normal status determination when not locked
+        if (hasFailedSources && sourcesNeedingTraining.length === 0) {
+          status = 'failed';
+        } else if (currentlyProcessingPages.length > 0) {
+          status = 'training';
+        } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
+          status = 'completed';
+        } else {
+          status = 'idle';
+        }
       }
 
-      // Create a unique session ID for this training session
-      const sessionId = `${agentId}-${totalPagesNeedingProcessing}-${totalPagesProcessed}`;
+      // Use stable session ID when training is active
+      let sessionId: string;
+      if (status === 'training' && stableSessionIdRef.current) {
+        sessionId = stableSessionIdRef.current;
+      } else if (status === 'training' && !stableSessionIdRef.current) {
+        sessionId = `${agentId}-${Date.now()}`;
+        stableSessionIdRef.current = sessionId;
+      } else if (status === 'completed' || status === 'failed') {
+        sessionId = stableSessionIdRef.current || `${agentId}-${Date.now()}`;
+        // Clear stable session ID after completion/failure
+        setTimeout(() => {
+          stableSessionIdRef.current = '';
+        }, 1000);
+      } else {
+        sessionId = `${agentId}-${totalPagesNeedingProcessing}-${totalPagesProcessed}`;
+      }
 
       const newProgress: TrainingProgress = {
         agentId,
@@ -332,6 +373,13 @@ export const useTrainingNotifications = () => {
         currentlyProcessing: currentlyProcessingPages,
         sessionId
       };
+
+      console.log('📊 Training status update:', {
+        status,
+        sessionId,
+        trainingLocked: trainingLockRef.current,
+        stableSessionId: stableSessionIdRef.current
+      });
 
       setTrainingProgress(newProgress);
 
@@ -399,6 +447,12 @@ export const useTrainingNotifications = () => {
     try {
       console.log('🚀 Starting enhanced training for agent:', agentId);
 
+      // Set training lock and create stable session ID
+      trainingLockRef.current = true;
+      const sessionId = `training-${agentId}-${Date.now()}`;
+      stableSessionIdRef.current = sessionId;
+      activeTrainingSessionRef.current = sessionId;
+
       // Reset completion tracking for new training session
       hasShownCompletionNotificationRef.current = false;
       lastCompletedSessionIdRef.current = '';
@@ -445,6 +499,11 @@ export const useTrainingNotifications = () => {
       }
 
       if (sourcesToProcess.length === 0) {
+        // Release training lock if no sources to process
+        trainingLockRef.current = false;
+        stableSessionIdRef.current = '';
+        activeTrainingSessionRef.current = null;
+        
         setTrainingProgress({
           agentId,
           status: 'completed',
@@ -454,10 +513,6 @@ export const useTrainingNotifications = () => {
         });
         return;
       }
-
-      // Generate unique session ID for this training start
-      const sessionId = `training-${agentId}-${Date.now()}`;
-      trainingStartedSessionRef.current = sessionId;
 
       setTrainingProgress({
         agentId,
@@ -486,6 +541,11 @@ export const useTrainingNotifications = () => {
 
     } catch (error) {
       console.error('Failed to start enhanced training:', error);
+      
+      // Release training lock on error
+      trainingLockRef.current = false;
+      stableSessionIdRef.current = '';
+      activeTrainingSessionRef.current = null;
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
       
