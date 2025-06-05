@@ -175,8 +175,23 @@ export class CrawlApiService {
         .single();
 
       if (!parentError && parentSource?.agent_id) {
-        // Clear any prevention flags before starting
+        // Clear ALL prevention flags before starting
+        console.log('🧹 Clearing all prevention flags for agent:', parentSource.agent_id);
         localStorage.removeItem(`training_completed_${parentSource.agent_id}`);
+        
+        // Also clear any session-based flags
+        const keys = Object.keys(localStorage);
+        keys.forEach(key => {
+          if (key.includes(`training_`) && key.includes(parentSource.agent_id)) {
+            localStorage.removeItem(key);
+            console.log('🧹 Removed prevention flag:', key);
+          }
+        });
+        
+        // Dispatch event to clear any in-memory prevention state
+        window.dispatchEvent(new CustomEvent('clearTrainingPrevention', {
+          detail: { agentId: parentSource.agent_id }
+        }));
       }
 
       const { data, error } = await supabase.functions.invoke('generate-missing-chunks', {

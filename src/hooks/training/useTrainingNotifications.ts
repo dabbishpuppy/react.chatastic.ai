@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -51,6 +50,38 @@ export const useTrainingNotifications = () => {
     clearAllTimers,
     addTrackedTimer
   );
+
+  // Listen for clear prevention events
+  useEffect(() => {
+    const handleClearPrevention = (event: CustomEvent) => {
+      const { agentId: eventAgentId } = event.detail;
+      if (eventAgentId === agentId) {
+        console.log('🧹 Clearing prevention state for agent:', agentId);
+        
+        // Reset all prevention-related refs
+        refs.agentCompletionStateRef.current = {
+          isCompleted: false,
+          completedAt: 0,
+          lastCompletedSessionId: ''
+        };
+        refs.activeTrainingSessionRef.current = '';
+        refs.trainingStartTimeRef.current = 0;
+        refs.globalTrainingActiveRef.current = false;
+        refs.lastTrainingActionRef.current = '';
+        refs.lastCompletionCheckRef.current = 0;
+        refs.completedSessionsRef.current.clear();
+        refs.sessionCompletionFlagRef.current.clear();
+        
+        console.log('✅ Prevention state cleared successfully');
+      }
+    };
+
+    window.addEventListener('clearTrainingPrevention', handleClearPrevention as EventListener);
+    
+    return () => {
+      window.removeEventListener('clearTrainingPrevention', handleClearPrevention as EventListener);
+    };
+  }, [agentId, refs]);
 
   // Listen for crawl initiation events
   useEffect(() => {
@@ -129,12 +160,17 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from source_pages update');
+              // REDUCED PREVENTION CHECKS: Only check every 5 seconds instead of always
+              const lastCheck = refs.lastCompletionCheckRef.current;
+              const now = Date.now();
+              if (now - lastCheck < 5000) {
+                console.log('⏭️ Skipping check - too recent');
                 return;
               }
               
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+              if (!shouldPreventTrainingAction('check')) {
+                addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+              }
             }
           }
         )
@@ -154,12 +190,17 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from agent_sources update');
+              // REDUCED PREVENTION CHECKS: Only check every 5 seconds
+              const lastCheck = refs.lastCompletionCheckRef.current;
+              const now = Date.now();
+              if (now - lastCheck < 5000) {
+                console.log('⏭️ Skipping check - too recent');
                 return;
               }
               
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+              if (!shouldPreventTrainingAction('check')) {
+                addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
+              }
             }
           }
         )
@@ -211,11 +252,12 @@ export const useTrainingNotifications = () => {
               });
             }
             
+            // REDUCED POLLING: Only poll every 30 seconds instead of 15
             pollInterval = setInterval(() => {
               if (!shouldPreventTrainingAction('check')) {
                 checkTrainingCompletion(agentId);
               }
-            }, 15000);
+            }, 30000);
           }
         });
 
