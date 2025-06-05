@@ -20,7 +20,7 @@ export const useTrainingCompletion = (
 
       const { data: agentSources, error: sourcesError } = await supabase
         .from('agent_sources')
-        .select('id, source_type, metadata, crawl_status')
+        .select('id, source_type, metadata, crawl_status, title, content')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -72,7 +72,7 @@ export const useTrainingCompletion = (
             failed: pages?.filter(p => p.processing_status === 'failed').length || 0
           };
 
-          console.log(`📊 Website source ${source.title}:`, pageStats);
+          console.log(`📊 Website source ${source.title || source.id}:`, pageStats);
 
           totalPagesNeedingProcessing += pageStats.totalPages;
           totalPagesProcessed += pageStats.processed;
@@ -87,7 +87,7 @@ export const useTrainingCompletion = (
           }
 
           if (pageStats.processed === pageStats.totalPages && pageStats.totalPages > 0) {
-            console.log(`✅ PROCESSED: ${source.title} all pages processed`);
+            console.log(`✅ PROCESSED: ${source.title || source.id} all pages processed`);
           }
         } else {
           // Handle other source types (text, file, qa)
