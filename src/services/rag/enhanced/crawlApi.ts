@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedCrawlRequest, CrawlStatus } from "./crawlTypes";
 
@@ -166,10 +167,16 @@ export class CrawlApiService {
         }
       }
 
-      // Clear any prevention flags before starting
-      const agentId = pages[0]?.agent_id; // Get agent ID from pages if available
-      if (agentId) {
-        localStorage.removeItem(`training_completed_${agentId}`);
+      // Get the parent source to get agent_id for clearing prevention flags
+      const { data: parentSource, error: parentError } = await supabase
+        .from('agent_sources')
+        .select('agent_id')
+        .eq('id', parentSourceId)
+        .single();
+
+      if (!parentError && parentSource?.agent_id) {
+        // Clear any prevention flags before starting
+        localStorage.removeItem(`training_completed_${parentSource.agent_id}`);
       }
 
       const { data, error } = await supabase.functions.invoke('generate-missing-chunks', {
