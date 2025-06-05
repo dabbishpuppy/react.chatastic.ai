@@ -55,10 +55,10 @@ export const useSimpleAgentTraining = () => {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // Check if there are any unprocessed sources
+      // FIXED: Query only columns that exist in agent_sources table
       const { data: sources, error } = await supabase
         .from('agent_sources')
-        .select('id, processing_status, metadata')
+        .select('id, requires_manual_training, metadata')
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -67,9 +67,9 @@ export const useSimpleAgentTraining = () => {
         return;
       }
 
+      // FIXED: Check requires_manual_training instead of processing_status
       const unprocessedSources = sources?.filter(source => 
-        source.processing_status !== 'completed' || 
-        !(source.metadata as any)?.training_completed
+        source.requires_manual_training === true
       ) || [];
 
       const totalSources = sources?.length || 0;

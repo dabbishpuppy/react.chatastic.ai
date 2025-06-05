@@ -13,6 +13,7 @@ export const useTrainingState = (): TrainingRefs => {
     lastCompletedSessionId: ''
   });
   const currentTrainingSessionRef = useRef('');
+  // FIXED: Include 'completed' in the type union
   const trainingStateRef = useRef<'idle' | 'initializing' | 'training' | 'completed' | 'failed'>('idle');
   const completedSessionsRef = useRef(new Set<string>());
   const lastCompletionCheckRef = useRef(0);
