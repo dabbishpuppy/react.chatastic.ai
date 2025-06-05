@@ -57,16 +57,6 @@ export class ToastNotificationService {
     setTimeout(() => this.shownToasts.delete(toastId), 5000);
   }
 
-  static showError(message: string) {
-    const toastId = `error-${Date.now()}`;
-    
-    toast({
-      title: "Error",
-      description: message,
-      variant: "destructive",
-    });
-  }
-
   static clearAllToasts() {
     this.shownToasts.clear();
   }
