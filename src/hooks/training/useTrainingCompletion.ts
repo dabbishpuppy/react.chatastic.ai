@@ -92,6 +92,7 @@ export const useTrainingCompletion = (
 
       setTrainingProgress(newProgress);
 
+      // FIXED: Include 'completed' in the type definition
       const previousStatus: 'idle' | 'initializing' | 'training' | 'completed' | 'failed' = refs.trainingStateRef.current;
       refs.trainingStateRef.current = status;
 

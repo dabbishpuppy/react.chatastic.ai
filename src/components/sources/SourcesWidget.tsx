@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -19,7 +18,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const [showRetrainingDialog, setShowRetrainingDialog] = useState(false);
   const [isTrainingInBackground, setIsTrainingInBackground] = useState(false);
   const [dialogOpenTimestamp, setDialogOpenTimestamp] = useState<number | null>(null);
-  const [lastCrawlCompleted, setLastCrawlCompleted] = useState<number>(0);
   
   // Use enhanced training hooks
   const {
@@ -63,10 +61,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     // ENHANCED: Listen for crawl completion events
     const handleCrawlCompleted = (event: CustomEvent) => {
       console.log('🕷️ Crawl completed event received:', event.detail);
-      setLastCrawlCompleted(Date.now());
-      // Force refresh stats and retraining status after crawl
+      
+      // ENHANCED: Force refresh and mark that retraining is needed
       refetchStats();
-      setTimeout(() => checkRetrainingNeeded(), 1000);
+      setTimeout(() => {
+        console.log('🔄 Checking retraining status after crawl completion');
+        checkRetrainingNeeded();
+      }, 1000);
     };
 
     window.addEventListener('trainingStateReset', handleTrainingStateReset as EventListener);
@@ -82,12 +83,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [refetchStats, checkRetrainingNeeded, showRetrainingDialog]);
 
-  // Enhanced: Check retraining status only when dialog is closed
+  // ENHANCED: Only check retraining status when dialog is closed to prevent override
   useEffect(() => {
     if (agentId && stats && !showRetrainingDialog) {
       checkRetrainingNeeded();
     }
-  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages, showRetrainingDialog]);
+  }, [agentId, checkRetrainingNeeded, stats?.totalSources, showRetrainingDialog]);
 
   // Enhanced: Handle training state transitions with immediate state checking
   useEffect(() => {
@@ -110,11 +111,6 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     const handleSourceEvent = (event: CustomEvent) => {
       console.log('📄 Source event received:', event.type, event.detail);
       
-      // Track crawl completion
-      if (event.type === 'crawlCompleted') {
-        setLastCrawlCompleted(Date.now());
-      }
-      
       // Immediately reset background training state for new content
       setIsTrainingInBackground(false);
       
@@ -123,7 +119,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
         // Refresh stats immediately
         refetchStats();
         
-        // Check retraining status
+        // Check retraining status after a delay to allow processing
         setTimeout(() => checkRetrainingNeeded(), 1500);
       }
     };
@@ -147,22 +143,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
-  // ENHANCED: Handle opening the retrain dialog with crawl-aware logic
+  // ENHANCED: Handle opening the retrain dialog with immediate fresh check
   const handleRetrainClick = () => {
-    console.log('🔄 Retrain button clicked - opening dialog');
+    console.log('🔄 ENHANCED: Retrain button clicked - forcing fresh retraining check');
     setDialogOpenTimestamp(Date.now());
     setShowRetrainingDialog(true);
     
-    // ENHANCED: Force fresh retraining check, especially after recent crawls
-    const timeSinceLastCrawl = Date.now() - lastCrawlCompleted;
-    const shouldForceFreshCheck = timeSinceLastCrawl < 60000; // Within last minute
-    
-    if (shouldForceFreshCheck) {
-      console.log('🕷️ Recent crawl detected, forcing fresh retraining check');
-      setTimeout(() => checkRetrainingNeeded(), 200);
-    } else {
-      setTimeout(() => checkRetrainingNeeded(), 100);
-    }
+    // ENHANCED: Always force a fresh retraining check when dialog opens
+    setTimeout(() => {
+      console.log('🔄 ENHANCED: Forcing immediate retraining status check');
+      checkRetrainingNeeded();
+    }, 100);
   };
 
   const handleDialogClose = (open: boolean) => {
@@ -193,16 +184,15 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   const isTrainingActive = trainingProgress?.status === 'training' || trainingProgress?.status === 'initializing' || isRetraining;
   const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
 
-  // ENHANCED: Determine if we should show training required based on recent crawls and actual content
+  // ENHANCED: Simplified logic - always trust retrainingNeeded?.needed when dialog is open
   const shouldShowTrainingRequired = () => {
-    // If there's unprocessed content, always show training required
-    if (retrainingNeeded?.needed) return true;
+    // When dialog is open, always show fresh retraining status
+    if (showRetrainingDialog) {
+      return retrainingNeeded?.needed || false;
+    }
     
-    // If we recently crawled and dialog is being opened, assume training is needed
-    const timeSinceLastCrawl = Date.now() - lastCrawlCompleted;
-    const hasRecentCrawl = timeSinceLastCrawl < 300000; // Within last 5 minutes
-    
-    return hasRecentCrawl && showRetrainingDialog;
+    // When dialog is closed, use current retraining status
+    return retrainingNeeded?.needed || false;
   };
 
   if (isLoading) {

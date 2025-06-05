@@ -5,7 +5,7 @@ import { RetrainingStatus } from '../types/retrainingTypes';
 export class RetrainingChecker {
   static async checkRetrainingNeeded(agentId: string): Promise<RetrainingStatus> {
     try {
-      console.log('🔍 Checking retraining status for agent:', agentId);
+      console.log('🔍 ENHANCED: Checking retraining status for agent:', agentId);
 
       // Get all active sources for this agent
       const { data: sources, error: sourcesError } = await supabase
@@ -33,80 +33,90 @@ export class RetrainingChecker {
       const unprocessedSources = [];
       const reasons = [];
 
-      // Check each source
+      // Check each source with enhanced logic
       for (const source of sources) {
         const metadata = (source.metadata as Record<string, any>) || {};
         
         if (source.source_type === 'website') {
-          // For website sources, check if there are crawled pages that need processing
-          const { data: unprocessedPages, error: pagesError } = await supabase
+          // ENHANCED: For website sources, be more aggressive about detecting unprocessed content
+          const { data: crawledPages, error: pagesError } = await supabase
             .from('source_pages')
-            .select('id, url, status, processing_status')
+            .select('id, url, status, processing_status, created_at')
             .eq('parent_source_id', source.id)
-            .eq('status', 'completed') // Only completed crawled pages
-            .neq('processing_status', 'processed'); // That haven't been fully processed yet
+            .eq('status', 'completed'); // Only completed crawled pages
 
           if (pagesError) {
             console.error('Error checking source pages:', pagesError);
             continue;
           }
 
-          // Check for truly unprocessed pages (no chunks created)
-          if (unprocessedPages && unprocessedPages.length > 0) {
-            const pageIds = unprocessedPages.map(p => p.id);
-            const { data: existingChunks } = await supabase
-              .from('source_chunks')
-              .select('id')
-              .in('source_id', pageIds)
-              .limit(1);
+          if (crawledPages && crawledPages.length > 0) {
+            // ENHANCED: Check for pages that truly need processing
+            let needsProcessingCount = 0;
+            
+            for (const page of crawledPages) {
+              // Check if chunks exist for this page
+              const { data: existingChunks } = await supabase
+                .from('source_chunks')
+                .select('id')
+                .eq('source_id', page.id)
+                .limit(1);
 
-            // Only include if no chunks exist for these pages AND crawl was recently completed
-            if (!existingChunks || existingChunks.length === 0) {
-              // Check if this is a recently crawled source (within last hour) or has "completed" crawl_status
-              const isRecentlyCrawled = source.crawl_status === 'completed' || 
-                (new Date().getTime() - new Date(source.created_at).getTime() < 60 * 60 * 1000);
-              
-              if (isRecentlyCrawled) {
-                unprocessedSources.push({
-                  id: source.id,
-                  title: source.title,
-                  type: 'website',
-                  reason: `${unprocessedPages.length} crawled page${unprocessedPages.length > 1 ? 's' : ''} need${unprocessedPages.length === 1 ? 's' : ''} processing`,
-                  status: 'Crawled - Needs Training',
-                  unprocessedPagesCount: unprocessedPages.length
-                });
-                reasons.push(`Website "${source.title}" has ${unprocessedPages.length} crawled pages that need processing`);
+              // ENHANCED: If no chunks exist OR processing status indicates pending/failed
+              const hasNoChunks = !existingChunks || existingChunks.length === 0;
+              const needsProcessing = !page.processing_status || 
+                                    page.processing_status === 'pending' || 
+                                    page.processing_status === 'failed' ||
+                                    page.processing_status === null;
+
+              if (hasNoChunks || needsProcessing) {
+                needsProcessingCount++;
               }
+            }
+
+            if (needsProcessingCount > 0) {
+              unprocessedSources.push({
+                id: source.id,
+                title: source.title,
+                type: 'website',
+                reason: `${needsProcessingCount} crawled page${needsProcessingCount > 1 ? 's' : ''} need${needsProcessingCount === 1 ? 's' : ''} processing`,
+                status: 'Crawled - Needs Training',
+                unprocessedPagesCount: needsProcessingCount
+              });
+              reasons.push(`Website "${source.title}" has ${needsProcessingCount} pages that need processing`);
+              console.log(`🟡 ENHANCED: Website "${source.title}" needs training - ${needsProcessingCount} unprocessed pages`);
+            } else {
+              console.log(`✅ ENHANCED: Website "${source.title}" is fully processed`);
             }
           }
         } else {
-          // For other source types, check if they have content and haven't been processed
+          // ENHANCED: For other source types, check more thoroughly
           const hasContent = source.source_type === 'qa' ? 
             (metadata?.question && metadata?.answer) :
             source.content && source.content.trim().length > 0;
 
-          const processingStatus = metadata?.processing_status;
-
-          // Only include if truly unprocessed and has content
-          if (hasContent && processingStatus !== 'completed') {
-            // Double-check: verify no chunks exist for this source
+          if (hasContent) {
+            // Check if chunks exist for this source
             const { data: existingChunks } = await supabase
               .from('source_chunks')
               .select('id')
               .eq('source_id', source.id)
               .limit(1);
 
-            // Only include if no chunks exist
-            if (!existingChunks || existingChunks.length === 0) {
+            const hasNoChunks = !existingChunks || existingChunks.length === 0;
+            const processingStatus = metadata?.processing_status;
+
+            // ENHANCED: Consider it unprocessed if no chunks OR status indicates pending/failed
+            if (hasNoChunks || processingStatus !== 'completed') {
               let status = 'Needs Processing';
               let reason = 'Has content but not processed yet';
 
               if (processingStatus === 'failed') {
                 status = 'Needs Reprocessing';
                 reason = 'Previous processing failed, needs retry';
-              } else if (!processingStatus) {
+              } else if (hasNoChunks) {
                 status = 'Needs Processing';
-                reason = 'Has content but not processed yet';
+                reason = 'Content available but no training chunks created yet';
               }
 
               unprocessedSources.push({
@@ -117,6 +127,9 @@ export class RetrainingChecker {
                 status
               });
               reasons.push(`${source.source_type.toUpperCase()} "${source.title}" ${reason.toLowerCase()}`);
+              console.log(`🟡 ENHANCED: Source "${source.title}" needs training - ${reason}`);
+            } else {
+              console.log(`✅ ENHANCED: Source "${source.title}" is fully processed`);
             }
           }
         }
@@ -141,7 +154,7 @@ export class RetrainingChecker {
         }
       }
 
-      console.log('📋 Retraining check result:', {
+      console.log('📋 ENHANCED Retraining check result:', {
         needed,
         unprocessedCount: unprocessedSources.length,
         status,
@@ -159,7 +172,7 @@ export class RetrainingChecker {
       };
 
     } catch (error) {
-      console.error('Error in checkRetrainingNeeded:', error);
+      console.error('Error in ENHANCED checkRetrainingNeeded:', error);
       return {
         needed: false,
         unprocessedSources: 0,
