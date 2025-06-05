@@ -31,7 +31,7 @@ export class RetrainingService {
 
       console.log(`📊 Found ${sources?.length || 0} total sources for agent ${agentId}`);
 
-      // Filter sources that have content (including Q&A which might have structured content)
+      // Filter sources that have content and normalize metadata
       const sourcesWithContent = (sources || []).filter(source => {
         // For Q&A sources, check if there's question/answer content
         if (source.source_type === 'qa') {
@@ -42,7 +42,10 @@ export class RetrainingService {
         
         // For other sources, check content field
         return source.content && source.content.trim().length > 0;
-      });
+      }).map(source => ({
+        ...source,
+        metadata: source.metadata || {} // Ensure metadata is never null/undefined
+      }));
 
       console.log(`📋 Processing ${sourcesWithContent.length} sources with content:`, 
         sourcesWithContent.map(s => `${s.source_type}: ${s.title}`));

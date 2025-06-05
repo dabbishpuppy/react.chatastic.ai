@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useParams } from 'react-router-dom';
-import { SourceProcessor } from '@/services/rag/retraining/sourceProcessor';
+import { useChunkProcessingProgress } from './useChunkProcessingProgress';
 
 interface TrainingProgress {
   agentId: string;
@@ -15,742 +15,289 @@ interface TrainingProgress {
   sessionId?: string;
 }
 
-interface DatabaseSource {
-  id: string;
-  source_type: string;
-  metadata: any;
-  title: string;
-  content?: string;
-}
-
 export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   
-  // Simplified refs for better state management
-  const pageLoadTimestampRef = useRef<number>(Date.now());
-  const hasEverConnectedRef = useRef<boolean>(false);
-  const crawlInitiationInProgressRef = useRef<boolean>(false);
-  const crawlInitiationStartTimeRef = useRef<number>(0);
+  // CRITICAL: All hooks must be called in the same order every time
+  const { progress: chunkProgress, startChunkProcessing, recoverFromStuckState } = useChunkProcessingProgress();
   
-  // CRITICAL: Agent-level completion tracking - PERMANENT STATE
-  const agentCompletionStateRef = useRef<{
-    isCompleted: boolean;
-    completedAt: number;
-    lastCompletedSessionId: string;
-  }>({
-    isCompleted: false,
-    completedAt: 0,
-    lastCompletedSessionId: ''
-  });
-  
-  // Training state management - STRENGTHENED
-  const currentTrainingSessionRef = useRef<string>('');
-  const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
-  const completedSessionsRef = useRef<Set<string>>(new Set());
-  const lastCompletionCheckRef = useRef<number>(0);
-  
-  // CRITICAL: Add training session tracking to prevent premature reversion
-  const activeTrainingSessionRef = useRef<string>('');
-  const trainingStartTimeRef = useRef<number>(0);
-  const minTrainingDurationRef = useRef<number>(10000); // Minimum 10 seconds of training display
-  
-  // Toast tracking - prevent duplicates
-  const shownToastsRef = useRef<Set<string>>(new Set());
-  
-  // Timer tracking for cleanup
-  const pendingTimersRef = useRef<Set<NodeJS.Timeout>>(new Set());
-  
-  // CRITICAL: Completion and session isolation flags
-  const sessionCompletionFlagRef = useRef<Set<string>>(new Set());
-  const globalTrainingActiveRef = useRef<boolean>(false);
-  const lastTrainingActionRef = useRef<'start' | 'complete' | 'none'>('none');
-  
+  // CRITICAL: Initialize all state hooks consistently
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // CRITICAL: Initialize all refs consistently
+  const trainingStateRef = useRef<{
+    status: 'idle' | 'training' | 'completed' | 'failed';
+    sessionId: string | null;
+    completedSessions: Set<string>;
+    permanentlyCompleted: boolean;
+    completionLocked: boolean;
+    lastProgressValue: number;
+    stuckDetectionTimer: NodeJS.Timeout | null;
+  }>({
+    status: 'idle',
+    sessionId: null,
+    completedSessions: new Set(),
+    permanentlyCompleted: false,
+    completionLocked: false,
+    lastProgressValue: 0,
+    stuckDetectionTimer: null
+  });
+  
+  const shownToastsRef = useRef<Set<string>>(new Set());
+  const lastStatusRef = useRef<string>('');
+  const isProcessingStatusRef = useRef<boolean>(false);
 
-  // Helper function to clear all pending timers
-  const clearAllTimers = () => {
-    console.log(`🧹 Clearing ${pendingTimersRef.current.size} pending timers`);
-    pendingTimersRef.current.forEach(timer => clearTimeout(timer));
-    pendingTimersRef.current.clear();
-  };
+  // Convert chunk progress to training progress format with enhanced session management
+  useEffect(() => {
+    // Early guard - but don't return before all hooks are called
+    if (!chunkProgress || !agentId) return;
 
-  // Helper function to add tracked timer
-  const addTrackedTimer = (callback: () => void, delay: number) => {
-    const timer = setTimeout(() => {
-      pendingTimersRef.current.delete(timer);
-      callback();
-    }, delay);
-    pendingTimersRef.current.add(timer);
-    return timer;
-  };
+    // CRITICAL: Prevent concurrent status processing
+    if (isProcessingStatusRef.current) {
+      console.log('🚫 Status processing blocked - already in progress');
+      return;
+    }
 
-  // CRITICAL: Check if we should prevent any training action - ENHANCED
-  const shouldPreventTrainingAction = (action: 'start' | 'check', sessionId?: string): boolean => {
-    const now = Date.now();
-    const recentActionThreshold = 5000; // Increased to 5 seconds
-    
-    // NEVER prevent explicit start actions - always allow user-initiated training
-    if (action === 'start') {
-      console.log('✅ Allowing explicit training start action');
-      return false;
+    // CRITICAL: Don't process if permanently completed
+    if (trainingStateRef.current.permanentlyCompleted) {
+      console.log('🚫 Status processing blocked - permanently completed');
+      return;
     }
-    
-    // CRITICAL: If we have an active training session, don't check for completion too early
-    if (activeTrainingSessionRef.current && 
-        now - trainingStartTimeRef.current < minTrainingDurationRef.current) {
-      console.log(`🚫 Preventing ${action} - training session ${activeTrainingSessionRef.current} still active (${now - trainingStartTimeRef.current}ms elapsed)`);
-      return true;
-    }
-    
-    // AGENT-LEVEL COMPLETION CHECK - ONLY FOR CHECK ACTIONS
-    if (agentCompletionStateRef.current.isCompleted) {
-      const timeSinceCompletion = now - agentCompletionStateRef.current.completedAt;
-      if (timeSinceCompletion < 30000) { // 30 second grace period
-        console.log(`🚫 AGENT-LEVEL: Preventing ${action} - agent completed ${timeSinceCompletion}ms ago`);
-        return true;
-      }
-    }
-    
-    // If we just completed training, block check actions for a period
-    if (lastTrainingActionRef.current === 'complete' && 
-        now - lastCompletionCheckRef.current < recentActionThreshold) {
-      console.log(`🚫 Preventing ${action} - recently completed training`);
-      return true;
-    }
-    
-    // If this specific session has completed, block check actions for it
-    if (sessionId && sessionCompletionFlagRef.current.has(sessionId)) {
-      console.log(`🚫 Preventing ${action} for completed session: ${sessionId}`);
-      return true;
-    }
-    
-    return false;
-  };
 
-  // CRITICAL: Mark agent-level completion - PERMANENT STATE
-  const markAgentCompletion = (sessionId: string) => {
-    const now = Date.now();
-    console.log(`🎯 MARKING AGENT-LEVEL COMPLETION for session: ${sessionId}`);
-    
-    agentCompletionStateRef.current = {
-      isCompleted: true,
-      completedAt: now,
-      lastCompletedSessionId: sessionId
-    };
-    
-    // Clear active training session
-    activeTrainingSessionRef.current = '';
-    trainingStartTimeRef.current = 0;
-    
-    // Clear all timers immediately
-    clearAllTimers();
-    
-    // Mark global states
-    globalTrainingActiveRef.current = false;
-    lastTrainingActionRef.current = 'complete';
-    lastCompletionCheckRef.current = now;
-    
-    // Mark this session and all related sessions as completed
-    completedSessionsRef.current.add(sessionId);
-    sessionCompletionFlagRef.current.add(sessionId);
-  };
+    isProcessingStatusRef.current = true;
 
-  // New function to mark parent sources as trained
-  const markParentSourcesAsTrained = async (agentId: string) => {
     try {
-      console.log('🎓 Marking parent sources as trained for agent:', agentId);
+      // CRITICAL: Create stable session ID only once per training cycle
+      if (!trainingStateRef.current.sessionId && 
+          (chunkProgress.status === 'processing' || chunkProgress.progress > 0)) {
+        trainingStateRef.current.sessionId = `training-${agentId}-${Date.now()}`;
+        console.log('🆔 Created stable session ID:', trainingStateRef.current.sessionId);
+      }
       
-      // Get all parent sources (sources without parent_source_id)
-      const { data: parentSources, error } = await supabase
-        .from('agent_sources')
-        .select('id, metadata')
-        .eq('agent_id', agentId)
-        .eq('is_active', true)
-        .is('parent_source_id', null);
+      const sessionId = trainingStateRef.current.sessionId || `default-${agentId}`;
 
-      if (error) {
-        console.error('Error fetching parent sources:', error);
+      // CRITICAL: Map chunk processing status to training status correctly
+      const mapStatus = (chunkStatus: 'idle' | 'processing' | 'completed' | 'failed'): 'idle' | 'training' | 'completed' | 'failed' => {
+        switch (chunkStatus) {
+          case 'processing':
+            return 'training';
+          case 'completed':
+            return 'completed';
+          case 'failed':
+            return 'failed';
+          case 'idle':
+          default:
+            if (chunkProgress.progress > 0 || chunkProgress.currentlyProcessing.length > 0) {
+              return 'training';
+            }
+            return 'idle';
+        }
+      };
+
+      const mappedStatus = mapStatus(chunkProgress.status);
+      const statusKey = `${mappedStatus}-${chunkProgress.progress}-${sessionId}`;
+
+      // Prevent duplicate status processing
+      if (lastStatusRef.current === statusKey) {
+        isProcessingStatusRef.current = false;
         return;
       }
+      lastStatusRef.current = statusKey;
 
-      if (parentSources && parentSources.length > 0) {
-        // Update each parent source to mark as trained
-        const updatePromises = parentSources.map(source => {
-          const existingMetadata = (source.metadata as Record<string, any>) || {};
-          const updatedMetadata = {
-            ...existingMetadata,
-            training_completed: true,
-            last_trained_at: new Date().toISOString()
-          };
+      const newTrainingProgress: TrainingProgress = {
+        agentId,
+        status: mappedStatus,
+        progress: chunkProgress.progress,
+        totalSources: chunkProgress.totalPages,
+        processedSources: chunkProgress.processedPages,
+        currentlyProcessing: chunkProgress.currentlyProcessing,
+        sessionId
+      };
 
-          return supabase
-            .from('agent_sources')
-            .update({ metadata: updatedMetadata })
-            .eq('id', source.id);
-        });
+      setTrainingProgress(newTrainingProgress);
 
-        await Promise.all(updatePromises);
-        console.log('✅ Marked all parent sources as trained');
-      }
-    } catch (error) {
-      console.error('Error marking parent sources as trained:', error);
-    }
-  };
+      console.log('🔄 Training progress mapped from chunk progress:', {
+        chunkStatus: chunkProgress.status,
+        mappedStatus,
+        progress: chunkProgress.progress,
+        processing: chunkProgress.currentlyProcessing.length,
+        sessionId,
+        permanentlyCompleted: trainingStateRef.current.permanentlyCompleted,
+        previousStatus: trainingStateRef.current.status
+      });
 
-  // Listen for crawl initiation events to suppress false connection warnings
-  useEffect(() => {
-    const handleCrawlStarted = () => {
-      console.log('🚀 Crawl initiation detected - extending connection grace period');
-      crawlInitiationInProgressRef.current = true;
-      crawlInitiationStartTimeRef.current = Date.now();
+      // Handle status changes - with enhanced completion checks
+      const hasRealData = chunkProgress.totalPages > 0 || chunkProgress.processedPages > 0 || chunkProgress.currentlyProcessing.length > 0;
       
-      addTrackedTimer(() => {
-        crawlInitiationInProgressRef.current = false;
-        console.log('✅ Crawl initiation grace period ended');
-      }, 45000);
-    };
+      if (hasRealData || chunkProgress.status === 'completed' || chunkProgress.status === 'failed') {
+        const previousStatus = trainingStateRef.current.status;
+        trainingStateRef.current.status = mappedStatus;
 
-    const handleCrawlCompleted = () => {
-      console.log('✅ Crawl completed - clearing initiation flags');
-      crawlInitiationInProgressRef.current = false;
-    };
+        // CRITICAL: Check if session is already completed or locked
+        const isSessionCompleted = trainingStateRef.current.completedSessions.has(sessionId);
+        const isCompletionLocked = trainingStateRef.current.completionLocked;
+        
+        // Training started detection - ONLY if not already completed and not locked
+        if (mappedStatus === 'training' && 
+            previousStatus !== 'training' && 
+            !isSessionCompleted && 
+            !isCompletionLocked &&
+            !trainingStateRef.current.permanentlyCompleted) {
+          
+          console.log('🚀 Training started detected! Session:', sessionId, 'Previous status:', previousStatus);
+          
+          // Show "Training Started" toast only if session hasn't completed
+          const startToastId = `start-${sessionId}`;
+          if (!shownToastsRef.current.has(startToastId)) {
+            shownToastsRef.current.add(startToastId);
+            
+            toast({
+              title: "Training Started",
+              description: "Processing sources and creating chunks for AI training...",
+              duration: 3000,
+            });
+            
+            console.log('✅ "Training Started" toast shown for session:', sessionId);
+          }
 
-    window.addEventListener('crawlStarted', handleCrawlStarted);
-    window.addEventListener('crawlCompleted', handleCrawlCompleted);
-    
-    return () => {
-      window.removeEventListener('crawlStarted', handleCrawlStarted);
-      window.removeEventListener('crawlCompleted', handleCrawlCompleted);
-      clearAllTimers();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!agentId) return;
-
-    console.log('🔔 Setting up IMPROVED training notifications for agent:', agentId);
-
-    let pollInterval: NodeJS.Timeout;
-    let websiteSources: string[] = [];
-
-    const initializeSubscriptions = async () => {
-      try {
-        const { data: sources, error } = await supabase
-          .from('agent_sources')
-          .select('id')
-          .eq('agent_id', agentId)
-          .eq('source_type', 'website')
-          .eq('is_active', true);
-
-        if (error) {
-          console.error('Error fetching website sources:', error);
-          return;
+          // Start stuck detection timer
+          if (trainingStateRef.current.stuckDetectionTimer) {
+            clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+          }
+          
+          trainingStateRef.current.stuckDetectionTimer = setTimeout(async () => {
+            if (trainingStateRef.current.status === 'training' && 
+                trainingStateRef.current.lastProgressValue === chunkProgress.progress &&
+                chunkProgress.progress > 0 && chunkProgress.progress < 100) {
+              
+              console.log('🔧 Stuck state detected, attempting recovery...');
+              const recovered = await recoverFromStuckState();
+              
+              if (recovered) {
+                console.log('✅ Successfully recovered from stuck state');
+              }
+            }
+          }, 45000); // 45 seconds
         }
 
-        websiteSources = sources?.map(s => s.id) || [];
-        console.log('📄 Found website sources to monitor:', websiteSources);
+        // Update progress tracking for stuck detection
+        trainingStateRef.current.lastProgressValue = chunkProgress.progress;
 
-        setupRealtimeChannels();
-      } catch (error) {
-        console.error('Error initializing subscriptions:', error);
-      }
-    };
-
-    const setupRealtimeChannels = () => {
-      const channel = supabase
-        .channel(`improved-training-notifications-${agentId}`)
-        
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'source_pages',
-            filter: websiteSources.length > 0 ? `parent_source_id=in.(${websiteSources.join(',')})` : 'parent_source_id=eq.00000000-0000-0000-0000-000000000000'
-          },
-          (payload) => {
-            const updatedPage = payload.new as any;
-            const oldPage = payload.old as any;
-            
-            if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // CRITICAL: Check agent-level completion first
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from source_pages update');
-                return;
-              }
-              
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
-            }
+        // Training completed - PERMANENTLY LOCK everything
+        if (chunkProgress.status === 'completed' && 
+            previousStatus !== 'completed' &&
+            !trainingStateRef.current.completedSessions.has(sessionId)) {
+          
+          console.log('🎉 Training completed! PERMANENTLY locking all training state for session:', sessionId);
+          
+          // Clear stuck detection timer
+          if (trainingStateRef.current.stuckDetectionTimer) {
+            clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+            trainingStateRef.current.stuckDetectionTimer = null;
           }
-        )
-        
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'agent_sources',
-            filter: `agent_id=eq.${agentId}`
-          },
-          (payload) => {
-            const updatedSource = payload.new as any;
-            const oldSource = payload.old as any;
-            const metadata = updatedSource.metadata || {};
-            const oldMetadata = oldSource?.metadata || {};
+          
+          // PERMANENTLY LOCK this session and all future training
+          trainingStateRef.current.completedSessions.add(sessionId);
+          trainingStateRef.current.permanentlyCompleted = true;
+          trainingStateRef.current.completionLocked = true;
+          
+          const completionToastId = `completion-${sessionId}`;
+          if (!shownToastsRef.current.has(completionToastId)) {
+            shownToastsRef.current.add(completionToastId);
             
-            if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              // CRITICAL: Check agent-level completion first
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from agent_sources update');
-                return;
-              }
-              
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
-            }
-          }
-        )
-        
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'agent_sources',
-            filter: `agent_id=eq.${agentId}`
-          },
-          (payload) => {
-            if ((payload.new as any)?.source_type === 'website') {
-              addTrackedTimer(initializeSubscriptions, 500);
-            }
-            
-            // CRITICAL: Check agent-level completion first
-            if (!shouldPreventTrainingAction('check')) {
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
-            }
-          }
-        )
-        
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            setIsConnected(true);
-            hasEverConnectedRef.current = true;
-            if (pollInterval) clearInterval(pollInterval);
-          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-            setIsConnected(false);
-            
-            const timeSincePageLoad = Date.now() - pageLoadTimestampRef.current;
-            const timeSinceCrawlStart = Date.now() - crawlInitiationStartTimeRef.current;
-            const isAfterPageLoadGracePeriod = timeSincePageLoad > 10000;
-            const isCrawlInitiationActive = crawlInitiationInProgressRef.current;
-            const isCrawlRecentlyStarted = timeSinceCrawlStart < 45000;
-            
-            const shouldShowConnectionWarning = hasEverConnectedRef.current && 
-              isAfterPageLoadGracePeriod && 
-              !isCrawlInitiationActive && 
-              !isCrawlRecentlyStarted;
-            
-            if (shouldShowConnectionWarning) {
-              console.log('⚠️ Showing connection issue toast - not related to crawl initiation');
-              toast({
-                title: "Connection Issue",
-                description: "Training updates may be delayed. We're working on it.",
-                duration: 3000,
-              });
-            }
-            
-            pollInterval = setInterval(() => {
-              if (!shouldPreventTrainingAction('check')) {
-                checkTrainingCompletion(agentId);
-              }
-            }, 15000);
-          }
-        });
-
-      return () => {
-        if (pollInterval) clearInterval(pollInterval);
-        supabase.removeChannel(channel);
-      };
-    };
-
-    initializeSubscriptions();
-
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-      clearAllTimers();
-    };
-  }, [agentId]);
-
-  const checkTrainingCompletion = async (agentId: string) => {
-    try {
-      const now = Date.now();
-      
-      // CRITICAL: Agent-level completion check FIRST
-      if (shouldPreventTrainingAction('check')) {
-        console.log('🚫 AGENT-LEVEL: Prevented checkTrainingCompletion');
-        return;
-      }
-      
-      // Debounce to prevent excessive calls
-      if (now - lastCompletionCheckRef.current < 3000) {
-        console.log('🚫 Debounced checkTrainingCompletion call');
-        return;
-      }
-      lastCompletionCheckRef.current = now;
-      
-      const { data: agentSources, error: sourcesError } = await supabase
-        .from('agent_sources')
-        .select('id, source_type, metadata, title, content, crawl_status')
-        .eq('agent_id', agentId)
-        .eq('is_active', true);
-
-      if (sourcesError) {
-        console.error('Error fetching agent sources:', sourcesError);
-        return;
-      }
-
-      if (!agentSources || agentSources.length === 0) {
-        return;
-      }
-
-      const sourcesNeedingTraining = [];
-      let totalPagesNeedingProcessing = 0;
-      let totalPagesProcessed = 0;
-      let currentlyProcessingPages: string[] = [];
-      let hasFailedSources = false;
-
-      console.log('🔍 IMPROVED: Checking training completion for', agentSources.length, 'sources');
-
-      for (const source of agentSources as DatabaseSource[]) {
-        const metadata = (source.metadata as Record<string, any>) || {};
-        
-        if (source.source_type === 'website') {
-          const { data: pages } = await supabase
-            .from('source_pages')
-            .select('id, url, processing_status, status')
-            .eq('parent_source_id', source.id)
-            .eq('status', 'completed');
-
-          if (pages && pages.length > 0) {
-            // FIXED: Better detection of pages needing processing
-            const pendingPages = pages.filter(p => 
-              !p.processing_status || 
-              p.processing_status === 'pending' || 
-              p.processing_status === null
-            );
-            const processingPages = pages.filter(p => p.processing_status === 'processing');
-            const processedPages = pages.filter(p => p.processing_status === 'processed');
-            const failedPages = pages.filter(p => p.processing_status === 'failed');
-
-            console.log(`📊 Website source ${source.title}:`, {
-              totalPages: pages.length,
-              pending: pendingPages.length,
-              processing: processingPages.length,
-              processed: processedPages.length,
-              failed: failedPages.length
+            toast({
+              title: "Training Complete",
+              description: `Successfully processed ${chunkProgress.chunksCreated} chunks from ${chunkProgress.processedPages} pages`,
+              duration: 5000,
             });
 
-            if (failedPages.length > 0) {
-              hasFailedSources = true;
-            }
+            console.log('✅ "Training Complete" toast shown for session:', sessionId);
 
-            // FIXED: Only consider source as needing training if there are unprocessed pages
-            if (pendingPages.length > 0 || processingPages.length > 0) {
-              sourcesNeedingTraining.push(source);
-              console.log(`✅ NEEDS TRAINING: ${source.title} has ${pendingPages.length + processingPages.length} unprocessed pages`);
-            } else {
-              console.log(`✅ PROCESSED: ${source.title} all pages processed`);
-            }
-            
-            totalPagesNeedingProcessing += pages.length;
-            totalPagesProcessed += processedPages.length;
-            
-            currentlyProcessingPages.push(...processingPages.map(p => p.url || p.id));
+            window.dispatchEvent(new CustomEvent('trainingCompleted', {
+              detail: { agentId, progress: newTrainingProgress }
+            }));
           }
-        } else {
-          const hasContent = source.source_type === 'qa' ? 
-            (metadata?.question && metadata?.answer) :
-            source.content && source.content.trim().length > 0;
+        }
 
-          if (hasContent) {
-            if (metadata.processing_status === 'failed') {
-              hasFailedSources = true;
-            }
+        // Training failed - PERMANENTLY LOCK the session
+        if (chunkProgress.status === 'failed' && previousStatus !== 'failed') {
+          console.log('❌ Training failed for session:', sessionId);
+          
+          // Clear stuck detection timer
+          if (trainingStateRef.current.stuckDetectionTimer) {
+            clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+            trainingStateRef.current.stuckDetectionTimer = null;
+          }
+          
+          // PERMANENTLY LOCK this session to prevent restart toasts
+          trainingStateRef.current.completedSessions.add(sessionId);
+          trainingStateRef.current.completionLocked = true;
+          
+          const failureToastId = `failure-${sessionId}`;
+          if (!shownToastsRef.current.has(failureToastId)) {
+            shownToastsRef.current.add(failureToastId);
             
-            if (metadata.processing_status !== 'completed') {
-              sourcesNeedingTraining.push(source);
-              totalPagesNeedingProcessing += 1;
-              
-              if (metadata.processing_status === 'processing') {
-                currentlyProcessingPages.push(source.title);
-              }
-            } else {
-              totalPagesNeedingProcessing += 1;
-              totalPagesProcessed += 1;
-            }
+            toast({
+              title: "Training Failed",
+              description: "Some sources failed to process. Please check your sources and try again.",
+              variant: "destructive",
+              duration: 5000,
+            });
           }
         }
       }
-
-      const progress = totalPagesNeedingProcessing > 0 ? 
-        Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
-
-      // FIXED: Better status determination
-      let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
-      
-      console.log('🔍 IMPROVED Status determination:', {
-        sourcesNeedingTraining: sourcesNeedingTraining.length,
-        currentlyProcessingPages: currentlyProcessingPages.length,
-        hasFailedSources,
-        totalPagesNeedingProcessing,
-        totalPagesProcessed,
-        activeTrainingSession: activeTrainingSessionRef.current
-      });
-      
-      if (hasFailedSources && sourcesNeedingTraining.length === 0) {
-        status = 'failed';
-        console.log('❌ Status: FAILED (has failed sources, no pending)');
-      } else if (currentlyProcessingPages.length > 0 || activeTrainingSessionRef.current) {
-        status = 'training';
-        console.log('🔄 Status: TRAINING (pages currently processing or active session)');
-      } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
-        status = 'completed';
-        console.log('✅ Status: COMPLETED (no sources need training, all processed)');
-      } else {
-        status = 'idle';
-        console.log('⏸️ Status: IDLE (default state)');
-      }
-
-      // CRITICAL: Use existing session or create ONLY if no completion yet
-      let sessionId = currentTrainingSessionRef.current;
-      
-      // PREVENT SESSION ID REGENERATION after any completion
-      if (!sessionId && !agentCompletionStateRef.current.isCompleted) {
-        sessionId = `${agentId}-${Date.now()}`;
-        currentTrainingSessionRef.current = sessionId;
-        console.log('🆔 Created new session:', sessionId);
-      } else if (!sessionId && agentCompletionStateRef.current.isCompleted) {
-        // Use the last completed session ID to prevent new session creation
-        sessionId = agentCompletionStateRef.current.lastCompletedSessionId || `${agentId}-completed`;
-        console.log('🔒 Using last completed session ID to prevent regeneration:', sessionId);
-      }
-
-      const newProgress: TrainingProgress = {
-        agentId,
-        status,
-        progress,
-        totalSources: totalPagesNeedingProcessing,
-        processedSources: totalPagesProcessed,
-        currentlyProcessing: currentlyProcessingPages,
-        sessionId
-      };
-
-      console.log('📊 IMPROVED Training status update:', {
-        status,
-        sessionId,
-        progress,
-        sourcesNeedingTraining: sourcesNeedingTraining.length,
-        currentState: trainingStateRef.current,
-        agentCompleted: agentCompletionStateRef.current.isCompleted,
-        lastAction: lastTrainingActionRef.current,
-        activeSession: activeTrainingSessionRef.current
-      });
-
-      setTrainingProgress(newProgress);
-
-      // Handle status transitions with strengthened toast management
-      const previousStatus = trainingStateRef.current;
-      trainingStateRef.current = status;
-
-      // Training completed - AGENT-LEVEL COMPLETION HANDLING
-      if (status === 'completed' && 
-          previousStatus !== 'completed' &&
-          totalPagesNeedingProcessing > 0 &&
-          totalPagesProcessed === totalPagesNeedingProcessing &&
-          !completedSessionsRef.current.has(sessionId) &&
-          !agentCompletionStateRef.current.isCompleted) {
-        
-        console.log('🎉 IMPROVED COMPLETION! Processing completion for session:', sessionId);
-        
-        // CRITICAL: Mark agent-level completion IMMEDIATELY
-        markAgentCompletion(sessionId);
-        
-        // Mark all parent sources as trained
-        await markParentSourcesAsTrained(agentId);
-        
-        const completionToastId = `completion-${sessionId}`;
-        if (!shownToastsRef.current.has(completionToastId)) {
-          shownToastsRef.current.add(completionToastId);
-          
-          toast({
-            title: "Training Complete",
-            description: "Your AI agent is trained and ready",
-            duration: 5000,
-          });
-
-          window.dispatchEvent(new CustomEvent('trainingCompleted', {
-            detail: { agentId, progress: newProgress }
-          }));
-        }
-      }
-
-      // Training failed - clear timers on failure
-      if (status === 'failed' && previousStatus !== 'failed') {
-        console.log('❌ Training failed for session:', sessionId);
-        
-        activeTrainingSessionRef.current = '';
-        trainingStartTimeRef.current = 0;
-        clearAllTimers();
-        globalTrainingActiveRef.current = false;
-        
-        const failureToastId = `failure-${sessionId}`;
-        if (!shownToastsRef.current.has(failureToastId)) {
-          shownToastsRef.current.add(failureToastId);
-          
-          toast({
-            title: "Training Failed",
-            description: "Training process encountered an error. Please try again.",
-            variant: "destructive",
-            duration: 5000,
-          });
-        }
-      }
-
-    } catch (error) {
-      console.error('Error in IMPROVED checkTrainingCompletion:', error);
-      setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
+    } finally {
+      isProcessingStatusRef.current = false;
     }
-  };
+  }, [chunkProgress, agentId, recoverFromStuckState]);
 
   const startTraining = async () => {
-    if (!agentId) return;
+    if (!agentId) {
+      console.error('❌ No agent ID found for training');
+      return;
+    }
 
     try {
-      console.log('🚀 Starting IMPROVED training for agent:', agentId);
+      console.log('🚀 Starting training for agent:', agentId);
 
-      // CRITICAL: Reset agent-level completion state when explicitly starting training
-      console.log('🔄 Resetting agent-level completion state for explicit training start');
-      agentCompletionStateRef.current = {
-        isCompleted: false,
-        completedAt: 0,
-        lastCompletedSessionId: ''
+      // CRITICAL: Reset all completion state for new training session
+      if (trainingStateRef.current.stuckDetectionTimer) {
+        clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+      }
+
+      trainingStateRef.current = {
+        status: 'idle', // Start as idle, will change to training when chunk processing starts
+        sessionId: null, // Will be created in useEffect when status changes
+        completedSessions: new Set(),
+        permanentlyCompleted: false,
+        completionLocked: false,
+        lastProgressValue: 0,
+        stuckDetectionTimer: null
       };
 
-      // Create new session and set active training state
-      const sessionId = `training-${agentId}-${Date.now()}`;
-      
-      currentTrainingSessionRef.current = sessionId;
-      activeTrainingSessionRef.current = sessionId;
-      trainingStartTimeRef.current = Date.now();
-      trainingStateRef.current = 'training';
-      globalTrainingActiveRef.current = true;
-      lastTrainingActionRef.current = 'start';
+      console.log('✅ Training state reset for new session');
 
-      // Clear previous completion state
-      completedSessionsRef.current.clear();
-      sessionCompletionFlagRef.current.clear();
-      clearAllTimers();
-
-      console.log(`🎯 ACTIVE TRAINING SESSION STARTED: ${sessionId} at ${trainingStartTimeRef.current}`);
-
-      // Show "Training Started" toast immediately
-      const startToastId = `start-${sessionId}`;
-      if (!shownToastsRef.current.has(startToastId)) {
-        shownToastsRef.current.add(startToastId);
-        
-        console.log('📢 Showing training start toast for session:', sessionId);
-        toast({
-          title: "Training Started",
-          description: "Processing sources for AI training...",
-          duration: 3000,
-        });
-      }
-
-      const { data: agentSources, error: sourcesError } = await supabase
-        .from('agent_sources')
-        .select('id, source_type, metadata, title, content')
-        .eq('agent_id', agentId)
-        .eq('is_active', true);
-
-      if (sourcesError) throw sourcesError;
-      if (!agentSources || agentSources.length === 0) return;
-
-      const sourcesToProcess = [];
-      let totalPages = 0;
-
-      for (const source of agentSources as DatabaseSource[]) {
-        const metadata = (source.metadata as Record<string, any>) || {};
-        
-        if (source.source_type === 'website') {
-          const { data: unprocessedPages } = await supabase
-            .from('source_pages')
-            .select('id')
-            .eq('parent_source_id', source.id)
-            .eq('status', 'completed')
-            .in('processing_status', ['pending', null]);
-
-          if (unprocessedPages && unprocessedPages.length > 0) {
-            sourcesToProcess.push(source);
-            totalPages += unprocessedPages.length;
-          }
-        } else {
-          const hasContent = source.source_type === 'qa' ? 
-            (metadata?.question && metadata?.answer) :
-            source.content && source.content.trim().length > 0;
-
-          if (hasContent && metadata.processing_status !== 'completed') {
-            sourcesToProcess.push(source);
-            totalPages += 1;
-          }
-        }
-      }
-
-      if (sourcesToProcess.length === 0) {
-        trainingStateRef.current = 'completed';
-        globalTrainingActiveRef.current = false;
-        markAgentCompletion(sessionId);
-        setTrainingProgress({
-          agentId,
-          status: 'completed',
-          progress: 100,
-          totalSources: 0,
-          processedSources: 0,
-          sessionId
-        });
-        return;
-      }
-
-      // Set initial training progress
-      setTrainingProgress({
-        agentId,
-        status: 'training',
-        progress: 0,
-        totalSources: totalPages,
-        processedSources: 0,
-        currentlyProcessing: [],
-        sessionId
-      });
-
-      // Process sources
-      const processingPromises = sourcesToProcess.map(async (source) => {
-        return SourceProcessor.processSource(source);
-      });
-
-      await Promise.allSettled(processingPromises);
-
-      // Check completion after processing - only if not already completed
-      if (!agentCompletionStateRef.current.isCompleted) {
-        addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
-      }
+      // Start the actual chunk processing which will trigger training state
+      console.log('🔄 Calling startChunkProcessing...');
+      await startChunkProcessing();
+      console.log('✅ startChunkProcessing completed successfully');
 
     } catch (error) {
-      console.error('Failed to start IMPROVED training:', error);
+      console.error('❌ Failed to start training:', error);
       
-      activeTrainingSessionRef.current = '';
-      trainingStartTimeRef.current = 0;
-      trainingStateRef.current = 'failed';
-      globalTrainingActiveRef.current = false;
-      clearAllTimers();
+      trainingStateRef.current.status = 'failed';
+      trainingStateRef.current.completionLocked = true;
+      
+      // Update training progress to failed state
+      setTrainingProgress({
+        agentId: agentId!,
+        status: 'failed',
+        progress: 0,
+        totalSources: 0,
+        processedSources: 0,
+        sessionId: trainingStateRef.current.sessionId || 'failed'
+      });
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;
       
@@ -759,25 +306,48 @@ export const useTrainingNotifications = () => {
           title: "Training In Progress",
           description: "Training is already running - no action needed",
         });
-        setTrainingProgress(prev => prev ? { ...prev, status: 'training' } : null);
       } else {
         toast({
           title: "Training Failed",
-          description: "Failed to start training process",
+          description: `Failed to start training process: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: "destructive",
         });
-        setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
       }
     }
   };
 
+  const checkTrainingCompletion = () => {
+    console.log('Training completion check - delegated to chunk processing hook');
+  };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (trainingStateRef.current.stuckDetectionTimer) {
+        clearTimeout(trainingStateRef.current.stuckDetectionTimer);
+      }
+    };
+  }, []);
+
+  // Set up basic connection monitoring
+  useEffect(() => {
+    if (!agentId) return;
+
+    const channel = supabase
+      .channel(`training-notifications-${agentId}`)
+      .subscribe((status) => {
+        setIsConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [agentId]);
+
   return {
     trainingProgress,
-    startTraining: async () => {
-      if (!agentId) return;
-      await startTraining();
-    },
-    checkTrainingCompletion: () => agentId && !shouldPreventTrainingAction('check') && checkTrainingCompletion(agentId),
+    startTraining,
+    checkTrainingCompletion,
     isConnected
   };
 };
