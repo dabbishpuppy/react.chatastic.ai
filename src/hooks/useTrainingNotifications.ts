@@ -120,7 +120,7 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              setTimeout(() => checkTrainingCompletion(agentId), 100);
+              setTimeout(() => checkTrainingCompletion(agentId, false), 100);
             }
           }
         )
@@ -140,7 +140,7 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              setTimeout(() => checkTrainingCompletion(agentId), 100);
+              setTimeout(() => checkTrainingCompletion(agentId, false), 100);
             }
           }
         )
@@ -159,7 +159,7 @@ export const useTrainingNotifications = () => {
             if ((payload.new as any)?.source_type === 'website') {
               setTimeout(initializeSubscriptions, 500);
             }
-            setTimeout(() => checkTrainingCompletion(agentId), 1000);
+            setTimeout(() => checkTrainingCompletion(agentId, false), 1000);
           }
         )
         
@@ -198,7 +198,7 @@ export const useTrainingNotifications = () => {
               console.log('🔄 Connection disruption during crawl initiation - suppressing warning toast');
             }
             
-            pollInterval = setInterval(() => checkTrainingCompletion(agentId), 8000);
+            pollInterval = setInterval(() => checkTrainingCompletion(agentId, false), 8000);
           }
         });
 
@@ -215,7 +215,7 @@ export const useTrainingNotifications = () => {
     };
   }, [agentId]);
 
-  const checkTrainingCompletion = async (agentId: string) => {
+  const checkTrainingCompletion = async (agentId: string, allowAutoStart: boolean = false) => {
     try {
       const now = Date.now();
       if (now - lastCompletionCheckRef.current < 2000) {
@@ -482,7 +482,7 @@ export const useTrainingNotifications = () => {
 
       await Promise.allSettled(processingPromises);
 
-      setTimeout(() => checkTrainingCompletion(agentId), 1000);
+      setTimeout(() => checkTrainingCompletion(agentId, true), 1000);
 
     } catch (error) {
       console.error('Failed to start enhanced training:', error);
@@ -513,7 +513,7 @@ export const useTrainingNotifications = () => {
       if (!agentId) return;
       await startTraining();
     },
-    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId),
+    checkTrainingCompletion: () => agentId && checkTrainingCompletion(agentId, true),
     isConnected
   };
 };
