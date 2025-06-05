@@ -32,7 +32,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // FIXED: Enhanced training completion listener with better state management
+  // Enhanced training completion listener
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
       console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
@@ -40,10 +40,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       // Refresh stats and check status
       refetchStats();
       setTimeout(() => checkRetrainingNeeded(), 1000);
+      
+      // Clear background training state
+      setIsTrainingInBackground(false);
     };
 
     const handleTrainingContinuesInBackground = (event: CustomEvent) => {
-      console.log('📱 Training continues in background - FIXED handler:', event.detail);
+      console.log('📱 Training continues in background:', event.detail);
       setIsTrainingInBackground(true);
       setShowRetrainingDialog(false);
     };
@@ -57,7 +60,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
   }, [refetchStats, checkRetrainingNeeded]);
 
-  // FIXED: Check retraining status with better debouncing
+  // Check retraining status when stats change
   useEffect(() => {
     if (agentId && stats) {
       const timeoutId = setTimeout(() => {
@@ -66,9 +69,9 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
+  }, [agentId, checkRetrainingNeeded, stats?.totalSources]);
 
-  // FIXED: Handle training state transitions with better logic
+  // Handle training state transitions
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
       console.log('🎯 Training completed - resetting background state');
@@ -82,7 +85,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [trainingProgress?.status, retrainingNeeded?.needed, refetchStats, checkRetrainingNeeded]);
 
-  // FIXED: Listen for source events with improved debouncing
+  // Listen for source events
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout;
     
@@ -131,12 +134,11 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     setShowRetrainingDialog(true);
   };
 
-  // FIXED: Improved dialog close handling
   const handleDialogClose = (open: boolean) => {
     console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
     setShowRetrainingDialog(open);
     
-    // FIXED: Only set background training if training is actually active AND dialog is being closed
+    // If closing dialog while training is active, set background mode
     if (!open && isTrainingActive && trainingProgress?.status === 'training') {
       console.log('📱 Setting background training state - training is active');
       setIsTrainingInBackground(true);
@@ -152,7 +154,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   };
 
-  // FIXED: Better training state determination
+  // Better training state determination
   const isTrainingActive = trainingProgress?.status === 'training' || isRetraining;
   const isTrainingCompleted = trainingProgress?.status === 'completed' && !retrainingNeeded?.needed;
 

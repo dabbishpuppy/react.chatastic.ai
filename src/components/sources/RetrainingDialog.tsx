@@ -1,3 +1,4 @@
+
 import React from "react";
 import {
   Dialog,
@@ -31,16 +32,18 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // FIXED: Enhanced status determination with clearer precedence and logging
+  // Enhanced status determination with better logging
   const getCurrentStatus = () => {
-    console.log('🔍 RetrainingDialog getCurrentStatus (FIXED):', {
+    console.log('🔍 RetrainingDialog getCurrentStatus:', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
       isRetraining,
       trainingProgress: trainingProgress ? {
         status: trainingProgress.status,
         progress: trainingProgress.progress,
-        sessionId: trainingProgress.sessionId
+        sessionId: trainingProgress.sessionId,
+        processedSources: trainingProgress.processedSources,
+        totalSources: trainingProgress.totalSources
       } : null
     });
 
@@ -90,7 +93,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
   const { status: currentStatus, progress: currentProgress } = getCurrentStatus();
   
-  console.log('🔍 RetrainingDialog render state (FIXED):', {
+  console.log('🔍 RetrainingDialog render state:', {
     currentStatus,
     isRetraining,
     trainingProgressStatus: trainingProgress?.status,
@@ -120,21 +123,23 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       const currentlyProcessing = trainingProgress?.currentlyProcessing || [];
       
       if (currentlyProcessing.length > 0) {
-        return `Training in progress... (${processed}/${total} processed, ${currentlyProcessing.length} currently processing)`;
+        return `Processing sources... (${processed}/${total} completed, ${currentlyProcessing.length} in progress)`;
       }
       
       if (total > 0) {
-        return `Training in progress... (${processed}/${total} items processed)`;
+        return `Processing sources... (${processed}/${total} completed)`;
       }
-      return "Training in progress...";
+      return "Processing sources...";
     }
     
     if (currentStatus === 'failed') {
-      return "Training failed. Please try again or check your sources.";
+      return "Training failed. Please check your sources and try again.";
     }
     
     if (currentStatus === 'completed') {
-      return "Training completed successfully! Your AI agent is trained and ready.";
+      const total = getTotalCount();
+      const processed = getProcessedCount();
+      return `Training completed successfully! Processed ${processed} items and your AI agent is ready.`;
     }
     
     // Show sources that need training
@@ -146,10 +151,10 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const getDialogTitle = () => {
-    if (currentStatus === 'training') return "Agent Training Status";
+    if (currentStatus === 'training') return "Processing Sources";
     if (currentStatus === 'completed') return "Training Complete";
     if (currentStatus === 'failed') return "Training Failed";
-    if (currentStatus === 'needs_training') return "Agent Training Status";
+    if (currentStatus === 'needs_training') return "Training Required";
     return "Agent Training Status";
   };
 
@@ -181,30 +186,24 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }
   };
 
-  // FIXED: Better training start handler with state tracking
   const handleStartTraining = async () => {
-    console.log('🚀 Start Training button clicked (FIXED)');
+    console.log('🚀 Start Training button clicked');
     
     try {
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
-      
-      // Keep dialog open to show progress - it will automatically switch to background mode
-      // when user clicks "Continue in Background" or when progress reaches certain point
-      
     } catch (error) {
       console.error('❌ Failed to start training:', error);
     }
   };
 
-  // FIXED: Better background handler with proper state management
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked (FIXED)');
+    console.log('📱 Continue in background clicked');
     
     // Close the dialog first
     onOpenChange(false);
     
-    // FIXED: Dispatch event with comprehensive data
+    // Dispatch event
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
@@ -268,9 +267,12 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
                 <div className="space-y-2">
                   <div className="text-sm font-medium">Currently processing:</div>
                   <div className="text-xs text-gray-600 max-h-20 overflow-y-auto">
-                    {trainingProgress.currentlyProcessing.map((item: string, index: number) => (
+                    {trainingProgress.currentlyProcessing.slice(0, 5).map((item: string, index: number) => (
                       <div key={index} className="truncate">• {item}</div>
                     ))}
+                    {trainingProgress.currentlyProcessing.length > 5 && (
+                      <div className="text-gray-500">... and {trainingProgress.currentlyProcessing.length - 5} more</div>
+                    )}
                   </div>
                 </div>
               )}

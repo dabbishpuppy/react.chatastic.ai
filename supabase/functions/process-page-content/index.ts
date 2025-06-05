@@ -32,13 +32,14 @@ serve(async (req) => {
       );
     }
 
-    const { pageId } = requestBody;
+    const { pageId, sourceId } = requestBody;
 
-    if (!pageId) {
+    // Handle both pageId (for website pages) and sourceId (for direct sources)
+    if (!pageId && !sourceId) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'pageId is required'
+          error: 'Either pageId or sourceId is required'
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -47,6 +48,217 @@ serve(async (req) => {
       );
     }
 
+    if (sourceId) {
+      // Handle direct source processing (non-website sources)
+      console.log(`🔄 Processing direct source: ${sourceId}`);
+
+      // Get the source details
+      const { data: source, error: sourceError } = await supabase
+        .from('agent_sources')
+        .select('*')
+        .eq('id', sourceId)
+        .single();
+
+      if (sourceError || !source) {
+        console.error('❌ Source not found:', sourceError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Source not found'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
+
+      // Update metadata to mark as processing
+      const metadata = (source.metadata as Record<string, any>) || {};
+      const updatedMetadata = {
+        ...metadata,
+        processing_status: 'processing',
+        last_processing_attempt: new Date().toISOString()
+      };
+
+      await supabase
+        .from('agent_sources')
+        .update({ metadata: updatedMetadata })
+        .eq('id', sourceId);
+
+      // Process the source content
+      const content = source.content || '';
+      
+      if (!content || content.trim().length === 0) {
+        // Mark as failed if no content
+        await supabase
+          .from('agent_sources')
+          .update({ 
+            metadata: {
+              ...metadata,
+              processing_status: 'failed',
+              error_message: 'No content to process',
+              failed_at: new Date().toISOString()
+            }
+          })
+          .eq('id', sourceId);
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'No content to process',
+            sourceId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 422,
+          }
+        );
+      }
+
+      // Create semantic chunks
+      const createSemanticChunks = (content: string, maxTokens = 150) => {
+        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15);
+        const chunks = [];
+        let currentChunk = '';
+        let tokenCount = 0;
+
+        for (const sentence of sentences) {
+          const sentenceTokens = sentence.trim().split(/\s+/).length;
+          
+          if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
+            if (currentChunk.trim().length > 30) {
+              chunks.push(currentChunk.trim());
+            }
+            currentChunk = sentence;
+            tokenCount = sentenceTokens;
+          } else {
+            currentChunk += (currentChunk ? '. ' : '') + sentence;
+            tokenCount += sentenceTokens;
+          }
+        }
+        
+        if (currentChunk.trim().length > 30) {
+          chunks.push(currentChunk.trim());
+        }
+        
+        return chunks.filter(chunk => chunk.length > 20);
+      };
+
+      const chunks = createSemanticChunks(content);
+      
+      if (chunks.length > 0) {
+        const chunksToInsert = chunks.map((chunk, index) => ({
+          source_id: sourceId,
+          chunk_index: index,
+          content: chunk,
+          token_count: Math.ceil(chunk.length / 4),
+          metadata: {
+            source_type: source.source_type,
+            source_title: source.title,
+            processed_at: new Date().toISOString()
+          }
+        }));
+
+        const { error: insertError } = await supabase
+          .from('source_chunks')
+          .upsert(chunksToInsert, {
+            onConflict: 'source_id,chunk_index',
+            ignoreDuplicates: false
+          });
+
+        if (insertError) {
+          console.error('❌ Error inserting chunks:', insertError);
+          
+          await supabase
+            .from('agent_sources')
+            .update({ 
+              metadata: {
+                ...metadata,
+                processing_status: 'failed',
+                error_message: `Failed to insert chunks: ${insertError.message}`,
+                failed_at: new Date().toISOString()
+              }
+            })
+            .eq('id', sourceId);
+
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Failed to insert chunks: ${insertError.message}`,
+              sourceId
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500,
+            }
+          );
+        }
+
+        // Mark as completed
+        await supabase
+          .from('agent_sources')
+          .update({ 
+            metadata: {
+              ...metadata,
+              processing_status: 'completed',
+              chunks_created: chunks.length,
+              completed_at: new Date().toISOString()
+            }
+          })
+          .eq('id', sourceId);
+
+        console.log(`✅ Direct source processed: ${chunks.length} chunks created`);
+
+        // Generate embeddings
+        try {
+          await supabase.functions.invoke('generate-embeddings', {
+            body: { sourceId }
+          });
+        } catch (error) {
+          console.warn('⚠️ Could not trigger embedding generation:', error);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              chunksCreated: chunks.length,
+              message: 'Source processed successfully',
+              sourceId
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        // Mark as failed if no chunks created
+        await supabase
+          .from('agent_sources')
+          .update({ 
+            metadata: {
+              ...metadata,
+              processing_status: 'failed',
+              error_message: 'No meaningful chunks could be created',
+              failed_at: new Date().toISOString()
+            }
+          })
+          .eq('id', sourceId);
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'No meaningful chunks could be created',
+            sourceId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 422,
+          }
+        );
+      }
+    }
+
+    // Original pageId processing logic continues here...
     console.log(`🔄 Processing content for page: ${pageId}`);
 
     // FIXED: Use atomic update with proper concurrency control for processing_status
