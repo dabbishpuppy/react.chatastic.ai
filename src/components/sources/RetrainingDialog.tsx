@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, AlertCircle, Loader2, FileText, Globe, HelpCircle, File } from "lucide-react";
-import { useTrainingStatusDebounced } from "@/hooks/useTrainingStatusDebounced";
 
 interface RetrainingDialogProps {
   open: boolean;
@@ -33,13 +32,55 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // Use debounced status to prevent rapid switching
-  const debouncedStatus = useTrainingStatusDebounced(trainingProgress, retrainingNeeded);
+  // Simplified status logic - no debouncing to prevent flickering
+  const getCurrentStatus = () => {
+    // If isRetraining is true, always show training state
+    if (isRetraining) {
+      return {
+        status: 'training',
+        progress: trainingProgress?.progress || 0
+      };
+    }
+    
+    // If training progress indicates active training, show training state
+    if (trainingProgress?.status === 'training') {
+      return {
+        status: 'training',
+        progress: trainingProgress.progress || 0
+      };
+    }
+    
+    // If training is completed
+    if (trainingProgress?.status === 'completed') {
+      return {
+        status: 'completed',
+        progress: 100
+      };
+    }
+    
+    // If training failed
+    if (trainingProgress?.status === 'failed') {
+      return {
+        status: 'failed',
+        progress: trainingProgress?.progress || 0
+      };
+    }
+    
+    // Default to showing retraining needed state
+    return {
+      status: retrainingNeeded?.needed ? 'needs_training' : 'up_to_date',
+      progress: 0
+    };
+  };
+
+  const { status: currentStatus, progress: currentProgress } = getCurrentStatus();
   
-  console.log('🔍 RetrainingDialog - Debounced status:', {
-    debouncedStatus,
+  console.log('🔍 RetrainingDialog render state:', {
+    currentStatus,
+    isRetraining,
     trainingProgressStatus: trainingProgress?.status,
-    retrainingNeeded: retrainingNeeded?.needed
+    retrainingNeeded: retrainingNeeded?.needed,
+    currentProgress
   });
 
   const getProcessedCount = () => {
@@ -57,9 +98,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   };
 
   const getStatusMessage = () => {
-    const { status, progress } = debouncedStatus;
-    
-    if (status === 'training') {
+    if (currentStatus === 'training') {
       const processed = getProcessedCount();
       const total = getTotalCount();
       const currentlyProcessing = trainingProgress?.currentlyProcessing || [];
@@ -74,11 +113,11 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
       return "Training in progress...";
     }
     
-    if (status === 'failed') {
+    if (currentStatus === 'failed') {
       return "Training failed. Please try again or check your sources.";
     }
     
-    if (status === 'completed') {
+    if (currentStatus === 'completed') {
       return "Training completed successfully! Your AI agent is trained and ready.";
     }
     
@@ -138,20 +177,9 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }));
   };
 
-  const { status: currentStatus, progress: currentProgress } = debouncedStatus;
   const isTrainingActive = currentStatus === 'training';
   const isTrainingCompleted = currentStatus === 'completed';
   const isTrainingFailed = currentStatus === 'failed';
-
-  console.log('🔍 RetrainingDialog render state:', {
-    currentStatus,
-    isTrainingActive,
-    isTrainingCompleted,
-    isTrainingFailed,
-    currentProgress,
-    processedCount: getProcessedCount(),
-    totalCount: getTotalCount()
-  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
