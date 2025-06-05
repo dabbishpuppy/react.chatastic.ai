@@ -26,24 +26,26 @@ interface DatabaseSource {
 export const useTrainingNotifications = () => {
   const { agentId } = useParams();
   
-  // Simplified refs for better state management
+  // State management refs - FIXED: More conservative prevention logic
   const pageLoadTimestampRef = useRef<number>(Date.now());
   const hasEverConnectedRef = useRef<boolean>(false);
   const crawlInitiationInProgressRef = useRef<boolean>(false);
   const crawlInitiationStartTimeRef = useRef<number>(0);
   
-  // CRITICAL: Agent-level completion tracking - PERMANENT STATE
+  // FIXED: Agent-level completion tracking with better isolation
   const agentCompletionStateRef = useRef<{
     isCompleted: boolean;
     completedAt: number;
     lastCompletedSessionId: string;
+    gracePeriodActive: boolean;
   }>({
     isCompleted: false,
     completedAt: 0,
-    lastCompletedSessionId: ''
+    lastCompletedSessionId: '',
+    gracePeriodActive: false
   });
   
-  // Training state management - STRENGTHENED
+  // FIXED: Training state management with better session isolation
   const currentTrainingSessionRef = useRef<string>('');
   const trainingStateRef = useRef<'idle' | 'training' | 'completed' | 'failed'>('idle');
   const completedSessionsRef = useRef<Set<string>>(new Set());
@@ -55,10 +57,11 @@ export const useTrainingNotifications = () => {
   // Timer tracking for cleanup
   const pendingTimersRef = useRef<Set<NodeJS.Timeout>>(new Set());
   
-  // CRITICAL: Completion and session isolation flags
+  // FIXED: More conservative completion and session isolation flags
   const sessionCompletionFlagRef = useRef<Set<string>>(new Set());
   const globalTrainingActiveRef = useRef<boolean>(false);
   const lastTrainingActionRef = useRef<'start' | 'complete' | 'none'>('none');
+  const trainingInitiatedByUserRef = useRef<boolean>(false);
   
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -80,43 +83,42 @@ export const useTrainingNotifications = () => {
     return timer;
   };
 
-  // CRITICAL: Check if we should prevent any training action - ENHANCED
+  // FIXED: Much more conservative prevention logic
   const shouldPreventTrainingAction = (action: 'start' | 'check', sessionId?: string): boolean => {
     const now = Date.now();
-    const recentActionThreshold = 5000; // Increased to 5 seconds
     
-    // AGENT-LEVEL COMPLETION CHECK - HIGHEST PRIORITY
-    if (agentCompletionStateRef.current.isCompleted) {
+    // CRITICAL: Only prevent during active grace period, not after completion
+    if (agentCompletionStateRef.current.gracePeriodActive) {
       const timeSinceCompletion = now - agentCompletionStateRef.current.completedAt;
-      if (timeSinceCompletion < 30000) { // 30 second grace period
-        console.log(`🚫 AGENT-LEVEL: Preventing ${action} - agent completed ${timeSinceCompletion}ms ago`);
+      if (timeSinceCompletion < 10000) { // Reduced to 10 seconds
+        console.log(`🚫 GRACE PERIOD: Preventing ${action} - in grace period (${timeSinceCompletion}ms)`);
+        return true;
+      } else {
+        // Grace period expired, clear it
+        agentCompletionStateRef.current.gracePeriodActive = false;
+        console.log(`✅ Grace period expired, allowing actions again`);
+      }
+    }
+    
+    // FIXED: Only prevent checks for recently completed sessions, not all actions
+    if (action === 'check' && sessionId && sessionCompletionFlagRef.current.has(sessionId)) {
+      const timeSinceAction = now - lastCompletionCheckRef.current;
+      if (timeSinceAction < 5000) { // Reduced debounce time
+        console.log(`🚫 Preventing check for completed session: ${sessionId}`);
         return true;
       }
     }
     
-    // If we just completed training, block all actions for a period
-    if (lastTrainingActionRef.current === 'complete' && 
-        now - lastCompletionCheckRef.current < recentActionThreshold) {
-      console.log(`🚫 Preventing ${action} - recently completed training`);
-      return true;
-    }
-    
-    // If this specific session has completed, block all actions for it
-    if (sessionId && sessionCompletionFlagRef.current.has(sessionId)) {
-      console.log(`🚫 Preventing ${action} for completed session: ${sessionId}`);
-      return true;
-    }
-    
-    // If global training is completed state, prevent start actions
-    if (action === 'start' && trainingStateRef.current === 'completed') {
-      console.log(`🚫 Preventing start - global training state is completed`);
+    // FIXED: Don't prevent start actions unless explicitly in training
+    if (action === 'start' && globalTrainingActiveRef.current && trainingStateRef.current === 'training') {
+      console.log(`🚫 Preventing start - training already active`);
       return true;
     }
     
     return false;
   };
 
-  // CRITICAL: Mark agent-level completion - PERMANENT STATE
+  // FIXED: Mark agent-level completion with grace period management
   const markAgentCompletion = (sessionId: string) => {
     const now = Date.now();
     console.log(`🎯 MARKING AGENT-LEVEL COMPLETION for session: ${sessionId}`);
@@ -124,28 +126,31 @@ export const useTrainingNotifications = () => {
     agentCompletionStateRef.current = {
       isCompleted: true,
       completedAt: now,
-      lastCompletedSessionId: sessionId
+      lastCompletedSessionId: sessionId,
+      gracePeriodActive: true
     };
     
-    // Clear all timers immediately
-    clearAllTimers();
+    // Clear grace period after a short time
+    addTrackedTimer(() => {
+      agentCompletionStateRef.current.gracePeriodActive = false;
+      console.log(`✅ Grace period ended for session: ${sessionId}`);
+    }, 10000);
     
     // Mark global states
     globalTrainingActiveRef.current = false;
     lastTrainingActionRef.current = 'complete';
     lastCompletionCheckRef.current = now;
     
-    // Mark this session and all related sessions as completed
+    // Mark this session as completed
     completedSessionsRef.current.add(sessionId);
     sessionCompletionFlagRef.current.add(sessionId);
   };
 
-  // New function to mark parent sources as trained
+  // Mark parent sources as trained
   const markParentSourcesAsTrained = async (agentId: string) => {
     try {
       console.log('🎓 Marking parent sources as trained for agent:', agentId);
       
-      // Get all parent sources (sources without parent_source_id)
       const { data: parentSources, error } = await supabase
         .from('agent_sources')
         .select('id, metadata')
@@ -159,7 +164,6 @@ export const useTrainingNotifications = () => {
       }
 
       if (parentSources && parentSources.length > 0) {
-        // Update each parent source to mark as trained
         const updatePromises = parentSources.map(source => {
           const existingMetadata = (source.metadata as Record<string, any>) || {};
           const updatedMetadata = {
@@ -182,7 +186,7 @@ export const useTrainingNotifications = () => {
     }
   };
 
-  // Listen for crawl initiation events to suppress false connection warnings
+  // Listen for crawl initiation events
   useEffect(() => {
     const handleCrawlStarted = () => {
       console.log('🚀 Crawl initiation detected - extending connection grace period');
@@ -213,7 +217,7 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up IMPROVED training notifications for agent:', agentId);
+    console.log('🔔 Setting up FIXED training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -243,7 +247,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`improved-training-notifications-${agentId}`)
+        .channel(`fixed-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -258,13 +262,10 @@ export const useTrainingNotifications = () => {
             const oldPage = payload.old as any;
             
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
-              // CRITICAL: Check agent-level completion first
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from source_pages update');
-                return;
+              // FIXED: More conservative prevention check
+              if (!shouldPreventTrainingAction('check')) {
+                addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
               }
-              
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -284,13 +285,10 @@ export const useTrainingNotifications = () => {
             const oldMetadata = oldSource?.metadata || {};
             
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
-              // CRITICAL: Check agent-level completion first
-              if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from agent_sources update');
-                return;
+              // FIXED: More conservative prevention check
+              if (!shouldPreventTrainingAction('check')) {
+                addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
               }
-              
-              addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
         )
@@ -308,7 +306,7 @@ export const useTrainingNotifications = () => {
               addTrackedTimer(initializeSubscriptions, 500);
             }
             
-            // CRITICAL: Check agent-level completion first
+            // FIXED: More conservative prevention check
             if (!shouldPreventTrainingAction('check')) {
               addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
             }
@@ -335,7 +333,7 @@ export const useTrainingNotifications = () => {
               !isCrawlRecentlyStarted;
             
             if (shouldShowConnectionWarning) {
-              console.log('⚠️ Showing connection issue toast - not related to crawl initiation');
+              console.log('⚠️ Showing connection issue toast');
               toast({
                 title: "Connection Issue",
                 description: "Training updates may be delayed. We're working on it.",
@@ -369,14 +367,14 @@ export const useTrainingNotifications = () => {
     try {
       const now = Date.now();
       
-      // CRITICAL: Agent-level completion check FIRST
+      // FIXED: More conservative prevention check
       if (shouldPreventTrainingAction('check')) {
-        console.log('🚫 AGENT-LEVEL: Prevented checkTrainingCompletion');
+        console.log('🚫 Prevented checkTrainingCompletion');
         return;
       }
       
-      // Debounce to prevent excessive calls
-      if (now - lastCompletionCheckRef.current < 3000) {
+      // FIXED: Reduced debounce time
+      if (now - lastCompletionCheckRef.current < 2000) {
         console.log('🚫 Debounced checkTrainingCompletion call');
         return;
       }
@@ -403,7 +401,7 @@ export const useTrainingNotifications = () => {
       let currentlyProcessingPages: string[] = [];
       let hasFailedSources = false;
 
-      console.log('🔍 IMPROVED: Checking training completion for', agentSources.length, 'sources');
+      console.log('🔍 FIXED: Checking training completion for', agentSources.length, 'sources');
 
       for (const source of agentSources as DatabaseSource[]) {
         const metadata = (source.metadata as Record<string, any>) || {};
@@ -416,7 +414,6 @@ export const useTrainingNotifications = () => {
             .eq('status', 'completed');
 
           if (pages && pages.length > 0) {
-            // FIXED: Better detection of pages needing processing
             const pendingPages = pages.filter(p => 
               !p.processing_status || 
               p.processing_status === 'pending' || 
@@ -438,7 +435,6 @@ export const useTrainingNotifications = () => {
               hasFailedSources = true;
             }
 
-            // FIXED: Only consider source as needing training if there are unprocessed pages
             if (pendingPages.length > 0 || processingPages.length > 0) {
               sourcesNeedingTraining.push(source);
               console.log(`✅ NEEDS TRAINING: ${source.title} has ${pendingPages.length + processingPages.length} unprocessed pages`);
@@ -479,23 +475,25 @@ export const useTrainingNotifications = () => {
       const progress = totalPagesNeedingProcessing > 0 ? 
         Math.round((totalPagesProcessed / totalPagesNeedingProcessing) * 100) : 100;
 
-      // FIXED: Better status determination
+      // FIXED: Better status determination with user-initiated training awareness
       let status: 'idle' | 'training' | 'completed' | 'failed' = 'idle';
       
-      console.log('🔍 IMPROVED Status determination:', {
+      console.log('🔍 FIXED Status determination:', {
         sourcesNeedingTraining: sourcesNeedingTraining.length,
         currentlyProcessingPages: currentlyProcessingPages.length,
         hasFailedSources,
         totalPagesNeedingProcessing,
-        totalPagesProcessed
+        totalPagesProcessed,
+        trainingInitiatedByUser: trainingInitiatedByUserRef.current,
+        globalTrainingActive: globalTrainingActiveRef.current
       });
       
       if (hasFailedSources && sourcesNeedingTraining.length === 0) {
         status = 'failed';
         console.log('❌ Status: FAILED (has failed sources, no pending)');
-      } else if (currentlyProcessingPages.length > 0) {
+      } else if (currentlyProcessingPages.length > 0 || globalTrainingActiveRef.current) {
         status = 'training';
-        console.log('🔄 Status: TRAINING (pages currently processing)');
+        console.log('🔄 Status: TRAINING (pages currently processing or training active)');
       } else if (sourcesNeedingTraining.length === 0 && totalPagesNeedingProcessing > 0) {
         status = 'completed';
         console.log('✅ Status: COMPLETED (no sources need training, all processed)');
@@ -504,18 +502,16 @@ export const useTrainingNotifications = () => {
         console.log('⏸️ Status: IDLE (default state)');
       }
 
-      // CRITICAL: Use existing session or create ONLY if no completion yet
+      // FIXED: Better session management - don't regenerate sessions unnecessarily
       let sessionId = currentTrainingSessionRef.current;
       
-      // PREVENT SESSION ID REGENERATION after any completion
-      if (!sessionId && !agentCompletionStateRef.current.isCompleted) {
+      if (!sessionId && (status === 'training' || trainingInitiatedByUserRef.current)) {
         sessionId = `${agentId}-${Date.now()}`;
         currentTrainingSessionRef.current = sessionId;
-        console.log('🆔 Created new session:', sessionId);
-      } else if (!sessionId && agentCompletionStateRef.current.isCompleted) {
-        // Use the last completed session ID to prevent new session creation
-        sessionId = agentCompletionStateRef.current.lastCompletedSessionId || `${agentId}-completed`;
-        console.log('🔒 Using last completed session ID to prevent regeneration:', sessionId);
+        console.log('🆔 Created new session for active training:', sessionId);
+      } else if (!sessionId) {
+        sessionId = `${agentId}-check`;
+        console.log('🔍 Using temporary session for check:', sessionId);
       }
 
       const newProgress: TrainingProgress = {
@@ -528,37 +524,39 @@ export const useTrainingNotifications = () => {
         sessionId
       };
 
-      console.log('📊 IMPROVED Training status update:', {
+      console.log('📊 FIXED Training status update:', {
         status,
         sessionId,
         progress,
         sourcesNeedingTraining: sourcesNeedingTraining.length,
         currentState: trainingStateRef.current,
-        agentCompleted: agentCompletionStateRef.current.isCompleted,
-        lastAction: lastTrainingActionRef.current
+        gracePeriodActive: agentCompletionStateRef.current.gracePeriodActive
       });
 
       setTrainingProgress(newProgress);
 
-      // Handle status transitions with strengthened toast management
+      // FIXED: Handle status transitions with better state management
       const previousStatus = trainingStateRef.current;
       trainingStateRef.current = status;
 
-      // Training completed - AGENT-LEVEL COMPLETION HANDLING
+      // Training completed - FIXED: Only trigger completion once per session
       if (status === 'completed' && 
           previousStatus !== 'completed' &&
           totalPagesNeedingProcessing > 0 &&
           totalPagesProcessed === totalPagesNeedingProcessing &&
           !completedSessionsRef.current.has(sessionId) &&
-          !agentCompletionStateRef.current.isCompleted) {
+          !agentCompletionStateRef.current.gracePeriodActive) {
         
-        console.log('🎉 IMPROVED COMPLETION! Processing completion for session:', sessionId);
+        console.log('🎉 FIXED COMPLETION! Processing completion for session:', sessionId);
         
         // CRITICAL: Mark agent-level completion IMMEDIATELY
         markAgentCompletion(sessionId);
         
         // Mark all parent sources as trained
         await markParentSourcesAsTrained(agentId);
+        
+        // Reset user-initiated flag
+        trainingInitiatedByUserRef.current = false;
         
         const completionToastId = `completion-${sessionId}`;
         if (!shownToastsRef.current.has(completionToastId)) {
@@ -576,12 +574,13 @@ export const useTrainingNotifications = () => {
         }
       }
 
-      // Training failed - clear timers on failure
+      // Training failed
       if (status === 'failed' && previousStatus !== 'failed') {
         console.log('❌ Training failed for session:', sessionId);
         
         clearAllTimers();
         globalTrainingActiveRef.current = false;
+        trainingInitiatedByUserRef.current = false;
         
         const failureToastId = `failure-${sessionId}`;
         if (!shownToastsRef.current.has(failureToastId)) {
@@ -597,7 +596,7 @@ export const useTrainingNotifications = () => {
       }
 
     } catch (error) {
-      console.error('Error in IMPROVED checkTrainingCompletion:', error);
+      console.error('Error in FIXED checkTrainingCompletion:', error);
       setTrainingProgress(prev => prev ? { ...prev, status: 'failed' } : null);
     }
   };
@@ -606,20 +605,23 @@ export const useTrainingNotifications = () => {
     if (!agentId) return;
 
     try {
-      console.log('🚀 Starting IMPROVED training for agent:', agentId);
+      console.log('🚀 Starting FIXED training for agent:', agentId);
 
-      // CRITICAL: Agent-level completion check FIRST
+      // FIXED: More conservative prevention check for starts
       if (shouldPreventTrainingAction('start')) {
-        console.log('🚫 AGENT-LEVEL: PREVENTED training start - conditions not met');
+        console.log('🚫 PREVENTED training start - conditions not met');
         return;
       }
 
-      // Reset agent-level completion state when explicitly starting training
-      console.log('🔄 Resetting agent-level completion state for new training');
+      // FIXED: Set user-initiated flag and reset completion state properly
+      trainingInitiatedByUserRef.current = true;
+      
+      console.log('🔄 Resetting completion state for new user-initiated training');
       agentCompletionStateRef.current = {
         isCompleted: false,
         completedAt: 0,
-        lastCompletedSessionId: ''
+        lastCompletedSessionId: '',
+        gracePeriodActive: false
       };
 
       // Create new session
@@ -690,6 +692,7 @@ export const useTrainingNotifications = () => {
       if (sourcesToProcess.length === 0) {
         trainingStateRef.current = 'completed';
         globalTrainingActiveRef.current = false;
+        trainingInitiatedByUserRef.current = false;
         markAgentCompletion(sessionId);
         setTrainingProgress({
           agentId,
@@ -720,16 +723,17 @@ export const useTrainingNotifications = () => {
 
       await Promise.allSettled(processingPromises);
 
-      // Check completion after processing - only if not already completed
-      if (!agentCompletionStateRef.current.isCompleted) {
+      // Check completion after processing
+      if (!agentCompletionStateRef.current.gracePeriodActive) {
         addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
       }
 
     } catch (error) {
-      console.error('Failed to start IMPROVED training:', error);
+      console.error('Failed to start FIXED training:', error);
       
       trainingStateRef.current = 'failed';
       globalTrainingActiveRef.current = false;
+      trainingInitiatedByUserRef.current = false;
       clearAllTimers();
       
       const isConflictError = error?.message?.includes('409') || error?.status === 409;

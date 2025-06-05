@@ -1,4 +1,3 @@
-
 import React from "react";
 import {
   Dialog,
@@ -32,18 +31,22 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
   onStartRetraining,
   trainingProgress
 }) => {
-  // FIXED: Enhanced status determination with better precedence
+  // FIXED: Enhanced status determination with clearer precedence and logging
   const getCurrentStatus = () => {
-    console.log('🔍 RetrainingDialog getCurrentStatus:', {
+    console.log('🔍 RetrainingDialog getCurrentStatus (FIXED):', {
       retrainingNeeded: retrainingNeeded?.needed,
       trainingProgressStatus: trainingProgress?.status,
       isRetraining,
-      trainingProgress
+      trainingProgress: trainingProgress ? {
+        status: trainingProgress.status,
+        progress: trainingProgress.progress,
+        sessionId: trainingProgress.sessionId
+      } : null
     });
 
     // PRIORITY 1: If currently training, show training state
     if (isRetraining || trainingProgress?.status === 'training') {
-      console.log('✅ Status: training (active training)');
+      console.log('✅ Status: training (active training detected)');
       return {
         status: 'training',
         progress: trainingProgress?.progress || 0
@@ -70,7 +73,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     
     // PRIORITY 4: If retraining is explicitly needed, show that state
     if (retrainingNeeded?.needed) {
-      console.log('✅ Status: needs_training (retraining needed)');
+      console.log('✅ Status: needs_training (retraining explicitly needed)');
       return {
         status: 'needs_training',
         progress: 0
@@ -78,7 +81,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }
     
     // DEFAULT: Up to date state
-    console.log('✅ Status: up_to_date (default)');
+    console.log('✅ Status: up_to_date (default - no issues detected)');
     return {
       status: 'up_to_date',
       progress: 0
@@ -87,12 +90,13 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
 
   const { status: currentStatus, progress: currentProgress } = getCurrentStatus();
   
-  console.log('🔍 RetrainingDialog render state:', {
+  console.log('🔍 RetrainingDialog render state (FIXED):', {
     currentStatus,
     isRetraining,
     trainingProgressStatus: trainingProgress?.status,
     retrainingNeeded: retrainingNeeded?.needed,
-    currentProgress
+    currentProgress,
+    open
   });
 
   const getProcessedCount = () => {
@@ -177,29 +181,36 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
     }
   };
 
+  // FIXED: Better training start handler with state tracking
   const handleStartTraining = async () => {
-    console.log('🚀 Start Training button clicked');
+    console.log('🚀 Start Training button clicked (FIXED)');
     
     try {
       await onStartRetraining();
       console.log('✅ Training initiated successfully');
+      
+      // Keep dialog open to show progress - it will automatically switch to background mode
+      // when user clicks "Continue in Background" or when progress reaches certain point
+      
     } catch (error) {
       console.error('❌ Failed to start training:', error);
     }
   };
 
+  // FIXED: Better background handler with proper state management
   const handleContinueInBackground = () => {
-    console.log('📱 Continue in background clicked - enhanced');
+    console.log('📱 Continue in background clicked (FIXED)');
     
     // Close the dialog first
     onOpenChange(false);
     
-    // FIXED: Dispatch event with better data
+    // FIXED: Dispatch event with comprehensive data
     window.dispatchEvent(new CustomEvent('trainingContinuesInBackground', {
       detail: { 
         agentId: trainingProgress?.agentId,
         sessionId: trainingProgress?.sessionId,
-        status: 'background'
+        status: 'background',
+        timestamp: Date.now()
       }
     }));
     
@@ -340,7 +351,7 @@ export const RetrainingDialog: React.FC<RetrainingDialogProps> = ({
               <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
                 Cancel
               </Button>
-              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="w-full">
+              <Button onClick={handleStartTraining} disabled={isTrainingActive} className="flex-1">
                 Start Training
               </Button>
             </div>
