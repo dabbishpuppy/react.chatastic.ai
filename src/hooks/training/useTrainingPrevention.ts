@@ -1,10 +1,10 @@
-
 import { TrainingRefs } from './types';
 
 export const useTrainingPrevention = (refs: TrainingRefs) => {
   const shouldPreventTrainingAction = (action: 'start' | 'check', sessionId?: string): boolean => {
     const now = Date.now();
     const recentActionThreshold = 5000;
+    const completionCooldownThreshold = 45000; // Extended from 30s to 45s
     
     if (action === 'start') {
       console.log('✅ Allowing explicit training start action');
@@ -17,18 +17,22 @@ export const useTrainingPrevention = (refs: TrainingRefs) => {
       return true;
     }
     
+    // ENHANCED: Stronger completion state protection with longer cooldown
     if (refs.agentCompletionStateRef.current.isCompleted) {
       const timeSinceCompletion = now - refs.agentCompletionStateRef.current.completedAt;
-      if (timeSinceCompletion < 30000) {
-        console.log(`🚫 AGENT-LEVEL: Preventing ${action} - agent completed ${timeSinceCompletion}ms ago`);
+      if (timeSinceCompletion < completionCooldownThreshold) {
+        console.log(`🚫 ENHANCED AGENT-LEVEL: Preventing ${action} - agent completed ${timeSinceCompletion}ms ago (cooldown: ${completionCooldownThreshold}ms)`);
         return true;
       }
     }
     
-    if (refs.lastTrainingActionRef.current === 'complete' && 
-        now - refs.lastCompletionCheckRef.current < recentActionThreshold) {
-      console.log(`🚫 Preventing ${action} - recently completed training`);
-      return true;
+    // ENHANCED: Prevent actions immediately after completion marking
+    if (refs.lastTrainingActionRef.current === 'complete') {
+      const timeSinceLastCompletion = now - refs.lastCompletionCheckRef.current;
+      if (timeSinceLastCompletion < completionCooldownThreshold) {
+        console.log(`🚫 ENHANCED: Preventing ${action} - recently completed training (${timeSinceLastCompletion}ms ago)`);
+        return true;
+      }
     }
     
     if (sessionId && refs.sessionCompletionFlagRef.current.has(sessionId)) {
@@ -39,9 +43,36 @@ export const useTrainingPrevention = (refs: TrainingRefs) => {
     return false;
   };
 
+  // ENHANCED: Helper function to detect completion-related database updates
+  const isCompletionRelatedUpdate = (oldData: any, newData: any): boolean => {
+    if (!oldData || !newData) return false;
+    
+    const oldMetadata = oldData.metadata || {};
+    const newMetadata = newData.metadata || {};
+    
+    // Check if this is just a completion bookkeeping update
+    const isTrainingCompletedUpdate = 
+      !oldMetadata.training_completed && newMetadata.training_completed;
+    
+    const isLastTrainedAtUpdate = 
+      oldMetadata.last_trained_at !== newMetadata.last_trained_at && 
+      newMetadata.last_trained_at;
+    
+    const hasNoProcessingStatusChange = 
+      oldMetadata.processing_status === newMetadata.processing_status;
+    
+    // If only completion bookkeeping changed, consider it completion-related
+    if ((isTrainingCompletedUpdate || isLastTrainedAtUpdate) && hasNoProcessingStatusChange) {
+      console.log('🔍 ENHANCED: Detected completion-related database update, ignoring');
+      return true;
+    }
+    
+    return false;
+  };
+
   const markAgentCompletion = (sessionId: string) => {
     const now = Date.now();
-    console.log(`🎯 MARKING AGENT-LEVEL COMPLETION for session: ${sessionId}`);
+    console.log(`🎯 ENHANCED MARKING AGENT-LEVEL COMPLETION for session: ${sessionId}`);
     
     refs.agentCompletionStateRef.current = {
       isCompleted: true,
@@ -57,10 +88,16 @@ export const useTrainingPrevention = (refs: TrainingRefs) => {
     
     refs.completedSessionsRef.current.add(sessionId);
     refs.sessionCompletionFlagRef.current.add(sessionId);
+    
+    // ENHANCED: Set a longer protection period
+    setTimeout(() => {
+      console.log('🔓 ENHANCED: Completion protection period ended, allowing new training checks');
+    }, 45000);
   };
 
   return {
     shouldPreventTrainingAction,
-    markAgentCompletion
+    markAgentCompletion,
+    isCompletionRelatedUpdate
   };
 };

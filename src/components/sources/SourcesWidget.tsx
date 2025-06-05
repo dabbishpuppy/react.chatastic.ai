@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useAgentSourceStats } from "@/hooks/useAgentSourceStats";
 import { useAgentSourcesRealtime } from "@/hooks/useAgentSourcesRealtime";
@@ -31,12 +32,10 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Set up centralized real-time subscription
   useAgentSourcesRealtime();
 
-  // Enhanced: Listen for training completion events (NO DUPLICATE TOAST)
+  // ENHANCED: Listen for training completion events with better cleanup
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
-      console.log('🎉 Training completed event received in SourcesWidget:', event.detail);
-      
-      // REMOVED: Duplicate toast notification - now handled only in useTrainingNotifications
+      console.log('🎉 ENHANCED: Training completed event received in SourcesWidget:', event.detail);
       
       // Refresh stats and check status
       refetchStats();
@@ -44,17 +43,17 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     };
 
     const handleTrainingContinuesInBackground = (event: CustomEvent) => {
-      console.log('📱 Training continues in background - enhanced handler:', event.detail);
+      console.log('📱 ENHANCED: Training continues in background:', event.detail);
       setIsTrainingInBackground(true);
-      
-      // Also close the dialog if it's open
       setShowRetrainingDialog(false);
     };
 
+    // ENHANCED: Add event listener cleanup tracking
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     window.addEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     
     return () => {
+      console.log('🧹 ENHANCED: Cleaning up SourcesWidget event listeners');
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('trainingContinuesInBackground', handleTrainingContinuesInBackground as EventListener);
     };
@@ -67,13 +66,13 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     }
   }, [agentId, checkRetrainingNeeded, stats?.totalSources, stats?.requiresTraining, stats?.unprocessedCrawledPages]);
 
-  // Enhanced: Handle training state transitions
+  // Enhanced: Handle training state transitions with better protection
   useEffect(() => {
     if (trainingProgress?.status === 'completed' && !retrainingNeeded?.needed) {
-      console.log('🎯 Training completed - resetting background state');
+      console.log('🎯 ENHANCED: Training completed - resetting background state');
       setIsTrainingInBackground(false);
       
-      // Refresh stats after completion
+      // Refresh stats after completion with delay to avoid race conditions
       setTimeout(() => {
         refetchStats();
         checkRetrainingNeeded();
@@ -84,6 +83,8 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   // Enhanced: Listen for source events with better debouncing
   useEffect(() => {
     const handleSourceEvent = (event: CustomEvent) => {
+      console.log('🔄 ENHANCED: Source event received:', event.type);
+      
       // Reset background training state when sources change
       setIsTrainingInBackground(false);
       
@@ -100,6 +101,7 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
     });
     
     return () => {
+      console.log('🧹 ENHANCED: Cleaning up source event listeners');
       eventTypes.forEach(eventType => {
         window.removeEventListener(eventType, handleSourceEvent as EventListener);
       });
@@ -118,12 +120,12 @@ const SourcesWidget: React.FC<SourcesWidgetProps> = ({ currentTab }) => {
   };
 
   const handleDialogClose = (open: boolean) => {
-    console.log('🔄 Dialog close requested:', { open, isTraining: isTrainingActive });
+    console.log('🔄 ENHANCED: Dialog close requested:', { open, isTraining: isTrainingActive });
     setShowRetrainingDialog(open);
     
-    // FIXED: Only set background training if training is actually active
+    // Only set background training if training is actually active
     if (!open && isTrainingActive) {
-      console.log('📱 Setting background training state');
+      console.log('📱 ENHANCED: Setting background training state');
       setIsTrainingInBackground(true);
     }
   };

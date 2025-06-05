@@ -31,8 +31,8 @@ export const useTrainingNotifications = () => {
     return timer;
   };
 
-  // Initialize prevention logic
-  const { shouldPreventTrainingAction, markAgentCompletion } = useTrainingPrevention(refs);
+  // Initialize prevention logic with enhanced filtering
+  const { shouldPreventTrainingAction, markAgentCompletion, isCompletionRelatedUpdate } = useTrainingPrevention(refs);
 
   // Initialize completion logic
   const { checkTrainingCompletion } = useTrainingCompletion(
@@ -84,7 +84,7 @@ export const useTrainingNotifications = () => {
   useEffect(() => {
     if (!agentId) return;
 
-    console.log('🔔 Setting up IMPROVED training notifications for agent:', agentId);
+    console.log('🔔 Setting up ENHANCED training notifications for agent:', agentId);
 
     let pollInterval: NodeJS.Timeout;
     let websiteSources: string[] = [];
@@ -114,7 +114,7 @@ export const useTrainingNotifications = () => {
 
     const setupRealtimeChannels = () => {
       const channel = supabase
-        .channel(`improved-training-notifications-${agentId}`)
+        .channel(`enhanced-training-notifications-${agentId}`)
         
         .on(
           'postgres_changes',
@@ -128,12 +128,19 @@ export const useTrainingNotifications = () => {
             const updatedPage = payload.new as any;
             const oldPage = payload.old as any;
             
+            // ENHANCED: Filter out completion-related updates
+            if (isCompletionRelatedUpdate(oldPage, updatedPage)) {
+              console.log('🚫 ENHANCED: Ignoring completion-related source_pages update');
+              return;
+            }
+            
             if (oldPage?.processing_status !== updatedPage?.processing_status) {
               if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from source_pages update');
+                console.log('🚫 ENHANCED AGENT-LEVEL: Prevented check from source_pages update');
                 return;
               }
               
+              console.log('✅ ENHANCED: Legitimate source_pages update, checking completion');
               addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
@@ -153,12 +160,19 @@ export const useTrainingNotifications = () => {
             const metadata = updatedSource.metadata || {};
             const oldMetadata = oldSource?.metadata || {};
             
+            // ENHANCED: Filter out completion-related updates
+            if (isCompletionRelatedUpdate(oldSource, updatedSource)) {
+              console.log('🚫 ENHANCED: Ignoring completion-related agent_sources update');
+              return;
+            }
+            
             if (oldMetadata?.processing_status !== metadata?.processing_status) {
               if (shouldPreventTrainingAction('check')) {
-                console.log('🚫 AGENT-LEVEL: Prevented check from agent_sources update');
+                console.log('🚫 ENHANCED AGENT-LEVEL: Prevented check from agent_sources update');
                 return;
               }
               
+              console.log('✅ ENHANCED: Legitimate agent_sources update, checking completion');
               addTrackedTimer(() => checkTrainingCompletion(agentId), 2000);
             }
           }
@@ -178,6 +192,7 @@ export const useTrainingNotifications = () => {
             }
             
             if (!shouldPreventTrainingAction('check')) {
+              console.log('✅ ENHANCED: New source added, checking completion');
               addTrackedTimer(() => checkTrainingCompletion(agentId), 1000);
             }
           }
