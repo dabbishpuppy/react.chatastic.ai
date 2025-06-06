@@ -89,6 +89,8 @@ export const useAgentSourcesRealtime = () => {
           // Immediate refresh for page completion
           if (payload.eventType === 'UPDATE' && pageStatus === 'completed') {
             debouncedRefresh('page-completed', 200);
+          } else if (payload.eventType === 'INSERT') {
+            debouncedRefresh('page-inserted', 300);
           } else {
             debouncedRefresh('page-updated', 1500);
           }

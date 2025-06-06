@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
@@ -71,7 +72,9 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           if (hasTrainingCompleted && source.crawl_status === 'completed') {
             setStatus('trained');
           } else {
-            setStatus(source.crawl_status || 'pending');
+            // Map the crawl_status properly
+            const mappedStatus = mapCrawlStatus(source.crawl_status);
+            setStatus(mappedStatus);
           }
           
           setProgress(source.progress || 0);
@@ -105,7 +108,9 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           if (hasTrainingCompleted && updatedSource.crawl_status === 'completed') {
             setStatus('trained');
           } else {
-            setStatus(updatedSource.crawl_status || 'pending');
+            // Map the crawl_status properly
+            const mappedStatus = mapCrawlStatus(updatedSource.crawl_status);
+            setStatus(mappedStatus);
           }
           
           setProgress(updatedSource.progress || 0);
@@ -126,6 +131,22 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
     };
   }, [sourceId]);
 
+  // Helper function to map crawl_status to display status
+  const mapCrawlStatus = (crawlStatus: string): string => {
+    switch (crawlStatus) {
+      case 'pending':
+        return 'pending';
+      case 'in_progress':
+        return 'in_progress';
+      case 'completed':
+        return 'crawled'; // Changed from 'completed' to 'crawled' to show it's ready for training
+      case 'failed':
+        return 'failed';
+      default:
+        return crawlStatus || 'pending'; // Default to pending instead of unknown
+    }
+  };
+
   const getStatusConfig = (currentStatus: string) => {
     switch (currentStatus) {
       case 'pending':
@@ -140,17 +161,23 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           text: 'Crawling',
           className: 'bg-blue-100 text-blue-800 border-blue-200'
         };
-      case 'completed':
+      case 'crawled':
         return {
           icon: <CheckCircle size={14} className="mr-1" />,
-          text: 'Completed',
-          className: 'bg-green-100 text-green-800 border-green-200'
+          text: 'Ready for Training',
+          className: 'bg-orange-100 text-orange-800 border-orange-200'
+        };
+      case 'training':
+        return {
+          icon: <Loader2 size={14} className="mr-1 animate-spin" />,
+          text: 'Training',
+          className: 'bg-purple-100 text-purple-800 border-purple-200'
         };
       case 'trained':
         return {
           icon: <GraduationCap size={14} className="mr-1" />,
           text: 'Trained',
-          className: 'bg-purple-100 text-purple-800 border-purple-200'
+          className: 'bg-green-100 text-green-800 border-green-200'
         };
       case 'failed':
         return {
@@ -161,7 +188,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       default:
         return {
           icon: <Clock size={14} className="mr-1" />,
-          text: 'Unknown',
+          text: 'Pending',
           className: 'bg-gray-100 text-gray-800 border-gray-200'
         };
     }

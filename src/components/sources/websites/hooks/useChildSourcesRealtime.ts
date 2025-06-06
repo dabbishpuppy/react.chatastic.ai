@@ -1,10 +1,22 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { AgentSource } from '@/types/rag';
 
-export const useChildSourcesRealtime = (parentSourceId: string, initialChildSources: AgentSource[] = []) => {
-  const [childSources, setChildSources] = useState<AgentSource[]>(initialChildSources);
+interface SourcePage {
+  id: string;
+  url: string;
+  status: string;
+  created_at: string;
+  completed_at?: string;
+  error_message?: string;
+  content_size?: number;
+  chunks_created?: number;
+  processing_time_ms?: number;
+  parent_source_id: string;
+}
+
+export const useChildSourcesRealtime = (parentSourceId: string, initialChildSources: SourcePage[] = []) => {
+  const [childSources, setChildSources] = useState<SourcePage[]>(initialChildSources);
 
   useEffect(() => {
     setChildSources(initialChildSources);
@@ -13,36 +25,36 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
   useEffect(() => {
     if (!parentSourceId) return;
 
-    console.log(`📡 Setting up real-time subscription for child sources of parent: ${parentSourceId}`);
+    console.log(`📡 Setting up real-time subscription for child pages of parent: ${parentSourceId}`);
 
-    // Subscribe to agent_sources changes for children of this parent
+    // Subscribe to source_pages changes for children of this parent
     const channel = supabase
-      .channel(`child-sources-${parentSourceId}`)
+      .channel(`child-pages-${parentSourceId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'agent_sources',
+          table: 'source_pages',
           filter: `parent_source_id=eq.${parentSourceId}`
         },
         (payload) => {
-          console.log('📡 Child source update:', payload);
+          console.log('📡 Child page update:', payload);
           
           if (payload.eventType === 'INSERT') {
-            const newSource = payload.new as AgentSource;
-            setChildSources(prev => [...prev, newSource]);
+            const newPage = payload.new as SourcePage;
+            setChildSources(prev => [...prev, newPage]);
           } else if (payload.eventType === 'UPDATE') {
-            const updatedSource = payload.new as AgentSource;
+            const updatedPage = payload.new as SourcePage;
             setChildSources(prev => 
-              prev.map(source => 
-                source.id === updatedSource.id ? updatedSource : source
+              prev.map(page => 
+                page.id === updatedPage.id ? updatedPage : page
               )
             );
           } else if (payload.eventType === 'DELETE') {
-            const deletedSource = payload.old as AgentSource;
+            const deletedPage = payload.old as SourcePage;
             setChildSources(prev => 
-              prev.filter(source => source.id !== deletedSource.id)
+              prev.filter(page => page.id !== deletedPage.id)
             );
           }
         }
@@ -50,7 +62,7 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
       .subscribe();
 
     return () => {
-      console.log(`🔌 Cleaning up child sources subscription for parent: ${parentSourceId}`);
+      console.log(`🔌 Cleaning up child pages subscription for parent: ${parentSourceId}`);
       supabase.removeChannel(channel);
     };
   }, [parentSourceId]);
