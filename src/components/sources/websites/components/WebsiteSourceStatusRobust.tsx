@@ -65,6 +65,8 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
         }
 
         if (source) {
+          console.log('📋 Initial source data:', source);
+          
           // Check if this source has been trained by looking at metadata
           const metadata = source.metadata as Record<string, any> || {};
           const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
@@ -73,8 +75,9 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
             setStatus('trained');
           } else {
             // Map the crawl_status properly including new states
-            const mappedStatus = mapCrawlStatus(source.crawl_status);
+            const mappedStatus = mapCrawlStatus(source.crawl_status, metadata);
             setStatus(mappedStatus);
+            console.log(`🔄 Status mapped from ${source.crawl_status} to ${mappedStatus}`);
           }
           
           setProgress(source.progress || 0);
@@ -100,6 +103,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
         },
         (payload) => {
           const updatedSource = payload.new as any;
+          console.log('📡 Real-time update received:', updatedSource);
           
           // Check if training has completed for this source
           const metadata = updatedSource.metadata as Record<string, any> || {};
@@ -109,8 +113,9 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
             setStatus('trained');
           } else {
             // Map the crawl_status properly including new states
-            const mappedStatus = mapCrawlStatus(updatedSource.crawl_status);
+            const mappedStatus = mapCrawlStatus(updatedSource.crawl_status, metadata);
             setStatus(mappedStatus);
+            console.log(`🔄 Real-time status mapped from ${updatedSource.crawl_status} to ${mappedStatus}`);
           }
           
           setProgress(updatedSource.progress || 0);
@@ -121,18 +126,27 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
+          console.log(`📡 Subscribed to real-time updates for source: ${sourceId}`);
         } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
           setIsConnected(false);
+          console.log(`📡 Real-time connection issue for source: ${sourceId}, status: ${status}`);
         }
       });
 
     return () => {
+      console.log(`📡 Cleaning up real-time subscription for source: ${sourceId}`);
       supabase.removeChannel(channel);
     };
   }, [sourceId]);
 
   // Helper function to map crawl_status to display status
-  const mapCrawlStatus = (crawlStatus: string): string => {
+  const mapCrawlStatus = (crawlStatus: string, metadata: Record<string, any> = {}): string => {
+    // Check for recrawling state first
+    if (metadata.is_recrawling === true && crawlStatus === 'recrawling') {
+      console.log('🔄 Detected recrawling state from metadata');
+      return 'recrawling';
+    }
+    
     switch (crawlStatus) {
       case 'pending':
         return 'pending';

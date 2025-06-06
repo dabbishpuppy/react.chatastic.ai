@@ -151,7 +151,8 @@ serve(async (req) => {
     if (parentSourceId && crawlMode === 'single-page') {
       console.log('🔄 Processing child page recrawl for parent:', parentSourceId);
       
-      // Mark parent as recrawling and reset progress
+      // STEP 1: Mark parent as recrawling with strong metadata
+      console.log('🔄 Step 1: Setting parent to recrawling state...');
       const { error: parentUpdateError } = await supabase
         .from('agent_sources')
         .update({
@@ -160,17 +161,25 @@ serve(async (req) => {
           metadata: {
             is_recrawling: true,
             recrawl_started_at: new Date().toISOString(),
-            recrawl_target_url: url
+            recrawl_target_url: url,
+            recrawl_initiated_by: 'child_page_recrawl',
+            last_recrawl_update: new Date().toISOString()
           }
         })
         .eq('id', parentSourceId);
 
       if (parentUpdateError) {
-        console.error('Error updating parent source for recrawl:', parentUpdateError);
+        console.error('❌ Error updating parent source for recrawl:', parentUpdateError);
         throw new Error(`Failed to initiate parent recrawl: ${parentUpdateError.message}`);
       }
 
-      // For child page recrawl, we need to update the existing source_pages entry
+      console.log('✅ Parent source marked as recrawling');
+
+      // STEP 2: Wait a moment to ensure the status is set before proceeding
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // STEP 3: Update the existing source_pages entry
+      console.log('🔄 Step 2: Updating child page status...');
       const { error: updateError } = await supabase
         .from('source_pages')
         .update({
@@ -178,17 +187,21 @@ serve(async (req) => {
           started_at: null,
           completed_at: null,
           error_message: null,
-          retry_count: 0
+          retry_count: 0,
+          updated_at: new Date().toISOString()
         })
         .eq('parent_source_id', parentSourceId)
         .eq('url', url);
 
       if (updateError) {
-        console.error('Error updating child page status:', updateError);
+        console.error('❌ Error updating child page status:', updateError);
         throw new Error(`Failed to update child page status: ${updateError.message}`);
       }
 
-      // Call the process-source-pages function to handle the actual crawling
+      console.log('✅ Child page status updated to pending');
+
+      // STEP 4: Call the process-source-pages function to handle the actual crawling
+      console.log('🔄 Step 3: Initiating page processing...');
       const { data: processData, error: processError } = await supabase.functions.invoke('process-source-pages', {
         body: {
           parentSourceId: parentSourceId,
@@ -198,7 +211,7 @@ serve(async (req) => {
       });
 
       if (processError) {
-        console.error('Error calling process-source-pages:', processError);
+        console.error('❌ Error calling process-source-pages:', processError);
         // Update the page status to failed
         await supabase
           .from('source_pages')
@@ -218,7 +231,13 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           message: `Child page recrawl initiated for ${url}`,
-          parentSourceId: parentSourceId
+          parentSourceId: parentSourceId,
+          debugInfo: {
+            recrawlInitiated: true,
+            parentStatus: 'recrawling',
+            childStatus: 'pending',
+            timestamp: new Date().toISOString()
+          }
         }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
