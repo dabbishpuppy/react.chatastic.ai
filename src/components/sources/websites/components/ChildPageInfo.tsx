@@ -2,7 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Calendar, Database, FileText, Loader2 } from 'lucide-react';
+import { Calendar, Database, FileText, Loader2, ExternalLink } from 'lucide-react';
 
 interface ChildPageInfoProps {
   url: string;
@@ -22,14 +22,17 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   errorMessage,
   createdAt
 }) => {
+  const getFullUrl = (url: string) => {
+    // If URL doesn't have protocol, add https://
+    return url.startsWith('http://') || url.startsWith('https://') 
+      ? url 
+      : `https://${url}`;
+  };
+
   const formatUrl = (url: string) => {
     try {
-      // If URL doesn't have protocol, add https://
-      const urlWithProtocol = url.startsWith('http://') || url.startsWith('https://') 
-        ? url 
-        : `https://${url}`;
-      
-      const urlObj = new URL(urlWithProtocol);
+      const fullUrl = getFullUrl(url);
+      const urlObj = new URL(fullUrl);
       return urlObj.hostname + urlObj.pathname;
     } catch {
       return url;
@@ -81,13 +84,20 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   };
 
   const isLoading = status === 'in_progress' || status === 'pending';
+  const fullUrl = getFullUrl(url);
 
   return (
     <>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate" title={url}>
-          {formatUrl(url)}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-gray-900 truncate" title={fullUrl}>
+            {fullUrl}
+          </p>
+          <ExternalLink 
+            className="w-3 h-3 text-gray-400 cursor-pointer hover:text-gray-600 flex-shrink-0" 
+            onClick={() => window.open(fullUrl, '_blank')}
+          />
+        </div>
         <div className="flex items-center text-xs text-gray-500 mt-1">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
