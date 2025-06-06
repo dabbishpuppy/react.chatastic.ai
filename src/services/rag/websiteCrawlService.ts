@@ -34,10 +34,9 @@ export class WebsiteCrawlService {
         throw new Error('Could not determine team ID for agent');
       }
 
-      // Update source metadata with crawl parameters
+      // Update source metadata with crawl parameters (without status)
       await CrawlMetadataManager.updateSourceCrawlMetadata(sourceId, {
-        ...options,
-        status: 'in_progress'
+        ...options
       });
 
       // Call the enhanced crawl edge function
