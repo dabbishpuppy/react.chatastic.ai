@@ -150,16 +150,17 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   };
 };
 
-// Helper function to map source status considering training state
+// FIXED: Helper function to map source status considering training state
 const mapSourceStatus = (crawlStatus: string, metadata: Record<string, any> = {}, requiresManualTraining: boolean = false): string => {
   // Check for training states first
   if (metadata.training_status === 'in_progress') {
     return 'training';
   }
   
-  if (metadata.training_completed_at || metadata.last_trained_at) {
+  // FIXED: Check for training completion with proper flags
+  if (metadata.training_completed_at || metadata.last_trained_at || metadata.children_training_completed) {
     // Check if this is a parent source that completed training
-    if (metadata.children_training_completed === true) {
+    if (metadata.children_training_completed === true || metadata.training_status === 'completed') {
       return 'training_completed';
     }
     return 'trained';
@@ -181,6 +182,12 @@ const mapSourceStatus = (crawlStatus: string, metadata: Record<string, any> = {}
     case 'training':
       return 'training';
     case 'completed':
+      // FIXED: If completed and no manual training required, check for training completion flags
+      if (!requiresManualTraining) {
+        if (metadata.training_completed_at || metadata.last_trained_at || metadata.children_training_completed) {
+          return 'training_completed';
+        }
+      }
       return requiresManualTraining ? 'ready_for_training' : 'training_completed';
     case 'ready_for_training':
       return 'ready_for_training';

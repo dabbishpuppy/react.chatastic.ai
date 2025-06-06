@@ -1,4 +1,3 @@
-
 export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed';
 
 export interface SourceStatusSummary {
@@ -14,6 +13,7 @@ interface SourceMetadata {
   training_completed_at?: string;
   training_started_at?: string;
   last_trained_at?: string;
+  children_training_completed?: boolean;
   [key: string]: any;
 }
 
@@ -44,11 +44,18 @@ export class SimplifiedSourceStatusService {
       return 'training';
     }
     
-    // Check if training completed - distinguish between trained and training_completed
-    if (metadata.training_completed_at || metadata.last_trained_at) {
+    // FIXED: Check if training completed - for website sources, look for children_training_completed
+    if (metadata.training_completed_at || metadata.last_trained_at || metadata.children_training_completed) {
       // For website sources, if all children are trained, it's training_completed
       if (source.source_type === 'website' && source.parent_source_id === null) {
-        return 'training_completed';
+        // Check if crawl_status is 'completed' AND training is done
+        if (source.crawl_status === 'completed' && (metadata.training_status === 'completed' || metadata.children_training_completed)) {
+          return 'training_completed';
+        }
+        // If training status shows completed but crawl_status hasn't been updated yet
+        if (metadata.training_status === 'completed') {
+          return 'training_completed';
+        }
       }
       return 'trained';
     }
@@ -60,14 +67,19 @@ export class SimplifiedSourceStatusService {
         return 'crawled'; // Ready for training
       }
       
-      // If training status is set
-      if (source.crawl_status === 'training') {
+      // If training status is set to training
+      if (source.crawl_status === 'training' || metadata.training_status === 'in_progress') {
         return 'training';
       }
       
-      // If crawl is completed/ready_for_training and training has been done, it's fully completed
-      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === false) {
-        return 'completed';
+      // FIXED: If crawl is completed AND requires_manual_training is false, check training status
+      if (source.crawl_status === 'completed' && source.requires_manual_training === false) {
+        // If we have training completion indicators, it's fully completed
+        if (metadata.training_completed_at || metadata.last_trained_at || metadata.children_training_completed) {
+          return 'training_completed';
+        }
+        // Otherwise it's just ready for training
+        return 'crawled';
       }
       
       // If currently crawling or recrawling
@@ -79,9 +91,14 @@ export class SimplifiedSourceStatusService {
       return 'pending';
     }
     
-    // For other sources, derive status from requires_manual_training
+    // For other sources, derive status from requires_manual_training and training indicators
     if (source.requires_manual_training === true) {
       return 'crawled'; // Needs training
+    }
+    
+    // If no manual training required and we have training completion indicators
+    if (metadata.training_completed_at || metadata.last_trained_at) {
+      return 'completed';
     }
     
     return 'completed'; // Already trained
