@@ -78,13 +78,13 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <h3 className="font-medium text-gray-900 truncate" title={title || url}>
               {title || formatUrl(url)}
             </h3>
+            <ExternalLink 
+              className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
+              onClick={() => window.open(url, '_blank')}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <ExternalLink 
-            className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
-            onClick={() => window.open(url, '_blank')}
-          />
           <WebsiteSourceStatusBadges
             crawlStatus={crawlStatus}
             isExcluded={false}
@@ -98,7 +98,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            <span>{formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+            <span>{formatDistanceToNow(new Date(createdAt), { addSuffix: true }).replace('about', 'About')}</span>
           </div>
           
           {shouldShowLinksCount && (
@@ -111,7 +111,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           {shouldShowTotalLinks && (
             <div className="flex items-center gap-1">
               <Link className="w-3 h-3" />
-              <span>Total: {source.total_jobs} links</span>
+              <span>{source.total_jobs} links</span>
             </div>
           )}
           
@@ -125,7 +125,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           {shouldShowChildTotalSize && (
             <div className="flex items-center gap-1">
               <Database className="w-3 h-3" />
-              <span>Total: {formatBytes(source.total_content_size)}</span>
+              <span>{formatBytes(source.total_content_size)}</span>
             </div>
           )}
         </div>
