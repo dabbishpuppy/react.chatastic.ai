@@ -6,15 +6,13 @@ import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle, GraduationCap, Bot 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
   isExcluded: boolean;
-  linksCount?: number;
+  linksCount: number;
   progress?: number;
 }
 
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   crawlStatus,
-  isExcluded,
-  linksCount,
-  progress
+  isExcluded
 }) => {
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -63,8 +61,8 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
       default:
         return {
           icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Pending',  // Default to Pending instead of Unknown
-          className: 'bg-yellow-500 text-white'
+          text: 'Unknown',
+          className: 'bg-gray-500 text-white'
         };
     }
   };
@@ -76,16 +74,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
       <Badge className={`${statusConfig.className} flex items-center`}>
         {statusConfig.icon}
         {statusConfig.text}
-        {progress !== undefined && progress > 0 && progress < 100 && (
-          <span className="ml-1 text-xs">({progress}%)</span>
-        )}
       </Badge>
-      
-      {linksCount !== undefined && linksCount > 0 && (
-        <Badge variant="outline" className="bg-gray-100">
-          {linksCount} pages
-        </Badge>
-      )}
       
       {isExcluded && (
         <Badge variant="secondary">

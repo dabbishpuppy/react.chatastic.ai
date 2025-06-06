@@ -23,16 +23,15 @@ export class SearchSuggestions {
 
       // Filter and format suggestions
       const suggestions = recentQueries
-        .map(q => q.content as string)
+        .map(q => q.content)
         .filter(content => 
-          typeof content === 'string' &&
           content.length > partialQuery.length && 
           content.length < 100 &&
           content.toLowerCase().includes(partialQuery.toLowerCase())
         )
         .slice(0, limit);
 
-      return [...new Set(suggestions)] as string[]; // Remove duplicates and ensure type
+      return [...new Set(suggestions)]; // Remove duplicates
 
     } catch (error) {
       console.error('❌ Failed to get search suggestions:', error);

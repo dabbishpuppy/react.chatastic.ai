@@ -131,7 +131,7 @@ export class EmbeddingService {
 
       const stats = {
         total_embeddings: embeddings?.length || 0,
-        models_used: [...new Set((embeddings || []).map(e => e.model_name || '').filter(Boolean))] as string[],
+        models_used: [...new Set(embeddings?.map(e => e.model_name) || [])],
         last_updated: embeddings?.length > 0 
           ? Math.max(...embeddings.map(e => new Date(e.created_at).getTime())).toString()
           : new Date().toISOString()

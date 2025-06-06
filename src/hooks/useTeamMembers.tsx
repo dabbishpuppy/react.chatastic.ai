@@ -72,9 +72,9 @@ export const useTeamMembers = () => {
           const existingMember = membersMap.get(userId)!;
           existingMember.teams.push(teamName);
         } else {
-          // For the current user, get their email from auth, for others use a placeholder
+          // For the current user, use their actual email, for others use a placeholder
           const email = userId === user.id 
-            ? (user.user_metadata?.email || user.email || 'unknown@example.com')
+            ? user.email || 'unknown@example.com'
             : `user-${userId.slice(0, 8)}@wonderwave.no`;
 
           membersMap.set(userId, {

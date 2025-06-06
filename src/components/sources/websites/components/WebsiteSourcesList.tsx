@@ -184,8 +184,9 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     <div className="relative">
       <Card className="border border-gray-200">
         <WebsiteSourcesHeader
-          loading={loading || isLoading}
-          count={parentSources.length}
+          sourcesCount={parentSources.length}
+          allCurrentPageSelected={allCurrentPageSelected}
+          onSelectAll={handleSelectAll}
         />
         <CardContent className="space-y-4">
           <WebsiteSourcesContent

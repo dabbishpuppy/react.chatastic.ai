@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AgentSource } from '@/types/rag';
-import { useExpandState } from './hooks/useExpandState';
+import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
+import { useChildSourcesRealtime } from './hooks/useChildSourcesRealtime';
 import WebsiteSourceHeader from './components/WebsiteSourceHeader';
 import WebsiteSourceActions from './components/WebsiteSourceActions';
 import WebsiteChildSources from './components/WebsiteChildSources';
@@ -30,7 +31,13 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url);
-  const { isExpanded, isAnimating, toggleExpanded } = useExpandState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Use real-time hook for child sources
+  const realtimeChildSources = useChildSourcesRealtime(source.id, childSources);
+
+  // Use the operations hook for enhanced recrawl
+  const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
 
   const handleSaveEdit = async () => {
     await onEdit(source.id, editUrl);
@@ -39,6 +46,11 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   // Check if this is a parent source (no parent_source_id)
   const isParentSource = !source.parent_source_id;
+  const hasChildSources = realtimeChildSources && realtimeChildSources.length > 0;
+
+  const handleToggleExpanded = () => {
+    setIsExpanded(!isExpanded);
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -61,19 +73,13 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     onDelete(source);
   };
 
-  const handleToggleExpanded = () => {
-    if (!isAnimating) {
-      toggleExpanded();
-    }
-  };
-
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <WebsiteSourceHeader
             source={source}
-            childSources={childSources}
+            childSources={realtimeChildSources}
             isSelected={isSelected}
             isEditing={isEditing}
             editUrl={editUrl}
@@ -85,7 +91,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           
           <WebsiteSourceActions
             source={source}
-            hasChildSources={true}
+            hasChildSources={hasChildSources}
             isExpanded={isExpanded}
             onEdit={handleEdit}
             onExclude={handleExclude}
@@ -96,7 +102,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
 
         {/* Child Sources Section - Show for parent sources when expanded */}
-        {isParentSource && isExpanded && !isAnimating && (
+        {isParentSource && isExpanded && (
           <WebsiteChildSources
             parentSourceId={source.id}
             isCrawling={source.crawl_status === 'in_progress'}

@@ -1,12 +1,10 @@
 
-import React from 'react';
-import { Loader2 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { AgentSource } from '@/types/rag';
-import { useSourcePagesPaginated } from '@/hooks/useSourcePagesPaginated';
-import { toast } from '@/hooks/use-toast';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import SourcePageItem from './SourcePageItem';
+import { AgentSource } from '@/types/rag';
+import { WebsiteSourceItem } from '../WebsiteSourceItem';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
 interface WebsiteChildSourcesProps {
   parentSourceId: string;
@@ -20,105 +18,84 @@ interface WebsiteChildSourcesProps {
 const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   parentSourceId,
   isCrawling = false,
+  onEdit,
+  onExclude,
+  onDelete,
+  onRecrawl
 }) => {
-  const { data: paginatedData, isLoading, error, refetch } = useSourcePagesPaginated({
-    parentSourceId,
-    page: 1,
-    pageSize: 50,
-    enabled: !!parentSourceId
-  });
+  const [childSources, setChildSources] = useState<AgentSource[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
 
-  const handleRetry = () => {
-    refetch();
-  };
-
-  const handleDeletePage = async (pageId: string) => {
+  const fetchChildSources = async () => {
     try {
-      const { error } = await supabase
-        .from('source_pages')
-        .delete()
-        .eq('id', pageId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Page deleted successfully",
-      });
-
-      refetch();
-    } catch (error) {
-      console.error('Error deleting page:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete page",
-        variant: "destructive",
-      });
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('agent_sources')
+        .select('*')
+        .eq('parent_source_id', parentSourceId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching child sources:', error);
+      } else {
+        setChildSources(data || []);
+      }
+    } catch (err) {
+      console.error('Exception fetching child sources:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRecrawlPage = async (pageId: string) => {
-    try {
-      const { error } = await supabase
-        .from('source_pages')
-        .update({
-          status: 'pending',
-          error_message: null,
-          content_size: null,
-          chunks_created: null,
-          processing_time_ms: null,
-          completed_at: null
-        })
-        .eq('id', pageId);
+  useEffect(() => {
+    fetchChildSources();
+    
+    // Set up realtime subscription for child sources
+    const subscription = supabase
+      .channel(`parent-source-${parentSourceId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'agent_sources',
+        filter: `parent_source_id=eq.${parentSourceId}` 
+      }, () => {
+        fetchChildSources();
+      })
+      .subscribe();
+      
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [parentSourceId]);
 
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Page recrawl initiated",
-      });
-
-      refetch();
-    } catch (error) {
-      console.error('Error recrawling page:', error);
-      toast({
-        title: "Error",
-        description: "Failed to initiate page recrawl",
-        variant: "destructive",
-      });
+  const handleSelectionChange = (sourceId: string, selected?: boolean) => {
+    const newSelected = new Set(selectedSources);
+    
+    if (selected) {
+      newSelected.add(sourceId);
+    } else {
+      newSelected.delete(sourceId);
     }
+    
+    setSelectedSources(newSelected);
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="mt-4 p-4 flex justify-center items-center">
         <Loader2 className="animate-spin mr-2" size={16} />
-        <span>Loading child pages...</span>
+        <span>Loading child sources...</span>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="mt-4 p-4 text-sm text-red-500 border border-red-200 rounded bg-red-50">
-        <p className="font-medium">Error loading child pages</p>
-        <p className="text-xs mt-1">{error.message}</p>
-        <button 
-          onClick={handleRetry} 
-          className="mt-2 text-xs underline text-blue-600"
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
-
-  const childPages = paginatedData?.pages || [];
-
-  if (childPages.length === 0) {
+  if (childSources.length === 0) {
     return isCrawling ? (
       <div className="mt-4 p-4 text-sm text-gray-500 text-center">
-        Crawling in progress. Child pages will appear here as they are discovered.
+        Crawling in progress. Child pages will appear here.
       </div>
     ) : (
       <div className="mt-4 p-4 text-sm text-gray-500 text-center">
@@ -130,20 +107,25 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   return (
     <div className="mt-4 border-t border-gray-200 pt-4">
       <div className="text-sm font-medium mb-2 text-gray-700">
-        Child Pages ({childPages.length})
+        Child Pages ({childSources.length})
       </div>
-      <ScrollArea className="max-h-64">
-        <div className="space-y-2 pr-2">
-          {childPages.map((page) => (
-            <SourcePageItem
-              key={page.id}
-              page={page}
-              onDelete={handleDeletePage}
-              onRecrawl={handleRecrawlPage}
-            />
-          ))}
-        </div>
-      </ScrollArea>
+      <div className="space-y-2">
+        {childSources.map((source) => (
+          <Card key={source.id} className="shadow-sm">
+            <CardContent className="p-3">
+              <WebsiteSourceItem
+                source={source}
+                onEdit={onEdit}
+                onExclude={onExclude}
+                onDelete={onDelete}
+                onRecrawl={onRecrawl}
+                isSelected={selectedSources.has(source.id)}
+                onSelectionChange={(selected) => handleSelectionChange(source.id, selected)}
+              />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 };

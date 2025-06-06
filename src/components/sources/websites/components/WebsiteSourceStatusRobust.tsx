@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
@@ -20,49 +19,74 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
   const [linksCount, setLinksCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
-  const [error, setError] = useState<string | null>(null);
+  
+  const statusRef = useRef(status);
+  const progressRef = useRef(progress);
+  const linksCountRef = useRef(linksCount);
 
-  // Fetch initial data and set up real-time subscription
+  // Update refs when state changes
+  useEffect(() => {
+    statusRef.current = status;
+    progressRef.current = progress;
+    linksCountRef.current = linksCount;
+  }, [status, progress, linksCount]);
+
+  // Listen for training completion events to update status to "trained"
+  useEffect(() => {
+    const handleTrainingCompleted = (event: CustomEvent) => {
+      console.log('🎓 Training completed event received, updating source status to trained');
+      setStatus('trained');
+      setLastUpdateTime(new Date());
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+    };
+  }, []);
+
+  // Real-time subscription for source updates
   useEffect(() => {
     if (!sourceId) return;
 
     const fetchInitialData = async () => {
       try {
-        setError(null);
-        console.log(`📊 Fetching initial status for source: ${sourceId}`);
-        
         const { data: source, error } = await supabase
           .from('agent_sources')
-          .select('crawl_status, progress, links_count, total_jobs, completed_jobs')
+          .select('crawl_status, progress, links_count, metadata')
           .eq('id', sourceId)
           .single();
 
         if (error) {
           console.error('Error fetching source data:', error);
-          setError(`Unable to fetch source data: ${error.message}`);
           return;
         }
 
         if (source) {
-          console.log(`📊 Initial source data:`, source);
-          setStatus(source.crawl_status || 'pending');
+          // Check if this source has been trained by looking at metadata
+          const metadata = source.metadata as Record<string, any> || {};
+          const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
+          
+          if (hasTrainingCompleted && source.crawl_status === 'completed') {
+            setStatus('trained');
+          } else {
+            setStatus(source.crawl_status || 'pending');
+          }
+          
           setProgress(source.progress || 0);
-          setLinksCount(source.links_count || source.total_jobs || 0);
+          setLinksCount(source.links_count || 0);
           setLastUpdateTime(new Date());
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('Error in fetchInitialData:', error);
-        setError(`Data fetch error: ${error.message}`);
       }
     };
 
     fetchInitialData();
 
-    // Set up real-time subscription for agent_sources changes
-    console.log(`📡 Setting up real-time subscription for source: ${sourceId}`);
-    
-    const agentSourceChannel = supabase
-      .channel(`source-status-realtime-${sourceId}`)
+    const channel = supabase
+      .channel(`source-status-${sourceId}`)
       .on(
         'postgres_changes',
         {
@@ -72,60 +96,33 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           filter: `id=eq.${sourceId}`
         },
         (payload) => {
-          console.log(`📡 Real-time update for source ${sourceId}:`, payload);
           const updatedSource = payload.new as any;
           
-          setStatus(updatedSource.crawl_status || 'pending');
-          setProgress(updatedSource.progress || 0);
-          setLinksCount(updatedSource.links_count || updatedSource.total_jobs || 0);
-          setLastUpdateTime(new Date());
-          setError(null);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'source_pages',
-          filter: `parent_source_id=eq.${sourceId}`
-        },
-        async (payload) => {
-          console.log(`📄 Source page update for parent ${sourceId}:`, payload);
+          // Check if training has completed for this source
+          const metadata = updatedSource.metadata as Record<string, any> || {};
+          const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
           
-          // When a source page updates, refresh the parent source data
-          try {
-            const { data: source, error } = await supabase
-              .from('agent_sources')
-              .select('crawl_status, progress, links_count, total_jobs, completed_jobs')
-              .eq('id', sourceId)
-              .single();
-
-            if (!error && source) {
-              setStatus(source.crawl_status || 'pending');
-              setProgress(source.progress || 0);
-              setLinksCount(source.links_count || source.total_jobs || 0);
-              setLastUpdateTime(new Date());
-            }
-          } catch (error) {
-            console.error('Error refreshing source after page update:', error);
+          if (hasTrainingCompleted && updatedSource.crawl_status === 'completed') {
+            setStatus('trained');
+          } else {
+            setStatus(updatedSource.crawl_status || 'pending');
           }
+          
+          setProgress(updatedSource.progress || 0);
+          setLinksCount(updatedSource.links_count || 0);
+          setLastUpdateTime(new Date());
         }
       )
       .subscribe((status) => {
-        console.log(`📡 Subscription status for ${sourceId}: ${status}`);
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
-          setError(null);
         } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
           setIsConnected(false);
-          setError('Real-time connection lost');
         }
       });
 
     return () => {
-      console.log(`📡 Cleaning up subscription for source: ${sourceId}`);
-      supabase.removeChannel(agentSourceChannel);
+      supabase.removeChannel(channel);
     };
   }, [sourceId]);
 
@@ -135,7 +132,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
         return {
           icon: <Clock size={14} className="mr-1" />,
           text: 'Pending',
-          className: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+          className: 'bg-gray-100 text-gray-800 border-gray-200'
         };
       case 'in_progress':
         return {
@@ -148,18 +145,6 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           icon: <CheckCircle size={14} className="mr-1" />,
           text: 'Completed',
           className: 'bg-green-100 text-green-800 border-green-200'
-        };
-      case 'crawled':
-        return {
-          icon: <Clock size={14} className="mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-100 text-orange-800 border-orange-200'
-        };
-      case 'training':
-        return {
-          icon: <Loader2 size={14} className="mr-1 animate-spin" />,
-          text: 'Training',
-          className: 'bg-blue-100 text-blue-800 border-blue-200'
         };
       case 'trained':
         return {
@@ -176,8 +161,8 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       default:
         return {
           icon: <Clock size={14} className="mr-1" />,
-          text: 'Pending',
-          className: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+          text: 'Unknown',
+          className: 'bg-gray-100 text-gray-800 border-gray-200'
         };
     }
   };
@@ -201,22 +186,12 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       {showConnectionStatus && (
         <div className="flex items-center">
           {isConnected ? (
-            <Wifi size={12} className="text-green-500" aria-label="Connected to real-time updates" />
+            <Wifi size={12} className="text-green-500" />
           ) : (
-            <WifiOff size={12} className="text-red-500" aria-label="Disconnected from real-time updates" />
+            <WifiOff size={12} className="text-red-500" />
           )}
         </div>
       )}
-      
-      {error && (
-        <div className="text-xs text-red-500" title={error}>
-          Error
-        </div>
-      )}
-      
-      <div className="text-xs text-gray-400">
-        {lastUpdateTime.toLocaleTimeString()}
-      </div>
     </div>
   );
 };

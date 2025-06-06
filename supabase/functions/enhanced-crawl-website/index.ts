@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { EnhancedCrawlRequest } from './types.ts';
@@ -146,38 +147,6 @@ serve(async (req) => {
       throw new Error(`Invalid team_id type: expected string, got ${typeof agent.team_id}`);
     }
 
-    // Find the parent source that was created by the frontend
-    console.log('🔍 Finding parent source for URL:', url);
-    const { data: parentSources, error: parentError } = await supabase
-      .from('agent_sources')
-      .select('id, crawl_status')
-      .eq('agent_id', agentId)
-      .eq('url', url)
-      .eq('source_type', 'website')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (parentError || !parentSources || parentSources.length === 0) {
-      throw new Error('Parent source not found. Please create the source first.');
-    }
-
-    const parentSource = parentSources[0];
-    console.log('✅ Found parent source:', parentSource.id);
-
-    // Update parent source status to in_progress if it's pending
-    if (parentSource.crawl_status === 'pending') {
-      await updateParentSourceStatus(parentSource.id, 'in_progress', {
-        discoveryStarted: true,
-        statusTransition: {
-          from: 'pending',
-          to: 'in_progress',
-          timestamp: new Date().toISOString()
-        }
-      });
-      console.log('📊 Updated parent source status to in_progress');
-    }
-
     // Discover URLs based on crawl mode with timeout
     let discoveredUrls: string[] = [];
     
@@ -231,6 +200,44 @@ serve(async (req) => {
       );
     }
 
+    // Create parent source with retry logic
+    let parentSource;
+    retryCount = 0;
+
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`🔧 Creating parent source (attempt ${retryCount + 1}/${maxRetries})`);
+        
+        parentSource = await createParentSource(agentId, agent.team_id, {
+          url,
+          totalJobs: discoveredUrls.length,
+          respectRobots,
+          crawlMode,
+          enableCompression,
+          enableDeduplication,
+          priority: safePriority
+        });
+        console.log('✅ Parent source created:', parentSource.id);
+        break;
+      } catch (createError) {
+        console.error(`❌ Parent source creation failed (attempt ${retryCount + 1}):`, createError);
+        if (retryCount === maxRetries - 1) {
+          throw new Error(`Failed to create parent source: ${createError.message}`);
+        }
+        retryCount++;
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+      }
+    }
+
+    if (!parentSource) {
+      throw new Error('Failed to create parent source after multiple attempts');
+    }
+
+    // Validate parent source ID before proceeding
+    if (!parentSource.id || typeof parentSource.id !== 'string') {
+      throw new Error(`Invalid parent source ID: ${parentSource.id}`);
+    }
+
     // Create source_pages with enhanced error handling and type validation
     console.log('🔍 Starting source pages insertion with type-safe validation...');
     
@@ -246,15 +253,15 @@ serve(async (req) => {
 
       await insertSourcePagesInBatches(parentSource.id, agent.team_id, discoveredUrls, safePriority);
 
-      // Update parent source with discovery completion and keep in_progress status
+      // Update parent source status to in_progress
       await updateParentSourceStatus(parentSource.id, 'in_progress', {
         discoveryCompleted: true,
         totalChildren: discoveredUrls.length,
         additionalMetadata: {
+          ...parentSource.metadata,
           insertion_completed_at: new Date().toISOString(),
           type_validation_passed: true,
-          api_authentication_verified: true,
-          crawl_started: true
+          api_authentication_verified: true
         }
       });
 
@@ -265,7 +272,7 @@ serve(async (req) => {
           success: true,
           parentSourceId: parentSource.id,
           totalJobs: discoveredUrls.length,
-          message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered. Crawling will begin shortly.`
+          message: `Enhanced crawl initiated with ${discoveredUrls.length} URLs discovered`
         }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -282,6 +289,7 @@ serve(async (req) => {
           discoveryCompleted: true,
           totalChildren: 0,
           additionalMetadata: {
+            ...parentSource.metadata,
             insertion_failed_at: new Date().toISOString(),
             insertion_error: insertError instanceof Error ? insertError.message : String(insertError),
             api_authentication_error: insertError.message?.includes('No API key') || false
