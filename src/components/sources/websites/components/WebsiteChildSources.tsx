@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentSource } from '@/types/rag';
@@ -105,13 +104,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         console.log('📡 Source page update received:', payload);
         fetchChildSources();
       })
-      .subscribe((status) => {
-        console.log(`📡 Source pages subscription status: ${status}`);
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Error with source pages subscription');
-          setError('Real-time updates disconnected');
-        }
-      });
+      .subscribe();
       
     return () => {
       subscription.unsubscribe();

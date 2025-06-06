@@ -20,6 +20,7 @@ declare module '@supabase/supabase-js' {
     insert(values: any): PostgrestFilterBuilder<T>;
     update(values: any): PostgrestFilterBuilder<T>;
     delete(): PostgrestFilterBuilder<T>;
+    upsert(values: any, options?: { onConflict?: string }): PostgrestFilterBuilder<T>;
     eq(column: string, value: any): PostgrestFilterBuilder<T>;
     neq(column: string, value: any): PostgrestFilterBuilder<T>;
     gt(column: string, value: any): PostgrestFilterBuilder<T>;
@@ -45,7 +46,7 @@ declare module '@supabase/supabase-js' {
     match(query: Record<string, any>): PostgrestFilterBuilder<T>;
     order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): PostgrestFilterBuilder<T>;
     limit(count: number): PostgrestFilterBuilder<T>;
-    range(from: number, to: number): PostgrestFilterBuilder<T>;
+    range(from: number, to?: number): PostgrestFilterBuilder<T>;
     single(): PostgrestFilterBuilder<T>;
     maybeSingle(): PostgrestFilterBuilder<T>;
     csv(): PostgrestFilterBuilder<T>;
@@ -65,6 +66,7 @@ declare module '@supabase/supabase-js' {
     app_metadata: any;
     user_metadata: any;
     aud: string;
+    email?: string;
     created_at: string;
     [key: string]: any;
   }
@@ -92,8 +94,12 @@ declare module '@supabase/supabase-js' {
 
   export interface SupabaseAuthClient {
     getSession(): Promise<{ data: { session: Session | null }; error: any }>;
+    getUser(): Promise<{ data: { user: User | null }; error: any }>;
     onAuthStateChange(callback: (event: string, session: Session | null) => void): { data: { subscription: any } };
     signOut(): Promise<any>;
+    signInWithPassword(credentials: { email: string; password: string }): Promise<AuthResponse>;
+    signUp(credentials: { email: string; password: string }): Promise<AuthResponse>;
+    signInWithOAuth(options: { provider: string; options?: any }): Promise<AuthResponse>;
   }
 
   // Realtime interfaces
@@ -109,11 +115,18 @@ declare module '@supabase/supabase-js' {
       callback: (payload: any) => void
     ): RealtimeChannel;
     subscribe(): RealtimeChannel;
+    unsubscribe(): Promise<string>;
+    send(type: string, payload: any): Promise<string>;
   }
 
   // Functions client
   export interface FunctionsClient {
     invoke(functionName: string, options?: { body?: any }): Promise<{ data: any; error: any }>;
+  }
+
+  // Storage client
+  export interface SupabaseStorageClient {
+    from(bucketName: string): any;
   }
 
   // Main Supabase client interface
@@ -128,6 +141,7 @@ declare module '@supabase/supabase-js' {
     channel(name: string): RealtimeChannel;
     removeChannel(channel: RealtimeChannel): void;
     functions: FunctionsClient;
+    storage: SupabaseStorageClient;
   }
 
   export function createClient<Database = any>(
