@@ -1,6 +1,3 @@
-
-
-
 // Type definitions for Supabase RPC functions
 
 declare namespace Database {
@@ -69,7 +66,19 @@ declare module '@supabase/supabase-js' {
     user_metadata: any;
     aud: string;
     email?: string;
+    phone?: string;
+    email_confirmed_at?: string;
+    phone_confirmed_at?: string;
+    confirmation_sent_at?: string;
+    recovery_sent_at?: string;
+    email_change_sent_at?: string;
+    new_email?: string;
+    invited_at?: string;
+    action_link?: string;
     created_at: string;
+    updated_at?: string;
+    last_sign_in_at?: string;
+    role?: string;
     [key: string]: any;
   }
 
