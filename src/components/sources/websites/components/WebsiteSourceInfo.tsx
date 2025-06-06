@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Calendar, Link, Database, FileText } from 'lucide-react';
+import { ExternalLink, Calendar, Link, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
@@ -84,16 +84,16 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </p>
           )}
         </div>
-      </div>
-
-      <div className="flex items-center justify-between">
+        
         <WebsiteSourceStatusBadges
           crawlStatus={crawlStatus}
           isExcluded={false}
           linksCount={linksCount}
           sourceId={sourceId}
         />
-        
+      </div>
+
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
