@@ -9,11 +9,13 @@ import { useWebsiteSourceOperations } from "../hooks/useWebsiteSourceOperations"
 import { useWebsiteFormState } from "../hooks/useWebsiteFormState";
 import { WebsiteCrawlService } from "@/services/rag/websiteCrawlService";
 import { SourceCreateService } from "@/services/rag/operations/SourceCreateService";
+import { useOptimizedAgentSources } from "@/hooks/useOptimizedAgentSources";
 
 const WebsiteTabContainer: React.FC = () => {
   const { agentId } = useParams();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const { sources } = useOptimizedAgentSources();
   
   const {
     activeSubTab,
@@ -48,24 +50,52 @@ const WebsiteTabContainer: React.FC = () => {
     handleRecrawl
   } = useWebsiteSourceOperations(handleRefetch, handleRemoveFromState);
 
+  // Check for duplicate URLs
+  const checkForDuplicateUrl = (urlToCheck: string) => {
+    const websiteSources = sources.filter(source => source.source_type === 'website');
+    return websiteSources.some(source => {
+      const sourceUrl = source.url?.toLowerCase().replace(/\/$/, '');
+      const checkUrl = urlToCheck.toLowerCase().replace(/\/$/, '');
+      return sourceUrl === checkUrl;
+    });
+  };
+
   const handleSubmit = async (
     crawlType: 'crawl-links' | 'sitemap' | 'individual-link',
     options?: { maxPages?: number; maxDepth?: number; concurrency?: number }
   ) => {
     if (!agentId || !url.trim()) return;
 
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+      console.log('Submission already in progress, ignoring duplicate request');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
       console.log('🚀 Starting website crawl workflow');
+      
+      const fullUrl = url.startsWith('http') ? url : `${protocol}${url}`;
+      
+      // Check for duplicate URLs
+      if (checkForDuplicateUrl(fullUrl)) {
+        toast({
+          title: "Duplicate URL",
+          description: "This URL has already been added to your sources.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Create the source first with PENDING status
       const source = await SourceCreateService.createSource({
         agent_id: agentId,
         team_id: '', // Will be fetched automatically
         source_type: 'website',
-        title: url,
-        url: url,
+        title: fullUrl,
+        url: fullUrl,
         crawl_status: 'pending', // Start with pending status
         progress: 0,
         links_count: 0,
@@ -101,13 +131,13 @@ const WebsiteTabContainer: React.FC = () => {
       await WebsiteCrawlService.startEnhancedCrawl(
         agentId,
         source.id,
-        url,
+        fullUrl,
         crawlOptions
       );
 
       toast({
         title: "Crawl Started",
-        description: `Started crawling ${url} with ${crawlType} method. Status will update in real-time.`,
+        description: `Started crawling ${fullUrl} with ${crawlType} method. Status will update in real-time.`,
       });
 
       // Clear form and refresh list

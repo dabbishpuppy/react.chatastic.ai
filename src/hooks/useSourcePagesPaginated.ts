@@ -14,6 +14,7 @@ interface SourcePage {
   chunks_created?: number;
   processing_time_ms?: number;
   parent_source_id: string;
+  compression_ratio?: number;
 }
 
 interface UseSourcePagesPaginatedProps {
@@ -54,11 +55,13 @@ export const useSourcePagesPaginated = ({
       }
 
       return {
-        pages: data || [],
+        pages: (data || []) as SourcePage[],
         totalCount: count || 0,
         totalPages: Math.ceil((count || 0) / pageSize)
       };
     },
-    enabled: enabled && !!parentSourceId && !!agentId
+    enabled: enabled && !!parentSourceId && !!agentId,
+    refetchOnWindowFocus: false,
+    staleTime: 30 * 1000, // Consider data fresh for 30 seconds
   });
 };

@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { AgentSource } from '@/types/rag';
 
 interface SourcePage {
   id: string;
@@ -12,34 +11,19 @@ interface SourcePage {
   content_size?: number;
   compression_ratio?: number;
   error_message?: string;
+  chunks_created?: number;
+  processing_time_ms?: number;
+  completed_at?: string;
 }
 
 export const useOptimizedChildSources = (parentSourceId: string) => {
-  const [childSources, setChildSources] = useState<AgentSource[]>([]);
+  const [childPages, setChildPages] = useState<SourcePage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
   const lastUpdateRef = useRef<number>(0);
 
-  const convertToAgentSource = useCallback((page: SourcePage): AgentSource => ({
-    id: page.id,
-    url: page.url,
-    title: new URL(page.url).pathname || page.url,
-    crawl_status: page.status,
-    created_at: page.created_at,
-    updated_at: page.created_at,
-    parent_source_id: page.parent_source_id,
-    agent_id: '',
-    source_type: 'website',
-    is_active: true,
-    is_excluded: false,
-    original_size: page.content_size || 0,
-    compressed_size: page.content_size ? Math.round(page.content_size * (page.compression_ratio || 1)) : 0,
-    metadata: { error_message: page.error_message } as Record<string, any>,
-    requires_manual_training: false
-  }), []);
-
-  const fetchChildSources = useCallback(async () => {
+  const fetchChildPages = useCallback(async () => {
     if (!parentSourceId) return;
 
     try {
@@ -56,14 +40,13 @@ export const useOptimizedChildSources = (parentSourceId: string) => {
         return;
       }
 
-      const formattedSources = (sourcePages || []).map(convertToAgentSource);
-      setChildSources(formattedSources);
+      setChildPages(sourcePages || []);
     } catch (err: any) {
       setError(`Error loading child pages: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }, [parentSourceId, convertToAgentSource]);
+  }, [parentSourceId]);
 
   // Debounced update to prevent rapid re-renders
   const debouncedUpdate = useCallback(() => {
@@ -76,37 +59,37 @@ export const useOptimizedChildSources = (parentSourceId: string) => {
       clearTimeout(debounceRef.current);
     }
     
-    debounceRef.current = setTimeout(fetchChildSources, 50);
-  }, [fetchChildSources]);
+    debounceRef.current = setTimeout(fetchChildPages, 50);
+  }, [fetchChildPages]);
 
   // Handle real-time updates directly
   const handleRealtimeUpdate = useCallback((payload: any) => {
     if (payload.eventType === 'INSERT') {
       const newPage = payload.new as SourcePage;
       if (newPage.parent_source_id === parentSourceId) {
-        setChildSources(prev => [...prev, convertToAgentSource(newPage)]);
+        setChildPages(prev => [...prev, newPage]);
       }
     } else if (payload.eventType === 'UPDATE') {
       const updatedPage = payload.new as SourcePage;
       if (updatedPage.parent_source_id === parentSourceId) {
-        setChildSources(prev => 
-          prev.map(source => 
-            source.id === updatedPage.id 
-              ? convertToAgentSource(updatedPage)
-              : source
+        setChildPages(prev => 
+          prev.map(page => 
+            page.id === updatedPage.id 
+              ? updatedPage
+              : page
           )
         );
       }
     } else if (payload.eventType === 'DELETE') {
       const deletedPage = payload.old as SourcePage;
-      setChildSources(prev => prev.filter(source => source.id !== deletedPage.id));
+      setChildPages(prev => prev.filter(page => page.id !== deletedPage.id));
     }
-  }, [parentSourceId, convertToAgentSource]);
+  }, [parentSourceId]);
 
   // Initial fetch
   useEffect(() => {
-    fetchChildSources();
-  }, [fetchChildSources]);
+    fetchChildPages();
+  }, [fetchChildPages]);
 
   // Set up optimized real-time subscription
   useEffect(() => {
@@ -131,9 +114,9 @@ export const useOptimizedChildSources = (parentSourceId: string) => {
   }, [parentSourceId, handleRealtimeUpdate]);
 
   return {
-    childSources,
+    childPages,
     loading,
     error,
-    refetch: fetchChildSources
+    refetch: fetchChildPages
   };
 };
