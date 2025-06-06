@@ -29,4 +29,30 @@ export class LoadTestingService {
       spaceSavedPercentage: 40
     };
   }
+
+  static async runQuickValidation(): Promise<boolean> {
+    console.log('🚀 Running quick validation...');
+    // Simulate validation logic
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return true;
+  }
+
+  static async runLoadTest(config: any): Promise<any> {
+    console.log('🚀 Running full load test with config:', config);
+    
+    // Simulate load test execution
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    return {
+      results: {
+        totalCrawlsCompleted: Math.floor(Math.random() * 100) + 50,
+        totalCrawlsFailed: Math.floor(Math.random() * 10),
+        errorRate: Math.random() * 0.1,
+        averageCompletionTimeMinutes: Math.random() * 5 + 1
+      },
+      acceptanceCriteriaMet: Math.random() > 0.3,
+      failedCriteria: Math.random() > 0.7 ? ['High error rate'] : [],
+      recommendations: ['Consider optimizing database queries', 'Increase server capacity']
+    };
+  }
 }

@@ -74,4 +74,65 @@ export class SourceProcessingService {
       source.content.trim().length > 0
     );
   }
+
+  static async fetchAndProcessSources(
+    agentId: string,
+    setTrainingProgress: Function,
+    markAgentCompletion: Function,
+    sessionId: string,
+    refs: any
+  ): Promise<boolean> {
+    try {
+      console.log('🔄 Fetching and processing sources for agent:', agentId);
+      
+      // Fetch sources for the agent
+      const { data: sources, error } = await supabase
+        .from('agent_sources')
+        .select('*')
+        .eq('agent_id', agentId)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('❌ Error fetching sources:', error);
+        return false;
+      }
+
+      if (!sources || sources.length === 0) {
+        console.log('ℹ️ No active sources found for agent');
+        return false;
+      }
+
+      // Validate sources
+      const validSources = await this.validateSources(sources);
+      
+      if (validSources.length === 0) {
+        console.log('ℹ️ No valid sources found after validation');
+        return false;
+      }
+
+      // Process sources
+      const result = await this.processSources(agentId, validSources);
+      
+      // Update training progress
+      setTrainingProgress({
+        agentId,
+        status: result.success ? 'completed' : 'error',
+        processedSources: result.processedSources,
+        totalSources: validSources.length,
+        processedChunks: result.processedChunks,
+        totalChunks: result.processedChunks,
+        progress: 100,
+        errors: result.errors
+      });
+
+      if (result.success) {
+        markAgentCompletion(sessionId);
+      }
+
+      return result.success;
+    } catch (error) {
+      console.error('❌ Error in fetchAndProcessSources:', error);
+      return false;
+    }
+  }
 }
