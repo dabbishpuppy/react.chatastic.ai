@@ -12,6 +12,8 @@ interface ChildPageInfoProps {
   processingTimeMs?: number;
   errorMessage?: string;
   createdAt: string;
+  processingStatus?: string; // Add processing status for training flow
+  parentSource?: any; // Parent source to check training state
 }
 
 const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
@@ -20,7 +22,9 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   contentSize,
   chunksCreated,
   errorMessage,
-  createdAt
+  createdAt,
+  processingStatus,
+  parentSource
 }) => {
   const getFullUrl = (url: string) => {
     // If URL doesn't have protocol, add https://
@@ -63,27 +67,49 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       .replace(/^less than a minute ago$/, 'just now');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-500 text-white';
-      case 'in_progress': return 'bg-blue-500 text-white';
-      case 'pending': return 'bg-yellow-500 text-white';
-      case 'failed': return 'bg-red-500 text-white';
+  const getStatusColor = (mappedStatus: string) => {
+    switch (mappedStatus) {
+      case 'Trained': return 'bg-green-500 text-white';
+      case 'In Progress': return 'bg-blue-500 text-white';
+      case 'Pending': return 'bg-yellow-500 text-white';
+      case 'Failed': return 'bg-red-500 text-white';
+      case 'Completed': return 'bg-green-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string, processingStatus?: string, parentSource?: any) => {
+    // Check if parent is in training or completed training
+    const parentMetadata = (parentSource?.metadata as any) || {};
+    const isParentTraining = parentMetadata.training_status === 'in_progress' || parentSource?.crawl_status === 'training';
+    const isParentTrainingCompleted = parentMetadata.training_completed_at || parentMetadata.children_training_completed;
+
+    // During training flow, map processing status
+    if (processingStatus) {
+      switch (processingStatus) {
+        case 'in_progress': return 'In Progress';
+        case 'completed': 
+          // If parent training is completed, show as "Trained"
+          return isParentTrainingCompleted ? 'Trained' : 'Completed';
+        case 'failed': return 'Failed';
+        default: return 'Pending';
+      }
+    }
+
+    // Fallback to original status mapping
     switch (status) {
-      case 'completed': return 'Completed';
-      case 'in_progress': return 'In Progress';
+      case 'completed': 
+        // If parent is training completed, show as "Trained"
+        return isParentTrainingCompleted ? 'Trained' : 'Completed';
+      case 'in_progress': return isParentTraining ? 'In Progress' : 'In Progress';
       case 'pending': return 'Pending';
       case 'failed': return 'Failed';
       default: return 'Unknown';
     }
   };
 
-  const isLoading = status === 'in_progress' || status === 'pending';
+  const mappedStatus = getStatusText(status, processingStatus, parentSource);
+  const isLoading = mappedStatus === 'In Progress' || mappedStatus === 'Pending';
   const fullUrl = getFullUrl(url);
 
   return (
@@ -104,7 +130,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
             <span>Crawled {formatTimeAgo(createdAt)}</span>
           </div>
           
-          {status === 'completed' && contentSize && (
+          {(status === 'completed' || mappedStatus === 'Trained') && contentSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
@@ -127,9 +153,9 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       </div>
       
       <div className="flex items-center gap-2">
-        <Badge className={`${getStatusColor(status)} text-xs px-2 py-0 flex items-center gap-1`}>
+        <Badge className={`${getStatusColor(mappedStatus)} text-xs px-2 py-0 flex items-center gap-1`}>
           {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-          {getStatusText(status)}
+          {mappedStatus}
         </Badge>
       </div>
 

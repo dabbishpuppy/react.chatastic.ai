@@ -16,13 +16,16 @@ interface ChildPageCardProps {
     chunks_created?: number;
     processing_time_ms?: number;
     parent_source_id: string;
+    processing_status?: string; // Add processing status
   };
+  parentSource?: any; // Add parent source prop
   onExclude?: (page: any) => void;
   onDelete?: (page: any) => void;
 }
 
 const ChildPageCard: React.FC<ChildPageCardProps> = ({
   page,
+  parentSource,
   onExclude,
   onDelete
 }) => {
@@ -42,6 +45,8 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
             processingTimeMs={page.processing_time_ms}
             errorMessage={page.error_message}
             createdAt={page.created_at}
+            processingStatus={page.processing_status}
+            parentSource={parentSource}
           />
           
           <ChildPageActions

@@ -1,4 +1,4 @@
-export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed';
+export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed' | 'failed' | 'in_progress' | 'ready_for_training';
 
 export interface SourceStatusSummary {
   totalSources: number;
@@ -60,6 +60,11 @@ export class SimplifiedSourceStatusService {
       return 'trained';
     }
     
+    // Check for training failures
+    if (metadata.training_status === 'failed' || metadata.training_error) {
+      return 'failed';
+    }
+    
     // For website sources, check crawl_status
     if (source.source_type === 'website') {
       // Handle "ready_for_training" status properly
@@ -85,6 +90,11 @@ export class SimplifiedSourceStatusService {
       // If currently crawling or recrawling
       if (source.crawl_status === 'in_progress' || source.crawl_status === 'recrawling') {
         return 'crawling';
+      }
+      
+      // Handle failed crawl status
+      if (source.crawl_status === 'failed') {
+        return 'failed';
       }
       
       // Default to pending for other states
