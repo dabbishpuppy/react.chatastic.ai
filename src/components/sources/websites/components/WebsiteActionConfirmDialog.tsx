@@ -19,6 +19,7 @@ interface WebsiteActionConfirmDialogProps {
   confirmText: string;
   onConfirm: () => void;
   isDestructive?: boolean;
+  disabled?: boolean;
 }
 
 const WebsiteActionConfirmDialog: React.FC<WebsiteActionConfirmDialogProps> = ({
@@ -28,7 +29,8 @@ const WebsiteActionConfirmDialog: React.FC<WebsiteActionConfirmDialogProps> = ({
   description,
   confirmText,
   onConfirm,
-  isDestructive = false
+  isDestructive = false,
+  disabled = false
 }) => {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -40,9 +42,10 @@ const WebsiteActionConfirmDialog: React.FC<WebsiteActionConfirmDialogProps> = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={disabled}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
+            disabled={disabled}
             className={isDestructive ? "bg-red-600 hover:bg-red-700" : ""}
           >
             {confirmText}
