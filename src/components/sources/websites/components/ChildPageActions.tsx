@@ -3,19 +3,18 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
-  Edit2, 
   RefreshCw, 
   Trash2,
   MoreHorizontal
 } from 'lucide-react';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
+import { useChildPageOperations } from '../hooks/useChildPageOperations';
 
 interface ChildPageActionsProps {
   url: string;
   pageId: string;
-  onExclude?: () => void;
+  parentSourceId: string;
   onDelete?: () => void;
-  onRecrawl?: () => void;
 }
 
 type ConfirmationType = 'recrawl' | 'delete' | null;
@@ -23,10 +22,11 @@ type ConfirmationType = 'recrawl' | 'delete' | null;
 const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
   pageId,
-  onDelete,
-  onRecrawl
+  parentSourceId,
+  onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
+  const { recrawlChildPage, isLoading } = useChildPageOperations();
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -39,8 +39,15 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   const handleConfirm = async () => {
     switch (confirmationType) {
       case 'recrawl':
-        if (onRecrawl) {
-          await onRecrawl();
+        try {
+          await recrawlChildPage({
+            id: pageId,
+            url: url,
+            status: 'pending',
+            parent_source_id: parentSourceId
+          });
+        } catch (error) {
+          console.error('Recrawl failed:', error);
         }
         break;
       case 'delete':
@@ -93,12 +100,10 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
-          {onRecrawl && (
-            <DropdownMenuItem onClick={handleRecrawlClick}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Recrawl
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem onClick={handleRecrawlClick} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Recrawl
+          </DropdownMenuItem>
           
           {onDelete && (
             <DropdownMenuItem onClick={handleDeleteClick} className="text-red-600">
@@ -117,7 +122,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         confirmText={confirmConfig.confirmText}
         onConfirm={handleConfirm}
         isDestructive={confirmConfig.isDestructive}
-        disabled={false}
+        disabled={isLoading}
       />
     </div>
   );

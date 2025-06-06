@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useWebsiteSourceOperations } from '../hooks/useWebsiteSourceOperations';
 import ChildPageInfo from './ChildPageInfo';
 import ChildPageActions from './ChildPageActions';
 
@@ -27,20 +26,8 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
   onExclude,
   onDelete
 }) => {
-  const { handleRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
-
   const handleDelete = () => {
     onDelete?.(page);
-  };
-
-  const handleRecrawlPage = async () => {
-    // Create a mock source object for the recrawl function
-    const mockSource = {
-      id: page.id,
-      url: page.url,
-      metadata: {}
-    };
-    await handleRecrawl(mockSource as any);
   };
 
   return (
@@ -60,8 +47,8 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
           <ChildPageActions
             url={page.url}
             pageId={page.id}
+            parentSourceId={page.parent_source_id}
             onDelete={onDelete ? handleDelete : undefined}
-            onRecrawl={handleRecrawlPage}
           />
         </div>
       </CardContent>

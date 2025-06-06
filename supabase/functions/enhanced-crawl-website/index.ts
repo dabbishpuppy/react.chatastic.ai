@@ -42,7 +42,7 @@ serve(async (req) => {
 
   try {
     // Parse request body with error handling
-    let requestBody: EnhancedCrawlRequest & { discoverOnly?: boolean };
+    let requestBody: EnhancedCrawlRequest & { discoverOnly?: boolean; parentSourceId?: string };
     try {
       requestBody = await req.json();
     } catch (parseError) {
@@ -71,11 +71,12 @@ serve(async (req) => {
       enableCompression = true,
       enableDeduplication = true,
       priority = 'normal',
-      discoverOnly = false
+      discoverOnly = false,
+      parentSourceId // For child page recrawl
     } = requestBody;
 
     console.log('🚀 Starting enhanced crawl for agent', agentId, ', URL:', url);
-    console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths, discoverOnly });
+    console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths, discoverOnly, parentSourceId });
 
     // Validate required fields
     if (!agentId || !url) {
@@ -145,6 +146,65 @@ serve(async (req) => {
     // Validate that we have valid UUIDs
     if (typeof agent.team_id !== 'string') {
       throw new Error(`Invalid team_id type: expected string, got ${typeof agent.team_id}`);
+    }
+
+    // Handle child page recrawl case
+    if (parentSourceId && crawlMode === 'single-page') {
+      console.log('🔄 Processing child page recrawl for parent:', parentSourceId);
+      
+      // For child page recrawl, we need to update the existing source_pages entry
+      const { error: updateError } = await supabase
+        .from('source_pages')
+        .update({
+          status: 'in_progress',
+          started_at: new Date().toISOString(),
+          error_message: null
+        })
+        .eq('parent_source_id', parentSourceId)
+        .eq('url', url);
+
+      if (updateError) {
+        console.error('Error updating child page status:', updateError);
+        throw new Error(`Failed to update child page status: ${updateError.message}`);
+      }
+
+      // Call the process-source-pages function to handle the actual crawling
+      const { data: processData, error: processError } = await supabase.functions.invoke('process-source-pages', {
+        body: {
+          parentSourceId: parentSourceId,
+          targetUrl: url, // Process only this specific URL
+          priority: safePriority
+        }
+      });
+
+      if (processError) {
+        console.error('Error calling process-source-pages:', processError);
+        // Update the page status to failed
+        await supabase
+          .from('source_pages')
+          .update({
+            status: 'failed',
+            error_message: `Processing failed: ${processError.message}`,
+            completed_at: new Date().toISOString()
+          })
+          .eq('parent_source_id', parentSourceId)
+          .eq('url', url);
+
+        throw new Error(`Failed to process child page: ${processError.message}`);
+      }
+
+      console.log('✅ Child page recrawl initiated successfully');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `Child page recrawl initiated for ${url}`,
+          parentSourceId: parentSourceId
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200
+        }
+      );
     }
 
     // Discover URLs based on crawl mode with timeout

@@ -43,7 +43,12 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
           
           if (payload.eventType === 'INSERT') {
             const newPage = payload.new as SourcePage;
-            setChildSources(prev => [...prev, newPage]);
+            setChildSources(prev => {
+              // Check if page already exists to avoid duplicates
+              const exists = prev.some(page => page.id === newPage.id);
+              if (exists) return prev;
+              return [...prev, newPage];
+            });
           } else if (payload.eventType === 'UPDATE') {
             const updatedPage = payload.new as SourcePage;
             setChildSources(prev => 
@@ -59,7 +64,9 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`📡 Child pages subscription status for ${parentSourceId}:`, status);
+      });
 
     return () => {
       console.log(`🔌 Cleaning up child pages subscription for parent: ${parentSourceId}`);
