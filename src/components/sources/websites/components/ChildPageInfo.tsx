@@ -12,8 +12,6 @@ interface ChildPageInfoProps {
   processingTimeMs?: number;
   errorMessage?: string;
   createdAt: string;
-  processingStatus?: string; // Add processing status for training flow
-  parentSource?: any; // Parent source to check training state
 }
 
 const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
@@ -22,9 +20,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   contentSize,
   chunksCreated,
   errorMessage,
-  createdAt,
-  processingStatus,
-  parentSource
+  createdAt
 }) => {
   const getFullUrl = (url: string) => {
     // If URL doesn't have protocol, add https://
@@ -67,86 +63,27 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       .replace(/^less than a minute ago$/, 'just now');
   };
 
-  const getStatusColor = (mappedStatus: string) => {
-    switch (mappedStatus) {
-      case 'Trained': return 'bg-green-500 text-white';
-      case 'In Progress': return 'bg-blue-500 text-white';
-      case 'Pending': return 'bg-yellow-500 text-white';
-      case 'Failed': return 'bg-red-500 text-white';
-      case 'Completed': return 'bg-green-500 text-white';
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-500 text-white';
+      case 'in_progress': return 'bg-blue-500 text-white';
+      case 'pending': return 'bg-yellow-500 text-white';
+      case 'failed': return 'bg-red-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
   };
 
-  const getStatusText = (status: string, processingStatus?: string, parentSource?: any) => {
-    // Get parent metadata to check training state
-    const parentMetadata = (parentSource?.metadata as any) || {};
-    const isParentTraining = parentMetadata.training_status === 'in_progress' || parentSource?.crawl_status === 'training';
-    const isParentTrainingCompleted = parentMetadata.training_status === 'completed' || 
-                                      parentMetadata.training_completed_at || 
-                                      parentMetadata.children_training_completed === true;
-
-    console.log('🔍 Child page status determination:', {
-      childStatus: status,
-      processingStatus,
-      isParentTraining,
-      isParentTrainingCompleted,
-      parentMetadata
-    });
-
-    // During training flow, prioritize processing status
-    if (processingStatus) {
-      switch (processingStatus) {
-        case 'in_progress': 
-          console.log('✅ Child status: IN PROGRESS (processing_status = in_progress)');
-          return 'In Progress';
-        case 'completed': 
-          if (isParentTrainingCompleted) {
-            console.log('✅ Child status: TRAINED (processing completed + parent training completed)');
-            return 'Trained';
-          } else {
-            console.log('✅ Child status: COMPLETED (processing completed, parent still training)');
-            return 'Completed';
-          }
-        case 'failed': 
-          console.log('✅ Child status: FAILED (processing_status = failed)');
-          return 'Failed';
-        default: 
-          console.log('✅ Child status: PENDING (default processing status)');
-          return 'Pending';
-      }
-    }
-
-    // Fallback to original status mapping
+  const getStatusText = (status: string) => {
     switch (status) {
-      case 'completed': 
-        if (isParentTrainingCompleted) {
-          console.log('✅ Child status: TRAINED (status = completed + parent training completed)');
-          return 'Trained';
-        } else if (isParentTraining) {
-          console.log('✅ Child status: IN PROGRESS (status = completed + parent training)');
-          return 'In Progress';
-        } else {
-          console.log('✅ Child status: COMPLETED (status = completed)');
-          return 'Completed';
-        }
-      case 'in_progress': 
-        console.log('✅ Child status: IN PROGRESS (status = in_progress)');
-        return 'In Progress';
-      case 'pending': 
-        console.log('✅ Child status: PENDING (status = pending)');
-        return 'Pending';
-      case 'failed': 
-        console.log('✅ Child status: FAILED (status = failed)');
-        return 'Failed';
-      default: 
-        console.log('✅ Child status: UNKNOWN (unknown status)');
-        return 'Unknown';
+      case 'completed': return 'Completed';
+      case 'in_progress': return 'In Progress';
+      case 'pending': return 'Pending';
+      case 'failed': return 'Failed';
+      default: return 'Unknown';
     }
   };
 
-  const mappedStatus = getStatusText(status, processingStatus, parentSource);
-  const isLoading = mappedStatus === 'In Progress' || mappedStatus === 'Pending';
+  const isLoading = status === 'in_progress' || status === 'pending';
   const fullUrl = getFullUrl(url);
 
   return (
@@ -167,7 +104,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
             <span>Crawled {formatTimeAgo(createdAt)}</span>
           </div>
           
-          {(status === 'completed' || mappedStatus === 'Trained') && contentSize && (
+          {status === 'completed' && contentSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
@@ -190,9 +127,9 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       </div>
       
       <div className="flex items-center gap-2">
-        <Badge className={`${getStatusColor(mappedStatus)} text-xs px-2 py-0 flex items-center gap-1`}>
+        <Badge className={`${getStatusColor(status)} text-xs px-2 py-0 flex items-center gap-1`}>
           {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-          {mappedStatus}
+          {getStatusText(status)}
         </Badge>
       </div>
 
