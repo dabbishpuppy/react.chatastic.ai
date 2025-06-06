@@ -245,8 +245,7 @@ export class WorkerQueueService {
       const channel = supabase.channel('crawl-worker-queue');
       
       for (const jobId of jobIds) {
-        await channel.send({
-          type: 'broadcast',
+        await channel.send('broadcast', {
           event: eventType,
           payload: { jobId, priority, timestamp: new Date().toISOString() }
         });

@@ -48,7 +48,7 @@ declare module '@supabase/supabase-js' {
     match(query: Record<string, any>): PostgrestFilterBuilder<T>;
     order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): PostgrestFilterBuilder<T>;
     limit(count: number): PostgrestFilterBuilder<T>;
-    range(from: number, to: number): PostgrestFilterBuilder<T>;
+    range(from: number, to?: number): PostgrestFilterBuilder<T>;
     single(): PostgrestFilterBuilder<T>;
     maybeSingle(): PostgrestFilterBuilder<T>;
     csv(): PostgrestFilterBuilder<T>;
@@ -118,7 +118,15 @@ declare module '@supabase/supabase-js' {
     ): RealtimeChannel;
     subscribe(callback?: (status: string) => void): RealtimeChannel;
     unsubscribe(): Promise<string>;
-    send(event: string, payload: any, options?: any): Promise<string>;
+    send(
+      type: 'broadcast',
+      payload: {
+        type?: string;
+        event: string;
+        payload: any;
+      },
+      options?: any
+    ): Promise<string>;
   }
 
   // Functions client
@@ -152,4 +160,3 @@ declare module '@supabase/supabase-js' {
     options?: any
   ): SupabaseClient<Database>;
 }
-
