@@ -27,6 +27,7 @@ export type Database = {
           created_by: string | null
           discovery_completed: boolean | null
           duplicate_chunks: number | null
+          error_message: string | null
           exclude_paths: string[] | null
           extraction_method: string | null
           failed_jobs: number | null
@@ -48,6 +49,7 @@ export type Database = {
           requires_manual_training: boolean | null
           respect_robots: boolean | null
           source_type: Database["public"]["Enums"]["source_type"]
+          status_history: Json | null
           team_id: string
           title: string
           total_children: number | null
@@ -76,6 +78,7 @@ export type Database = {
           created_by?: string | null
           discovery_completed?: boolean | null
           duplicate_chunks?: number | null
+          error_message?: string | null
           exclude_paths?: string[] | null
           extraction_method?: string | null
           failed_jobs?: number | null
@@ -97,6 +100,7 @@ export type Database = {
           requires_manual_training?: boolean | null
           respect_robots?: boolean | null
           source_type: Database["public"]["Enums"]["source_type"]
+          status_history?: Json | null
           team_id: string
           title: string
           total_children?: number | null
@@ -125,6 +129,7 @@ export type Database = {
           created_by?: string | null
           discovery_completed?: boolean | null
           duplicate_chunks?: number | null
+          error_message?: string | null
           exclude_paths?: string[] | null
           extraction_method?: string | null
           failed_jobs?: number | null
@@ -146,6 +151,7 @@ export type Database = {
           requires_manual_training?: boolean | null
           respect_robots?: boolean | null
           source_type?: Database["public"]["Enums"]["source_type"]
+          status_history?: Json | null
           team_id?: string
           title?: string
           total_children?: number | null
@@ -2156,6 +2162,16 @@ export type Database = {
           partition_name: string
           row_count: number
           size_bytes: number
+        }[]
+      }
+      get_source_pages_stats: {
+        Args: { parent_source_id_param: string }
+        Returns: {
+          total_count: number
+          completed_count: number
+          failed_count: number
+          pending_count: number
+          in_progress_count: number
         }[]
       }
       get_team_role: {

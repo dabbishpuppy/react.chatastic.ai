@@ -41,7 +41,12 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       if (error) {
         console.error('Error fetching child sources:', error);
       } else {
-        setChildSources(data || []);
+        // Properly cast the data to AgentSource type
+        const typedData: AgentSource[] = (data || []).map(item => ({
+          ...item,
+          metadata: item.metadata as Record<string, any> || {}
+        }));
+        setChildSources(typedData);
       }
     } catch (err) {
       console.error('Exception fetching child sources:', err);

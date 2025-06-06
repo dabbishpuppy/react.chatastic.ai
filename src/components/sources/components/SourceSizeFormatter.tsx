@@ -30,6 +30,11 @@ export const formatFileSize = (source: AgentSource): string => {
   }
 
   // Convert bytes to human readable format
+  return formatBytes(sizeInBytes);
+};
+
+// Export the standalone formatBytes function
+export const formatBytes = (sizeInBytes: number): string => {
   if (sizeInBytes === 0) return "0 B";
   
   const k = 1024;
