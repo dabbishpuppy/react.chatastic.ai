@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -201,83 +202,83 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
               <Card key={page.id} className="shadow-sm">
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate" title={page.url}>
+                        {formatUrl(page.url)}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        {page.content_size && (
+                          <span>{formatBytes(page.content_size)}</span>
+                        )}
+                        {page.chunks_created && (
+                          <span>• {page.chunks_created} chunks</span>
+                        )}
+                        {page.processing_time_ms && (
+                          <span>• {page.processing_time_ms}ms</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
                       <Badge className={`${getStatusColor(page.status)} text-xs px-2 py-0`}>
                         {getStatusText(page.status)}
                       </Badge>
                       
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate" title={page.url}>
-                          {formatUrl(page.url)}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          {page.content_size && (
-                            <span>{formatBytes(page.content_size)}</span>
-                          )}
-                          {page.chunks_created && (
-                            <span>• {page.chunks_created} chunks</span>
-                          )}
-                          {page.processing_time_ms && (
-                            <span>• {page.processing_time_ms}ms</span>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(page.url, '_blank')}
+                                className="h-6 w-6 p-0"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Open URL</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onExclude({ ...page, source_type: 'website' })}
+                                className="h-6 w-6 p-0"
+                              >
+                                <EyeOff className="w-3 h-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Exclude</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onDelete({ ...page, source_type: 'website' })}
+                                className="h-6 w-6 p-0 text-red-600"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(page.url, '_blank')}
-                              className="h-6 w-6 p-0"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Open URL</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onExclude({ ...page, source_type: 'website' })}
-                              className="h-6 w-6 p-0"
-                            >
-                              <EyeOff className="w-3 h-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Exclude</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => onDelete({ ...page, source_type: 'website' })}
-                              className="h-6 w-6 p-0 text-red-600"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Delete</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
                     </div>
                   </div>
 
