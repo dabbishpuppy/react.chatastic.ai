@@ -56,6 +56,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
+  const formatTimeAgo = (dateString: string): string => {
+    const timeAgo = formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    
+    // Handle various time formats that might include "0"
+    return timeAgo
+      .replace(/^about\s+0\s+\w+\s+ago$/, 'just now')
+      .replace(/^0\s+\w+\s+ago$/, 'just now')
+      .replace(/^about\s+/, 'About ')
+      .replace(/^less than a minute ago$/, 'just now');
+  };
+
   const shouldShowLinksCount = !isChild && linksCount > 0;
   const shouldShowContentSize = !isChild && totalContentSize > 0;
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
@@ -98,7 +109,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
         <div className="flex items-center text-xs text-gray-500">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            <span>{formatDistanceToNow(new Date(createdAt), { addSuffix: true }).replace('about', 'About')}</span>
+            <span>{formatTimeAgo(createdAt)}</span>
           </div>
           
           {shouldShowLinksCount && (

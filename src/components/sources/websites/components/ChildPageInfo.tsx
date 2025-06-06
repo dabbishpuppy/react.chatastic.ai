@@ -44,6 +44,17 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
+  const formatTimeAgo = (dateString: string): string => {
+    const timeAgo = formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    
+    // Handle various time formats that might include "0"
+    return timeAgo
+      .replace(/^about\s+0\s+\w+\s+ago$/, 'just now')
+      .replace(/^0\s+\w+\s+ago$/, 'just now')
+      .replace(/^about\s+/, 'About ')
+      .replace(/^less than a minute ago$/, 'just now');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-500 text-white';
@@ -73,7 +84,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
         <div className="flex items-center text-xs text-gray-500 mt-1">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+            <span>Added {formatTimeAgo(createdAt)}</span>
           </div>
           
           {status === 'completed' && contentSize && (
