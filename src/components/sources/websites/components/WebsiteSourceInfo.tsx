@@ -74,23 +74,23 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     <div className="space-y-2">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-0.5">
             <h3 className="font-medium text-gray-900 truncate" title={title || url}>
               {title || formatUrl(url)}
             </h3>
-            <div className="flex items-center gap-2">
-              <ExternalLink 
-                className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
-                onClick={() => window.open(url, '_blank')}
-              />
-              <WebsiteSourceStatusBadges
-                crawlStatus={crawlStatus}
-                isExcluded={false}
-                linksCount={linksCount}
-                sourceId={sourceId}
-              />
-            </div>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExternalLink 
+            className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
+            onClick={() => window.open(url, '_blank')}
+          />
+          <WebsiteSourceStatusBadges
+            crawlStatus={crawlStatus}
+            isExcluded={false}
+            linksCount={linksCount}
+            sourceId={sourceId}
+          />
         </div>
       </div>
 
