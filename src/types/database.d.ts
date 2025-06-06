@@ -14,32 +14,122 @@ declare namespace Database {
 }
 
 declare module '@supabase/supabase-js' {
-  export interface SupabaseClient<Database = any> {
-    rpc<T = any>(
-      fn: string,
-      params?: object,
-      options?: { head?: boolean; count?: null | 'exact' | 'planned' | 'estimated' }
-    ): PostgrestFilterBuilder<T>;
+  // PostgrestFilterBuilder interface for query building
+  export interface PostgrestFilterBuilder<T = any> {
+    select(columns?: string): PostgrestFilterBuilder<T>;
+    insert(values: any): PostgrestFilterBuilder<T>;
+    update(values: any): PostgrestFilterBuilder<T>;
+    delete(): PostgrestFilterBuilder<T>;
+    eq(column: string, value: any): PostgrestFilterBuilder<T>;
+    neq(column: string, value: any): PostgrestFilterBuilder<T>;
+    gt(column: string, value: any): PostgrestFilterBuilder<T>;
+    gte(column: string, value: any): PostgrestFilterBuilder<T>;
+    lt(column: string, value: any): PostgrestFilterBuilder<T>;
+    lte(column: string, value: any): PostgrestFilterBuilder<T>;
+    like(column: string, pattern: string): PostgrestFilterBuilder<T>;
+    ilike(column: string, pattern: string): PostgrestFilterBuilder<T>;
+    is(column: string, value: any): PostgrestFilterBuilder<T>;
+    in(column: string, values: any[]): PostgrestFilterBuilder<T>;
+    contains(column: string, value: any): PostgrestFilterBuilder<T>;
+    containedBy(column: string, value: any): PostgrestFilterBuilder<T>;
+    rangeGt(column: string, value: any): PostgrestFilterBuilder<T>;
+    rangeGte(column: string, value: any): PostgrestFilterBuilder<T>;
+    rangeLt(column: string, value: any): PostgrestFilterBuilder<T>;
+    rangeLte(column: string, value: any): PostgrestFilterBuilder<T>;
+    rangeAdjacent(column: string, value: any): PostgrestFilterBuilder<T>;
+    overlaps(column: string, value: any): PostgrestFilterBuilder<T>;
+    textSearch(column: string, query: string): PostgrestFilterBuilder<T>;
+    not(column: string, operator: string, value: any): PostgrestFilterBuilder<T>;
+    or(filters: string): PostgrestFilterBuilder<T>;
+    filter(column: string, operator: string, value: any): PostgrestFilterBuilder<T>;
+    match(query: Record<string, any>): PostgrestFilterBuilder<T>;
+    order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): PostgrestFilterBuilder<T>;
+    limit(count: number): PostgrestFilterBuilder<T>;
+    range(from: number, to: number): PostgrestFilterBuilder<T>;
+    single(): PostgrestFilterBuilder<T>;
+    maybeSingle(): PostgrestFilterBuilder<T>;
+    csv(): PostgrestFilterBuilder<T>;
+    geojson(): PostgrestFilterBuilder<T>;
+    explain(options?: any): PostgrestFilterBuilder<T>;
+    rollback(): PostgrestFilterBuilder<T>;
+    returns<NewResult = any>(): PostgrestFilterBuilder<NewResult>;
+    then<TResult1 = any, TResult2 = never>(
+      onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+      onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null
+    ): Promise<TResult1 | TResult2>;
   }
-  
-  // Add exported type declarations
-  export type User = {
+
+  // Auth interfaces
+  export interface User {
     id: string;
     app_metadata: any;
     user_metadata: any;
     aud: string;
     created_at: string;
     [key: string]: any;
-  };
-  
-  export type Session = {
+  }
+
+  export interface Session {
     access_token: string;
     refresh_token: string;
     expires_at: number;
     user: User;
     [key: string]: any;
-  };
-  
+  }
+
+  export interface AuthChangeEvent {
+    event: 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED' | 'PASSWORD_RECOVERY';
+    session: Session | null;
+  }
+
+  export interface AuthResponse {
+    data: {
+      user: User | null;
+      session: Session | null;
+    };
+    error: any;
+  }
+
+  export interface SupabaseAuthClient {
+    getSession(): Promise<{ data: { session: Session | null }; error: any }>;
+    onAuthStateChange(callback: (event: string, session: Session | null) => void): { data: { subscription: any } };
+    signOut(): Promise<any>;
+  }
+
+  // Realtime interfaces
+  export interface RealtimeChannel {
+    on(
+      type: string,
+      config: {
+        event: string;
+        schema: string;
+        table: string;
+        filter?: string;
+      },
+      callback: (payload: any) => void
+    ): RealtimeChannel;
+    subscribe(): RealtimeChannel;
+  }
+
+  // Functions client
+  export interface FunctionsClient {
+    invoke(functionName: string, options?: { body?: any }): Promise<{ data: any; error: any }>;
+  }
+
+  // Main Supabase client interface
+  export interface SupabaseClient<Database = any> {
+    from(table: string): PostgrestFilterBuilder<any>;
+    rpc<T = any>(
+      fn: string,
+      params?: object,
+      options?: { head?: boolean; count?: null | 'exact' | 'planned' | 'estimated' }
+    ): PostgrestFilterBuilder<T>;
+    auth: SupabaseAuthClient;
+    channel(name: string): RealtimeChannel;
+    removeChannel(channel: RealtimeChannel): void;
+    functions: FunctionsClient;
+  }
+
   export function createClient<Database = any>(
     supabaseUrl: string,
     supabaseKey: string,
