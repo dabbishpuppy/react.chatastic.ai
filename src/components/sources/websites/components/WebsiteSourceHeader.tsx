@@ -1,28 +1,14 @@
 
 import React from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Check, X } from 'lucide-react';
-import { AgentSource } from '@/types/rag';
-import WebsiteSourceInfo from './WebsiteSourceInfo';
-
-interface SourcePage {
-  id: string;
-  url: string;
-  status: string;
-  created_at: string;
-  completed_at?: string;
-  error_message?: string;
-  content_size?: number;
-  chunks_created?: number;
-  processing_time_ms?: number;
-  parent_source_id: string;
-}
+import { Check, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceHeaderProps {
-  source: AgentSource;
-  childSources: SourcePage[];
+  source: any;
+  childSources?: any[];
   isSelected: boolean;
   isEditing: boolean;
   editUrl: string;
@@ -34,7 +20,7 @@ interface WebsiteSourceHeaderProps {
 
 const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
   source,
-  childSources,
+  childSources = [],
   isSelected,
   isEditing,
   editUrl,
@@ -47,66 +33,62 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
     onSelectionChange(checked);
   };
 
-  // Calculate total content size from child pages
-  const totalContentSize = childSources.reduce((total, child) => {
-    return total + (child.content_size || 0);
-  }, 0);
-
-  // Calculate compressed content size from child pages
-  const compressedContentSize = childSources.reduce((total, child) => {
-    const originalSize = child.content_size || 0;
-    const compressionRatio = 0.3; // Default compression ratio
-    return total + Math.round(originalSize * compressionRatio);
-  }, 0);
+  const isParentSource = !source.parent_source_id;
+  const hasChildren = childSources && childSources.length > 0;
 
   return (
-    <div className="flex items-start gap-3 flex-1 min-w-0">
+    <div className="flex items-center space-x-4">
       <Checkbox
         checked={isSelected}
         onCheckedChange={handleSelectionChange}
-        className="flex-shrink-0 mt-1"
       />
       
-      <div className="flex-1 min-w-0">
+      <div className="flex-1">
+        <div className="flex items-center gap-3 mb-2">
+          <WebsiteSourceStatusBadges
+            crawlStatus={source.crawl_status}
+            isExcluded={source.is_excluded}
+            linksCount={source.links_count || 0}
+            progress={source.progress}
+            sourceId={source.id}
+            sourceData={source}
+            isChildSource={false}
+          />
+          
+          {hasChildren && (
+            <span className="text-sm text-gray-500">
+              {childSources.length} pages
+            </span>
+          )}
+        </div>
+        
         {isEditing ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center space-x-2">
             <Input
               value={editUrl}
               onChange={(e) => onEditUrlChange(e.target.value)}
               className="flex-1"
               placeholder="Enter website URL"
             />
-            <Button 
-              size="sm" 
-              onClick={onSaveEdit}
-              className="flex-shrink-0"
-            >
-              <Check className="w-4 h-4" />
+            <Button size="sm" onClick={onSaveEdit}>
+              <Check className="h-4 w-4" />
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={onCancelEdit}
-              className="flex-shrink-0"
-            >
-              <X className="w-4 h-4" />
+            <Button size="sm" variant="outline" onClick={onCancelEdit}>
+              <X className="h-4 w-4" />
             </Button>
           </div>
         ) : (
-          <WebsiteSourceInfo
-            title={source.title}
-            url={source.url || ''}
-            createdAt={source.created_at}
-            linksCount={childSources.length}
-            lastCrawledAt={source.last_crawled_at}
-            crawlStatus={source.crawl_status}
-            metadata={source.metadata}
-            isChild={!!source.parent_source_id}
-            totalContentSize={totalContentSize}
-            compressedContentSize={compressedContentSize}
-            source={source}
-            sourceId={source.id}
-          />
+          <div>
+            <div className="font-medium text-sm">{source.title}</div>
+            <div className="text-sm text-gray-600 truncate" title={source.url}>
+              {source.url}
+            </div>
+            {source.progress > 0 && source.crawl_status === 'in_progress' && (
+              <div className="text-xs text-gray-500 mt-1">
+                Progress: {source.progress}%
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

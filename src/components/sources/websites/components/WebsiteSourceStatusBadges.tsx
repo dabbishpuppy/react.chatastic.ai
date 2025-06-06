@@ -1,8 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle, GraduationCap, Bot } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { SimplifiedSourceStatusService, SourceStatus } from '@/services/SimplifiedSourceStatusService';
+import { getStatusConfig } from '../services/statusConfigService';
 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
@@ -10,20 +12,49 @@ interface WebsiteSourceStatusBadgesProps {
   linksCount: number;
   progress?: number;
   sourceId?: string;
+  sourceData?: any; // Full source object with metadata
+  isChildSource?: boolean;
+  processingStatus?: string; // For child sources
 }
 
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   crawlStatus: initialCrawlStatus,
   isExcluded,
-  sourceId
+  sourceId,
+  sourceData,
+  isChildSource = false,
+  processingStatus
 }) => {
-  const [crawlStatus, setCrawlStatus] = useState(initialCrawlStatus);
+  const [currentStatus, setCurrentStatus] = useState<SourceStatus>('pending');
+
+  // Determine status using the service
+  useEffect(() => {
+    if (sourceData) {
+      const status = SimplifiedSourceStatusService.getSourceStatus(sourceData);
+      setCurrentStatus(status);
+    } else if (isChildSource && processingStatus) {
+      // For child sources, map processing_status to display status
+      switch (processingStatus) {
+        case 'in_progress':
+          setCurrentStatus('training');
+          break;
+        case 'completed':
+          setCurrentStatus('trained');
+          break;
+        case 'failed':
+          setCurrentStatus('failed');
+          break;
+        default:
+          setCurrentStatus('pending');
+      }
+    } else {
+      setCurrentStatus(initialCrawlStatus as SourceStatus);
+    }
+  }, [sourceData, isChildSource, processingStatus, initialCrawlStatus]);
 
   // Set up real-time subscription for status updates
   useEffect(() => {
     if (!sourceId) return;
-
-    setCrawlStatus(initialCrawlStatus);
 
     const channel = supabase
       .channel(`source-status-${sourceId}`)
@@ -32,13 +63,32 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'agent_sources',
+          table: isChildSource ? 'source_pages' : 'agent_sources',
           filter: `id=eq.${sourceId}`
         },
         (payload) => {
           const updatedSource = payload.new as any;
-          if (updatedSource.crawl_status) {
-            setCrawlStatus(updatedSource.crawl_status);
+          
+          if (isChildSource) {
+            // For child sources, use processing_status
+            const status = updatedSource.processing_status;
+            switch (status) {
+              case 'in_progress':
+                setCurrentStatus('training');
+                break;
+              case 'completed':
+                setCurrentStatus('trained');
+                break;
+              case 'failed':
+                setCurrentStatus('failed');
+                break;
+              default:
+                setCurrentStatus('pending');
+            }
+          } else {
+            // For parent sources, use the service
+            const status = SimplifiedSourceStatusService.getSourceStatus(updatedSource);
+            setCurrentStatus(status);
           }
         }
       )
@@ -47,62 +97,9 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sourceId, initialCrawlStatus]);
+  }, [sourceId, isChildSource]);
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return {
-          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
-          text: 'Pending',
-          className: 'bg-yellow-500 text-white'
-        };
-      case 'in_progress':
-        return {
-          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
-          text: 'Crawling',
-          className: 'bg-blue-500 text-white'
-        };
-      case 'completed':
-        return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-500 text-white'
-        };
-      case 'crawled':
-        return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-500 text-white'
-        };
-      case 'training':
-        return {
-          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
-          text: 'Training',
-          className: 'bg-blue-600 text-white'
-        };
-      case 'trained':
-        return {
-          icon: <GraduationCap className="w-3 h-3 mr-1" />,
-          text: 'Trained',
-          className: 'bg-purple-600 text-white'
-        };
-      case 'failed':
-        return {
-          icon: <AlertTriangle className="w-3 h-3 mr-1" />,
-          text: 'Failed',
-          className: 'bg-red-500 text-white'
-        };
-      default:
-        return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-500 text-white'
-        };
-    }
-  };
-
-  const statusConfig = getStatusConfig(crawlStatus);
+  const statusConfig = getStatusConfig(currentStatus);
 
   return (
     <div className="flex items-center gap-2">

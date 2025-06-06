@@ -6,6 +6,7 @@ interface SourcePage {
   id: string;
   url: string;
   status: string;
+  processing_status?: string;
   created_at: string;
   completed_at?: string;
   error_message?: string;
@@ -17,78 +18,97 @@ interface SourcePage {
 
 export const useChildSourcesData = (parentSourceId: string) => {
   const [childPages, setChildPages] = useState<SourcePage[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
-  const fetchChildPages = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('source_pages')
-        .select('*')
-        .eq('parent_source_id', parentSourceId)
-        .order('created_at', { ascending: true });
-      
-      if (error) {
-        console.error('Error fetching child pages:', error);
-      } else {
-        setChildPages(data || []);
-      }
-    } catch (err) {
-      console.error('Exception fetching child pages:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch initial data
   useEffect(() => {
+    const fetchChildPages = async () => {
+      if (!parentSourceId) return;
+
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('source_pages')
+          .select(`
+            id,
+            url,
+            status,
+            processing_status,
+            created_at,
+            completed_at,
+            error_message,
+            content_size,
+            chunks_created,
+            processing_time_ms,
+            parent_source_id
+          `)
+          .eq('parent_source_id', parentSourceId)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching child pages:', error);
+          return;
+        }
+
+        setChildPages(data || []);
+      } catch (error) {
+        console.error('Error in fetchChildPages:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchChildPages();
-    
-    // Set up optimized realtime subscription for source_pages
-    const subscription = supabase
-      .channel(`source-pages-${parentSourceId}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'source_pages',
-        filter: `parent_source_id=eq.${parentSourceId}` 
-      }, (payload) => {
-        const newPage = payload.new as SourcePage;
-        setChildPages(prev => {
-          // Check if page already exists to prevent duplicates
-          const exists = prev.some(page => page.id === newPage.id);
-          if (exists) return prev;
-          return [...prev, newPage];
-        });
-      })
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'source_pages',
-        filter: `parent_source_id=eq.${parentSourceId}` 
-      }, (payload) => {
-        const updatedPage = payload.new as SourcePage;
-        setChildPages(prev => 
-          prev.map(page => 
-            page.id === updatedPage.id ? updatedPage : page
-          )
-        );
-      })
-      .on('postgres_changes', { 
-        event: 'DELETE', 
-        schema: 'public', 
-        table: 'source_pages',
-        filter: `parent_source_id=eq.${parentSourceId}` 
-      }, (payload) => {
-        const deletedPage = payload.old as SourcePage;
-        setChildPages(prev => 
-          prev.filter(page => page.id !== deletedPage.id)
-        );
-      })
-      .subscribe();
-      
+  }, [parentSourceId]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    if (!parentSourceId) return;
+
+    console.log(`📡 Setting up real-time subscription for child pages of parent: ${parentSourceId}`);
+
+    const channel = supabase
+      .channel(`child-pages-${parentSourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `parent_source_id=eq.${parentSourceId}`
+        },
+        (payload) => {
+          console.log('📡 Child page update:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newPage = payload.new as SourcePage;
+            setChildPages(prev => {
+              const exists = prev.some(page => page.id === newPage.id);
+              if (exists) return prev;
+              return [...prev, newPage];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedPage = payload.new as SourcePage;
+            setChildPages(prev => 
+              prev.map(page => 
+                page.id === updatedPage.id ? updatedPage : page
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedPage = payload.old as SourcePage;
+            setChildPages(prev => 
+              prev.filter(page => page.id !== deletedPage.id)
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`📡 Child pages subscription status for ${parentSourceId}:`, status);
+      });
+
     return () => {
-      subscription.unsubscribe();
+      console.log(`🔌 Cleaning up child pages subscription for parent: ${parentSourceId}`);
+      supabase.removeChannel(channel);
     };
   }, [parentSourceId]);
 
