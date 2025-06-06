@@ -1,7 +1,9 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { SourcePagesStats } from '@/services/rag/enhanced/crawlTypes';
 
 interface WebsiteSourceStatusRobustProps {
   sourceId: string;
@@ -166,15 +168,18 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           // On any source_pages change, fetch current counts and update status
           try {
             // Count total and completed pages
-            const { data: pageCounts, error: countError } = await supabase.rpc('get_source_pages_stats', { 
-              parent_source_id_param: sourceId
-            });
+            const { data: statsData, error: countError } = await supabase
+              .rpc<SourcePagesStats>('get_source_pages_stats', { 
+                parent_source_id_param: sourceId
+              });
 
             if (countError) {
               console.error('Error fetching source pages stats:', countError);
               return;
             }
 
+            const pageCounts = statsData as SourcePagesStats;
+            
             if (pageCounts) {
               // If we have data from source_pages, update our local state
               const totalPages = pageCounts.total_count || 0;
@@ -307,9 +312,9 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       {showConnectionStatus && (
         <div className="flex items-center">
           {isConnected ? (
-            <Wifi size={12} className="text-green-500" title="Connected to real-time updates" />
+            <Wifi size={12} className="text-green-500" aria-label="Connected to real-time updates" />
           ) : (
-            <WifiOff size={12} className="text-red-500" title="Disconnected from real-time updates" />
+            <WifiOff size={12} className="text-red-500" aria-label="Disconnected from real-time updates" />
           )}
         </div>
       )}

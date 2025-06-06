@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { SourcePagesStats } from '@/services/rag/enhanced/crawlTypes';
 
 const WebsiteSourceFixer: React.FC = () => {
   const [isFixing, setIsFixing] = useState(false);
@@ -49,8 +50,8 @@ const WebsiteSourceFixer: React.FC = () => {
         
         for (const source of sources) {
           // For each parent source, count its child pages
-          const { data: stats, error: statsError } = await supabase
-            .rpc('get_source_pages_stats', { 
+          const { data: statsData, error: statsError } = await supabase
+            .rpc<SourcePagesStats>('get_source_pages_stats', { 
               parent_source_id_param: source.id
             });
           
@@ -58,6 +59,8 @@ const WebsiteSourceFixer: React.FC = () => {
             console.error(`Error getting stats for source ${source.id}:`, statsError);
             continue;
           }
+          
+          const stats = statsData as SourcePagesStats;
           
           if (stats && stats.total_count > 0) {
             // Calculate status based on counts

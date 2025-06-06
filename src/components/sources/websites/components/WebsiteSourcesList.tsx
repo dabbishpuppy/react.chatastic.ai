@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useMemo } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
@@ -184,9 +183,9 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     <div className="relative">
       <Card className="border border-gray-200">
         <WebsiteSourcesHeader
-          sourcesCount={parentSources.length}
-          allCurrentPageSelected={allCurrentPageSelected}
-          onSelectAll={handleSelectAll}
+          openModal={() => {}} // This will be replaced with actual modal open function
+          loading={loading || isLoading}
+          count={parentSources.length}
         />
         <CardContent className="space-y-4">
           <WebsiteSourcesContent
