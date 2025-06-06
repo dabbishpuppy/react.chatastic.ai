@@ -51,20 +51,23 @@ export class SimplifiedSourceStatusService {
     
     // For website sources, check crawl_status
     if (source.source_type === 'website') {
-      // If crawl is completed and requires manual training, it's ready for training
-      if (source.crawl_status === 'completed' && source.requires_manual_training === true) {
-        return 'crawled';
+      // FIXED: Handle "ready_for_training" status properly
+      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === true) {
+        return 'crawled'; // Ready for training
       }
-      // If crawl is completed and training has been done, it's fully completed
-      if (source.crawl_status === 'completed' && source.requires_manual_training === false) {
+      
+      // If crawl is completed/ready_for_training and training has been done, it's fully completed
+      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === false) {
         return 'completed';
       }
-      // If currently crawling
-      if (source.crawl_status === 'in_progress') {
+      
+      // If currently crawling or recrawling
+      if (source.crawl_status === 'in_progress' || source.crawl_status === 'recrawling') {
         return 'crawling';
       }
-      // Default to pending
-      return source.crawl_status || 'pending';
+      
+      // Default to pending for other states
+      return 'pending';
     }
     
     // For other sources, derive status from requires_manual_training
