@@ -40,22 +40,23 @@ export class TrainingEventService {
     };
 
     const handleCrawlCompleted = () => {
-      console.log('✅ Crawl completed - ensuring fresh training state');
+      console.log('✅ Crawl completed - keeping training state ready for user action');
       refs.crawlInitiationInProgressRef.current = false;
       
-      // IMMEDIATE: Reset completion state on crawl completion
-      console.log('🔄 CRAWL COMPLETE: IMMEDIATE reset to ensure fresh training state');
-      refs.agentCompletionStateRef.current = {
-        isCompleted: false,
-        completedAt: 0,
-        lastCompletedSessionId: ''
-      };
-      refs.trainingStateRef.current = 'idle';
-      refs.completedSessionsRef.current.clear();
-      refs.lastTrainingActionRef.current = 'none';
+      // CHANGED: Do NOT reset completion state on crawl completion
+      // This allows the "Train Agent" button to remain visible
+      console.log('🔄 CRAWL COMPLETE: Keeping training state ready for user-initiated training');
       
-      // Dispatch event to notify UI components
-      window.dispatchEvent(new CustomEvent('trainingStateReset', {
+      // Only reset if we're in a training state, not if we're idle/ready
+      if (refs.trainingStateRef.current === 'training' || refs.trainingStateRef.current === 'initializing') {
+        refs.trainingStateRef.current = 'idle';
+        refs.activeTrainingSessionRef.current = '';
+        refs.globalTrainingActiveRef.current = false;
+        refs.currentTrainingSessionRef.current = '';
+      }
+      
+      // Dispatch event to notify UI components that crawl is done and training can start
+      window.dispatchEvent(new CustomEvent('crawlCompletedReadyForTraining', {
         detail: { reason: 'crawl_completed', timestamp: Date.now() }
       }));
     };

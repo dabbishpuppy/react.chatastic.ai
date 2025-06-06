@@ -142,6 +142,10 @@ export const useSimplifiedFlow = () => {
       ToastNotificationService.showCrawlingCompleted();
       setTimeout(updateSourceStatus, 1000);
     };
+    const handleCrawlCompletedReadyForTraining = () => {
+      console.log('🎯 Crawl completed - sources ready for training');
+      setTimeout(updateSourceStatus, 1000);
+    };
     const handleSourceUpdated = () => setTimeout(updateSourceStatus, 1000);
     const handleTrainingCompleted = () => {
       setIsTraining(false);
@@ -151,12 +155,14 @@ export const useSimplifiedFlow = () => {
 
     window.addEventListener('crawlStarted', handleCrawlStarted);
     window.addEventListener('crawlCompleted', handleCrawlCompleted);
+    window.addEventListener('crawlCompletedReadyForTraining', handleCrawlCompletedReadyForTraining);
     window.addEventListener('sourceUpdated', handleSourceUpdated);
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
 
     return () => {
       window.removeEventListener('crawlStarted', handleCrawlStarted);
       window.removeEventListener('crawlCompleted', handleCrawlCompleted);
+      window.removeEventListener('crawlCompletedReadyForTraining', handleCrawlCompletedReadyForTraining);
       window.removeEventListener('sourceUpdated', handleSourceUpdated);
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     };
