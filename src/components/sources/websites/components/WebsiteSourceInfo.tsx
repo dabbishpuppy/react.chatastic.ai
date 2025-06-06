@@ -5,7 +5,6 @@ import { ExternalLink, Calendar, Link, Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
-import CompressionMetrics from './CompressionMetrics';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -59,6 +58,11 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
 
   const shouldShowLinksCount = !isChild && linksCount > 0;
   const shouldShowContentSize = !isChild && totalContentSize > 0;
+  const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
+
+  const compressionRatio = shouldShowCompressionMetrics 
+    ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)
+    : 0;
 
   return (
     <div className="space-y-2">
@@ -112,12 +116,13 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
         </div>
       </div>
 
-      {shouldShowContentSize && (
-        <CompressionMetrics
-          originalSize={totalContentSize}
-          compressedSize={compressedContentSize}
-          showDetails={false}
-        />
+      {shouldShowCompressionMetrics && (
+        <div className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1">
+          <div className="flex items-center justify-between">
+            <span>Compressed: {formatBytes(compressedContentSize)}</span>
+            <span className="text-green-600 font-medium">{compressionRatio}% saved</span>
+          </div>
+        </div>
       )}
     </div>
   );
