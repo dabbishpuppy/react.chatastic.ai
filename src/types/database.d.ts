@@ -1,5 +1,6 @@
 
 
+
 // Type definitions for Supabase RPC functions
 
 declare namespace Database {
@@ -17,7 +18,7 @@ declare namespace Database {
 declare module '@supabase/supabase-js' {
   // PostgrestFilterBuilder interface for query building
   export interface PostgrestFilterBuilder<T = any> {
-    select(columns?: string): PostgrestFilterBuilder<T>;
+    select(columns?: string, options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }): PostgrestFilterBuilder<T>;
     insert(values: any): PostgrestFilterBuilder<T>;
     update(values: any): PostgrestFilterBuilder<T>;
     delete(): PostgrestFilterBuilder<T>;
@@ -117,7 +118,7 @@ declare module '@supabase/supabase-js' {
     ): RealtimeChannel;
     subscribe(callback?: (status: string) => void): RealtimeChannel;
     unsubscribe(): Promise<string>;
-    send(type: string, payload: any, options?: any): Promise<string>;
+    send(event: string, payload: any, options?: any): Promise<string>;
   }
 
   // Functions client
