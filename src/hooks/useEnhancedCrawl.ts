@@ -28,6 +28,8 @@ export const useEnhancedCrawl = () => {
     getActiveCrawlStatus,
     retryFailedJobs,
     getCrawlJobs,
-    isLoading
+    isLoading,
+    // Add loading alias for backward compatibility
+    loading: isLoading
   };
 };
