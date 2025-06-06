@@ -51,7 +51,7 @@ export class SimplifiedSourceStatusService {
     
     // For website sources, check crawl_status
     if (source.source_type === 'website') {
-      // FIXED: Handle "ready_for_training" status properly
+      // Handle "ready_for_training" status properly
       if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === true) {
         return 'crawled'; // Ready for training
       }

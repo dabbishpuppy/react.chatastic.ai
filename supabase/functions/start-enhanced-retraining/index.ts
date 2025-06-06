@@ -55,20 +55,39 @@ serve(async (req) => {
       try {
         console.log(`🔄 Training source: ${source.title} (${source.id})`);
 
-        // Mark source as training
-        await supabase
-          .from('agent_sources')
-          .update({ 
-            crawl_status: source.source_type === 'website' ? 'training' : undefined,
-            requires_manual_training: false,
-            metadata: {
-              ...((source.metadata as any) || {}),
-              training_started_at: new Date().toISOString(),
-              training_status: 'in_progress',
-              training_method: 'simplified_flow'
-            }
-          })
-          .eq('id', source.id);
+        // Mark source as training - set different statuses for parent vs child
+        const isParentSource = !source.parent_source_id;
+        
+        if (isParentSource) {
+          // For parent sources, set training status
+          await supabase
+            .from('agent_sources')
+            .update({ 
+              crawl_status: 'training',
+              requires_manual_training: false,
+              metadata: {
+                ...((source.metadata as any) || {}),
+                training_started_at: new Date().toISOString(),
+                training_status: 'in_progress',
+                training_method: 'simplified_flow'
+              }
+            })
+            .eq('id', source.id);
+        } else {
+          // For child sources, mark as in progress
+          await supabase
+            .from('agent_sources')
+            .update({ 
+              requires_manual_training: false,
+              metadata: {
+                ...((source.metadata as any) || {}),
+                training_started_at: new Date().toISOString(),
+                training_status: 'in_progress',
+                training_method: 'simplified_flow'
+              }
+            })
+            .eq('id', source.id);
+        }
 
         // Generate chunks based on source type
         if (source.source_type === 'website') {
@@ -109,27 +128,34 @@ serve(async (req) => {
         }
 
         // Mark source as completed/trained
-        await supabase
-          .from('agent_sources')
-          .update({ 
-            crawl_status: source.source_type === 'website' ? 'completed' : undefined,
-            requires_manual_training: false,
-            metadata: {
-              ...((source.metadata as any) || {}),
-              training_completed_at: new Date().toISOString(),
-              training_status: 'completed',
-              training_method: 'simplified_flow',
-              last_trained_at: new Date().toISOString()
-            }
-          })
-          .eq('id', source.id);
+        if (isParentSource) {
+          // Don't mark parent as completed yet - wait for all children
+          console.log(`⏳ Parent source ${source.id} training initiated, waiting for children`);
+        } else {
+          // Mark child source as trained
+          await supabase
+            .from('agent_sources')
+            .update({ 
+              requires_manual_training: false,
+              metadata: {
+                ...((source.metadata as any) || {}),
+                training_completed_at: new Date().toISOString(),
+                training_status: 'completed',
+                training_method: 'simplified_flow',
+                last_trained_at: new Date().toISOString()
+              }
+            })
+            .eq('id', source.id);
+
+          console.log(`✅ Child source ${source.id} marked as trained`);
+        }
 
         processedCount++;
-        console.log(`✅ Successfully trained source: ${source.title}`);
+        console.log(`✅ Successfully processed source: ${source.title}`);
 
         // If this is a child source, check if all siblings are trained and update parent
         if (source.parent_source_id) {
-          await this.checkAndUpdateParentStatus(supabase, source.parent_source_id);
+          await checkAndUpdateParentStatus(supabase, source.parent_source_id);
         }
 
       } catch (error) {
@@ -139,7 +165,7 @@ serve(async (req) => {
         await supabase
           .from('agent_sources')
           .update({ 
-            crawl_status: source.source_type === 'website' ? 'crawled' : undefined,
+            crawl_status: source.source_type === 'website' ? 'ready_for_training' : undefined,
             requires_manual_training: true,
             metadata: {
               ...((source.metadata as any) || {}),
@@ -210,7 +236,7 @@ async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string)
     });
 
     if (allChildrenTrained) {
-      // Update parent source status
+      // Update parent source status to completed
       await supabase
         .from('agent_sources')
         .update({
@@ -226,6 +252,9 @@ async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string)
         .eq('id', parentSourceId);
 
       console.log(`✅ Updated parent source ${parentSourceId} - all children trained`);
+      
+      // Dispatch training completed event
+      // Note: This won't work in edge functions, but the frontend will detect the status change
     }
   } catch (error) {
     console.error('Error updating parent status:', error);

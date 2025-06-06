@@ -33,7 +33,7 @@ export const useSimplifiedFlow = () => {
 
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // First, mark all sources that require manual training as training
+      // First, mark parent sources as training (not completed yet)
       const { error: updateError } = await supabase
         .from('agent_sources')
         .update({ 
@@ -44,10 +44,11 @@ export const useSimplifiedFlow = () => {
           }
         })
         .eq('agent_id', agentId)
-        .eq('requires_manual_training', true);
+        .eq('requires_manual_training', true)
+        .is('parent_source_id', null); // Only update parent sources
 
       if (updateError) {
-        console.error('Error updating sources for training:', updateError);
+        console.error('Error updating parent sources for training:', updateError);
         throw updateError;
       }
 

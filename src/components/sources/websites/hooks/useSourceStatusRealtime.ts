@@ -48,7 +48,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
       try {
         const { data: source, error } = await supabase
           .from('agent_sources')
-          .select('crawl_status, progress, links_count, metadata')
+          .select('crawl_status, progress, links_count, metadata, requires_manual_training')
           .eq('id', sourceId)
           .single();
 
@@ -62,16 +62,11 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           
           // Check if this source has been trained by looking at metadata
           const metadata = source.metadata as Record<string, any> || {};
-          const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
           
-          if (hasTrainingCompleted && source.crawl_status === 'ready_for_training') {
-            setStatus('trained');
-          } else {
-            // Map the crawl_status properly including new states
-            const mappedStatus = mapCrawlStatus(source.crawl_status, metadata);
-            setStatus(mappedStatus);
-            console.log(`🔄 Status mapped from ${source.crawl_status} to ${mappedStatus}`);
-          }
+          // Determine status based on training state and crawl status
+          const mappedStatus = mapSourceStatus(source.crawl_status, metadata, source.requires_manual_training);
+          setStatus(mappedStatus);
+          console.log(`🔄 Status mapped to ${mappedStatus}`);
           
           setProgress(source.progress || 0);
           setLinksCount(source.links_count || 0);
@@ -98,18 +93,11 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           const updatedSource = payload.new as any;
           console.log('📡 Real-time update received:', updatedSource);
           
-          // Check if training has completed for this source
+          // Check training status and update accordingly
           const metadata = updatedSource.metadata as Record<string, any> || {};
-          const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
-          
-          if (hasTrainingCompleted && updatedSource.crawl_status === 'ready_for_training') {
-            setStatus('trained');
-          } else {
-            // Map the crawl_status properly including new states
-            const mappedStatus = mapCrawlStatus(updatedSource.crawl_status, metadata);
-            setStatus(mappedStatus);
-            console.log(`🔄 Real-time status mapped from ${updatedSource.crawl_status} to ${mappedStatus}`);
-          }
+          const mappedStatus = mapSourceStatus(updatedSource.crawl_status, metadata, updatedSource.requires_manual_training);
+          setStatus(mappedStatus);
+          console.log(`🔄 Real-time status mapped to ${mappedStatus}`);
           
           setProgress(updatedSource.progress || 0);
           setLinksCount(updatedSource.links_count || 0);
@@ -141,9 +129,18 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   };
 };
 
-// Helper function to map crawl_status to display status
-const mapCrawlStatus = (crawlStatus: string, metadata: Record<string, any> = {}): string => {
-  // Check for recrawling state first
+// Helper function to map source status considering training state
+const mapSourceStatus = (crawlStatus: string, metadata: Record<string, any> = {}, requiresManualTraining: boolean = false): string => {
+  // Check for training states first
+  if (metadata.training_status === 'in_progress') {
+    return 'training';
+  }
+  
+  if (metadata.training_completed_at || metadata.last_trained_at) {
+    return 'trained';
+  }
+  
+  // Check for recrawling state
   if (metadata.is_recrawling === true && crawlStatus === 'recrawling') {
     console.log('🔄 Detected recrawling state from metadata');
     return 'recrawling';
@@ -156,6 +153,8 @@ const mapCrawlStatus = (crawlStatus: string, metadata: Record<string, any> = {})
       return 'in_progress';
     case 'recrawling':
       return 'recrawling';
+    case 'training':
+      return 'training';
     case 'completed':
       return 'ready_for_training'; // Map completed to ready_for_training
     case 'ready_for_training':
