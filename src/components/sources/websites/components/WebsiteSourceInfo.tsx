@@ -63,6 +63,9 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // Show total child sources size when training is completed and we have child data
   const shouldShowChildTotalSize = !isChild && crawlStatus === 'trained' && source?.total_content_size > 0;
 
+  // Show total links from parent source metadata when available
+  const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
+
   const compressionRatio = shouldShowCompressionMetrics 
     ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)
     : 0;
@@ -102,6 +105,13 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <div className="flex items-center gap-1">
               <Link className="w-3 h-3" />
               <span>{linksCount} links</span>
+            </div>
+          )}
+
+          {shouldShowTotalLinks && (
+            <div className="flex items-center gap-1">
+              <Link className="w-3 h-3" />
+              <span>Total: {source.total_jobs} links</span>
             </div>
           )}
           
