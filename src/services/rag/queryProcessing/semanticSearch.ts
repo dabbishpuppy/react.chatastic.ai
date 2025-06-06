@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { HybridSearchEngine } from './search/hybridSearchEngine';
 import { SearchSuggestions } from './search/searchSuggestions';
@@ -106,11 +105,11 @@ export class SemanticSearchService {
         .select('id, title, source_type')
         .in('id', uniqueSourceIds);
 
-      const sourceMap = new Map(sources?.map(s => [s.id, s]) || []);
+      const sourceMap = new Map((sources || []).map(s => [s.id, s]));
 
       // Calculate similarity scores and build results
       const results: SemanticSearchResult[] = chunks.map((chunk, index) => {
-        const source = sourceMap.get(chunk.source_id);
+        const source = sourceMap.get(chunk.source_id) as any;
         const chunkMetadata = chunk.metadata && typeof chunk.metadata === 'object' ? chunk.metadata : {};
         
         return {
@@ -216,11 +215,11 @@ export class SemanticSearchService {
         .select('id, title, source_type')
         .in('id', uniqueSourceIds);
 
-      const sourceMap = new Map(sources?.map(s => [s.id, s]) || []);
+      const sourceMap = new Map((sources || []).map(s => [s.id, s]));
 
       // Calculate keyword-based similarity
       const results: SemanticSearchResult[] = chunks.map((chunk) => {
-        const source = sourceMap.get(chunk.source_id);
+        const source = sourceMap.get(chunk.source_id) as any;
         const chunkMetadata = chunk.metadata && typeof chunk.metadata === 'object' ? chunk.metadata : {};
         
         return {

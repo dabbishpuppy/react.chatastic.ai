@@ -23,8 +23,9 @@ export class SearchSuggestions {
 
       // Filter and format suggestions
       const suggestions = recentQueries
-        .map(q => q.content)
+        .map(q => q.content as string)
         .filter(content => 
+          typeof content === 'string' &&
           content.length > partialQuery.length && 
           content.length < 100 &&
           content.toLowerCase().includes(partialQuery.toLowerCase())
