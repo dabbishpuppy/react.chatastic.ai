@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
@@ -13,7 +12,8 @@ interface ChildPageInfoProps {
   processingTimeMs?: number;
   errorMessage?: string;
   createdAt: string;
-  parentSourceId?: string; // Add parent source ID to track parent training state
+  parentSourceId?: string;
+  pageId?: string; // Add page ID to listen for updates
 }
 
 const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
@@ -23,12 +23,14 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   chunksCreated,
   errorMessage,
   createdAt,
-  parentSourceId
+  parentSourceId,
+  pageId
 }) => {
   const [displayStatus, setDisplayStatus] = useState(status);
   const [parentTrainingState, setParentTrainingState] = useState<any>(null);
+  const [childProcessingStatus, setChildProcessingStatus] = useState<string | null>(null);
 
-  // Monitor parent source training state
+  // Monitor both parent source training state AND child processing state
   useEffect(() => {
     if (!parentSourceId) {
       setDisplayStatus(status);
@@ -45,14 +47,14 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       
       if (data) {
         setParentTrainingState(data);
-        updateDisplayStatus(status, data);
+        updateDisplayStatus(status, childProcessingStatus, data);
       }
     };
 
     fetchParentState();
 
     // Subscribe to parent source changes
-    const channel = supabase
+    const parentChannel = supabase
       .channel(`parent-training-${parentSourceId}`)
       .on(
         'postgres_changes',
@@ -66,7 +68,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
           const updatedParent = payload.new as any;
           console.log('Parent source update for child page:', updatedParent);
           setParentTrainingState(updatedParent);
-          updateDisplayStatus(status, updatedParent);
+          updateDisplayStatus(status, childProcessingStatus, updatedParent);
         }
       )
       .subscribe();
@@ -80,32 +82,82 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     window.addEventListener('trainingCompleted', handleTrainingCompleted);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(parentChannel);
       window.removeEventListener('trainingCompleted', handleTrainingCompleted);
     };
-  }, [status, parentSourceId]);
+  }, [status, parentSourceId, childProcessingStatus]);
 
-  const updateDisplayStatus = (childStatus: string, parentState: any) => {
-    if (!parentState) {
-      setDisplayStatus(childStatus);
+  // Monitor child page processing status changes
+  useEffect(() => {
+    if (!pageId) return;
+
+    // Fetch initial child processing status
+    const fetchChildStatus = async () => {
+      const { data } = await supabase
+        .from('source_pages')
+        .select('processing_status')
+        .eq('id', pageId)
+        .single();
+      
+      if (data) {
+        setChildProcessingStatus(data.processing_status);
+        updateDisplayStatus(status, data.processing_status, parentTrainingState);
+      }
+    };
+
+    fetchChildStatus();
+
+    // Subscribe to child page processing status changes
+    const childChannel = supabase
+      .channel(`child-processing-${pageId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `id=eq.${pageId}`
+        },
+        (payload) => {
+          const updatedChild = payload.new as any;
+          console.log('Child page processing update:', updatedChild);
+          setChildProcessingStatus(updatedChild.processing_status);
+          updateDisplayStatus(status, updatedChild.processing_status, parentTrainingState);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(childChannel);
+    };
+  }, [pageId, status, parentTrainingState]);
+
+  const updateDisplayStatus = (childStatus: string, processingStatus: string | null, parentState: any) => {
+    // Priority 1: If child is actively being processed (chunked), show "In Progress"
+    if (processingStatus === 'processing') {
+      setDisplayStatus('in_progress');
       return;
     }
 
-    const metadata = (parentState.metadata as any) || {};
-    
-    // If parent is currently training and child is completed, show "In Progress"
-    if (parentState.crawl_status === 'training' || metadata.training_status === 'in_progress') {
-      if (childStatus === 'completed') {
-        setDisplayStatus('in_progress');
+    // Priority 2: If child processing is complete and parent training is done, show "Trained"
+    if (processingStatus === 'processed' && parentState) {
+      const metadata = (parentState.metadata as any) || {};
+      
+      if (metadata.training_completed_at || metadata.last_trained_at) {
+        setDisplayStatus('trained');
         return;
       }
     }
-    
-    // If parent training is completed and child is completed, show "Trained"
-    if (metadata.training_completed_at || metadata.last_trained_at) {
-      if (childStatus === 'completed') {
-        setDisplayStatus('trained');
-        return;
+
+    // Priority 3: If parent is currently training and child is completed, show "In Progress"
+    if (parentState) {
+      const metadata = (parentState.metadata as any) || {};
+      
+      if (parentState.crawl_status === 'training' || metadata.training_status === 'in_progress') {
+        if (childStatus === 'completed') {
+          setDisplayStatus('in_progress');
+          return;
+        }
       }
     }
     
@@ -167,7 +219,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending';
   const fullUrl = getFullUrl(url);
 
-  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'parentState:', parentTrainingState);
+  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'processingStatus:', childProcessingStatus, 'parentState:', parentTrainingState);
 
   return (
     <>
