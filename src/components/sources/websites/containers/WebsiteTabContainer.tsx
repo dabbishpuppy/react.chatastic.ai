@@ -31,7 +31,6 @@ const WebsiteTabContainer: React.FC = () => {
   
   const handleRefetch = () => {
     console.log('Refetch triggered');
-    // Invalidate both stats and paginated sources
     if (agentId) {
       queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
       queryClient.invalidateQueries({ queryKey: ['agent-sources-paginated', agentId, 'website'] });
@@ -58,23 +57,38 @@ const WebsiteTabContainer: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Create the source first
+      console.log('🚀 Starting website crawl workflow');
+      
+      // Create the source first with PENDING status
       const source = await SourceCreateService.createSource({
         agent_id: agentId,
         team_id: '', // Will be fetched automatically
         source_type: 'website',
         title: url,
         url: url,
-        crawl_status: 'pending',
+        crawl_status: 'pending', // Start with pending status
         progress: 0,
         links_count: 0,
         include_paths: includePaths ? includePaths.split('\n').filter(p => p.trim()) : [],
         exclude_paths: excludePaths ? excludePaths.split('\n').filter(p => p.trim()) : [],
         respect_robots: true,
-        max_concurrent_jobs: options?.concurrency || 2
+        max_concurrent_jobs: options?.concurrency || 2,
+        metadata: {
+          crawl_type: crawlType,
+          max_pages: options?.maxPages || 50,
+          max_depth: crawlType === 'individual-link' ? 0 : (options?.maxDepth || 3),
+          concurrency: options?.concurrency || 2,
+          status_history: [{
+            status: 'pending',
+            timestamp: new Date().toISOString(),
+            message: 'Website source created, crawl queued'
+          }]
+        }
       });
 
-      // Start the crawl
+      console.log('✅ Source created with pending status:', source.id);
+
+      // Start the crawl process
       const crawlOptions = {
         maxPages: options?.maxPages || 50,
         maxDepth: crawlType === 'individual-link' ? 0 : (options?.maxDepth || 3),
@@ -83,6 +97,7 @@ const WebsiteTabContainer: React.FC = () => {
         excludePaths: excludePaths ? excludePaths.split('\n').filter(p => p.trim()) : []
       };
 
+      // Start enhanced crawl which will update status to 'in_progress'
       await WebsiteCrawlService.startEnhancedCrawl(
         agentId,
         source.id,
@@ -92,7 +107,7 @@ const WebsiteTabContainer: React.FC = () => {
 
       toast({
         title: "Crawl Started",
-        description: `Started crawling ${url} with ${crawlType} method`,
+        description: `Started crawling ${url} with ${crawlType} method. Status will update in real-time.`,
       });
 
       // Clear form and refresh list
@@ -100,7 +115,7 @@ const WebsiteTabContainer: React.FC = () => {
       handleRefetch();
 
     } catch (error) {
-      console.error('Error starting crawl:', error);
+      console.error('❌ Error starting crawl:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to start crawl",
