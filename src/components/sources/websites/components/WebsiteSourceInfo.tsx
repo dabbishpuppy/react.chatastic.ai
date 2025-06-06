@@ -11,6 +11,17 @@ import {
 import WebsiteSourceStatus from './WebsiteSourceStatus';
 import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
 
+// Helper function to format bytes if needed
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const size = bytes / Math.pow(k, i);
+  const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
+  return `${formattedSize} ${sizes[i]}`;
+};
+
 interface WebsiteSourceInfoProps {
   title: string;
   url: string;
@@ -49,17 +60,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const displayCompressedSize = compressedContentSize || compressedSize || 0;
 
   const hostname = url ? new URL(url).hostname.replace('www.', '') : '';
-
-  // Helper function to format bytes
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const size = bytes / Math.pow(k, i);
-    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
-    return `${formattedSize} ${sizes[i]}`;
-  };
 
   return (
     <div className="flex flex-col">
