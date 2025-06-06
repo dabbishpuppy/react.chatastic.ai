@@ -51,7 +51,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     return timeAgo
       .replace(/^about\s+0\s+\w+\s+ago$/, 'just now')
       .replace(/^0\s+\w+\s+ago$/, 'just now')
-      .replace(/^about\s+/, 'About ')
+      .replace(/^about\s+/, '')
       .replace(/^less than a minute ago$/, 'just now');
   };
 
@@ -84,7 +84,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
         <div className="flex items-center text-xs text-gray-500 mt-1">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            <span>Added {formatTimeAgo(createdAt)}</span>
+            <span>Crawled {formatTimeAgo(createdAt)}</span>
           </div>
           
           {status === 'completed' && contentSize && (
