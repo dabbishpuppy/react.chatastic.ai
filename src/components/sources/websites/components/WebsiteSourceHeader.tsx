@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -59,11 +60,11 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
   }, 0);
 
   return (
-    <div className="flex items-center gap-3 flex-1 min-w-0">
+    <div className="flex items-start gap-3 flex-1 min-w-0">
       <Checkbox
         checked={isSelected}
         onCheckedChange={handleSelectionChange}
-        className="flex-shrink-0"
+        className="flex-shrink-0 mt-1"
       />
       
       <div className="flex-1 min-w-0">

@@ -24,7 +24,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
   if (loading) {
     return (
-      <div className="mt-4 p-4 flex justify-center items-center">
+      <div className="mt-4 p-4 flex justify-center items-center bg-gray-50 rounded-lg border">
         <Loader2 className="animate-spin mr-2" size={16} />
         <span>Loading child pages...</span>
       </div>
@@ -33,11 +33,11 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
   if (childPages.length === 0) {
     return isCrawling ? (
-      <div className="mt-4 p-4 text-sm text-gray-500 text-center">
+      <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
         Crawling in progress. Child pages will appear here.
       </div>
     ) : (
-      <div className="mt-4 p-4 text-sm text-gray-500 text-center">
+      <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
         No child pages found.
       </div>
     );
@@ -45,10 +45,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
   return (
     <div className="mt-4 border-t border-gray-200 pt-4">
-      <div className="text-sm font-medium mb-2 text-gray-700">
+      <div className="text-sm font-medium mb-3 text-gray-700">
         Child Pages ({childPages.length})
       </div>
-      <div className="relative">
+      <div className="relative bg-gray-50 rounded-lg border p-3">
         <ScrollArea className="h-96 w-full">
           <div className="space-y-2 pr-4">
             {childPages.map((page) => (

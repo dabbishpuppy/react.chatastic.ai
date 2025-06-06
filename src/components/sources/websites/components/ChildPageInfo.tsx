@@ -24,7 +24,12 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
 }) => {
   const formatUrl = (url: string) => {
     try {
-      const urlObj = new URL(url);
+      // If URL doesn't have protocol, add https://
+      const urlWithProtocol = url.startsWith('http://') || url.startsWith('https://') 
+        ? url 
+        : `https://${url}`;
+      
+      const urlObj = new URL(urlWithProtocol);
       return urlObj.hostname + urlObj.pathname;
     } catch {
       return url;

@@ -35,7 +35,7 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
   };
 
   return (
-    <Card className="border border-gray-200">
+    <Card className="border border-gray-200 bg-white">
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
           <ChildPageInfo
