@@ -79,32 +79,69 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   };
 
   const getStatusText = (status: string, processingStatus?: string, parentSource?: any) => {
-    // Check if parent is in training or completed training
+    // Get parent metadata to check training state
     const parentMetadata = (parentSource?.metadata as any) || {};
     const isParentTraining = parentMetadata.training_status === 'in_progress' || parentSource?.crawl_status === 'training';
-    const isParentTrainingCompleted = parentMetadata.training_completed_at || parentMetadata.children_training_completed;
+    const isParentTrainingCompleted = parentMetadata.training_status === 'completed' || 
+                                      parentMetadata.training_completed_at || 
+                                      parentMetadata.children_training_completed === true;
 
-    // During training flow, map processing status
+    console.log('🔍 Child page status determination:', {
+      childStatus: status,
+      processingStatus,
+      isParentTraining,
+      isParentTrainingCompleted,
+      parentMetadata
+    });
+
+    // During training flow, prioritize processing status
     if (processingStatus) {
       switch (processingStatus) {
-        case 'in_progress': return 'In Progress';
+        case 'in_progress': 
+          console.log('✅ Child status: IN PROGRESS (processing_status = in_progress)');
+          return 'In Progress';
         case 'completed': 
-          // If parent training is completed, show as "Trained"
-          return isParentTrainingCompleted ? 'Trained' : 'Completed';
-        case 'failed': return 'Failed';
-        default: return 'Pending';
+          if (isParentTrainingCompleted) {
+            console.log('✅ Child status: TRAINED (processing completed + parent training completed)');
+            return 'Trained';
+          } else {
+            console.log('✅ Child status: COMPLETED (processing completed, parent still training)');
+            return 'Completed';
+          }
+        case 'failed': 
+          console.log('✅ Child status: FAILED (processing_status = failed)');
+          return 'Failed';
+        default: 
+          console.log('✅ Child status: PENDING (default processing status)');
+          return 'Pending';
       }
     }
 
     // Fallback to original status mapping
     switch (status) {
       case 'completed': 
-        // If parent is training completed, show as "Trained"
-        return isParentTrainingCompleted ? 'Trained' : 'Completed';
-      case 'in_progress': return isParentTraining ? 'In Progress' : 'In Progress';
-      case 'pending': return 'Pending';
-      case 'failed': return 'Failed';
-      default: return 'Unknown';
+        if (isParentTrainingCompleted) {
+          console.log('✅ Child status: TRAINED (status = completed + parent training completed)');
+          return 'Trained';
+        } else if (isParentTraining) {
+          console.log('✅ Child status: IN PROGRESS (status = completed + parent training)');
+          return 'In Progress';
+        } else {
+          console.log('✅ Child status: COMPLETED (status = completed)');
+          return 'Completed';
+        }
+      case 'in_progress': 
+        console.log('✅ Child status: IN PROGRESS (status = in_progress)');
+        return 'In Progress';
+      case 'pending': 
+        console.log('✅ Child status: PENDING (status = pending)');
+        return 'Pending';
+      case 'failed': 
+        console.log('✅ Child status: FAILED (status = failed)');
+        return 'Failed';
+      default: 
+        console.log('✅ Child status: UNKNOWN (unknown status)');
+        return 'Unknown';
     }
   };
 

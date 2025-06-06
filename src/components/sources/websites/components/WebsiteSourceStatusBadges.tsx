@@ -40,6 +40,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
         },
         (payload) => {
           const updatedSource = payload.new as any;
+          console.log('📡 Real-time source update received:', updatedSource);
           setSource(updatedSource);
         }
       )
@@ -114,6 +115,16 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   // Use SimplifiedSourceStatusService to get the correct status
   const computedStatus = source ? SimplifiedSourceStatusService.getSourceStatus(source) : 'pending';
   const statusConfig = getStatusConfig(computedStatus);
+
+  console.log('🔍 WebsiteSourceStatusBadges rendering:', {
+    sourceId,
+    computedStatus,
+    source: source ? {
+      crawl_status: source.crawl_status,
+      requires_manual_training: source.requires_manual_training,
+      metadata: source.metadata
+    } : null
+  });
 
   return (
     <div className="flex items-center gap-2">
