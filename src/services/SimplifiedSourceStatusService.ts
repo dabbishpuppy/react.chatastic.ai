@@ -54,20 +54,20 @@ export class SimplifiedSourceStatusService {
       return 'training';
     }
     
-    // Check if training completed
+    // Check if training completed - FIXED: Distinguish between "trained" and "training_completed"
     if (metadata.training_completed_at || metadata.last_trained_at) {
       // For website sources, distinguish between parent and child completion
       if (source.source_type === 'website') {
         // For parent sources, check if all children are trained
         if (source.parent_source_id === null && metadata.children_training_completed === true) {
-          return 'training_completed';
+          return 'training_completed'; // FIXED: Return training_completed for parent
         }
         // For child sources, they're "trained" when training is done
         if (source.parent_source_id !== null) {
           return 'trained';
         }
-        // Parent without children completion flag - still "trained"
-        return 'trained';
+        // Parent without children completion flag - show "training_completed"
+        return 'training_completed'; // FIXED: Change from 'trained' to 'training_completed'
       }
       return 'trained';
     }

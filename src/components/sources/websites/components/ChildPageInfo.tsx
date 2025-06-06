@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
@@ -13,7 +12,8 @@ interface ChildPageInfoProps {
   processingTimeMs?: number;
   errorMessage?: string;
   createdAt: string;
-  parentSourceId?: string; // Add parent source ID to track parent training state
+  parentSourceId?: string;
+  pageId?: string; // Add pageId to track individual page updates
 }
 
 const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
@@ -23,36 +23,51 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   chunksCreated,
   errorMessage,
   createdAt,
-  parentSourceId
+  parentSourceId,
+  pageId
 }) => {
   const [displayStatus, setDisplayStatus] = useState(status);
   const [parentTrainingState, setParentTrainingState] = useState<any>(null);
+  const [childProcessingStatus, setChildProcessingStatus] = useState<string>('pending');
 
-  // Monitor parent source training state
+  // Monitor both parent training state AND child processing status
   useEffect(() => {
-    if (!parentSourceId) {
+    if (!parentSourceId || !pageId) {
       setDisplayStatus(status);
       return;
     }
 
-    // Fetch initial parent state
-    const fetchParentState = async () => {
-      const { data } = await supabase
+    // Fetch initial states
+    const fetchInitialStates = async () => {
+      // Get parent state
+      const { data: parentData } = await supabase
         .from('agent_sources')
         .select('crawl_status, metadata, requires_manual_training')
         .eq('id', parentSourceId)
         .single();
       
-      if (data) {
-        setParentTrainingState(data);
-        updateDisplayStatus(status, data);
+      // Get child processing status
+      const { data: childData } = await supabase
+        .from('source_pages')
+        .select('processing_status, status')
+        .eq('id', pageId)
+        .single();
+      
+      if (parentData) {
+        setParentTrainingState(parentData);
       }
+      
+      if (childData) {
+        setChildProcessingStatus(childData.processing_status || 'pending');
+      }
+      
+      updateDisplayStatus(status, parentData, childData?.processing_status || 'pending');
     };
 
-    fetchParentState();
+    fetchInitialStates();
 
     // Subscribe to parent source changes
-    const channel = supabase
+    const parentChannel = supabase
       .channel(`parent-training-${parentSourceId}`)
       .on(
         'postgres_changes',
@@ -66,7 +81,28 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
           const updatedParent = payload.new as any;
           console.log('Parent source update for child page:', updatedParent);
           setParentTrainingState(updatedParent);
-          updateDisplayStatus(status, updatedParent);
+          updateDisplayStatus(status, updatedParent, childProcessingStatus);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to child page processing status changes
+    const childChannel = supabase
+      .channel(`child-processing-${pageId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `id=eq.${pageId}`
+        },
+        (payload) => {
+          const updatedChild = payload.new as any;
+          console.log('Child page processing update:', updatedChild);
+          const newProcessingStatus = updatedChild.processing_status || 'pending';
+          setChildProcessingStatus(newProcessingStatus);
+          updateDisplayStatus(updatedChild.status, parentTrainingState, newProcessingStatus);
         }
       )
       .subscribe();
@@ -74,37 +110,44 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     // Listen for training completion events
     const handleTrainingCompleted = () => {
       console.log('Training completed event - updating child page status');
-      fetchParentState();
+      fetchInitialStates();
     };
 
     window.addEventListener('trainingCompleted', handleTrainingCompleted);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(parentChannel);
+      supabase.removeChannel(childChannel);
       window.removeEventListener('trainingCompleted', handleTrainingCompleted);
     };
-  }, [status, parentSourceId]);
+  }, [status, parentSourceId, pageId, childProcessingStatus]);
 
-  const updateDisplayStatus = (childStatus: string, parentState: any) => {
-    if (!parentState) {
-      setDisplayStatus(childStatus);
+  const updateDisplayStatus = (childStatus: string, parentState: any, processingStatus: string) => {
+    console.log('Updating child display status:', {
+      childStatus,
+      processingStatus,
+      parentState: parentState?.metadata
+    });
+
+    // If child is actively being processed (chunking), show "In Progress"
+    if (processingStatus === 'processing') {
+      setDisplayStatus('in_progress');
       return;
     }
 
-    const metadata = (parentState.metadata as any) || {};
-    
-    // If parent is currently training and child is completed, show "In Progress"
-    if (parentState.crawl_status === 'training' || metadata.training_status === 'in_progress') {
-      if (childStatus === 'completed') {
-        setDisplayStatus('in_progress');
+    // If child is completed and parent has training metadata
+    if (childStatus === 'completed' && parentState) {
+      const metadata = (parentState.metadata as any) || {};
+      
+      // If parent training is completed, show "Trained"
+      if (metadata.training_completed_at || metadata.last_trained_at) {
+        setDisplayStatus('trained');
         return;
       }
-    }
-    
-    // If parent training is completed and child is completed, show "Trained"
-    if (metadata.training_completed_at || metadata.last_trained_at) {
-      if (childStatus === 'completed') {
-        setDisplayStatus('trained');
+      
+      // If parent is currently training, show "In Progress"
+      if (parentState.crawl_status === 'training' || metadata.training_status === 'in_progress') {
+        setDisplayStatus('in_progress');
         return;
       }
     }
@@ -167,7 +210,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending';
   const fullUrl = getFullUrl(url);
 
-  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'parentState:', parentTrainingState);
+  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'processingStatus:', childProcessingStatus);
 
   return (
     <>
