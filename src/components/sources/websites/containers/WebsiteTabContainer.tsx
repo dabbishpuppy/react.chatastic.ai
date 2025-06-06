@@ -2,12 +2,32 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 import WebsiteSourcesList from "../components/WebsiteSourcesList";
+import WebsiteFormSection from "../components/WebsiteFormSection";
 import { useWebsiteSourceOperations } from "../hooks/useWebsiteSourceOperations";
+import { useWebsiteFormState } from "../hooks/useWebsiteFormState";
+import { WebsiteCrawlService } from "@/services/rag/websiteCrawlService";
+import { SourceCreateService } from "@/services/rag/operations/SourceCreateService";
 
 const WebsiteTabContainer: React.FC = () => {
   const { agentId } = useParams();
   const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  
+  const {
+    activeSubTab,
+    setActiveSubTab,
+    url,
+    setUrl,
+    protocol,
+    setProtocol,
+    includePaths,
+    setIncludePaths,
+    excludePaths,
+    setExcludePaths,
+    clearForm
+  } = useWebsiteFormState();
   
   const handleRefetch = () => {
     console.log('Refetch triggered');
@@ -29,8 +49,85 @@ const WebsiteTabContainer: React.FC = () => {
     handleRecrawl
   } = useWebsiteSourceOperations(handleRefetch, handleRemoveFromState);
 
+  const handleSubmit = async (
+    crawlType: 'crawl-links' | 'sitemap' | 'individual-link',
+    options?: { maxPages?: number; maxDepth?: number; concurrency?: number }
+  ) => {
+    if (!agentId || !url.trim()) return;
+
+    setIsSubmitting(true);
+    
+    try {
+      // Create the source first
+      const source = await SourceCreateService.createSource({
+        agent_id: agentId,
+        team_id: '', // Will be fetched automatically
+        source_type: 'website',
+        title: url,
+        url: url,
+        crawl_status: 'pending',
+        progress: 0,
+        links_count: 0,
+        include_paths: includePaths ? includePaths.split('\n').filter(p => p.trim()) : [],
+        exclude_paths: excludePaths ? excludePaths.split('\n').filter(p => p.trim()) : [],
+        respect_robots: true,
+        max_concurrent_jobs: options?.concurrency || 2
+      });
+
+      // Start the crawl
+      const crawlOptions = {
+        maxPages: options?.maxPages || 50,
+        maxDepth: crawlType === 'individual-link' ? 0 : (options?.maxDepth || 3),
+        concurrency: options?.concurrency || 2,
+        includePaths: includePaths ? includePaths.split('\n').filter(p => p.trim()) : [],
+        excludePaths: excludePaths ? excludePaths.split('\n').filter(p => p.trim()) : []
+      };
+
+      await WebsiteCrawlService.startEnhancedCrawl(
+        agentId,
+        source.id,
+        url,
+        crawlOptions
+      );
+
+      toast({
+        title: "Crawl Started",
+        description: `Started crawling ${url} with ${crawlType} method`,
+      });
+
+      // Clear form and refresh list
+      clearForm();
+      handleRefetch();
+
+    } catch (error) {
+      console.error('Error starting crawl:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to start crawl",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 mt-4">
+      <WebsiteFormSection
+        activeSubTab={activeSubTab}
+        setActiveSubTab={setActiveSubTab}
+        url={url}
+        setUrl={setUrl}
+        protocol={protocol}
+        setProtocol={setProtocol}
+        includePaths={includePaths}
+        setIncludePaths={setIncludePaths}
+        excludePaths={excludePaths}
+        setExcludePaths={setExcludePaths}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+      />
+      
       <WebsiteSourcesList
         onEdit={handleEdit}
         onExclude={handleExclude}
