@@ -2,31 +2,34 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ExternalLink, Eye, EyeOff, Trash2, MoreHorizontal } from 'lucide-react';
+import { 
+  Edit2, 
+  RefreshCw, 
+  Trash2,
+  MoreHorizontal
+} from 'lucide-react';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from "@/hooks/use-toast";
 
 interface ChildPageActionsProps {
   url: string;
-  pageId: string; // Add pageId for direct deletion
+  pageId: string;
   onExclude?: () => void;
   onDelete?: () => void;
+  onRecrawl?: () => void;
 }
 
-type ConfirmationType = 'exclude' | 'delete' | null;
+type ConfirmationType = 'recrawl' | 'delete' | null;
 
 const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
   pageId,
-  onExclude,
-  onDelete
+  onDelete,
+  onRecrawl
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleExcludeClick = () => {
-    setConfirmationType('exclude');
+  const handleRecrawlClick = () => {
+    setConfirmationType('recrawl');
   };
 
   const handleDeleteClick = () => {
@@ -35,37 +38,14 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   const handleConfirm = async () => {
     switch (confirmationType) {
-      case 'exclude':
-        onExclude?.();
+      case 'recrawl':
+        if (onRecrawl) {
+          await onRecrawl();
+        }
         break;
       case 'delete':
-        setIsDeleting(true);
-        try {
-          // Delete directly from source_pages table
-          const { error } = await supabase
-            .from('source_pages')
-            .delete()
-            .eq('id', pageId);
-
-          if (error) {
-            throw error;
-          }
-
-          toast({
-            title: "Success",
-            description: "Child page deleted successfully"
-          });
-
-          onDelete?.();
-        } catch (error) {
-          console.error('Error deleting child page:', error);
-          toast({
-            title: "Error",
-            description: "Failed to delete child page",
-            variant: "destructive"
-          });
-        } finally {
-          setIsDeleting(false);
+        if (onDelete) {
+          await onDelete();
         }
         break;
     }
@@ -74,18 +54,18 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   const getConfirmationConfig = () => {
     switch (confirmationType) {
-      case 'exclude':
+      case 'recrawl':
         return {
-          title: 'Exclude Source',
-          description: `Are you sure you want to exclude "${url}"? This will hide the content from AI responses.`,
-          confirmText: 'Exclude',
-          isDestructive: true
+          title: 'Confirm Recrawl',
+          description: `Are you sure you want to recrawl "${url}"? This will refresh the content and may take some time to complete.`,
+          confirmText: 'Recrawl',
+          isDestructive: false
         };
       case 'delete':
         return {
-          title: 'Delete Child Page',
+          title: 'Delete Page',
           description: `Are you sure you want to permanently delete "${url}"? This action cannot be undone.`,
-          confirmText: isDeleting ? 'Deleting...' : 'Delete',
+          confirmText: 'Delete',
           isDestructive: true
         };
       default:
@@ -101,7 +81,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   const confirmConfig = getConfirmationConfig();
 
   return (
-    <>
+    <div className="flex items-center gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -112,16 +92,11 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
             <MoreHorizontal className="w-3 h-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={() => window.open(url, '_blank')}>
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open URL
-          </DropdownMenuItem>
-          
-          {onExclude && (
-            <DropdownMenuItem onClick={handleExcludeClick}>
-              <EyeOff className="w-4 h-4 mr-2" />
-              Exclude
+        <DropdownMenuContent align="end" className="w-32">
+          {onRecrawl && (
+            <DropdownMenuItem onClick={handleRecrawlClick}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Recrawl
             </DropdownMenuItem>
           )}
           
@@ -142,9 +117,9 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         confirmText={confirmConfig.confirmText}
         onConfirm={handleConfirm}
         isDestructive={confirmConfig.isDestructive}
-        disabled={isDeleting}
+        disabled={false}
       />
-    </>
+    </div>
   );
 };
 
