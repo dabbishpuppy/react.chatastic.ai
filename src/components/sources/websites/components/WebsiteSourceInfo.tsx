@@ -22,6 +22,48 @@ const formatBytes = (bytes: number): string => {
   return `${formattedSize} ${sizes[i]}`;
 };
 
+// Helper function to safely parse URL and extract hostname
+const getHostnameFromUrl = (url: string): string => {
+  if (!url) return '';
+  
+  try {
+    // First try to parse as-is
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace('www.', '');
+  } catch (error) {
+    // If it fails, try adding https:// protocol
+    try {
+      const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
+      const urlObj = new URL(urlWithProtocol);
+      return urlObj.hostname.replace('www.', '');
+    } catch (secondError) {
+      // If still fails, return the original URL as fallback
+      return url.replace('www.', '');
+    }
+  }
+};
+
+// Helper function to create a valid URL for links
+const createValidUrl = (url: string): string => {
+  if (!url) return '#';
+  
+  try {
+    // First try to parse as-is
+    new URL(url);
+    return url;
+  } catch (error) {
+    // If it fails, try adding https:// protocol
+    try {
+      const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
+      new URL(urlWithProtocol);
+      return urlWithProtocol;
+    } catch (secondError) {
+      // If still fails, return a safe fallback
+      return '#';
+    }
+  }
+};
+
 interface WebsiteSourceInfoProps {
   title: string;
   url: string;
@@ -59,7 +101,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const displayTotalSize = totalContentSize || originalSize || 0;
   const displayCompressedSize = compressedContentSize || compressedSize || 0;
 
-  const hostname = url ? new URL(url).hostname.replace('www.', '') : '';
+  const hostname = getHostnameFromUrl(url);
+  const validUrl = createValidUrl(url);
 
   return (
     <div className="flex flex-col">
@@ -68,21 +111,29 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           {displayTitle}
         </h3>
         
-        <a href={url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700">
-          <ExternalLink size={14} />
-        </a>
+        {validUrl !== '#' && (
+          <a href={validUrl} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700">
+            <ExternalLink size={14} />
+          </a>
+        )}
       </div>
 
       <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-        <a 
-          href={url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 hover:text-blue-600"
-        >
-          {hostname}
-          <ArrowUpRight className="h-3 w-3" />
-        </a>
+        {validUrl !== '#' ? (
+          <a 
+            href={validUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-blue-600"
+          >
+            {hostname}
+            <ArrowUpRight className="h-3 w-3" />
+          </a>
+        ) : (
+          <span className="flex items-center gap-1">
+            {hostname}
+          </span>
+        )}
         
         {!isChild && (
           <>
