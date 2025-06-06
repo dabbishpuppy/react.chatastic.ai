@@ -135,8 +135,8 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       return;
     }
 
-    // If child is completed and parent has training metadata
-    if (childStatus === 'completed' && parentState) {
+    // FIXED: If child processing is completed (chunked) and parent has training metadata, show "Trained"
+    if (childStatus === 'completed' && processingStatus === 'processed' && parentState) {
       const metadata = (parentState.metadata as any) || {};
       
       // If parent training is completed, show "Trained"
@@ -150,6 +150,12 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
         setDisplayStatus('in_progress');
         return;
       }
+    }
+    
+    // FIXED: If child is completed and processed, but parent has no training metadata yet, show "Completed"
+    if (childStatus === 'completed' && processingStatus === 'processed') {
+      setDisplayStatus('completed');
+      return;
     }
     
     // Default to original status
