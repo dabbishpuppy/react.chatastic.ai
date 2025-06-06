@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -194,8 +195,8 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       <div className="text-sm font-medium mb-2 text-gray-700">
         Child Pages ({childPages.length})
       </div>
-      <ScrollArea className="h-96 w-full">
-        <div className="space-y-2 pr-4">
+      <ScrollArea className="h-96 w-full" style={{ scrollBehavior: 'smooth' }}>
+        <div className="space-y-2 pr-4" style={{ paddingRight: '16px' }}>
           {childPages.map((page) => (
             <Card key={page.id} className="shadow-sm">
               <CardContent className="p-3">
