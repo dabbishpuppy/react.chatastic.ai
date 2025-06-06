@@ -53,7 +53,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
     switch (status) {
       case 'pending':
         return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
+          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
           text: 'Pending',
           className: 'bg-yellow-500 text-white'
         };

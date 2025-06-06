@@ -4,23 +4,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import ChildPageInfo from './ChildPageInfo';
 import ChildPageActions from './ChildPageActions';
 
-interface SourcePage {
-  id: string;
-  url: string;
-  status: string;
-  created_at: string;
-  completed_at?: string;
-  error_message?: string;
-  content_size?: number;
-  chunks_created?: number;
-  processing_time_ms?: number;
-  parent_source_id: string;
-}
-
 interface ChildPageCardProps {
-  page: SourcePage;
-  onExclude: (source: any) => void;
-  onDelete: (source: any) => void;
+  page: {
+    id: string;
+    url: string;
+    status: string;
+    created_at: string;
+    completed_at?: string;
+    error_message?: string;
+    content_size?: number;
+    chunks_created?: number;
+    processing_time_ms?: number;
+    parent_source_id: string;
+  };
+  onExclude?: (page: any) => void;
+  onDelete?: (page: any) => void;
 }
 
 const ChildPageCard: React.FC<ChildPageCardProps> = ({
@@ -29,15 +27,15 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
   onDelete
 }) => {
   const handleExclude = () => {
-    onExclude({ ...page, source_type: 'website' });
+    onExclude?.(page);
   };
 
   const handleDelete = () => {
-    onDelete({ ...page, source_type: 'website' });
+    onDelete?.(page);
   };
 
   return (
-    <Card className="shadow-sm">
+    <Card className="border border-gray-200">
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
           <ChildPageInfo
@@ -45,14 +43,16 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
             status={page.status}
             contentSize={page.content_size}
             chunksCreated={page.chunks_created}
+            processingTimeMs={page.processing_time_ms}
             errorMessage={page.error_message}
             createdAt={page.created_at}
           />
           
           <ChildPageActions
             url={page.url}
-            onExclude={handleExclude}
-            onDelete={handleDelete}
+            pageId={page.id}
+            onExclude={onExclude ? handleExclude : undefined}
+            onDelete={onDelete ? handleDelete : undefined}
           />
         </div>
       </CardContent>

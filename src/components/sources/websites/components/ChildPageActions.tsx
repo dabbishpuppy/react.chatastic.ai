@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ExternalLink, Eye, EyeOff, Trash2, MoreHorizontal } from 'lucide-react';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from "@/hooks/use-toast";
 
 interface ChildPageActionsProps {
   url: string;
+  pageId: string; // Add pageId for direct deletion
   onExclude?: () => void;
   onDelete?: () => void;
 }
@@ -15,10 +18,12 @@ type ConfirmationType = 'exclude' | 'delete' | null;
 
 const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
+  pageId,
   onExclude,
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleExcludeClick = () => {
     setConfirmationType('exclude');
@@ -28,13 +33,40 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
     setConfirmationType('delete');
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     switch (confirmationType) {
       case 'exclude':
         onExclude?.();
         break;
       case 'delete':
-        onDelete?.();
+        setIsDeleting(true);
+        try {
+          // Delete directly from source_pages table
+          const { error } = await supabase
+            .from('source_pages')
+            .delete()
+            .eq('id', pageId);
+
+          if (error) {
+            throw error;
+          }
+
+          toast({
+            title: "Success",
+            description: "Child page deleted successfully"
+          });
+
+          onDelete?.();
+        } catch (error) {
+          console.error('Error deleting child page:', error);
+          toast({
+            title: "Error",
+            description: "Failed to delete child page",
+            variant: "destructive"
+          });
+        } finally {
+          setIsDeleting(false);
+        }
         break;
     }
     setConfirmationType(null);
@@ -51,9 +83,9 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         };
       case 'delete':
         return {
-          title: 'Delete Source',
-          description: `Are you sure you want to permanently delete "${url}"? This action cannot be undone and will remove all associated content and embeddings.`,
-          confirmText: 'Delete',
+          title: 'Delete Child Page',
+          description: `Are you sure you want to permanently delete "${url}"? This action cannot be undone.`,
+          confirmText: isDeleting ? 'Deleting...' : 'Delete',
           isDestructive: true
         };
       default:
@@ -110,6 +142,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         confirmText={confirmConfig.confirmText}
         onConfirm={handleConfirm}
         isDestructive={confirmConfig.isDestructive}
+        disabled={isDeleting}
       />
     </>
   );

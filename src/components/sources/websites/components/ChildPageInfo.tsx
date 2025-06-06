@@ -2,7 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
-import { Calendar, Database, FileText } from 'lucide-react';
+import { Calendar, Database, FileText, Loader2 } from 'lucide-react';
 
 interface ChildPageInfoProps {
   url: string;
@@ -75,6 +75,8 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     }
   };
 
+  const isLoading = status === 'in_progress' || status === 'pending';
+
   return (
     <>
       <div className="flex-1 min-w-0">
@@ -110,7 +112,8 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       </div>
       
       <div className="flex items-center gap-2">
-        <Badge className={`${getStatusColor(status)} text-xs px-2 py-0`}>
+        <Badge className={`${getStatusColor(status)} text-xs px-2 py-0 flex items-center gap-1`}>
+          {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
           {getStatusText(status)}
         </Badge>
       </div>
