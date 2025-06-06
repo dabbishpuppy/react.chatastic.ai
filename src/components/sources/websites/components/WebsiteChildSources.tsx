@@ -26,6 +26,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     enabled: !!parentSourceId
   });
 
+  const handleRetry = () => {
+    refetch();
+  };
+
   if (isLoading) {
     return (
       <div className="mt-4 p-4 flex justify-center items-center">
@@ -41,7 +45,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         <p className="font-medium">Error loading child pages</p>
         <p className="text-xs mt-1">{error.message}</p>
         <button 
-          onClick={refetch} 
+          onClick={handleRetry} 
           className="mt-2 text-xs underline text-blue-600"
         >
           Try again
