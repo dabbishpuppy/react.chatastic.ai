@@ -46,7 +46,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
         return {
           icon: <Clock size={14} className="mr-1" />,
           text: 'Pending',
-          className: 'bg-gray-100 text-gray-800 border-gray-200'
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200'
         };
       case 'in_progress':
         return {
@@ -87,8 +87,8 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
       default:
         return {
           icon: <Clock size={14} className="mr-1" />,
-          text: 'Unknown',
-          className: 'bg-gray-100 text-gray-800 border-gray-200'
+          text: 'Pending', // Default to Pending instead of Unknown
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200'
         };
     }
   };

@@ -61,8 +61,8 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
       default:
         return {
           icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Unknown',
-          className: 'bg-gray-500 text-white'
+          text: 'Pending',  // Default to Pending instead of Unknown
+          className: 'bg-yellow-500 text-white'
         };
     }
   };

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
@@ -132,7 +133,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
         return {
           icon: <Clock size={14} className="mr-1" />,
           text: 'Pending',
-          className: 'bg-gray-100 text-gray-800 border-gray-200'
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200'
         };
       case 'in_progress':
         return {
@@ -145,6 +146,18 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           icon: <CheckCircle size={14} className="mr-1" />,
           text: 'Completed',
           className: 'bg-green-100 text-green-800 border-green-200'
+        };
+      case 'crawled':
+        return {
+          icon: <Clock size={14} className="mr-1" />,
+          text: 'Ready for Training',
+          className: 'bg-orange-100 text-orange-800 border-orange-200'
+        };
+      case 'training':
+        return {
+          icon: <Loader2 size={14} className="mr-1 animate-spin" />,
+          text: 'Training',
+          className: 'bg-blue-100 text-blue-800 border-blue-200'
         };
       case 'trained':
         return {
@@ -161,8 +174,8 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       default:
         return {
           icon: <Clock size={14} className="mr-1" />,
-          text: 'Unknown',
-          className: 'bg-gray-100 text-gray-800 border-gray-200'
+          text: 'Pending', // Default to Pending instead of Unknown
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200'
         };
     }
   };
