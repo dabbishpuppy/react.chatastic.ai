@@ -77,12 +77,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
               onClick={() => window.open(url, '_blank')}
             />
           </div>
-          
-          {title && (
-            <p className="text-sm text-gray-500 truncate" title={url}>
-              {formatUrl(url)}
-            </p>
-          )}
         </div>
         
         <WebsiteSourceStatusBadges
