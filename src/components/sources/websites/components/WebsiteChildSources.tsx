@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentSource } from '@/types/rag';
-import { WebsiteSourceItem } from '../WebsiteSourceItem';
-import { Card, CardContent } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import ChildSourceItem from './ChildSourceItem';
 
 interface WebsiteChildSourcesProps {
   parentSourceId: string;
@@ -28,14 +29,11 @@ interface SourcePage {
 const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   parentSourceId,
   isCrawling = false,
-  onEdit,
   onExclude,
   onDelete,
-  onRecrawl
 }) => {
   const [childSources, setChildSources] = useState<AgentSource[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
   const fetchChildSources = async () => {
@@ -111,18 +109,6 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     };
   }, [parentSourceId]);
 
-  const handleSelectionChange = (sourceId: string, selected?: boolean) => {
-    const newSelected = new Set(selectedSources);
-    
-    if (selected) {
-      newSelected.add(sourceId);
-    } else {
-      newSelected.delete(sourceId);
-    }
-    
-    setSelectedSources(newSelected);
-  };
-
   if (loading) {
     return (
       <div className="mt-4 p-4 flex justify-center items-center">
@@ -164,23 +150,18 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       <div className="text-sm font-medium mb-2 text-gray-700">
         Child Pages ({childSources.length})
       </div>
-      <div className="space-y-2">
-        {childSources.map((source) => (
-          <Card key={source.id} className="shadow-sm">
-            <CardContent className="p-3">
-              <WebsiteSourceItem
-                source={source}
-                onEdit={onEdit}
-                onExclude={onExclude}
-                onDelete={onDelete}
-                onRecrawl={onRecrawl}
-                isSelected={selectedSources.has(source.id)}
-                onSelectionChange={(selected) => handleSelectionChange(source.id, selected)}
-              />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <ScrollArea className="max-h-64">
+        <div className="space-y-2 pr-2">
+          {childSources.map((source) => (
+            <ChildSourceItem
+              key={source.id}
+              source={source}
+              onExclude={onExclude}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      </ScrollArea>
     </div>
   );
 };
