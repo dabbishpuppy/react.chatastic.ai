@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, CheckCircle, Clock, GraduationCap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import WebsiteSourceStatusRobust from './WebsiteSourceStatusRobust';
+import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
 
 interface WebsiteSourceStatusProps {
   sourceId?: string;
@@ -13,6 +14,7 @@ interface WebsiteSourceStatusProps {
   metadata?: any;
   showProgressBar?: boolean;
   isChild?: boolean;
+  source?: any; // Full source object for status computation
 }
 
 const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
@@ -20,7 +22,8 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
   status,
   linksCount = 0,
   metadata,
-  isChild = false
+  isChild = false,
+  source
 }) => {
   // Use the robust version if we have a sourceId
   if (sourceId) {
@@ -32,6 +35,9 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
       />
     );
   }
+
+  // Compute status using SimplifiedSourceStatusService if we have the full source
+  const computedStatus = source ? SimplifiedSourceStatusService.getSourceStatus(source) : status;
 
   // Fallback to simple status display for legacy usage
   const getStatusConfig = (status?: string) => {
@@ -54,6 +60,18 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
           text: 'Completed',
           className: 'bg-green-100 text-green-800 border-green-200'
         };
+      case 'crawled':
+        return {
+          icon: <Clock size={14} className="mr-1" />,
+          text: 'Ready for Training',
+          className: 'bg-orange-100 text-orange-800 border-orange-200'
+        };
+      case 'training':
+        return {
+          icon: <Loader2 size={14} className="mr-1 animate-spin" />,
+          text: 'Training',
+          className: 'bg-blue-100 text-blue-800 border-blue-200'
+        };
       case 'trained':
         return {
           icon: <GraduationCap size={14} className="mr-1" />,
@@ -75,7 +93,7 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
     }
   };
 
-  const statusConfig = getStatusConfig(status);
+  const statusConfig = getStatusConfig(computedStatus);
 
   return (
     <div className="flex items-center gap-3">

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle } from 'lucide-react';
+import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle, GraduationCap, Bot } from 'lucide-react';
 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
@@ -33,6 +33,24 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
           icon: <CheckCircle className="w-3 h-3 mr-1" />,
           text: 'Completed',
           className: 'bg-green-500 text-white'
+        };
+      case 'crawled':
+        return {
+          icon: <Clock className="w-3 h-3 mr-1" />,
+          text: 'Ready for Training',
+          className: 'bg-orange-500 text-white'
+        };
+      case 'training':
+        return {
+          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
+          text: 'Training',
+          className: 'bg-blue-600 text-white'
+        };
+      case 'trained':
+        return {
+          icon: <GraduationCap className="w-3 h-3 mr-1" />,
+          text: 'Trained',
+          className: 'bg-purple-600 text-white'
         };
       case 'failed':
         return {

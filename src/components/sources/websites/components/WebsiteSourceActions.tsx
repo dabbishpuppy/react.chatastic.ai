@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -16,6 +17,7 @@ import {
 import { AgentSource } from '@/types/rag';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
+import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
@@ -43,6 +45,9 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   isChild = false
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
+
+  // Use SimplifiedSourceStatusService to get the computed status
+  const computedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -111,7 +116,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
       {/* Only show Status Badge for parent sources, not child sources */}
       {!isChild && (
         <WebsiteSourceStatusBadges
-          crawlStatus={source.crawl_status}
+          crawlStatus={computedStatus}
           isExcluded={source.is_excluded}
           linksCount={source.links_count || 0}
         />

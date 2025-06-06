@@ -70,6 +70,7 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
               compressedContentSize={source.compressed_content_size}
               originalSize={source.original_size}
               compressedSize={source.compressed_size}
+              source={source}
             />
           </div>
         )}
