@@ -1,6 +1,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
 
 interface UseSourceStatusRealtimeProps {
   sourceId: string;
@@ -13,6 +14,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   const [linksCount, setLinksCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const [sourceData, setSourceData] = useState<any>(null);
   
   const statusRef = useRef(status);
   const progressRef = useRef(progress);
@@ -28,9 +30,30 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   // Listen for training completion events
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
-      console.log('🎓 Training completed event received, updating source status to training_completed');
-      setStatus('training_completed');
-      setLastUpdateTime(new Date());
+      console.log('🎓 Training completed event received, refetching source data');
+      
+      // Refetch source data to get latest metadata
+      if (sourceId) {
+        supabase
+          .from('agent_sources')
+          .select('*')
+          .eq('id', sourceId)
+          .single()
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Error refetching source data:', error);
+              return;
+            }
+            
+            if (data) {
+              console.log('Refetched source data after training:', data);
+              setSourceData(data);
+              const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(data);
+              setStatus(mappedStatus);
+              setLastUpdateTime(new Date());
+            }
+          });
+      }
     };
 
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
@@ -38,7 +61,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     return () => {
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
     };
-  }, []);
+  }, [sourceId]);
 
   // Real-time subscription for source updates
   useEffect(() => {
@@ -48,7 +71,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
       try {
         const { data: source, error } = await supabase
           .from('agent_sources')
-          .select('crawl_status, progress, links_count, metadata, requires_manual_training')
+          .select('*')
           .eq('id', sourceId)
           .single();
 
@@ -59,12 +82,10 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
 
         if (source) {
           console.log('📋 Initial source data:', source);
+          setSourceData(source);
           
-          // Check if this source has been trained by looking at metadata
-          const metadata = source.metadata as Record<string, any> || {};
-          
-          // Determine status based on training state and crawl status
-          const mappedStatus = mapSourceStatus(source.crawl_status, metadata, source.requires_manual_training);
+          // Use SimplifiedSourceStatusService to determine proper status
+          const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
           setStatus(mappedStatus);
           console.log(`🔄 Status mapped to ${mappedStatus}`);
           
@@ -93,35 +114,15 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           const updatedSource = payload.new as any;
           console.log('📡 Real-time update received:', updatedSource);
           
-          // Check training status and update accordingly
-          const metadata = updatedSource.metadata as Record<string, any> || {};
-          const mappedStatus = mapSourceStatus(updatedSource.crawl_status, metadata, updatedSource.requires_manual_training);
+          setSourceData(updatedSource);
+          
+          // Use SimplifiedSourceStatusService to determine proper status
+          const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(updatedSource);
           setStatus(mappedStatus);
           console.log(`🔄 Real-time status mapped to ${mappedStatus}`);
           
           setProgress(updatedSource.progress || 0);
           setLinksCount(updatedSource.links_count || 0);
-          setLastUpdateTime(new Date());
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'source_pages',
-          filter: `parent_source_id=eq.${sourceId}`
-        },
-        (payload) => {
-          const updatedPage = payload.new as any;
-          console.log('📡 Source page update received:', updatedPage);
-          
-          // For website sources, check if this is a child page status update
-          if (updatedPage.processing_status === 'in_progress') {
-            setStatus('in_progress');
-          } else if (updatedPage.processing_status === 'completed') {
-            setStatus('trained');
-          }
           setLastUpdateTime(new Date());
         }
       )
@@ -146,47 +147,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     progress,
     linksCount,
     isConnected,
-    lastUpdateTime
+    lastUpdateTime,
+    sourceData
   };
-};
-
-// Helper function to map source status considering training state
-const mapSourceStatus = (crawlStatus: string, metadata: Record<string, any> = {}, requiresManualTraining: boolean = false): string => {
-  // Check for training states first
-  if (metadata.training_status === 'in_progress') {
-    return 'training';
-  }
-  
-  if (metadata.training_completed_at || metadata.last_trained_at) {
-    // Check if this is a parent source that completed training
-    if (metadata.children_training_completed === true) {
-      return 'training_completed';
-    }
-    return 'trained';
-  }
-  
-  // Check for recrawling state
-  if (metadata.is_recrawling === true && crawlStatus === 'recrawling') {
-    console.log('🔄 Detected recrawling state from metadata');
-    return 'recrawling';
-  }
-  
-  switch (crawlStatus) {
-    case 'pending':
-      return 'pending';
-    case 'in_progress':
-      return 'in_progress';
-    case 'recrawling':
-      return 'recrawling';
-    case 'training':
-      return 'training';
-    case 'completed':
-      return requiresManualTraining ? 'ready_for_training' : 'training_completed';
-    case 'ready_for_training':
-      return 'ready_for_training';
-    case 'failed':
-      return 'failed';
-    default:
-      return crawlStatus || 'pending'; // Default to pending instead of unknown
-  }
 };

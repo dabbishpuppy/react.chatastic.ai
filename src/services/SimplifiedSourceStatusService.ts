@@ -14,6 +14,7 @@ interface SourceMetadata {
   training_completed_at?: string;
   training_started_at?: string;
   last_trained_at?: string;
+  children_training_completed?: boolean;
   [key: string]: any;
 }
 
@@ -39,16 +40,34 @@ export class SimplifiedSourceStatusService {
   static getSourceStatus(source: any): SourceStatus {
     const metadata = (source.metadata as SourceMetadata) || {};
     
+    console.log('SimplifiedSourceStatusService.getSourceStatus:', {
+      sourceId: source.id,
+      crawlStatus: source.crawl_status,
+      requiresManualTraining: source.requires_manual_training,
+      metadata: metadata,
+      sourceType: source.source_type,
+      parentSourceId: source.parent_source_id
+    });
+    
     // Check if currently training
-    if (metadata.training_status === 'in_progress') {
+    if (metadata.training_status === 'in_progress' || source.crawl_status === 'training') {
       return 'training';
     }
     
-    // Check if training completed - distinguish between trained and training_completed
+    // Check if training completed
     if (metadata.training_completed_at || metadata.last_trained_at) {
-      // For website sources, if all children are trained, it's training_completed
-      if (source.source_type === 'website' && source.parent_source_id === null) {
-        return 'training_completed';
+      // For website sources, distinguish between parent and child completion
+      if (source.source_type === 'website') {
+        // For parent sources, check if all children are trained
+        if (source.parent_source_id === null && metadata.children_training_completed === true) {
+          return 'training_completed';
+        }
+        // For child sources, they're "trained" when training is done
+        if (source.parent_source_id !== null) {
+          return 'trained';
+        }
+        // Parent without children completion flag - still "trained"
+        return 'trained';
       }
       return 'trained';
     }
@@ -58,11 +77,6 @@ export class SimplifiedSourceStatusService {
       // Handle "ready_for_training" status properly
       if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === true) {
         return 'crawled'; // Ready for training
-      }
-      
-      // If training status is set
-      if (source.crawl_status === 'training') {
-        return 'training';
       }
       
       // If crawl is completed/ready_for_training and training has been done, it's fully completed

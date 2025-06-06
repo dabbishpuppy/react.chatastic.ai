@@ -42,6 +42,7 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
             processingTimeMs={page.processing_time_ms}
             errorMessage={page.error_message}
             createdAt={page.created_at}
+            parentSourceId={page.parent_source_id}
           />
           
           <ChildPageActions

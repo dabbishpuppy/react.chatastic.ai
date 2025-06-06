@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { Calendar, Database, FileText, Loader2, ExternalLink } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChildPageInfoProps {
   url: string;
@@ -12,6 +13,7 @@ interface ChildPageInfoProps {
   processingTimeMs?: number;
   errorMessage?: string;
   createdAt: string;
+  parentSourceId?: string; // Add parent source ID to track parent training state
 }
 
 const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
@@ -20,23 +22,101 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   contentSize,
   chunksCreated,
   errorMessage,
-  createdAt
+  createdAt,
+  parentSourceId
 }) => {
+  const [displayStatus, setDisplayStatus] = useState(status);
+  const [parentTrainingState, setParentTrainingState] = useState<any>(null);
+
+  // Monitor parent source training state
+  useEffect(() => {
+    if (!parentSourceId) {
+      setDisplayStatus(status);
+      return;
+    }
+
+    // Fetch initial parent state
+    const fetchParentState = async () => {
+      const { data } = await supabase
+        .from('agent_sources')
+        .select('crawl_status, metadata, requires_manual_training')
+        .eq('id', parentSourceId)
+        .single();
+      
+      if (data) {
+        setParentTrainingState(data);
+        updateDisplayStatus(status, data);
+      }
+    };
+
+    fetchParentState();
+
+    // Subscribe to parent source changes
+    const channel = supabase
+      .channel(`parent-training-${parentSourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `id=eq.${parentSourceId}`
+        },
+        (payload) => {
+          const updatedParent = payload.new as any;
+          console.log('Parent source update for child page:', updatedParent);
+          setParentTrainingState(updatedParent);
+          updateDisplayStatus(status, updatedParent);
+        }
+      )
+      .subscribe();
+
+    // Listen for training completion events
+    const handleTrainingCompleted = () => {
+      console.log('Training completed event - updating child page status');
+      fetchParentState();
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted);
+    };
+  }, [status, parentSourceId]);
+
+  const updateDisplayStatus = (childStatus: string, parentState: any) => {
+    if (!parentState) {
+      setDisplayStatus(childStatus);
+      return;
+    }
+
+    const metadata = (parentState.metadata as any) || {};
+    
+    // If parent is currently training and child is completed, show "In Progress"
+    if (parentState.crawl_status === 'training' || metadata.training_status === 'in_progress') {
+      if (childStatus === 'completed') {
+        setDisplayStatus('in_progress');
+        return;
+      }
+    }
+    
+    // If parent training is completed and child is completed, show "Trained"
+    if (metadata.training_completed_at || metadata.last_trained_at) {
+      if (childStatus === 'completed') {
+        setDisplayStatus('trained');
+        return;
+      }
+    }
+    
+    // Default to original status
+    setDisplayStatus(childStatus);
+  };
+
   const getFullUrl = (url: string) => {
-    // If URL doesn't have protocol, add https://
     return url.startsWith('http://') || url.startsWith('https://') 
       ? url 
       : `https://${url}`;
-  };
-
-  const formatUrl = (url: string) => {
-    try {
-      const fullUrl = getFullUrl(url);
-      const urlObj = new URL(fullUrl);
-      return urlObj.hostname + urlObj.pathname;
-    } catch {
-      return url;
-    }
   };
 
   const formatBytes = (bytes: number): string => {
@@ -55,7 +135,6 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   const formatTimeAgo = (dateString: string): string => {
     const timeAgo = formatDistanceToNow(new Date(dateString), { addSuffix: true });
     
-    // Handle various time formats that might include "0"
     return timeAgo
       .replace(/^about\s+0\s+\w+\s+ago$/, 'just now')
       .replace(/^0\s+\w+\s+ago$/, 'just now')
@@ -66,6 +145,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'bg-green-500 text-white';
+      case 'trained': return 'bg-purple-500 text-white';
       case 'in_progress': return 'bg-blue-500 text-white';
       case 'pending': return 'bg-yellow-500 text-white';
       case 'failed': return 'bg-red-500 text-white';
@@ -76,6 +156,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   const getStatusText = (status: string) => {
     switch (status) {
       case 'completed': return 'Completed';
+      case 'trained': return 'Trained';
       case 'in_progress': return 'In Progress';
       case 'pending': return 'Pending';
       case 'failed': return 'Failed';
@@ -83,8 +164,10 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     }
   };
 
-  const isLoading = status === 'in_progress' || status === 'pending';
+  const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending';
   const fullUrl = getFullUrl(url);
+
+  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'parentState:', parentTrainingState);
 
   return (
     <>
@@ -104,7 +187,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
             <span>Crawled {formatTimeAgo(createdAt)}</span>
           </div>
           
-          {status === 'completed' && contentSize && (
+          {(displayStatus === 'completed' || displayStatus === 'trained') && contentSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
@@ -127,9 +210,9 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       </div>
       
       <div className="flex items-center gap-2">
-        <Badge className={`${getStatusColor(status)} text-xs px-2 py-0 flex items-center gap-1`}>
+        <Badge className={`${getStatusColor(displayStatus)} text-xs px-2 py-0 flex items-center gap-1`}>
           {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-          {getStatusText(status)}
+          {getStatusText(displayStatus)}
         </Badge>
       </div>
 

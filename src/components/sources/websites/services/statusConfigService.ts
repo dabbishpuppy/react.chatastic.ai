@@ -16,6 +16,7 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
         text: 'Pending',
         className: 'bg-gray-100 text-gray-800 border-gray-200'
       };
+    case 'crawling':
     case 'in_progress':
       return {
         icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
@@ -28,11 +29,11 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
         text: 'Recrawling',
         className: 'bg-orange-100 text-orange-800 border-orange-200'
       };
-    case 'ready_for_training':
+    case 'crawled':
       return {
         icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
         text: 'Ready for Training',
-        className: 'bg-green-100 text-green-800 border-green-200'
+        className: 'bg-orange-100 text-orange-800 border-orange-200'
       };
     case 'training':
       return {
@@ -46,11 +47,18 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
         text: 'Trained',
         className: 'bg-green-100 text-green-800 border-green-200'
       };
+    case 'completed':
     case 'training_completed':
       return {
         icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
         text: 'Training Completed',
         className: 'bg-green-100 text-green-800 border-green-200'
+      };
+    case 'ready_for_training':
+      return {
+        icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
+        text: 'Ready for Training',
+        className: 'bg-orange-100 text-orange-800 border-orange-200'
       };
     case 'failed':
       return {

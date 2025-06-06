@@ -1,8 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle, GraduationCap, Bot } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
+import { getStatusConfig } from '../services/statusConfigService';
 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
@@ -10,20 +12,24 @@ interface WebsiteSourceStatusBadgesProps {
   linksCount: number;
   progress?: number;
   sourceId?: string;
+  source?: any; // Full source object for proper status computation
 }
 
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   crawlStatus: initialCrawlStatus,
   isExcluded,
-  sourceId
+  sourceId,
+  source
 }) => {
   const [crawlStatus, setCrawlStatus] = useState(initialCrawlStatus);
+  const [sourceData, setSourceData] = useState(source);
 
-  // Set up real-time subscription for status updates
+  // Set up real-time subscription for status updates including metadata changes
   useEffect(() => {
     if (!sourceId) return;
 
     setCrawlStatus(initialCrawlStatus);
+    setSourceData(source);
 
     const channel = supabase
       .channel(`source-status-${sourceId}`)
@@ -37,72 +43,47 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
         },
         (payload) => {
           const updatedSource = payload.new as any;
-          if (updatedSource.crawl_status) {
-            setCrawlStatus(updatedSource.crawl_status);
-          }
+          console.log('Real-time source update received:', updatedSource);
+          
+          // Update both crawl status and full source data for proper status computation
+          setCrawlStatus(updatedSource.crawl_status);
+          setSourceData(updatedSource);
         }
       )
       .subscribe();
 
+    // Listen for training completion events
+    const handleTrainingCompleted = () => {
+      console.log('Training completed event - updating source status');
+      // Trigger a refetch of source data
+      if (sourceId) {
+        supabase
+          .from('agent_sources')
+          .select('*')
+          .eq('id', sourceId)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              setSourceData(data);
+              setCrawlStatus(data.crawl_status);
+            }
+          });
+      }
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted);
+
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted);
     };
-  }, [sourceId, initialCrawlStatus]);
+  }, [sourceId, initialCrawlStatus, source]);
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return {
-          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
-          text: 'Pending',
-          className: 'bg-yellow-500 text-white'
-        };
-      case 'in_progress':
-        return {
-          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
-          text: 'Crawling',
-          className: 'bg-blue-500 text-white'
-        };
-      case 'completed':
-        return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-500 text-white'
-        };
-      case 'crawled':
-        return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-500 text-white'
-        };
-      case 'training':
-        return {
-          icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />,
-          text: 'Training',
-          className: 'bg-blue-600 text-white'
-        };
-      case 'trained':
-        return {
-          icon: <GraduationCap className="w-3 h-3 mr-1" />,
-          text: 'Trained',
-          className: 'bg-purple-600 text-white'
-        };
-      case 'failed':
-        return {
-          icon: <AlertTriangle className="w-3 h-3 mr-1" />,
-          text: 'Failed',
-          className: 'bg-red-500 text-white'
-        };
-      default:
-        return {
-          icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-500 text-white'
-        };
-    }
-  };
+  // Use SimplifiedSourceStatusService to determine the correct status
+  const computedStatus = sourceData ? SimplifiedSourceStatusService.getSourceStatus(sourceData) : crawlStatus;
+  const statusConfig = getStatusConfig(computedStatus);
 
-  const statusConfig = getStatusConfig(crawlStatus);
+  console.log('WebsiteSourceStatusBadges - computed status:', computedStatus, 'for source:', sourceId);
 
   return (
     <div className="flex items-center gap-2">
