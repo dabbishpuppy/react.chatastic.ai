@@ -1,4 +1,5 @@
 
+
 // Type definitions for Supabase RPC functions
 
 declare namespace Database {
@@ -46,7 +47,7 @@ declare module '@supabase/supabase-js' {
     match(query: Record<string, any>): PostgrestFilterBuilder<T>;
     order(column: string, options?: { ascending?: boolean; nullsFirst?: boolean }): PostgrestFilterBuilder<T>;
     limit(count: number): PostgrestFilterBuilder<T>;
-    range(from: number, to?: number): PostgrestFilterBuilder<T>;
+    range(from: number, to: number): PostgrestFilterBuilder<T>;
     single(): PostgrestFilterBuilder<T>;
     maybeSingle(): PostgrestFilterBuilder<T>;
     csv(): PostgrestFilterBuilder<T>;
@@ -114,9 +115,9 @@ declare module '@supabase/supabase-js' {
       },
       callback: (payload: any) => void
     ): RealtimeChannel;
-    subscribe(): RealtimeChannel;
+    subscribe(callback?: (status: string) => void): RealtimeChannel;
     unsubscribe(): Promise<string>;
-    send(type: string, payload: any): Promise<string>;
+    send(type: string, payload: any, options?: any): Promise<string>;
   }
 
   // Functions client
@@ -150,3 +151,4 @@ declare module '@supabase/supabase-js' {
     options?: any
   ): SupabaseClient<Database>;
 }
+
