@@ -33,8 +33,8 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   const [editUrl, setEditUrl] = useState(source.url);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Use real-time hook for child sources
-  const realtimeChildSources = useChildSourcesRealtime(source.id, childSources);
+  // Use real-time hook for child pages (SourcePage[])
+  const realtimeChildPages = useChildSourcesRealtime(source.id, []);
 
   // Use the operations hook for enhanced recrawl
   const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
@@ -46,7 +46,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   // Check if this is a parent source (no parent_source_id)
   const isParentSource = !source.parent_source_id;
-  const hasChildSources = realtimeChildSources && realtimeChildSources.length > 0;
+  const hasChildSources = realtimeChildPages && realtimeChildPages.length > 0;
 
   const handleToggleExpanded = () => {
     setIsExpanded(!isExpanded);
@@ -73,13 +73,69 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     onDelete(source);
   };
 
+  // Convert SourcePage to AgentSource for operations that need AgentSource
+  const handleChildEdit = (sourceId: string, newUrl: string) => {
+    onEdit(sourceId, newUrl);
+  };
+
+  const handleChildExclude = (childPage: any) => {
+    // Create a minimal AgentSource-like object for the operation
+    const sourceForOperation: AgentSource = {
+      id: childPage.id,
+      agent_id: source.agent_id,
+      title: childPage.url,
+      source_type: 'website' as const,
+      url: childPage.url,
+      created_at: childPage.created_at,
+      updated_at: childPage.updated_at || childPage.created_at,
+      is_active: true,
+      requires_manual_training: false,
+      parent_source_id: childPage.parent_source_id
+    };
+    onExclude(sourceForOperation);
+  };
+
+  const handleChildDelete = (childPage: any) => {
+    // Create a minimal AgentSource-like object for the operation
+    const sourceForOperation: AgentSource = {
+      id: childPage.id,
+      agent_id: source.agent_id,
+      title: childPage.url,
+      source_type: 'website' as const,
+      url: childPage.url,
+      created_at: childPage.created_at,
+      updated_at: childPage.updated_at || childPage.created_at,
+      is_active: true,
+      requires_manual_training: false,
+      parent_source_id: childPage.parent_source_id
+    };
+    onDelete(sourceForOperation);
+  };
+
+  const handleChildRecrawl = (childPage: any) => {
+    // Create a minimal AgentSource-like object for the operation
+    const sourceForOperation: AgentSource = {
+      id: childPage.id,
+      agent_id: source.agent_id,
+      title: childPage.url,
+      source_type: 'website' as const,
+      url: childPage.url,
+      created_at: childPage.created_at,
+      updated_at: childPage.updated_at || childPage.created_at,
+      is_active: true,
+      requires_manual_training: false,
+      parent_source_id: childPage.parent_source_id
+    };
+    onRecrawl(sourceForOperation);
+  };
+
   return (
     <Card className="mb-4">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <WebsiteSourceHeader
             source={source}
-            childSources={realtimeChildSources}
+            childSources={realtimeChildPages}
             isSelected={isSelected}
             isEditing={isEditing}
             editUrl={editUrl}
@@ -106,10 +162,10 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           <WebsiteChildSources
             parentSourceId={source.id}
             isCrawling={source.crawl_status === 'in_progress'}
-            onEdit={onEdit}
-            onExclude={onExclude}
-            onDelete={onDelete}
-            onRecrawl={onRecrawl}
+            onEdit={handleChildEdit}
+            onExclude={handleChildExclude}
+            onDelete={handleChildDelete}
+            onRecrawl={handleChildRecrawl}
           />
         )}
       </CardContent>
