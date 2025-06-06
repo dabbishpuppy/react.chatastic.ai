@@ -3,6 +3,7 @@ import React from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import WebsiteSourcesList from "../components/WebsiteSourcesList";
 import WebsiteFormSection from "../components/WebsiteFormSection";
 import { useWebsiteSourceOperations } from "../hooks/useWebsiteSourceOperations";
@@ -50,14 +51,34 @@ const WebsiteTabContainer: React.FC = () => {
     handleRecrawl
   } = useWebsiteSourceOperations(handleRefetch, handleRemoveFromState);
 
-  // Check for duplicate URLs
-  const checkForDuplicateUrl = (urlToCheck: string) => {
-    const websiteSources = sources.filter(source => source.source_type === 'website');
-    return websiteSources.some(source => {
-      const sourceUrl = source.url?.toLowerCase().replace(/\/$/, '');
-      const checkUrl = urlToCheck.toLowerCase().replace(/\/$/, '');
-      return sourceUrl === checkUrl;
-    });
+  // Enhanced duplicate check using direct database query
+  const checkForDuplicateUrl = async (urlToCheck: string) => {
+    if (!agentId) return false;
+    
+    try {
+      const normalizedUrl = urlToCheck.toLowerCase().replace(/\/$/, '');
+      
+      const { data: existingSources, error } = await supabase
+        .from('agent_sources')
+        .select('id, url')
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .eq('is_active', true)
+        .is('parent_source_id', null);
+
+      if (error) {
+        console.error('Error checking for duplicates:', error);
+        return false;
+      }
+
+      return existingSources?.some(source => {
+        const existingUrl = source.url?.toLowerCase().replace(/\/$/, '');
+        return existingUrl === normalizedUrl;
+      }) || false;
+    } catch (error) {
+      console.error('Error in duplicate check:', error);
+      return false;
+    }
   };
 
   const handleSubmit = async (
@@ -79,8 +100,9 @@ const WebsiteTabContainer: React.FC = () => {
       
       const fullUrl = url.startsWith('http') ? url : `${protocol}${url}`;
       
-      // Check for duplicate URLs
-      if (checkForDuplicateUrl(fullUrl)) {
+      // Check for duplicate URLs using database query
+      const isDuplicate = await checkForDuplicateUrl(fullUrl);
+      if (isDuplicate) {
         toast({
           title: "Duplicate URL",
           description: "This URL has already been added to your sources.",

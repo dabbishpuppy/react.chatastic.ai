@@ -1,7 +1,15 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Clock, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ExternalLink, Clock, CheckCircle, AlertTriangle, Loader2, MoreHorizontal, Trash2, RefreshCcw } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 interface SourcePageItemProps {
   page: {
@@ -15,9 +23,17 @@ interface SourcePageItemProps {
     chunks_created?: number;
     processing_time_ms?: number;
   };
+  onDelete?: (pageId: string) => void;
+  onRecrawl?: (pageId: string) => void;
 }
 
-const SourcePageItem: React.FC<SourcePageItemProps> = ({ page }) => {
+const SourcePageItem: React.FC<SourcePageItemProps> = ({ 
+  page, 
+  onDelete,
+  onRecrawl 
+}) => {
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'pending':
@@ -54,6 +70,7 @@ const SourcePageItem: React.FC<SourcePageItemProps> = ({ page }) => {
   };
 
   const statusConfig = getStatusConfig(page.status);
+  
   const formatBytes = (bytes?: number) => {
     if (!bytes) return '0 B';
     const k = 1024;
@@ -68,6 +85,34 @@ const SourcePageItem: React.FC<SourcePageItemProps> = ({ page }) => {
     return `${(ms / 1000).toFixed(1)}s`;
   };
 
+  const getTimeAgo = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return 'Unknown';
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setIsActionLoading(true);
+    try {
+      await onDelete(page.id);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRecrawl = async () => {
+    if (!onRecrawl) return;
+    setIsActionLoading(true);
+    try {
+      await onRecrawl(page.id);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg hover:border-gray-200 transition-colors">
       <div className="flex-1 min-w-0">
@@ -76,12 +121,17 @@ const SourcePageItem: React.FC<SourcePageItemProps> = ({ page }) => {
             href={page.url} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-sm font-medium text-blue-600 hover:text-blue-800 truncate flex items-center gap-1"
+            className="text-sm font-medium text-blue-600 hover:text-blue-800 truncate flex items-center gap-1 max-w-md"
             title={page.url}
           >
             <ExternalLink size={12} />
-            {new URL(page.url).pathname || '/'}
+            {page.url}
           </a>
+        </div>
+        
+        <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+          <Clock size={10} />
+          <span>Added {getTimeAgo(page.created_at)}</span>
         </div>
         
         <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -103,11 +153,38 @@ const SourcePageItem: React.FC<SourcePageItemProps> = ({ page }) => {
         )}
       </div>
       
-      <div className="flex-shrink-0">
+      <div className="flex items-center gap-2">
         <Badge className={`${statusConfig.className} border flex items-center gap-1 text-xs`}>
           {statusConfig.icon}
           {statusConfig.text}
         </Badge>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0"
+              disabled={isActionLoading}
+            >
+              <MoreHorizontal size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem onClick={handleRecrawl} disabled={isActionLoading}>
+              <RefreshCcw size={14} className="mr-2" />
+              Recrawl Page
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={handleDelete} 
+              disabled={isActionLoading}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash2 size={14} className="mr-2" />
+              Delete Page
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

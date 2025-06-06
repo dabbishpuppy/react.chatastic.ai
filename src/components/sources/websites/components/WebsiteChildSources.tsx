@@ -4,6 +4,8 @@ import { Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AgentSource } from '@/types/rag';
 import { useSourcePagesPaginated } from '@/hooks/useSourcePagesPaginated';
+import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import SourcePageItem from './SourcePageItem';
 
 interface WebsiteChildSourcesProps {
@@ -28,6 +30,63 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 
   const handleRetry = () => {
     refetch();
+  };
+
+  const handleDeletePage = async (pageId: string) => {
+    try {
+      const { error } = await supabase
+        .from('source_pages')
+        .delete()
+        .eq('id', pageId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Page deleted successfully",
+      });
+
+      refetch();
+    } catch (error) {
+      console.error('Error deleting page:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete page",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRecrawlPage = async (pageId: string) => {
+    try {
+      const { error } = await supabase
+        .from('source_pages')
+        .update({
+          status: 'pending',
+          error_message: null,
+          content_size: null,
+          chunks_created: null,
+          processing_time_ms: null,
+          completed_at: null
+        })
+        .eq('id', pageId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Page recrawl initiated",
+      });
+
+      refetch();
+    } catch (error) {
+      console.error('Error recrawling page:', error);
+      toast({
+        title: "Error",
+        description: "Failed to initiate page recrawl",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading) {
@@ -79,6 +138,8 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             <SourcePageItem
               key={page.id}
               page={page}
+              onDelete={handleDeletePage}
+              onRecrawl={handleRecrawlPage}
             />
           ))}
         </div>
