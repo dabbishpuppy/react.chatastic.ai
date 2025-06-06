@@ -58,16 +58,12 @@ export class SimplifiedSourceStatusService {
     if (metadata.training_completed_at || metadata.last_trained_at) {
       // For website sources, distinguish between parent and child completion
       if (source.source_type === 'website') {
-        // For parent sources, check if all children are trained
-        if (source.parent_source_id === null && metadata.children_training_completed === true) {
-          return 'training_completed'; // FIXED: Return training_completed for parent
-        }
         // For child sources, they're "trained" when training is done
         if (source.parent_source_id !== null) {
           return 'trained';
         }
-        // Parent without children completion flag - show "training_completed"
-        return 'training_completed'; // FIXED: Change from 'trained' to 'training_completed'
+        // For parent sources, they should show "training_completed" when training is done
+        return 'training_completed';
       }
       return 'trained';
     }
@@ -79,8 +75,15 @@ export class SimplifiedSourceStatusService {
         return 'crawled'; // Ready for training
       }
       
-      // If crawl is completed/ready_for_training and training has been done, it's fully completed
+      // FIXED: For parent sources, if crawl is completed/ready_for_training and no manual training required,
+      // but no training metadata exists yet, it should be "completed" (not yet trained)
+      // Once training happens and metadata is added, it will become "training_completed"
       if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === false) {
+        // If this is a parent source and has no training metadata, it's just "completed" (crawling done, not trained yet)
+        if (source.parent_source_id === null && !metadata.training_completed_at && !metadata.last_trained_at) {
+          return 'completed';
+        }
+        // If it has training metadata, it should be handled by the training completion logic above
         return 'completed';
       }
       
