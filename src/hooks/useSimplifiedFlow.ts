@@ -33,10 +33,11 @@ export const useSimplifiedFlow = () => {
 
       const { supabase } = await import('@/integrations/supabase/client');
       
-      // First, mark parent sources as training (not completed yet)
+      // Mark parent sources as training (not completed yet)
       const { error: updateError } = await supabase
         .from('agent_sources')
         .update({ 
+          crawl_status: 'training',
           requires_manual_training: false,
           metadata: {
             training_started_at: new Date().toISOString(),
@@ -71,6 +72,7 @@ export const useSimplifiedFlow = () => {
       await supabase
         .from('agent_sources')
         .update({ 
+          crawl_status: 'ready_for_training',
           requires_manual_training: true,
           metadata: {
             training_failed_at: new Date().toISOString(),

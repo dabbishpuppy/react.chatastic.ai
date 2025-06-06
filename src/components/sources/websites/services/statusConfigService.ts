@@ -19,7 +19,7 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
     case 'in_progress':
       return {
         icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
-        text: 'Crawling',
+        text: 'In Progress',
         className: 'bg-blue-100 text-blue-800 border-blue-200'
       };
     case 'recrawling':
@@ -44,6 +44,12 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
       return {
         icon: React.createElement(GraduationCap, { size: 14, className: "mr-1" }),
         text: 'Trained',
+        className: 'bg-green-100 text-green-800 border-green-200'
+      };
+    case 'training_completed':
+      return {
+        icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
+        text: 'Training Completed',
         className: 'bg-green-100 text-green-800 border-green-200'
       };
     case 'failed':

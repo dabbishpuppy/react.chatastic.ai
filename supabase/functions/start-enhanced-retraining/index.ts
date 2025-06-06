@@ -55,9 +55,9 @@ serve(async (req) => {
       try {
         console.log(`🔄 Training source: ${source.title} (${source.id})`);
 
-        // Mark source as training - set different statuses for parent vs child
         const isParentSource = !source.parent_source_id;
         
+        // Mark source as training
         if (isParentSource) {
           // For parent sources, set training status
           await supabase
@@ -91,7 +91,18 @@ serve(async (req) => {
 
         // Generate chunks based on source type
         if (source.source_type === 'website') {
-          // For website sources, process crawled pages
+          // For website sources, process crawled pages and update their status
+          console.log(`📄 Processing website source pages for: ${source.id}`);
+          
+          // Update all source_pages for this parent to "in_progress"
+          await supabase
+            .from('source_pages')
+            .update({ 
+              processing_status: 'in_progress'
+            })
+            .eq('parent_source_id', source.id)
+            .eq('status', 'completed');
+
           const processingResult = await supabase.functions.invoke('process-crawled-pages', {
             body: { parentSourceId: source.id }
           });
@@ -99,6 +110,16 @@ serve(async (req) => {
           if (processingResult.error) {
             throw new Error(`Failed to process crawled pages: ${processingResult.error.message}`);
           }
+
+          // Mark all processed pages as "trained"
+          await supabase
+            .from('source_pages')
+            .update({ 
+              processing_status: 'completed'
+            })
+            .eq('parent_source_id', source.id)
+            .eq('processing_status', 'in_progress');
+
         } else {
           // For other source types, generate chunks directly
           const chunkResult = await supabase.functions.invoke('generate-chunks', {
@@ -127,10 +148,25 @@ serve(async (req) => {
           console.log(`🤖 Generated embeddings for source: ${source.id}`);
         }
 
-        // Mark source as completed/trained
+        // Mark source as training completed
         if (isParentSource) {
-          // Don't mark parent as completed yet - wait for all children
-          console.log(`⏳ Parent source ${source.id} training initiated, waiting for children`);
+          // Mark parent as training completed
+          await supabase
+            .from('agent_sources')
+            .update({ 
+              crawl_status: 'completed',
+              requires_manual_training: false,
+              metadata: {
+                ...((source.metadata as any) || {}),
+                training_completed_at: new Date().toISOString(),
+                training_status: 'completed',
+                training_method: 'simplified_flow',
+                last_trained_at: new Date().toISOString()
+              }
+            })
+            .eq('id', source.id);
+
+          console.log(`✅ Parent source ${source.id} marked as training completed`);
         } else {
           // Mark child source as trained
           await supabase
@@ -236,7 +272,7 @@ async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string)
     });
 
     if (allChildrenTrained) {
-      // Update parent source status to completed
+      // Update parent source status to training completed
       await supabase
         .from('agent_sources')
         .update({
@@ -252,9 +288,6 @@ async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string)
         .eq('id', parentSourceId);
 
       console.log(`✅ Updated parent source ${parentSourceId} - all children trained`);
-      
-      // Dispatch training completed event
-      // Note: This won't work in edge functions, but the frontend will detect the status change
     }
   } catch (error) {
     console.error('Error updating parent status:', error);

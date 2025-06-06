@@ -1,5 +1,5 @@
 
-export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained';
+export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed';
 
 export interface SourceStatusSummary {
   totalSources: number;
@@ -25,7 +25,7 @@ export class SimplifiedSourceStatusService {
     const crawledSources = sources.filter(s => this.getSourceStatus(s) === 'crawled');
     const trainingSources = sources.filter(s => this.getSourceStatus(s) === 'training');
     const trainedSources = sources.filter(s => this.getSourceStatus(s) === 'trained');
-    const completedSources = sources.filter(s => this.getSourceStatus(s) === 'completed');
+    const completedSources = sources.filter(s => this.getSourceStatus(s) === 'completed' || this.getSourceStatus(s) === 'training_completed');
     
     return {
       totalSources,
@@ -44,8 +44,12 @@ export class SimplifiedSourceStatusService {
       return 'training';
     }
     
-    // Check if training completed - this takes precedence
+    // Check if training completed - distinguish between trained and training_completed
     if (metadata.training_completed_at || metadata.last_trained_at) {
+      // For website sources, if all children are trained, it's training_completed
+      if (source.source_type === 'website' && source.parent_source_id === null) {
+        return 'training_completed';
+      }
       return 'trained';
     }
     
@@ -54,6 +58,11 @@ export class SimplifiedSourceStatusService {
       // Handle "ready_for_training" status properly
       if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === true) {
         return 'crawled'; // Ready for training
+      }
+      
+      // If training status is set
+      if (source.crawl_status === 'training') {
+        return 'training';
       }
       
       // If crawl is completed/ready_for_training and training has been done, it's fully completed

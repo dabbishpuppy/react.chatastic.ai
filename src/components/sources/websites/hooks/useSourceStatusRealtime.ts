@@ -28,8 +28,8 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   // Listen for training completion events
   useEffect(() => {
     const handleTrainingCompleted = (event: CustomEvent) => {
-      console.log('🎓 Training completed event received, updating source status to trained');
-      setStatus('trained');
+      console.log('🎓 Training completed event received, updating source status to training_completed');
+      setStatus('training_completed');
       setLastUpdateTime(new Date());
     };
 
@@ -104,6 +104,27 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           setLastUpdateTime(new Date());
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `parent_source_id=eq.${sourceId}`
+        },
+        (payload) => {
+          const updatedPage = payload.new as any;
+          console.log('📡 Source page update received:', updatedPage);
+          
+          // For website sources, check if this is a child page status update
+          if (updatedPage.processing_status === 'in_progress') {
+            setStatus('in_progress');
+          } else if (updatedPage.processing_status === 'completed') {
+            setStatus('trained');
+          }
+          setLastUpdateTime(new Date());
+        }
+      )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
@@ -137,6 +158,10 @@ const mapSourceStatus = (crawlStatus: string, metadata: Record<string, any> = {}
   }
   
   if (metadata.training_completed_at || metadata.last_trained_at) {
+    // Check if this is a parent source that completed training
+    if (metadata.children_training_completed === true) {
+      return 'training_completed';
+    }
     return 'trained';
   }
   
@@ -156,7 +181,7 @@ const mapSourceStatus = (crawlStatus: string, metadata: Record<string, any> = {}
     case 'training':
       return 'training';
     case 'completed':
-      return 'ready_for_training'; // Map completed to ready_for_training
+      return requiresManualTraining ? 'ready_for_training' : 'training_completed';
     case 'ready_for_training':
       return 'ready_for_training';
     case 'failed':
