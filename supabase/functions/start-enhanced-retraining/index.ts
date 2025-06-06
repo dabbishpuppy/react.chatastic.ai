@@ -111,7 +111,7 @@ serve(async (req) => {
             throw new Error(`Failed to process crawled pages: ${processingResult.error.message}`);
           }
 
-          // Mark all processed pages as "completed" 
+          // Mark all processed pages as "trained"
           await supabase
             .from('source_pages')
             .update({ 
@@ -148,9 +148,9 @@ serve(async (req) => {
           console.log(`🤖 Generated embeddings for source: ${source.id}`);
         }
 
-        // FIXED: Mark source as training completed with proper status
+        // Mark source as training completed
         if (isParentSource) {
-          // For website parent sources, mark as training completed
+          // Mark parent as training completed
           await supabase
             .from('agent_sources')
             .update({ 
@@ -161,8 +161,7 @@ serve(async (req) => {
                 training_completed_at: new Date().toISOString(),
                 training_status: 'completed',
                 training_method: 'simplified_flow',
-                last_trained_at: new Date().toISOString(),
-                children_training_completed: true // FIXED: Add this flag for website sources
+                last_trained_at: new Date().toISOString()
               }
             })
             .eq('id', source.id);
@@ -219,11 +218,6 @@ serve(async (req) => {
 
     console.log(`✅ Simplified training completed: ${processedCount} sources processed`);
 
-    // FIXED: Dispatch training completed event for UI updates
-    if (processedCount > 0) {
-      console.log('🎉 Dispatching training completion event');
-    }
-
     const result = {
       success: true,
       processedSources: processedCount,
@@ -256,7 +250,7 @@ serve(async (req) => {
   }
 });
 
-// FIXED: Helper function to check and update parent status
+// Helper function to check and update parent status
 async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string) {
   try {
     // Get all child sources for this parent
@@ -278,7 +272,7 @@ async function checkAndUpdateParentStatus(supabase: any, parentSourceId: string)
     });
 
     if (allChildrenTrained) {
-      // Update parent source status to training completed with proper flags
+      // Update parent source status to training completed
       await supabase
         .from('agent_sources')
         .update({
