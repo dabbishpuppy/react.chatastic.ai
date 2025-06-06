@@ -1,19 +1,54 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { EyeOff, CheckCircle, Loader2, Clock, AlertTriangle, GraduationCap, Bot } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
   isExcluded: boolean;
   linksCount: number;
   progress?: number;
+  sourceId?: string;
 }
 
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
-  crawlStatus,
-  isExcluded
+  crawlStatus: initialCrawlStatus,
+  isExcluded,
+  sourceId
 }) => {
+  const [crawlStatus, setCrawlStatus] = useState(initialCrawlStatus);
+
+  // Set up real-time subscription for status updates
+  useEffect(() => {
+    if (!sourceId) return;
+
+    setCrawlStatus(initialCrawlStatus);
+
+    const channel = supabase
+      .channel(`source-status-${sourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `id=eq.${sourceId}`
+        },
+        (payload) => {
+          const updatedSource = payload.new as any;
+          if (updatedSource.crawl_status) {
+            setCrawlStatus(updatedSource.crawl_status);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sourceId, initialCrawlStatus]);
+
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'pending':
@@ -30,9 +65,9 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
         };
       case 'completed':
         return {
-          icon: <CheckCircle className="w-3 h-3 mr-1" />,
-          text: 'Completed',
-          className: 'bg-green-500 text-white'
+          icon: <Clock className="w-3 h-3 mr-1" />,
+          text: 'Ready for Training',
+          className: 'bg-orange-500 text-white'
         };
       case 'crawled':
         return {
@@ -61,8 +96,8 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
       default:
         return {
           icon: <Clock className="w-3 h-3 mr-1" />,
-          text: 'Unknown',
-          className: 'bg-gray-500 text-white'
+          text: 'Ready for Training',
+          className: 'bg-orange-500 text-white'
         };
     }
   };

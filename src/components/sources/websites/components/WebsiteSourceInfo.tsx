@@ -1,32 +1,25 @@
 
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Info } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import WebsiteSourceStatus from './WebsiteSourceStatus';
-import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
+import { ExternalLink, Calendar, Link, Database, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { AgentSource } from '@/types/rag';
+import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
+import CompressionMetrics from './CompressionMetrics';
 
 interface WebsiteSourceInfoProps {
-  title: string;
+  title?: string;
   url: string;
-  createdAt?: string;
+  createdAt: string;
   linksCount?: number;
   lastCrawledAt?: string;
   crawlStatus?: string;
   metadata?: any;
-  content?: string;
-  childSources?: any[];
   isChild?: boolean;
   totalContentSize?: number;
   compressedContentSize?: number;
-  originalSize?: number;
-  compressedSize?: number;
-  source?: any; // Full source object for status computation
+  source?: AgentSource;
+  sourceId?: string;
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -34,23 +27,23 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   url,
   createdAt,
   linksCount = 0,
-  lastCrawledAt,
-  crawlStatus,
+  crawlStatus = 'unknown',
   metadata,
   isChild = false,
-  totalContentSize,
-  compressedContentSize,
-  originalSize,
-  compressedSize,
-  source
+  totalContentSize = 0,
+  compressedContentSize = 0,
+  source,
+  sourceId
 }) => {
-  const displayTitle = title || url;
-  const displayTotalSize = totalContentSize || originalSize || 0;
-  const displayCompressedSize = compressedContentSize || compressedSize || 0;
+  const formatUrl = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname + urlObj.pathname;
+    } catch {
+      return url;
+    }
+  };
 
-  const hostname = url ? new URL(url).hostname.replace('www.', '') : '';
-
-  // Helper function to format bytes
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return "0 B";
     
@@ -64,76 +57,68 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
+  const shouldShowLinksCount = !isChild && linksCount > 0;
+  const shouldShowContentSize = !isChild && totalContentSize > 0;
+
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-2">
-        <h3 className="font-medium text-gray-900 truncate max-w-md" title={displayTitle}>
-          {displayTitle}
-        </h3>
-        
-        <a href={url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700">
-          <ExternalLink size={14} />
-        </a>
+    <div className="space-y-2">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-medium text-gray-900 truncate" title={title || url}>
+              {title || formatUrl(url)}
+            </h3>
+            <ExternalLink 
+              className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
+              onClick={() => window.open(url, '_blank')}
+            />
+          </div>
+          
+          {title && (
+            <p className="text-sm text-gray-500 truncate" title={url}>
+              {formatUrl(url)}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-        <a 
-          href={url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 hover:text-blue-600"
-        >
-          {hostname}
-          <ExternalLink className="h-3 w-3" />
-        </a>
-        
-        {!isChild && (
-          <>
-            <span className="hidden md:inline">•</span>
-            <span className="hidden md:inline">{linksCount} pages</span>
-          </>
-        )}
-        
-        {lastCrawledAt && (
-          <>
-            <span className="hidden md:inline">•</span>
-            <span className="hidden md:inline">
-              Last crawled {formatDistanceToNow(new Date(lastCrawledAt), { addSuffix: true })}
-            </span>
-          </>
-        )}
-
-        {/* Display total content size and compression if available */}
-        {displayTotalSize > 0 && (
-          <>
-            <span className="hidden md:inline">•</span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="hidden md:inline cursor-help flex items-center gap-1">
-                    {formatBytes(displayCompressedSize)}
-                    <Info size={12} />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Original size: {formatBytes(displayTotalSize)}</p>
-                  <p>Compressed size: {formatBytes(displayCompressedSize)}</p>
-                  <p>Compression: {Math.round((1 - (displayCompressedSize / displayTotalSize)) * 100)}%</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        )}
-      </div>
-
-      <div className="mt-1">
-        <WebsiteSourceStatus 
-          status={crawlStatus} 
-          metadata={metadata} 
-          isChild={isChild}
-          source={source}
+      <div className="flex items-center justify-between">
+        <WebsiteSourceStatusBadges
+          crawlStatus={crawlStatus}
+          isExcluded={false}
+          linksCount={linksCount}
+          sourceId={sourceId}
         />
+        
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            <span>{formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+          </div>
+          
+          {shouldShowLinksCount && (
+            <div className="flex items-center gap-1">
+              <Link className="w-3 h-3" />
+              <span>{linksCount} links</span>
+            </div>
+          )}
+          
+          {shouldShowContentSize && (
+            <div className="flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              <span>{formatBytes(totalContentSize)}</span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {shouldShowContentSize && (
+        <CompressionMetrics
+          originalSize={totalContentSize}
+          compressedSize={compressedContentSize}
+          showDetails={false}
+        />
+      )}
     </div>
   );
 };

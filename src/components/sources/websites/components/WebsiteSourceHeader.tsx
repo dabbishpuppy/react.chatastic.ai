@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -105,6 +104,7 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
             totalContentSize={totalContentSize}
             compressedContentSize={compressedContentSize}
             source={source}
+            sourceId={source.id}
           />
         )}
       </div>
