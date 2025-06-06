@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, Calendar, Link, Database, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
+import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -86,8 +86,12 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
       </div>
 
       <div className="flex items-center justify-between">
-        {/* Status badges are now only shown in WebsiteSourceHeader, not here */}
-        <div></div>
+        <WebsiteSourceStatusBadges
+          crawlStatus={crawlStatus}
+          isExcluded={false}
+          linksCount={linksCount}
+          sourceId={sourceId}
+        />
         
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <div className="flex items-center gap-1">
