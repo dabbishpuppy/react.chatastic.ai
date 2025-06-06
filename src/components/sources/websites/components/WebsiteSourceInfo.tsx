@@ -1,8 +1,7 @@
 
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowTopRightIcon } from '@radix-ui/react-icons';
-import { ExternalLink, Info } from 'lucide-react';
+import { ExternalLink, Info, ArrowUpRight } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -10,7 +9,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import WebsiteSourceStatus from './WebsiteSourceStatus';
-import { formatBytes } from '@/components/sources/components/SourceSizeFormatter';
+import { formatFileSize } from '@/components/sources/components/SourceSizeFormatter';
 
 interface WebsiteSourceInfoProps {
   title: string;
@@ -51,6 +50,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
 
   const hostname = url ? new URL(url).hostname.replace('www.', '') : '';
 
+  // Helper function to format bytes
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const size = bytes / Math.pow(k, i);
+    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
+    return `${formattedSize} ${sizes[i]}`;
+  };
+
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2">
@@ -71,7 +81,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           className="flex items-center gap-1 hover:text-blue-600"
         >
           {hostname}
-          <ArrowTopRightIcon className="h-3 w-3" />
+          <ArrowUpRight className="h-3 w-3" />
         </a>
         
         {!isChild && (
