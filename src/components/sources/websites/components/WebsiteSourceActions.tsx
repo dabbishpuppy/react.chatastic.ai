@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
-import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
 
 interface WebsiteSourceActionsProps {
@@ -113,15 +112,6 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2 ml-4">
-      {/* Only show Status Badge for parent sources, not child sources */}
-      {!isChild && (
-        <WebsiteSourceStatusBadges
-          crawlStatus={computedStatus}
-          isExcluded={source.is_excluded}
-          linksCount={source.links_count || 0}
-        />
-      )}
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
