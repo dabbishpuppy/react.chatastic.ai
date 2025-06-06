@@ -32,7 +32,7 @@ export class SearchSuggestions {
         )
         .slice(0, limit);
 
-      return [...new Set(suggestions)]; // Remove duplicates
+      return [...new Set(suggestions)] as string[]; // Remove duplicates and ensure type
 
     } catch (error) {
       console.error('❌ Failed to get search suggestions:', error);
