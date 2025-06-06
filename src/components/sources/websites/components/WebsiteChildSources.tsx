@@ -1,10 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { AgentSource } from '@/types/rag';
+import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import ChildSourceItem from './ChildSourceItem';
+import { AgentSource } from '@/types/rag';
+import { useOptimizedChildSources } from '../hooks/useOptimizedChildSources';
 
 interface WebsiteChildSourcesProps {
   parentSourceId: string;
@@ -15,99 +15,13 @@ interface WebsiteChildSourcesProps {
   onRecrawl: (source: AgentSource) => void;
 }
 
-interface SourcePage {
-  id: string;
-  url: string;
-  status: string;
-  created_at: string;
-  parent_source_id: string;
-  content_size?: number;
-  compression_ratio?: number;
-  error_message?: string;
-}
-
 const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   parentSourceId,
   isCrawling = false,
   onExclude,
   onDelete,
 }) => {
-  const [childSources, setChildSources] = useState<AgentSource[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchChildSources = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Query source_pages table instead of agent_sources
-      const { data: sourcePages, error } = await supabase
-        .from('source_pages')
-        .select('*')
-        .eq('parent_source_id', parentSourceId)
-        .order('created_at', { ascending: true });
-      
-      if (error) {
-        console.error('Error fetching child sources:', error);
-        setError(`Failed to fetch child pages: ${error.message}`);
-        return;
-      }
-
-      if (!sourcePages || sourcePages.length === 0) {
-        setChildSources([]);
-        return;
-      }
-
-      // Convert source_pages to AgentSource format for compatibility with existing components
-      const formattedSources: AgentSource[] = (sourcePages as SourcePage[]).map(page => ({
-        id: page.id,
-        url: page.url,
-        title: new URL(page.url).pathname || page.url,
-        crawl_status: page.status,
-        created_at: page.created_at,
-        updated_at: page.created_at, // Use created_at as updated_at since source_pages doesn't have updated_at
-        parent_source_id: page.parent_source_id,
-        agent_id: '', // Not needed for child display
-        source_type: 'website',
-        is_active: true,
-        is_excluded: false, // Default value
-        original_size: page.content_size || 0,
-        compressed_size: page.content_size ? Math.round(page.content_size * (page.compression_ratio || 1)) : 0,
-        metadata: { error_message: page.error_message } as Record<string, any>,
-        requires_manual_training: false // Add the required field
-      }));
-      
-      setChildSources(formattedSources);
-    } catch (err: any) {
-      console.error('Exception fetching child sources:', err);
-      setError(`Error loading child pages: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchChildSources();
-    
-    // Set up realtime subscription for source_pages changes
-    const subscription = supabase
-      .channel(`source-pages-${parentSourceId}`)
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'source_pages',
-        filter: `parent_source_id=eq.${parentSourceId}` 
-      }, (payload) => {
-        console.log('📡 Source page update received:', payload);
-        fetchChildSources();
-      })
-      .subscribe();
-      
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [parentSourceId]);
+  const { childSources, loading, error, refetch } = useOptimizedChildSources(parentSourceId);
 
   if (loading) {
     return (
@@ -124,7 +38,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         <p className="font-medium">Error loading child pages</p>
         <p className="text-xs mt-1">{error}</p>
         <button 
-          onClick={fetchChildSources} 
+          onClick={refetch} 
           className="mt-2 text-xs underline text-blue-600"
         >
           Try again
