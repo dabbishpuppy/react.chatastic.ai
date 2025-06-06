@@ -1,120 +1,89 @@
 
-import { RetrainingProgressTracker } from './retraining/retrainingProgressTracker';
-import { SourceProcessor } from './retraining/sourceProcessor';
-import { RetrainingChecker } from './retraining/retrainingChecker';
-import { supabase } from "@/integrations/supabase/client";
-import { DatabaseSource, RetrainingProgress, RetrainingStatus } from './types/retrainingTypes';
+import { supabase } from '@/integrations/supabase/client';
+import { AgentSource } from '@/types/rag';
 
-export type { RetrainingProgress, RetrainingStatus } from './types/retrainingTypes';
+export interface RetrainingProgress {
+  agentId: string;
+  status: 'idle' | 'processing' | 'completed' | 'error';
+  processedSources: number;
+  totalSources: number;
+  processedChunks: number;
+  totalChunks: number;
+  progress: number;
+  errorMessage?: string;
+  startedAt?: Date;
+  completedAt?: Date;
+}
 
 export class RetrainingService {
-  static async retrainAgent(
-    agentId: string, 
-    onProgress?: (progress: RetrainingProgress) => void
-  ): Promise<boolean> {
-    console.log('🔄 Starting agent retraining:', agentId);
+  static async startRetraining(agentId: string): Promise<void> {
+    console.log('🚀 Starting retraining for agent:', agentId);
     
     try {
-      // Set up progress tracking
-      if (onProgress) {
-        RetrainingProgressTracker.setProgressCallback(agentId, onProgress);
-      }
-
-      // Get all active sources for this agent across all types
-      const { data: sources, error } = await supabase
-        .from('agent_sources')
-        .select('id, title, content, metadata, source_type')
-        .eq('agent_id', agentId)
-        .eq('is_active', true);
-
-      if (error) throw error;
-
-      console.log(`📊 Found ${sources?.length || 0} total sources for agent ${agentId}`);
-
-      // Filter sources that have content (including Q&A which might have structured content)
-      const sourcesWithContent = (sources || []).filter(source => {
-        // For Q&A sources, check if there's question/answer content
-        if (source.source_type === 'qa') {
-          const metadata = source.metadata as any;
-          return (source.content && source.content.trim().length > 0) || 
-                 (metadata?.question && metadata?.answer);
-        }
-        
-        // For other sources, check content field
-        return source.content && source.content.trim().length > 0;
+      const { data, error } = await supabase.functions.invoke('start-enhanced-retraining', {
+        body: { agentId }
       });
 
-      console.log(`📋 Processing ${sourcesWithContent.length} sources with content:`, 
-        sourcesWithContent.map(s => `${s.source_type}: ${s.title}`));
-
-      if (sourcesWithContent.length === 0) {
-        console.log('⚠️ No sources with content found for agent:', agentId);
-        return false;
+      if (error) {
+        console.error('❌ Retraining failed:', error);
+        throw new Error(error.message);
       }
 
-      // Create initial progress
-      const initialProgress = RetrainingProgressTracker.createInitialProgress(sourcesWithContent.length);
-      RetrainingProgressTracker.updateProgress(agentId, initialProgress);
-
-      let processedCount = 0;
-      let errorCount = 0;
-
-      // Process each source
-      for (const source of sourcesWithContent) {
-        try {
-          const currentProgress: RetrainingProgress = {
-            ...initialProgress,
-            processedSources: processedCount,
-            currentSource: source.title,
-            status: 'processing'
-          };
-          RetrainingProgressTracker.updateProgress(agentId, currentProgress);
-
-          console.log(`🔄 Processing source: ${source.title} (${source.source_type})`);
-          await SourceProcessor.processSource(source as DatabaseSource);
-          processedCount++;
-
-          console.log(`✅ Processed source: ${source.title} (${processedCount}/${sourcesWithContent.length})`);
-        } catch (error) {
-          console.error(`❌ Failed to process source ${source.title}:`, error);
-          errorCount++;
-          // Continue processing other sources instead of stopping
-        }
-      }
-
-      // Create completion progress
-      const completedProgress = RetrainingProgressTracker.createCompletedProgress(
-        sourcesWithContent.length, 
-        processedCount
-      );
-      RetrainingProgressTracker.updateProgress(agentId, completedProgress);
-
-      if (errorCount > 0) {
-        console.log(`⚠️ Retraining completed with errors. Processed ${processedCount}/${sourcesWithContent.length} sources, ${errorCount} errors`);
-      } else {
-        console.log(`✅ Retraining completed successfully. Processed ${processedCount}/${sourcesWithContent.length} sources`);
-      }
-
-      return processedCount > 0; // Return true if at least one source was processed
-
+      console.log('✅ Retraining started successfully:', data);
     } catch (error) {
-      console.error('❌ Retraining failed:', error);
-      
-      const errorProgress = RetrainingProgressTracker.createErrorProgress(
-        error instanceof Error ? error.message : 'Unknown error'
-      );
-      RetrainingProgressTracker.updateProgress(agentId, errorProgress);
-      
+      console.error('❌ Error starting retraining:', error);
       throw error;
-    } finally {
-      // Clean up progress tracking
-      if (onProgress) {
-        RetrainingProgressTracker.removeProgressCallback(agentId);
-      }
     }
   }
 
-  static async checkRetrainingNeeded(agentId: string): Promise<RetrainingStatus> {
-    return RetrainingChecker.checkRetrainingNeeded(agentId);
+  static async getProgress(agentId: string): Promise<RetrainingProgress> {
+    try {
+      const { data: trainingJob, error } = await supabase
+        .from('agent_training_jobs')
+        .select('*')
+        .eq('agent_id', agentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (!trainingJob) {
+        return {
+          agentId,
+          status: 'idle',
+          processedSources: 0,
+          totalSources: 0,
+          processedChunks: 0,
+          totalChunks: 0,
+          progress: 0
+        };
+      }
+
+      return {
+        agentId,
+        status: trainingJob.status,
+        processedSources: trainingJob.processed_sources || 0,
+        totalSources: trainingJob.total_sources || 0,
+        processedChunks: trainingJob.processed_chunks || 0,
+        totalChunks: trainingJob.total_chunks || 0,
+        progress: trainingJob.total_sources > 0 
+          ? (trainingJob.processed_sources / trainingJob.total_sources) * 100 
+          : 0,
+        errorMessage: trainingJob.error_message,
+        startedAt: trainingJob.started_at ? new Date(trainingJob.started_at) : undefined,
+        completedAt: trainingJob.completed_at ? new Date(trainingJob.completed_at) : undefined
+      };
+    } catch (error) {
+      console.error('❌ Error fetching retraining progress:', error);
+      throw error;
+    }
+  }
+
+  static async stopRetraining(agentId: string): Promise<void> {
+    console.log('🛑 Stopping retraining for agent:', agentId);
+    // Implementation would stop the retraining process
   }
 }

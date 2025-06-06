@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState, useMemo } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
@@ -183,7 +184,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     <div className="relative">
       <Card className="border border-gray-200">
         <WebsiteSourcesHeader
-          openModal={() => {}} // This will be replaced with actual modal open function
           loading={loading || isLoading}
           count={parentSources.length}
         />

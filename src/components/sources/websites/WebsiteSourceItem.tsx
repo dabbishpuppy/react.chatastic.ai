@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { AgentSource } from '@/types/rag';
-import { useWebsiteSourceOperations } from './hooks/useWebsiteSourceOperations';
 import { useExpandState } from './hooks/useExpandState';
 import WebsiteSourceHeader from './components/WebsiteSourceHeader';
 import WebsiteSourceActions from './components/WebsiteSourceActions';
@@ -32,9 +31,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url);
   const { isExpanded, isAnimating, toggleExpanded } = useExpandState(false);
-
-  // Use the operations hook for enhanced recrawl
-  const { handleEnhancedRecrawl } = useWebsiteSourceOperations(() => {}, () => {});
 
   const handleSaveEdit = async () => {
     await onEdit(source.id, editUrl);

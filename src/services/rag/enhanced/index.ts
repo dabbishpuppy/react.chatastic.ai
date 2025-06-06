@@ -31,7 +31,6 @@ export { WorkerQueueService } from './workerQueue';
 export { CrawlWorkerService, WorkerCore, ChunkProcessor } from './crawlWorker';
 
 // Phase 1: Core Enhanced Services
-export { EnhancedCrawlService } from './enhancedCrawlService';
 export { ChunkPruningService } from './chunkPruning';
 export { AdvancedChunkPruningService } from './advancedChunkPruning';
 export { GlobalDeduplicationService } from './globalDeduplication';
@@ -41,10 +40,6 @@ export { EnhancedContentProcessor } from './enhancedContentProcessor';
 // Modular Compression Services
 export { CompressionEngine } from './compression';
 export { AdvancedCompressionEngine } from './advancedCompressionEngine';
-
-// API and Subscriptions
-export { CrawlApiService } from './crawlApi';
-export { CrawlSubscriptionService } from './crawlSubscriptions';
 
 // Types
 export type { EnhancedCrawlRequest, CrawlStatus } from './crawlTypes';
