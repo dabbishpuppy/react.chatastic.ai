@@ -59,9 +59,11 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       
       if (childData) {
         setChildProcessingStatus(childData.processing_status || 'pending');
+        // FIXED: Update display status immediately when fetching initial state
+        updateDisplayStatus(childData.status, parentData, childData.processing_status || 'pending');
+      } else {
+        updateDisplayStatus(status, parentData, 'pending');
       }
-      
-      updateDisplayStatus(status, parentData, childData?.processing_status || 'pending');
     };
 
     fetchInitialStates();
@@ -102,6 +104,8 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
           console.log('Child page processing update:', updatedChild);
           const newProcessingStatus = updatedChild.processing_status || 'pending';
           setChildProcessingStatus(newProcessingStatus);
+          
+          // FIXED: Update display status immediately when child status changes
           updateDisplayStatus(updatedChild.status, parentTrainingState, newProcessingStatus);
         }
       )
@@ -120,7 +124,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       supabase.removeChannel(childChannel);
       window.removeEventListener('trainingCompleted', handleTrainingCompleted);
     };
-  }, [status, parentSourceId, pageId, childProcessingStatus]);
+  }, [status, parentSourceId, pageId, childProcessingStatus, parentTrainingState]);
 
   const updateDisplayStatus = (childStatus: string, parentState: any, processingStatus: string) => {
     console.log('Updating child display status:', {
@@ -141,6 +145,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
       
       // If parent training is completed, show "Trained"
       if (metadata.training_completed_at || metadata.last_trained_at) {
+        console.log('Setting child status to TRAINED - parent has training metadata');
         setDisplayStatus('trained');
         return;
       }
@@ -154,6 +159,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     
     // FIXED: If child is completed and processed, but parent has no training metadata yet, show "Completed"
     if (childStatus === 'completed' && processingStatus === 'processed') {
+      console.log('Setting child status to COMPLETED - no parent training metadata yet');
       setDisplayStatus('completed');
       return;
     }
