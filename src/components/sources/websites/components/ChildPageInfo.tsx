@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ChildPageInfoProps {
   url: string;
@@ -9,6 +10,7 @@ interface ChildPageInfoProps {
   chunksCreated?: number;
   processingTimeMs?: number;
   errorMessage?: string;
+  createdAt: string;
 }
 
 const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
@@ -16,8 +18,8 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   status,
   contentSize,
   chunksCreated,
-  processingTimeMs,
-  errorMessage
+  errorMessage,
+  createdAt
 }) => {
   const formatUrl = (url: string) => {
     try {
@@ -67,15 +69,19 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
         <p className="text-sm font-medium text-gray-900 truncate" title={url}>
           {formatUrl(url)}
         </p>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          {contentSize && (
-            <span>{formatBytes(contentSize)}</span>
+        <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+          <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+          {status === 'completed' && contentSize && (
+            <>
+              <span>•</span>
+              <span>{formatBytes(contentSize)}</span>
+            </>
           )}
           {chunksCreated && (
-            <span>• {chunksCreated} chunks</span>
-          )}
-          {processingTimeMs && (
-            <span>• {processingTimeMs}ms</span>
+            <>
+              <span>•</span>
+              <span>{chunksCreated} chunks</span>
+            </>
           )}
         </div>
       </div>

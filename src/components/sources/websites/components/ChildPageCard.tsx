@@ -45,8 +45,8 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
             status={page.status}
             contentSize={page.content_size}
             chunksCreated={page.chunks_created}
-            processingTimeMs={page.processing_time_ms}
             errorMessage={page.error_message}
+            createdAt={page.created_at}
           />
           
           <ChildPageActions
