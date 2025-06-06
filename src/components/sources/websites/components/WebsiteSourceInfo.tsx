@@ -60,6 +60,9 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const shouldShowContentSize = !isChild && totalContentSize > 0;
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
 
+  // Show total child sources size when training is completed and we have child data
+  const shouldShowChildTotalSize = !isChild && crawlStatus === 'trained' && source?.total_content_size > 0;
+
   const compressionRatio = shouldShowCompressionMetrics 
     ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)
     : 0;
@@ -72,19 +75,20 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <h3 className="font-medium text-gray-900 truncate" title={title || url}>
               {title || formatUrl(url)}
             </h3>
-            <ExternalLink 
-              className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
-              onClick={() => window.open(url, '_blank')}
-            />
+            <div className="flex items-center gap-2">
+              <ExternalLink 
+                className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" 
+                onClick={() => window.open(url, '_blank')}
+              />
+              <WebsiteSourceStatusBadges
+                crawlStatus={crawlStatus}
+                isExcluded={false}
+                linksCount={linksCount}
+                sourceId={sourceId}
+              />
+            </div>
           </div>
         </div>
-        
-        <WebsiteSourceStatusBadges
-          crawlStatus={crawlStatus}
-          isExcluded={false}
-          linksCount={linksCount}
-          sourceId={sourceId}
-        />
       </div>
 
       <div className="flex items-center justify-between">
@@ -105,6 +109,13 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             <div className="flex items-center gap-1">
               <Database className="w-3 h-3" />
               <span>{formatBytes(totalContentSize)}</span>
+            </div>
+          )}
+
+          {shouldShowChildTotalSize && (
+            <div className="flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              <span>Total: {formatBytes(source.total_content_size)}</span>
             </div>
           )}
         </div>
