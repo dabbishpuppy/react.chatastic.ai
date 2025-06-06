@@ -2,6 +2,7 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
+import { Calendar, Database, FileText } from 'lucide-react';
 
 interface ChildPageInfoProps {
   url: string;
@@ -69,18 +70,29 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
         <p className="text-sm font-medium text-gray-900 truncate" title={url}>
           {formatUrl(url)}
         </p>
-        <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-          <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+        <div className="flex items-center text-xs text-gray-500 mt-1">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            <span>Added {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}</span>
+          </div>
+          
           {status === 'completed' && contentSize && (
             <>
-              <span>•</span>
-              <span>{formatBytes(contentSize)}</span>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                <span>{formatBytes(contentSize)}</span>
+              </div>
             </>
           )}
+          
           {chunksCreated && (
             <>
-              <span>•</span>
-              <span>{chunksCreated} chunks</span>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <FileText className="w-3 h-3" />
+                <span>{chunksCreated} chunks</span>
+              </div>
             </>
           )}
         </div>

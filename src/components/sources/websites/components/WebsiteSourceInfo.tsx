@@ -74,7 +74,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     <div className="space-y-2">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2">
             <h3 className="font-medium text-gray-900 truncate" title={title || url}>
               {title || formatUrl(url)}
             </h3>
@@ -95,38 +95,50 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex items-center text-xs text-gray-500">
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             <span>{formatDistanceToNow(new Date(createdAt), { addSuffix: true }).replace('about', 'About')}</span>
           </div>
           
           {shouldShowLinksCount && (
-            <div className="flex items-center gap-1">
-              <Link className="w-3 h-3" />
-              <span>{linksCount} links</span>
-            </div>
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Link className="w-3 h-3" />
+                <span>{linksCount} links</span>
+              </div>
+            </>
           )}
 
           {shouldShowTotalLinks && (
-            <div className="flex items-center gap-1">
-              <Link className="w-3 h-3" />
-              <span>{source.total_jobs} links</span>
-            </div>
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Link className="w-3 h-3" />
+                <span>{source.total_jobs} links</span>
+              </div>
+            </>
           )}
           
           {shouldShowContentSize && (
-            <div className="flex items-center gap-1">
-              <Database className="w-3 h-3" />
-              <span>{formatBytes(totalContentSize)}</span>
-            </div>
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                <span>{formatBytes(totalContentSize)}</span>
+              </div>
+            </>
           )}
 
           {shouldShowChildTotalSize && (
-            <div className="flex items-center gap-1">
-              <Database className="w-3 h-3" />
-              <span>{formatBytes(source.total_content_size)}</span>
-            </div>
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                <span>{formatBytes(source.total_content_size)}</span>
+              </div>
+            </>
           )}
         </div>
       </div>
