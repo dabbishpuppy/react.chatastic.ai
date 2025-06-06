@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Clock, Wifi, WifiOff, GraduationCap, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WebsiteSourceStatusRobustProps {
@@ -69,10 +69,10 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           const metadata = source.metadata as Record<string, any> || {};
           const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
           
-          if (hasTrainingCompleted && source.crawl_status === 'completed') {
+          if (hasTrainingCompleted && source.crawl_status === 'ready_for_training') {
             setStatus('trained');
           } else {
-            // Map the crawl_status properly
+            // Map the crawl_status properly including new states
             const mappedStatus = mapCrawlStatus(source.crawl_status);
             setStatus(mappedStatus);
           }
@@ -105,10 +105,10 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           const metadata = updatedSource.metadata as Record<string, any> || {};
           const hasTrainingCompleted = metadata.training_completed || metadata.last_trained_at;
           
-          if (hasTrainingCompleted && updatedSource.crawl_status === 'completed') {
+          if (hasTrainingCompleted && updatedSource.crawl_status === 'ready_for_training') {
             setStatus('trained');
           } else {
-            // Map the crawl_status properly
+            // Map the crawl_status properly including new states
             const mappedStatus = mapCrawlStatus(updatedSource.crawl_status);
             setStatus(mappedStatus);
           }
@@ -138,8 +138,12 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
         return 'pending';
       case 'in_progress':
         return 'in_progress';
+      case 'recrawling':
+        return 'recrawling';
       case 'completed':
-        return 'crawled'; // Changed from 'completed' to 'crawled' to show it's ready for training
+        return 'ready_for_training'; // Map completed to ready_for_training
+      case 'ready_for_training':
+        return 'ready_for_training';
       case 'failed':
         return 'failed';
       default:
@@ -161,11 +165,17 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
           text: 'Crawling',
           className: 'bg-blue-100 text-blue-800 border-blue-200'
         };
-      case 'crawled':
+      case 'recrawling':
+        return {
+          icon: <RefreshCw size={14} className="mr-1 animate-spin" />,
+          text: 'Recrawling',
+          className: 'bg-orange-100 text-orange-800 border-orange-200'
+        };
+      case 'ready_for_training':
         return {
           icon: <CheckCircle size={14} className="mr-1" />,
           text: 'Ready for Training',
-          className: 'bg-orange-100 text-orange-800 border-orange-200'
+          className: 'bg-green-100 text-green-800 border-green-200'
         };
       case 'training':
         return {
@@ -203,7 +213,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
         {statusConfig.text}
       </Badge>
       
-      {status === 'in_progress' && (
+      {(status === 'in_progress' || status === 'recrawling') && (
         <div className="text-xs text-gray-500">
           {progress > 0 && `${progress}% • `}
           {linksCount > 0 && `${linksCount} links`}

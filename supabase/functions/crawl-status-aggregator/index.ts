@@ -26,6 +26,18 @@ serve(async (req) => {
 
     console.log(`🔍 Aggregating status for parent source: ${parentSourceId}`)
 
+    // Get parent source info
+    const { data: parentSource, error: parentError } = await supabase
+      .from('agent_sources')
+      .select('crawl_status, metadata')
+      .eq('id', parentSourceId)
+      .single()
+
+    if (parentError) {
+      console.error('Error fetching parent source:', parentError)
+      throw parentError
+    }
+
     // Get source_pages statistics (correct table)
     const { data: jobs, error: jobsError } = await supabase
       .from('source_pages')
@@ -46,18 +58,31 @@ serve(async (req) => {
     // Calculate progress
     const progress = totalJobs > 0 ? Math.round(((completedJobs + failedJobs) / totalJobs) * 100) : 0
 
-    // Determine status - FIXED: When all jobs are completed, mark as completed
-    let status = 'pending'
-    if (totalJobs === 0) {
-      status = 'pending'
-    } else if (completedJobs === totalJobs) {
-      // All jobs completed successfully
-      status = 'completed'
-    } else if (completedJobs + failedJobs === totalJobs) {
-      // All jobs are done (some failed, some completed)
-      status = 'completed'
-    } else if (inProgressJobs > 0 || completedJobs > 0) {
-      status = 'in_progress'
+    // Determine status based on recrawl state
+    let status = parentSource.crawl_status
+    const isRecrawling = parentSource.metadata?.is_recrawling
+
+    if (isRecrawling) {
+      // We're in recrawl mode
+      if (inProgressJobs > 0 || pendingJobs > 0) {
+        status = 'recrawling'
+      } else if (completedJobs + failedJobs === totalJobs && totalJobs > 0) {
+        // All jobs completed during recrawl
+        status = completedJobs > 0 ? 'ready_for_training' : 'failed'
+      }
+    } else {
+      // Normal crawl flow  
+      if (totalJobs === 0) {
+        status = 'pending'
+      } else if (completedJobs === totalJobs) {
+        // All jobs completed successfully
+        status = 'ready_for_training'
+      } else if (completedJobs + failedJobs === totalJobs) {
+        // All jobs are done (some failed, some completed)
+        status = 'ready_for_training'
+      } else if (inProgressJobs > 0 || completedJobs > 0) {
+        status = 'in_progress'
+      }
     }
 
     // Calculate compression stats from completed jobs
@@ -71,7 +96,7 @@ serve(async (req) => {
       totalDuplicateChunks: completedJobsData.reduce((sum, job) => sum + (job.duplicates_found || 0), 0)
     }
 
-    // Update parent source with aggregated data - IMPORTANT: Set requires_manual_training when completed
+    // Update parent source with aggregated data
     const updateData: any = {
       crawl_status: status,
       progress: progress,
@@ -85,9 +110,20 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     }
 
-    // When crawling is completed, mark as requiring manual training
-    if (status === 'completed') {
+    // Clear recrawl flag and mark as requiring manual training when ready_for_training
+    if (status === 'ready_for_training') {
       updateData.requires_manual_training = true
+      updateData.metadata = {
+        ...(parentSource.metadata || {}),
+        is_recrawling: false,
+        last_aggregation: new Date().toISOString()
+      }
+    } else if (status === 'failed') {
+      updateData.metadata = {
+        ...(parentSource.metadata || {}),
+        is_recrawling: false,
+        last_aggregation: new Date().toISOString()
+      }
     }
 
     const { error: updateError } = await supabase
@@ -98,7 +134,7 @@ serve(async (req) => {
     if (updateError) {
       console.error('Error updating parent source:', updateError)
     } else {
-      console.log(`✅ Parent source ${parentSourceId} updated to status: ${status}, requires_manual_training: ${status === 'completed'}`)
+      console.log(`✅ Parent source ${parentSourceId} updated to status: ${status}, requires_manual_training: ${status === 'ready_for_training'}`)
     }
 
     const result = {
@@ -111,6 +147,7 @@ serve(async (req) => {
       pendingJobs,
       inProgressJobs,
       compressionStats,
+      isRecrawling: isRecrawling || false,
       features: {
         compression: 'Advanced Multi-Level',
         deduplication: 'Global Cross-Customer',

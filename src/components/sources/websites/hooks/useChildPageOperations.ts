@@ -18,23 +18,6 @@ export const useChildPageOperations = () => {
     try {
       console.log('🔄 Starting child page recrawl for:', childPage.url);
 
-      // First, update the child page status to pending
-      const { error: updateError } = await supabase
-        .from('source_pages')
-        .update({
-          status: 'pending',
-          error_message: null,
-          started_at: null,
-          completed_at: null,
-          retry_count: 0
-        })
-        .eq('id', childPage.id);
-
-      if (updateError) {
-        console.error('Error updating child page status:', updateError);
-        throw new Error(`Failed to update page status: ${updateError.message}`);
-      }
-
       // Get the parent source to determine team_id and agent_id
       const { data: parentSource, error: parentError } = await supabase
         .from('agent_sources')

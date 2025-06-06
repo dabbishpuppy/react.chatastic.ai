@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertTriangle, CheckCircle, Clock, GraduationCap } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Clock, GraduationCap, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import WebsiteSourceStatusRobust from './WebsiteSourceStatusRobust';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
@@ -54,10 +54,22 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
           text: 'Crawling',
           className: 'bg-blue-100 text-blue-800 border-blue-200'
         };
+      case 'recrawling':
+        return {
+          icon: <RefreshCw size={14} className="mr-1 animate-spin" />,
+          text: 'Recrawling',
+          className: 'bg-orange-100 text-orange-800 border-orange-200'
+        };
       case 'completed':
         return {
           icon: <CheckCircle size={14} className="mr-1" />,
           text: 'Completed',
+          className: 'bg-green-100 text-green-800 border-green-200'
+        };
+      case 'ready_for_training':
+        return {
+          icon: <CheckCircle size={14} className="mr-1" />,
+          text: 'Ready for Training',
           className: 'bg-green-100 text-green-800 border-green-200'
         };
       case 'crawled':

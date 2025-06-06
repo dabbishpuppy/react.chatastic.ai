@@ -1,6 +1,5 @@
-
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { EnhancedCrawlRequest } from './types.ts';
 import { discoverLinks, discoverSitemapLinks } from './discovery.ts';
 import { insertSourcePagesInBatches, createParentSource, updateParentSourceStatus } from './database.ts';
@@ -152,13 +151,34 @@ serve(async (req) => {
     if (parentSourceId && crawlMode === 'single-page') {
       console.log('🔄 Processing child page recrawl for parent:', parentSourceId);
       
+      // Mark parent as recrawling and reset progress
+      const { error: parentUpdateError } = await supabase
+        .from('agent_sources')
+        .update({
+          crawl_status: 'recrawling',
+          progress: 0,
+          metadata: {
+            is_recrawling: true,
+            recrawl_started_at: new Date().toISOString(),
+            recrawl_target_url: url
+          }
+        })
+        .eq('id', parentSourceId);
+
+      if (parentUpdateError) {
+        console.error('Error updating parent source for recrawl:', parentUpdateError);
+        throw new Error(`Failed to initiate parent recrawl: ${parentUpdateError.message}`);
+      }
+
       // For child page recrawl, we need to update the existing source_pages entry
       const { error: updateError } = await supabase
         .from('source_pages')
         .update({
-          status: 'in_progress',
-          started_at: new Date().toISOString(),
-          error_message: null
+          status: 'pending',
+          started_at: null,
+          completed_at: null,
+          error_message: null,
+          retry_count: 0
         })
         .eq('parent_source_id', parentSourceId)
         .eq('url', url);
