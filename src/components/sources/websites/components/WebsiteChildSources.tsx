@@ -15,6 +15,17 @@ interface WebsiteChildSourcesProps {
   onRecrawl: (source: AgentSource) => void;
 }
 
+interface SourcePage {
+  id: string;
+  url: string;
+  status: string;
+  created_at: string;
+  parent_source_id: string;
+  content_size?: number;
+  compression_ratio?: number;
+  error_message?: string;
+}
+
 const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   parentSourceId,
   isCrawling = false,
@@ -26,30 +37,52 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   const [childSources, setChildSources] = useState<AgentSource[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
 
   const fetchChildSources = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      const { data, error } = await supabase
-        .from('agent_sources')
+      // Query source_pages table instead of agent_sources
+      const { data: sourcePages, error } = await supabase
+        .from('source_pages')
         .select('*')
         .eq('parent_source_id', parentSourceId)
-        .eq('is_active', true)
         .order('created_at', { ascending: true });
       
       if (error) {
         console.error('Error fetching child sources:', error);
-      } else {
-        // Type assertion to handle the Json metadata type
-        const typedData = (data || []).map(source => ({
-          ...source,
-          metadata: (source.metadata || {}) as Record<string, any>
-        })) as AgentSource[];
-        setChildSources(typedData);
+        setError(`Failed to fetch child pages: ${error.message}`);
+        return;
       }
-    } catch (err) {
+
+      if (!sourcePages || sourcePages.length === 0) {
+        setChildSources([]);
+        return;
+      }
+
+      // Convert source_pages to AgentSource format for compatibility with existing components
+      const formattedSources: AgentSource[] = (sourcePages as SourcePage[]).map(page => ({
+        id: page.id,
+        url: page.url,
+        title: new URL(page.url).pathname || page.url,
+        crawl_status: page.status,
+        created_at: page.created_at,
+        parent_source_id: page.parent_source_id,
+        agent_id: '', // Not needed for child display
+        source_type: 'website',
+        is_active: true,
+        is_excluded: false, // Default value
+        original_size: page.content_size || 0,
+        compressed_size: page.content_size ? Math.round(page.content_size * (page.compression_ratio || 1)) : 0,
+        metadata: { error_message: page.error_message } as Record<string, any>
+      }));
+      
+      setChildSources(formattedSources);
+    } catch (err: any) {
       console.error('Exception fetching child sources:', err);
+      setError(`Error loading child pages: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -58,18 +91,25 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   useEffect(() => {
     fetchChildSources();
     
-    // Set up realtime subscription for child sources
+    // Set up realtime subscription for source_pages changes
     const subscription = supabase
-      .channel(`parent-source-${parentSourceId}`)
+      .channel(`source-pages-${parentSourceId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'agent_sources',
+        table: 'source_pages',
         filter: `parent_source_id=eq.${parentSourceId}` 
-      }, () => {
+      }, (payload) => {
+        console.log('📡 Source page update received:', payload);
         fetchChildSources();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`📡 Source pages subscription status: ${status}`);
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Error with source pages subscription');
+          setError('Real-time updates disconnected');
+        }
+      });
       
     return () => {
       subscription.unsubscribe();
@@ -92,7 +132,22 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     return (
       <div className="mt-4 p-4 flex justify-center items-center">
         <Loader2 className="animate-spin mr-2" size={16} />
-        <span>Loading child sources...</span>
+        <span>Loading child pages...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-4 p-4 text-sm text-red-500 border border-red-200 rounded bg-red-50">
+        <p className="font-medium">Error loading child pages</p>
+        <p className="text-xs mt-1">{error}</p>
+        <button 
+          onClick={fetchChildSources} 
+          className="mt-2 text-xs underline text-blue-600"
+        >
+          Try again
+        </button>
       </div>
     );
   }

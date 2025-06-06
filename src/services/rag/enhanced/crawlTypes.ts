@@ -1,4 +1,3 @@
-
 export interface EnhancedCrawlRequest {
   agentId: string;
   url: string;
@@ -36,4 +35,12 @@ export interface CompressionStats {
   avgCompressionRatio: number;
   spaceSavedBytes: number;
   spaceSavedPercentage: number;
+}
+
+export interface SourcePagesStats {
+  total_count: number;
+  completed_count: number;
+  failed_count: number;
+  in_progress_count: number;
+  pending_count: number;
 }
