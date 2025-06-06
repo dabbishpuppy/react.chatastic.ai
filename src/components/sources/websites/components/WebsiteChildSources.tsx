@@ -66,16 +66,46 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   useEffect(() => {
     fetchChildPages();
     
-    // Set up realtime subscription for source_pages
+    // Set up optimized realtime subscription for source_pages
     const subscription = supabase
       .channel(`source-pages-${parentSourceId}`)
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'source_pages',
         filter: `parent_source_id=eq.${parentSourceId}` 
-      }, () => {
-        fetchChildPages();
+      }, (payload) => {
+        const newPage = payload.new as SourcePage;
+        setChildPages(prev => {
+          // Check if page already exists to prevent duplicates
+          const exists = prev.some(page => page.id === newPage.id);
+          if (exists) return prev;
+          return [...prev, newPage];
+        });
+      })
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'source_pages',
+        filter: `parent_source_id=eq.${parentSourceId}` 
+      }, (payload) => {
+        const updatedPage = payload.new as SourcePage;
+        setChildPages(prev => 
+          prev.map(page => 
+            page.id === updatedPage.id ? updatedPage : page
+          )
+        );
+      })
+      .on('postgres_changes', { 
+        event: 'DELETE', 
+        schema: 'public', 
+        table: 'source_pages',
+        filter: `parent_source_id=eq.${parentSourceId}` 
+      }, (payload) => {
+        const deletedPage = payload.old as SourcePage;
+        setChildPages(prev => 
+          prev.filter(page => page.id !== deletedPage.id)
+        );
       })
       .subscribe();
       
