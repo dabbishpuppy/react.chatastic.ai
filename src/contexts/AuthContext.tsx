@@ -1,22 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-
-// Define our own types to match what supabase-js provides
-interface User {
-  id: string;
-  app_metadata: any;
-  user_metadata: any;
-  aud: string;
-  created_at: string;
-}
-
-interface Session {
-  access_token: string;
-  refresh_token: string;
-  expires_at: number;
-  user: User;
-}
+import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   session: Session | null;
