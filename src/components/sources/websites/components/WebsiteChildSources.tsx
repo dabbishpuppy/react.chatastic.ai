@@ -46,7 +46,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           ...item,
           workflow_metadata: typeof item.workflow_metadata === 'string' 
             ? JSON.parse(item.workflow_metadata) 
-            : (item.workflow_metadata || {})
+            : (item.workflow_metadata || {}),
+          status_history: typeof item.status_history === 'string' 
+            ? JSON.parse(item.status_history) 
+            : (Array.isArray(item.status_history) ? item.status_history : [])
         }));
 
         setChildSources(transformedData);
@@ -129,10 +132,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             
             <WebsiteSourceActions
               source={childSource}
-              onEdit={(sourceId, newUrl) => onEdit(sourceId, newUrl)}
-              onExclude={(source) => onExclude(source)}
-              onRecrawl={(source) => onRecrawl(source)}
-              onDelete={(source) => onDelete(source)}
+              onEdit={() => onEdit(childSource.id, childSource.url || '')}
+              onExclude={() => onExclude(childSource)}
+              onRecrawl={() => onRecrawl(childSource)}
+              onDelete={() => onDelete(childSource)}
             />
           </div>
         </div>
