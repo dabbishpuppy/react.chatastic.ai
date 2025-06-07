@@ -117,18 +117,18 @@ export class WorkflowEngine {
       throw error;
     }
 
-    // Convert the Supabase response to our typed interface
+    // Convert the Supabase response to our typed interface with proper type conversion
     return (data || []).map(event => ({
-      id: event.id,
-      source_id: event.source_id,
-      page_id: event.page_id,
-      event_type: event.event_type,
-      from_status: event.from_status,
-      to_status: event.to_status,
+      id: event.id as string,
+      source_id: event.source_id as string,
+      page_id: event.page_id as string | null,
+      event_type: event.event_type as string,
+      from_status: event.from_status as string | null,
+      to_status: event.to_status as string,
       metadata: this.parseJsonMetadata(event.metadata),
-      created_at: event.created_at,
-      processed_at: event.processed_at,
-      error_message: event.error_message
+      created_at: event.created_at as string,
+      processed_at: event.processed_at as string | null,
+      error_message: event.error_message as string | null
     }));
   }
 
@@ -147,24 +147,24 @@ export class WorkflowEngine {
       throw error;
     }
 
-    // Convert the Supabase response to our typed interface
+    // Convert the Supabase response to our typed interface with proper type conversion
     return (data || []).map(job => ({
-      id: job.id,
-      job_type: job.job_type,
-      source_id: job.source_id,
-      page_id: job.page_id,
-      job_key: job.job_key,
-      priority: job.priority,
+      id: job.id as string,
+      job_type: job.job_type as string,
+      source_id: job.source_id as string,
+      page_id: job.page_id as string | null,
+      job_key: job.job_key as string | null,
+      priority: job.priority as number,
       payload: this.parseJsonMetadata(job.payload),
       status: job.status as 'pending' | 'processing' | 'completed' | 'failed',
-      attempts: job.attempts,
-      max_attempts: job.max_attempts,
-      scheduled_at: job.scheduled_at,
-      started_at: job.started_at,
-      completed_at: job.completed_at,
-      error_message: job.error_message,
-      created_at: job.created_at,
-      updated_at: job.updated_at
+      attempts: job.attempts as number,
+      max_attempts: job.max_attempts as number,
+      scheduled_at: job.scheduled_at as string,
+      started_at: job.started_at as string | null,
+      completed_at: job.completed_at as string | null,
+      error_message: job.error_message as string | null,
+      created_at: job.created_at as string,
+      updated_at: job.updated_at as string
     }));
   }
 
