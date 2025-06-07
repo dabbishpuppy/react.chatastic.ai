@@ -1,76 +1,61 @@
 
-import React from 'react';
-import { Loader2, AlertTriangle, CheckCircle, Clock, GraduationCap, RefreshCw } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, XCircle, Loader2, GraduationCap, RotateCcw } from 'lucide-react';
 
-export interface StatusConfig {
-  icon: React.ReactElement;
-  text: string;
-  className: string;
-}
-
-export const getStatusConfig = (currentStatus: string): StatusConfig => {
-  switch (currentStatus) {
+export const getStatusConfig = (status: string) => {
+  switch (status) {
     case 'pending':
       return {
-        icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
         text: 'Pending',
-        className: 'bg-gray-100 text-gray-800 border-gray-200'
+        className: 'bg-gray-100 text-gray-800 border-gray-200',
+        icon: <Clock className="w-3 h-3 mr-1" />
       };
-    case 'crawling':
     case 'in_progress':
       return {
-        icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
         text: 'In Progress',
-        className: 'bg-blue-100 text-blue-800 border-blue-200'
+        className: 'bg-blue-100 text-blue-800 border-blue-200',
+        icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />
       };
     case 'recrawling':
       return {
-        icon: React.createElement(RefreshCw, { size: 14, className: "mr-1 animate-spin" }),
         text: 'Recrawling',
-        className: 'bg-orange-100 text-orange-800 border-orange-200'
-      };
-    case 'crawled':
-      return {
-        icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
-        text: 'Ready for Training',
-        className: 'bg-orange-100 text-orange-800 border-orange-200'
-      };
-    case 'training':
-      return {
-        icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
-        text: 'Training',
-        className: 'bg-purple-100 text-purple-800 border-purple-200'
-      };
-    case 'trained':
-    case 'training_completed':
-      return {
-        icon: React.createElement(GraduationCap, { size: 14, className: "mr-1" }),
-        text: 'Trained',
-        className: 'bg-green-100 text-green-800 border-green-200'
+        className: 'bg-orange-100 text-orange-800 border-orange-200',
+        icon: <RotateCcw className="w-3 h-3 mr-1" />
       };
     case 'completed':
       return {
-        icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
         text: 'Completed',
-        className: 'bg-green-100 text-green-800 border-green-200'
+        className: 'bg-green-100 text-green-800 border-green-200',
+        icon: <CheckCircle className="w-3 h-3 mr-1" />
       };
     case 'ready_for_training':
       return {
-        icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
         text: 'Ready for Training',
-        className: 'bg-orange-100 text-orange-800 border-orange-200'
+        className: 'bg-purple-100 text-purple-800 border-purple-200',
+        icon: <GraduationCap className="w-3 h-3 mr-1" />
+      };
+    case 'training':
+      return {
+        text: 'Training',
+        className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+      };
+    case 'trained':
+      return {
+        text: 'Trained',
+        className: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+        icon: <GraduationCap className="w-3 h-3 mr-1" />
       };
     case 'failed':
       return {
-        icon: React.createElement(AlertTriangle, { size: 14, className: "mr-1" }),
         text: 'Failed',
-        className: 'bg-red-100 text-red-800 border-red-200'
+        className: 'bg-red-100 text-red-800 border-red-200',
+        icon: <XCircle className="w-3 h-3 mr-1" />
       };
     default:
       return {
-        icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
-        text: 'Pending',
-        className: 'bg-gray-100 text-gray-800 border-gray-200'
+        text: 'Unknown',
+        className: 'bg-gray-100 text-gray-800 border-gray-200',
+        icon: <AlertCircle className="w-3 h-3 mr-1" />
       };
   }
 };

@@ -62,6 +62,11 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
           
           setRealtimeCrawlStatus(updatedSource.crawl_status);
           setRealtimeSource(updatedSource);
+          
+          // Force immediate UI update by dispatching a custom event
+          window.dispatchEvent(new CustomEvent('sourceStatusUpdate', {
+            detail: { sourceId, status: updatedSource.crawl_status, source: updatedSource }
+          }));
         }
       )
       .subscribe((status) => {
@@ -118,7 +123,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
 
   // Show total child sources size when training is completed and we have child data
-  const shouldShowChildTotalSize = !isChild && (realtimeCrawlStatus === 'trained' || realtimeCrawlStatus === 'completed') && realtimeSource?.total_content_size > 0;
+  const shouldShowChildTotalSize = !isChild && (realtimeCrawlStatus === 'trained' || realtimeCrawlStatus === 'completed' || realtimeCrawlStatus === 'ready_for_training') && realtimeSource?.total_content_size > 0;
 
   // Show total links from parent source metadata when available
   const shouldShowTotalLinks = !isChild && realtimeSource?.total_jobs > 0;

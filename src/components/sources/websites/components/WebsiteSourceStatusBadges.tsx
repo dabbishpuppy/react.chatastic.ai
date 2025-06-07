@@ -31,8 +31,10 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
     setCrawlStatus(initialCrawlStatus);
     setSourceData(source);
 
+    console.log(`📡 Setting up real-time status tracking for source: ${sourceId}`);
+
     const channel = supabase
-      .channel(`source-status-${sourceId}`)
+      .channel(`source-status-badges-${sourceId}`)
       .on(
         'postgres_changes',
         {
@@ -43,18 +45,20 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
         },
         (payload) => {
           const updatedSource = payload.new as any;
-          console.log('Real-time source update received:', updatedSource);
+          console.log('📡 Real-time source update received in badges:', updatedSource);
           
           // Update both crawl status and full source data for proper status computation
           setCrawlStatus(updatedSource.crawl_status);
           setSourceData(updatedSource);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`📡 Status badges subscription status for ${sourceId}:`, status);
+      });
 
     // Listen for training completion events
     const handleTrainingCompleted = () => {
-      console.log('Training completed event - updating source status');
+      console.log('🎓 Training completed event - updating source status in badges');
       // Trigger a refetch of source data
       if (sourceId) {
         supabase
@@ -64,6 +68,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
           .single()
           .then(({ data }) => {
             if (data) {
+              console.log('🔄 Refetched source data in badges:', data);
               setSourceData(data);
               setCrawlStatus(data.crawl_status);
             }
@@ -74,6 +79,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
     window.addEventListener('trainingCompleted', handleTrainingCompleted);
 
     return () => {
+      console.log(`🔌 Cleaning up status badges subscription for: ${sourceId}`);
       supabase.removeChannel(channel);
       window.removeEventListener('trainingCompleted', handleTrainingCompleted);
     };
@@ -83,7 +89,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   const computedStatus = sourceData ? SimplifiedSourceStatusService.getSourceStatus(sourceData) : crawlStatus;
   const statusConfig = getStatusConfig(computedStatus);
 
-  console.log('WebsiteSourceStatusBadges - computed status:', computedStatus, 'for source:', sourceId);
+  console.log('📊 WebsiteSourceStatusBadges - computed status:', computedStatus, 'for source:', sourceId, 'raw status:', crawlStatus);
 
   return (
     <div className="flex items-center gap-2">

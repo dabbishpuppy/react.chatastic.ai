@@ -56,10 +56,23 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
       }
     };
 
+    // Listen for custom source status updates
+    const handleSourceStatusUpdate = (event: CustomEvent) => {
+      if (event.detail.sourceId === sourceId) {
+        console.log('🔄 Custom source status update received:', event.detail);
+        setSourceData(event.detail.source);
+        const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(event.detail.source);
+        setStatus(mappedStatus);
+        setLastUpdateTime(new Date());
+      }
+    };
+
     window.addEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+    window.addEventListener('sourceStatusUpdate', handleSourceStatusUpdate as EventListener);
     
     return () => {
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
+      window.removeEventListener('sourceStatusUpdate', handleSourceStatusUpdate as EventListener);
     };
   }, [sourceId]);
 
@@ -87,7 +100,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           // Use SimplifiedSourceStatusService to determine proper status
           const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
           setStatus(mappedStatus);
-          console.log(`🔄 Status mapped to ${mappedStatus}`);
+          console.log(`🔄 Initial status mapped to ${mappedStatus} for source ${sourceId}`);
           
           setProgress(source.progress || 0);
           setLinksCount(source.links_count || 0);
@@ -101,7 +114,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     fetchInitialData();
 
     const channel = supabase
-      .channel(`source-status-${sourceId}`)
+      .channel(`source-status-realtime-${sourceId}`)
       .on(
         'postgres_changes',
         {
@@ -112,14 +125,14 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
         },
         (payload) => {
           const updatedSource = payload.new as any;
-          console.log('📡 Real-time update received:', updatedSource);
+          console.log('📡 Real-time update received in useSourceStatusRealtime:', updatedSource);
           
           setSourceData(updatedSource);
           
           // Use SimplifiedSourceStatusService to determine proper status
           const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(updatedSource);
           setStatus(mappedStatus);
-          console.log(`🔄 Real-time status mapped to ${mappedStatus}`);
+          console.log(`🔄 Real-time status mapped to ${mappedStatus} for source ${sourceId}`);
           
           setProgress(updatedSource.progress || 0);
           setLinksCount(updatedSource.links_count || 0);
