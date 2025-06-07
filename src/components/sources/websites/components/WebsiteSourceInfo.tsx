@@ -72,14 +72,18 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
 
   // Show total child sources size when training is completed and we have child data
-  const shouldShowChildTotalSize = !isChild && crawlStatus === 'trained' && source?.total_content_size > 0;
+  const shouldShowChildTotalSize = !isChild && (crawlStatus === 'trained' || crawlStatus === 'completed') && source?.total_content_size > 0;
 
   // Show total links from parent source metadata when available
   const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
 
-  // Get total child pages size from metadata - this is what we want to display
+  // Get total child pages size from metadata - show for both trained and ready_for_training statuses
   const childPagesSize = source?.metadata?.total_child_pages_size || 0;
-  const shouldShowChildPagesSize = !isChild && childPagesSize > 0;
+  const shouldShowChildPagesSize = !isChild && childPagesSize > 0 && (
+    crawlStatus === 'trained' || 
+    crawlStatus === 'completed' || 
+    crawlStatus === 'ready_for_training'
+  );
 
   const compressionRatio = shouldShowCompressionMetrics 
     ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)

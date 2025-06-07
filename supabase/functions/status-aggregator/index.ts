@@ -34,14 +34,15 @@ serve(async (req) => {
     const jobStats = StatisticsCalculator.calculateJobStatistics(pages);
     const { stats: compressionStats, totalChildSize, completedJobsData } = StatisticsCalculator.calculateCompressionStats(pages);
     
-    // Determine status
+    // Determine status - pass eventType to handle training completion properly
     const status = StatusCalculator.determineStatus(
       parentSource,
       jobStats.totalJobs,
       jobStats.completedJobs,
       jobStats.failedJobs,
       jobStats.pendingJobs,
-      jobStats.inProgressJobs
+      jobStats.inProgressJobs,
+      eventType
     );
 
     const progress = StatusCalculator.calculateProgress(
@@ -57,7 +58,8 @@ serve(async (req) => {
       status,
       totalChildSize,
       completedJobsData,
-      isRecrawling
+      isRecrawling,
+      eventType
     );
 
     const updateData = {
@@ -105,6 +107,7 @@ serve(async (req) => {
         newStatus: status,
         wasRecrawling: isRecrawling,
         recrawlStartedAt: parentSource.metadata?.recrawl_started_at,
+        eventType: eventType,
         jobBreakdown: {
           total: jobStats.totalJobs,
           completed: jobStats.completedJobs,

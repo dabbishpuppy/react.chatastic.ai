@@ -7,7 +7,8 @@ export class MetadataManager {
     status: string,
     totalChildSize: number,
     completedJobsData: any[],
-    isRecrawling: boolean
+    isRecrawling: boolean,
+    eventType?: string
   ): any {
     const baseMetadata = {
       ...(parentSource.metadata || {}),
@@ -16,6 +17,18 @@ export class MetadataManager {
       child_pages_count: completedJobsData.length,
       size_calculation_method: 'child_page_aggregation'
     };
+
+    // Special handling for training completion events
+    if (eventType === 'training_completion_metadata_update' || eventType === 'training_completed') {
+      console.log('🎓 Training completion metadata update - preserving training info');
+      return {
+        ...baseMetadata,
+        training_metadata_updated: new Date().toISOString(),
+        final_total_child_pages_size: totalChildSize,
+        last_trained_at: parentSource.metadata?.last_trained_at || new Date().toISOString(),
+        training_status: 'completed'
+      };
+    }
 
     if (status === 'ready_for_training' || status === 'failed') {
       console.log(`🏁 Recrawl completed with status: ${status}, clearing recrawl flags`);
