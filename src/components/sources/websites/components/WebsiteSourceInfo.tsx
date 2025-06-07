@@ -4,7 +4,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, Calendar, Link, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
-import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -102,14 +101,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
               onClick={() => window.open(url, '_blank')}
             />
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <WebsiteSourceStatusBadges
-            crawlStatus={crawlStatus}
-            isExcluded={false}
-            linksCount={linksCount}
-            sourceId={sourceId}
-          />
         </div>
       </div>
 
