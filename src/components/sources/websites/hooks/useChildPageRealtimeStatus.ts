@@ -37,15 +37,19 @@ export const useChildPageRealtimeStatus = ({
         .single();
       
       if (pageData) {
+        console.log('📊 Initial page data:', pageData);
         setStatus(pageData.status);
         setProcessingStatus(pageData.processing_status || 'pending');
       }
 
       if (parentData) {
+        console.log('📊 Initial parent data:', parentData);
         const metadata = parentData.metadata as Record<string, any> | null;
         const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
                                   (metadata && metadata.is_recrawling === true);
-        setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status || '');
+        const newParentStatus = isParentRecrawling ? 'recrawling' : parentData.crawl_status || '';
+        console.log('📊 Parent recrawl status determined:', newParentStatus, { crawl_status: parentData.crawl_status, is_recrawling: metadata?.is_recrawling });
+        setParentRecrawlStatus(newParentStatus);
       }
     };
 
@@ -90,7 +94,9 @@ export const useChildPageRealtimeStatus = ({
           const metadata = updatedSource.metadata as Record<string, any> | null;
           const isParentRecrawling = updatedSource.crawl_status === 'recrawling' || 
                                     (metadata && metadata.is_recrawling === true);
-          setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : updatedSource.crawl_status || '');
+          const newParentStatus = isParentRecrawling ? 'recrawling' : updatedSource.crawl_status || '';
+          console.log('📡 Parent status update - new recrawl status:', newParentStatus, { crawl_status: updatedSource.crawl_status, is_recrawling: metadata?.is_recrawling });
+          setParentRecrawlStatus(newParentStatus);
           
           // If parent training is completed and child is completed, mark as trained
           if (updatedSource.crawl_status === 'trained' && status === 'completed') {
@@ -117,28 +123,35 @@ export const useChildPageRealtimeStatus = ({
       pageId
     });
 
-    // If parent is recrawling, show recrawling status for child
+    // PRIORITY 1: If parent is recrawling, show recrawling status for child
     if (parentRecrawlStatus === 'recrawling') {
+      console.log('🔄 Parent is recrawling - showing recrawling status');
       return 'recrawling';
     }
 
-    // If child is actively being processed (chunking), show "In Progress"
+    // PRIORITY 2: If child is actively being processed (chunking), show "In Progress"
     if (processingStatus === 'processing') {
+      console.log('🔄 Child is being processed - showing in_progress status');
       return 'in_progress';
     }
 
-    // If child processing is completed (chunked) and parent is trained, show "Trained"
+    // PRIORITY 3: If child processing is completed (chunked) and parent is trained, show "Trained"
     if (status === 'completed' && processingStatus === 'processed') {
+      console.log('🎓 Child processing completed - showing trained status');
       return 'trained';
     }
     
-    // Return the current status, ensuring it's a valid status
+    // PRIORITY 4: Return the current child status, ensuring it's a valid status
     const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'trained', 'recrawling'];
-    return validStatuses.includes(status) ? status : 'pending';
+    const finalStatus = validStatuses.includes(status) ? status : 'pending';
+    console.log('📊 Final status determined:', finalStatus, 'from original:', status);
+    return finalStatus;
   };
 
   const displayStatus = getDisplayStatus();
   const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending' || displayStatus === 'recrawling';
+
+  console.log('🎯 Final hook result:', { displayStatus, isLoading, rawStatus: status, processingStatus, parentRecrawlStatus });
 
   return {
     displayStatus,
