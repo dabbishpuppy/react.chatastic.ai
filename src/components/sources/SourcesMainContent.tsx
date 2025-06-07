@@ -50,7 +50,11 @@ const SourcesMainContent: React.FC = () => {
       </div>
       
       <div className="lg:w-80">
-        <SimplifiedSourcesWidget />
+        <SimplifiedSourcesWidget
+          currentTab={currentTab}
+          sourcesByType={stats?.sourcesByType}
+          totalSize={stats ? formatTotalSize(stats.totalBytes) : "0 B"}
+        />
       </div>
     </div>
   );

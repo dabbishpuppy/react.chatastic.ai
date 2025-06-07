@@ -10,7 +10,7 @@ const SimplifiedSourcesWidget: React.FC = () => {
   const { agentId } = useParams();
   const queryClient = useQueryClient();
   
-  const { sources, loading } = useOptimizedAgentSources();
+  const { data: stats, isLoading } = useOptimizedAgentSources(agentId || '');
 
   // Listen for real-time updates to invalidate queries
   useEffect(() => {
@@ -43,32 +43,7 @@ const SimplifiedSourcesWidget: React.FC = () => {
     };
   }, [agentId, queryClient]);
 
-  // Calculate stats from sources
-  const stats = React.useMemo(() => {
-    if (!sources || sources.length === 0) return null;
-    
-    const sourcesByType = sources.reduce((acc, source) => {
-      const type = source.source_type;
-      if (!acc[type]) {
-        acc[type] = 0;
-      }
-      // For website sources, only count parent sources
-      if (type === 'website' && source.parent_source_id) {
-        return acc;
-      }
-      acc[type]++;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return {
-      text: sourcesByType.text || 0,
-      qa: sourcesByType.qa || 0,
-      file: sourcesByType.file || 0,
-      website: sourcesByType.website || 0,
-    };
-  }, [sources]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -104,24 +79,24 @@ const SimplifiedSourcesWidget: React.FC = () => {
       <CardContent className="space-y-3">
         <div className="flex justify-between">
           <span className="text-sm text-muted-foreground">Text Sources</span>
-          <span className="font-medium">{stats.text}</span>
+          <span className="font-medium">{stats.text || 0}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-sm text-muted-foreground">Q&A Sources</span>
-          <span className="font-medium">{stats.qa}</span>
+          <span className="font-medium">{stats.qa || 0}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-sm text-muted-foreground">File Sources</span>
-          <span className="font-medium">{stats.file}</span>
+          <span className="font-medium">{stats.file || 0}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-sm text-muted-foreground">Website Sources</span>
-          <span className="font-medium">{stats.website}</span>
+          <span className="font-medium">{stats.website || 0}</span>
         </div>
         <div className="border-t pt-3 mt-3">
           <div className="flex justify-between font-semibold">
             <span>Total Sources</span>
-            <span>{stats.text + stats.qa + stats.file + stats.website}</span>
+            <span>{(stats.text || 0) + (stats.qa || 0) + (stats.file || 0) + (stats.website || 0)}</span>
           </div>
         </div>
       </CardContent>
