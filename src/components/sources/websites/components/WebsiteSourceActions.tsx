@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
-import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
+import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
@@ -41,9 +41,6 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   isChild = false
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
-
-  // Use SimplifiedSourceStatusService to get the computed status
-  const computedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -109,6 +106,17 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2 ml-4">
+      {/* Show status badge only for parent sources (not child sources) */}
+      {!isChild && (
+        <WebsiteSourceStatusBadges
+          crawlStatus={source.crawl_status}
+          isExcluded={source.is_excluded || false}
+          linksCount={source.links_count || 0}
+          sourceId={source.id}
+          source={source}
+        />
+      )}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
