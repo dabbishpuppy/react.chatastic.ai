@@ -5,14 +5,23 @@ import { Button } from '@/components/ui/button';
 import { GraduationCap } from 'lucide-react';
 import { SimpleStatusService } from '@/services/SimpleStatusService';
 import { useSimpleFlow } from '@/hooks/useSimpleFlow';
+import { useAgentSourceStats } from '@/hooks/useAgentSourceStats';
+import SourceRow from './SourceRow';
 
 const SimplifiedSourcesWidget: React.FC = () => {
   const { statusSummary, buttonState, isTraining, startTraining } = useSimpleFlow();
+  const { data: stats, isLoading, error } = useAgentSourceStats();
 
   const handleTrainClick = () => {
     if (!buttonState.disabled) {
       startTraining();
     }
+  };
+
+  const formatTotalSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${Math.round(bytes / (1024 * 1024))} MB`;
   };
 
   return (
@@ -49,6 +58,33 @@ const SimplifiedSourcesWidget: React.FC = () => {
           {statusSummary.totalSources > 0 && (
             <div className="text-xs text-gray-500">
               {statusSummary.totalSources} source{statusSummary.totalSources !== 1 ? 's' : ''}
+            </div>
+          )}
+
+          {/* Source breakdown */}
+          {!isLoading && !error && stats && (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs font-medium text-gray-700 mb-2">Sources</div>
+              <div className="space-y-1">
+                {Object.entries(stats.sourcesByType).map(([type, data]) => (
+                  data.count > 0 && (
+                    <SourceRow
+                      key={type}
+                      type={type}
+                      count={data.count}
+                      size={data.size}
+                    />
+                  )
+                ))}
+              </div>
+              {stats.totalBytes > 0 && (
+                <div className="pt-2 mt-2 border-t border-gray-100">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-700 font-medium">Total</span>
+                    <span className="text-gray-600">{formatTotalSize(stats.totalBytes)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
