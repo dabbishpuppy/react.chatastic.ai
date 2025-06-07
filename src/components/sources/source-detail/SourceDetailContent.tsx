@@ -37,10 +37,10 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   // Helper function to render content with proper line breaks
   const renderPlainTextContent = (content: string) => {
     return content.split('\n').map((line, index) => (
-      <React.Fragment key={index}>
+      <span key={index}>
         {line}
         {index < content.split('\n').length - 1 && <br />}
-      </React.Fragment>
+      </span>
     ));
   };
 
@@ -49,12 +49,16 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
     return /<[^>]+>/.test(content);
   };
 
+  // For child pages, we should always try to render as HTML first
+  const shouldRenderAsHtml = isHtmlContent || (isChildPage && source.content && looksLikeHtml(source.content));
+
   console.log('🔍 Content rendering debug:', {
     isHtmlContent,
     isChildPage,
     contentLength: source.content?.length,
     contentPreview: source.content?.substring(0, 100),
-    looksLikeHtml: source.content ? looksLikeHtml(source.content) : false
+    looksLikeHtml: source.content ? looksLikeHtml(source.content) : false,
+    shouldRenderAsHtml
   });
 
   return (
@@ -114,7 +118,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
             <div className="prose max-w-none">
               {source.content ? (
                 <>
-                  {(isHtmlContent || (isChildPage && looksLikeHtml(source.content))) ? (
+                  {shouldRenderAsHtml ? (
                     <div 
                       className="font-sans text-gray-700 prose prose-headings:text-gray-900 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-sm prose-p:text-gray-700 prose-strong:text-gray-900 prose-em:italic prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4"
                       style={{ 
