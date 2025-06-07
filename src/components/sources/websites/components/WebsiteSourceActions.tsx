@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -211,18 +210,6 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
           <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </Button>
       )}
-
-      {/* Show view button for trained sources */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleViewClick}
-        disabled={!isViewEnabled}
-        className="h-6 w-6 p-0"
-        title={isViewEnabled ? "View source details" : "Available after training is complete"}
-      >
-        <ChevronDown className={`w-3 h-3 ${!isViewEnabled ? 'text-gray-400' : ''}`} />
-      </Button>
 
       <WebsiteActionConfirmDialog
         open={confirmationType !== null}
