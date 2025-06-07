@@ -77,6 +77,8 @@ export class VectorSearchService {
       
       if (data) {
         for (const item of data) {
+          const itemMetadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+          
           results.push({
             chunkId: item.id,
             sourceId: item.source_id,
@@ -86,7 +88,7 @@ export class VectorSearchService {
               sourceName: item.agent_sources?.title || 'Unknown',
               sourceType: item.agent_sources?.source_type || 'text',
               sourceUrl: item.agent_sources?.url,
-              ...item.metadata
+              ...itemMetadata
             }
           });
         }
@@ -199,9 +201,12 @@ export class VectorSearchService {
       }
 
       const modelDistribution: Record<string, number> = {};
-      data?.forEach(item => {
-        modelDistribution[item.model_name] = (modelDistribution[item.model_name] || 0) + 1;
-      });
+      if (data) {
+        data.forEach(item => {
+          const modelName = item.model_name || 'unknown';
+          modelDistribution[modelName] = (modelDistribution[modelName] || 0) + 1;
+        });
+      }
 
       return {
         totalEmbeddings: data?.length || 0,
