@@ -12,7 +12,7 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
   switch (currentStatus) {
     case 'pending':
       return {
-        icon: React.createElement(Clock, { size: 14, className: "mr-1" }),
+        icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
         text: 'Pending',
         className: 'bg-gray-100 text-gray-800 border-gray-200'
       };
@@ -68,7 +68,7 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
       };
     default:
       return {
-        icon: React.createElement(Clock, { size: 14, className: "mr-1" }),
+        icon: React.createElement(Loader2, { size: 14, className: "mr-1 animate-spin" }),
         text: 'Pending',
         className: 'bg-gray-100 text-gray-800 border-gray-200'
       };
