@@ -40,11 +40,12 @@ export const useSourceDetail = () => {
           
           console.log('🔍 Fetched page data:', pageData);
 
-          // Fetch the actual content from source_chunks table
+          // Fetch the actual content from source_chunks table using parent_source_id and page_id in metadata
           const { data: chunkData, error: chunkError } = await supabase
             .from('source_chunks')
-            .select('content, chunk_index')
-            .eq('source_id', pageId)
+            .select('content, chunk_index, metadata')
+            .eq('source_id', pageData.parent_source_id)
+            .contains('metadata', { page_id: pageId })
             .order('chunk_index');
 
           console.log('🔍 Fetched chunk data:', chunkData);
