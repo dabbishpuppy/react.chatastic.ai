@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, Calendar, Link, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -36,6 +37,49 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   sourceId,
   showStatusBadge = true
 }) => {
+  const [realtimeCrawlStatus, setRealtimeCrawlStatus] = useState(crawlStatus);
+  const [realtimeSource, setRealtimeSource] = useState(source);
+
+  // Set up realtime subscription for parent source status changes
+  useEffect(() => {
+    if (!sourceId || isChild) return;
+
+    console.log(`📡 Setting up realtime status tracking for parent source: ${sourceId}`);
+
+    const channel = supabase
+      .channel(`source-info-${sourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `id=eq.${sourceId}`
+        },
+        (payload) => {
+          const updatedSource = payload.new as any;
+          console.log('📡 Source status update in WebsiteSourceInfo:', updatedSource);
+          
+          setRealtimeCrawlStatus(updatedSource.crawl_status);
+          setRealtimeSource(updatedSource);
+        }
+      )
+      .subscribe((status) => {
+        console.log(`📡 Source info subscription status for ${sourceId}:`, status);
+      });
+
+    return () => {
+      console.log(`🔌 Cleaning up source info subscription for: ${sourceId}`);
+      supabase.removeChannel(channel);
+    };
+  }, [sourceId, isChild]);
+
+  // Update local state when props change
+  useEffect(() => {
+    setRealtimeCrawlStatus(crawlStatus);
+    setRealtimeSource(source);
+  }, [crawlStatus, source]);
+
   const formatUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
@@ -74,17 +118,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
 
   // Show total child sources size when training is completed and we have child data
-  const shouldShowChildTotalSize = !isChild && (crawlStatus === 'trained' || crawlStatus === 'completed') && source?.total_content_size > 0;
+  const shouldShowChildTotalSize = !isChild && (realtimeCrawlStatus === 'trained' || realtimeCrawlStatus === 'completed') && realtimeSource?.total_content_size > 0;
 
   // Show total links from parent source metadata when available
-  const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
+  const shouldShowTotalLinks = !isChild && realtimeSource?.total_jobs > 0;
 
-  // Get total child pages size from metadata - FIXED: Show for trained status as well
-  const childPagesSize = source?.metadata?.total_child_pages_size || 0;
+  // Get total child pages size from metadata - Show for trained status as well
+  const childPagesSize = realtimeSource?.metadata?.total_child_pages_size || 0;
   const shouldShowChildPagesSize = !isChild && childPagesSize > 0 && (
-    crawlStatus === 'trained' || 
-    crawlStatus === 'completed' || 
-    crawlStatus === 'ready_for_training'
+    realtimeCrawlStatus === 'trained' || 
+    realtimeCrawlStatus === 'completed' || 
+    realtimeCrawlStatus === 'ready_for_training'
   );
 
   const compressionRatio = shouldShowCompressionMetrics 
@@ -109,10 +153,11 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
         {(isChild || showStatusBadge) && (
           <div className="flex items-center gap-2">
             <WebsiteSourceStatusBadges
-              crawlStatus={crawlStatus}
+              crawlStatus={realtimeCrawlStatus}
               isExcluded={false}
               linksCount={linksCount}
               sourceId={sourceId}
+              source={realtimeSource}
             />
           </div>
         )}
@@ -140,7 +185,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
                 <Link className="w-3 h-3" />
-                <span>{source.total_jobs} links</span>
+                <span>{realtimeSource.total_jobs} links</span>
               </div>
             </>
           )}
@@ -173,7 +218,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
                 <Database className="w-3 h-3" />
-                <span>{formatBytes(source.total_content_size)}</span>
+                <span>{formatBytes(realtimeSource.total_content_size)}</span>
               </div>
             </>
           )}
