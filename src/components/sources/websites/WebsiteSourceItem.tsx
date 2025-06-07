@@ -62,9 +62,23 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Never';
+    
+    // DEBUG: Log the raw date values
+    console.log('🐛 DEBUG formatDate - Raw dateString:', JSON.stringify(dateString));
+    console.log('🐛 DEBUG formatDate - Type:', typeof dateString);
+    console.log('🐛 DEBUG formatDate - Length:', dateString.length);
+    
     try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-    } catch {
+      const parsedDate = new Date(dateString);
+      console.log('🐛 DEBUG formatDate - Parsed date:', parsedDate);
+      console.log('🐛 DEBUG formatDate - Is valid:', !isNaN(parsedDate.getTime()));
+      
+      const formatted = formatDistanceToNow(parsedDate, { addSuffix: true });
+      console.log('🐛 DEBUG formatDate - Formatted result:', JSON.stringify(formatted));
+      
+      return formatted;
+    } catch (error) {
+      console.error('🐛 DEBUG formatDate - Error:', error);
       return 'Invalid date';
     }
   };
@@ -94,6 +108,16 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     }
     return 0;
   }, [status, childSources]);
+
+  // DEBUG: Log source data to identify the extra "0"
+  console.log('🐛 DEBUG WebsiteSourceItem - Source data:', {
+    id: source.id,
+    title: source.title,
+    url: source.url,
+    last_crawled_at: JSON.stringify(source.last_crawled_at),
+    updated_at: JSON.stringify(source.updated_at),
+    created_at: JSON.stringify(source.created_at)
+  });
 
   return (
     <div className="border-b border-gray-100 last:border-b-0">
