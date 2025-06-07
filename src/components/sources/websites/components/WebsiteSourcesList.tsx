@@ -145,11 +145,12 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     })));
     
     // Filter for parent sources (no parent_source_id) and include ALL active sources
-    // IMPORTANT: Do NOT filter out sources with pending_deletion or is_excluded
+    // CRITICAL FIX: Include sources with pending_deletion=true in the display
     const parents = allSources.filter(source => {
       const isParent = !source.parent_source_id;
       const isWebsite = source.source_type === 'website';
       const isActive = source.is_active === true;
+      // REMOVED the pending_deletion filter - we want to show these sources
       
       console.log(`🔍 DEBUG: Source ${source.id} filter check:`, {
         isParent,

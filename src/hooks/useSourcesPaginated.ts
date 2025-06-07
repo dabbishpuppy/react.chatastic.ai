@@ -46,7 +46,7 @@ export const useSourcesPaginated = ({
         .from('agent_sources')
         .select('*', { count: 'exact' })
         .eq('agent_id', agentId)
-        .eq('is_active', true); // Only filter by is_active, keep everything else
+        .eq('is_active', true); // Only filter by is_active, keep everything else including pending_deletion
 
       // Add source type filter if specified
       if (sourceType) {
@@ -141,7 +141,6 @@ export const useSourcesPaginated = ({
         updated_by: source.updated_by || undefined,
         requires_manual_training: source.requires_manual_training || false,
         links_count: source.links_count || undefined,
-        // Set optional properties that don't exist in DB to undefined
         file_type: undefined,
       }));
 
