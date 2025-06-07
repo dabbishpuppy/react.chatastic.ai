@@ -2,23 +2,18 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   RefreshCw, 
   Trash2,
-  MoreHorizontal,
-  ChevronRight
+  MoreHorizontal
 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
-import { useChildPageStatus } from '../hooks/useChildPageStatus';
 
 interface ChildPageActionsProps {
   url: string;
   pageId: string;
   parentSourceId: string;
-  status: string;
   onDelete?: () => void;
 }
 
@@ -28,17 +23,10 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
   pageId,
   parentSourceId,
-  status,
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
-  const { displayStatus } = useChildPageStatus({ status, parentSourceId, pageId });
-  const navigate = useNavigate();
-  const { agentId } = useParams();
-
-  // Check if the page is ready for viewing (training completed)
-  const isViewable = displayStatus === 'trained' || displayStatus === 'completed';
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -46,12 +34,6 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   const handleDeleteClick = () => {
     setConfirmationType('delete');
-  };
-
-  const handleViewClick = () => {
-    if (isViewable && agentId) {
-      navigate(`/agent/${agentId}/sources/website/${pageId}`);
-    }
   };
 
   const handleConfirm = async () => {
@@ -105,35 +87,8 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   const confirmConfig = getConfirmationConfig();
 
-  const getViewTooltip = () => {
-    if (isViewable) {
-      return 'View extracted content';
-    }
-    return 'Content will be available after training is completed';
-  };
-
   return (
     <div className="flex items-center gap-2">
-      {/* Right arrow for viewing source details */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={isViewable ? handleViewClick : undefined}
-              disabled={!isViewable}
-              className={`h-6 w-6 p-0 ${!isViewable ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'}`}
-            >
-              <ChevronRight className="w-3 h-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{getViewTooltip()}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

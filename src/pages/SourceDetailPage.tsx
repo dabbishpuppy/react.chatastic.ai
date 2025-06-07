@@ -25,8 +25,7 @@ const SourceDetailPage: React.FC = () => {
     handleDelete,
     handleBackClick,
     handleCancelEdit,
-    agentId,
-    isWebsiteSourcePage
+    agentId
   } = useSourceDetail();
 
   if (loading) {
@@ -53,12 +52,8 @@ const SourceDetailPage: React.FC = () => {
     );
   }
 
-  const pageTitle = isWebsiteSourcePage 
-    ? 'Website Page Details' 
-    : 'Source Details';
-
   return (
-    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle={pageTitle} showPageTitle={false}>
+    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Source Details" showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] min-h-screen">
         <div className="flex gap-8">
           <div className="flex-1">
@@ -80,7 +75,6 @@ const SourceDetailPage: React.FC = () => {
               onContentChange={setEditContent}
               onSave={handleSave}
               onCancel={handleCancelEdit}
-              isWebsiteSourcePage={isWebsiteSourcePage}
             />
           </div>
 

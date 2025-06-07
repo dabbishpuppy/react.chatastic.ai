@@ -5,7 +5,6 @@ import { useRAGServices } from '@/hooks/useRAGServices';
 import { toast } from '@/hooks/use-toast';
 import { AgentSource } from '@/types/rag';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 export const useSourceDetail = () => {
   const { agentId, sourceId } = useParams();
@@ -22,65 +21,16 @@ export const useSourceDetail = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
 
-  // Check if this is a website source page by looking at the URL
-  const isWebsiteSourcePage = window.location.pathname.includes('/sources/website/');
-
   useEffect(() => {
     const fetchSource = async () => {
       if (!sourceId) return;
       
       try {
         setLoading(true);
-        
-        if (isWebsiteSourcePage) {
-          // Fetch from source_pages table for website child pages
-          const { data: pageData, error: pageError } = await supabase
-            .from('source_pages')
-            .select('*')
-            .eq('id', sourceId)
-            .single();
-
-          if (pageError) {
-            console.error('Error fetching source page:', pageError);
-            throw pageError;
-          }
-
-          if (pageData) {
-            // Transform source_pages data to match AgentSource interface
-            const transformedSource: AgentSource = {
-              id: pageData.id,
-              title: pageData.url,
-              content: 'Extracted content will be shown here', // Placeholder for now
-              url: pageData.url,
-              source_type: 'website',
-              agent_id: agentId || '',
-              team_id: '', // Will be filled from parent source if needed
-              created_at: pageData.created_at,
-              updated_at: pageData.updated_at,
-              is_active: true,
-              metadata: {
-                content_size: pageData.content_size,
-                chunks_created: pageData.chunks_created,
-                processing_time_ms: pageData.processing_time_ms,
-                status: pageData.status
-              },
-              parent_source_id: pageData.parent_source_id,
-              crawl_status: pageData.status,
-              is_excluded: false,
-              requires_manual_training: false
-            };
-            
-            setSource(transformedSource);
-            setEditTitle(transformedSource.title);
-            setEditContent(transformedSource.content || '');
-          }
-        } else {
-          // Regular source fetch for other source types
-          const sourceData = await sources.getSourceWithStats(sourceId);
-          setSource(sourceData);
-          setEditTitle(sourceData.title);
-          setEditContent(sourceData.content || '');
-        }
+        const sourceData = await sources.getSourceWithStats(sourceId);
+        setSource(sourceData);
+        setEditTitle(sourceData.title);
+        setEditContent(sourceData.content || '');
       } catch (error) {
         console.error('Error fetching source:', error);
         toast({
@@ -94,23 +44,13 @@ export const useSourceDetail = () => {
     };
 
     fetchSource();
-  }, [sourceId, sources, isWebsiteSourcePage, agentId]);
+  }, [sourceId, sources]);
 
   const handleSave = async () => {
     if (!source) return;
 
     setIsSaving(true);
     try {
-      if (isWebsiteSourcePage) {
-        // For website sources, we might not allow editing initially
-        toast({
-          title: 'Info',
-          description: 'Editing website source content is not available yet',
-          variant: 'default',
-        });
-        return;
-      }
-
       await sources.updateSource(source.id, {
         title: editTitle,
         content: editContent,
@@ -146,26 +86,12 @@ export const useSourceDetail = () => {
     console.log('🗑️ Starting source deletion:', {
       sourceId: source.id,
       sourceType: source.source_type,
-      agentId,
-      isWebsiteSourcePage
+      agentId
     });
 
     setIsDeleting(true);
     try {
-      if (isWebsiteSourcePage) {
-        // Delete from source_pages table
-        const { error } = await supabase
-          .from('source_pages')
-          .delete()
-          .eq('id', source.id);
-
-        if (error) {
-          throw error;
-        }
-      } else {
-        // Regular source deletion
-        await sources.deleteSource(source.id);
-      }
+      await sources.deleteSource(source.id);
       
       // Comprehensive query invalidation for all source types
       const queryKeysToInvalidate = [
@@ -255,7 +181,6 @@ export const useSourceDetail = () => {
     handleDelete,
     handleBackClick,
     handleCancelEdit,
-    agentId,
-    isWebsiteSourcePage
+    agentId
   };
 };
