@@ -37,23 +37,8 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   const navigate = useNavigate();
   const { agentId } = useParams();
 
-  // Debug logging to understand status
-  console.log('ChildPageActions status debug:', {
-    pageId,
-    originalStatus: status,
-    displayStatus,
-    url
-  });
-
   // Check if the page is ready for viewing (training completed)
-  const isViewable = displayStatus === 'trained' || displayStatus === 'completed' || status === 'completed';
-
-  console.log('ChildPageActions viewability:', {
-    pageId,
-    isViewable,
-    displayStatus,
-    originalStatus: status
-  });
+  const isViewable = displayStatus === 'trained' || displayStatus === 'completed';
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -64,9 +49,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const handleViewClick = () => {
-    console.log('View click attempted:', { isViewable, agentId, pageId });
     if (isViewable && agentId) {
-      console.log('Navigating to:', `/agent/${agentId}/sources/website/${pageId}`);
       navigate(`/agent/${agentId}/sources/website/${pageId}`);
     }
   };
