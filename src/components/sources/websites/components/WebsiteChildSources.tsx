@@ -44,6 +44,9 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
         // Transform the data to match AgentSource type
         const transformedData: AgentSource[] = (data || []).map(item => ({
           ...item,
+          metadata: typeof item.metadata === 'string' 
+            ? JSON.parse(item.metadata) 
+            : (item.metadata as Record<string, any> || {}),
           workflow_metadata: typeof item.workflow_metadata === 'string' 
             ? JSON.parse(item.workflow_metadata) 
             : (item.workflow_metadata || {}),
