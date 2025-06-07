@@ -22,10 +22,7 @@ export const useWebsiteSubmission = () => {
 
     try {
       setIsSubmitting(true);
-
-      // Emit crawling started event and show toast
-      ToastNotificationService.showCrawlingStarted();
-      window.dispatchEvent(new CustomEvent('crawlStarted'));
+      console.log('🚀 Starting website crawl submission:', data.url);
 
       // Create the website source with pending status
       const source = await AgentSourceService.createSource({
@@ -45,34 +42,83 @@ export const useWebsiteSubmission = () => {
         }
       });
 
-      // Update status to crawling
+      console.log('✅ Website source created:', source.id);
+
+      // Immediately emit source creation event for real-time UI update
+      window.dispatchEvent(new CustomEvent('sourceCreated', {
+        detail: { 
+          sourceId: source.id, 
+          agentId,
+          sourceType: 'website',
+          source: source
+        }
+      }));
+
+      // Show initial toast
+      ToastNotificationService.showCrawlingStarted();
+      window.dispatchEvent(new CustomEvent('crawlStarted', {
+        detail: { sourceId: source.id }
+      }));
+
+      // Update status to crawling and trigger UI update
       await AgentSourceService.updateSource(source.id, {
         crawl_status: 'crawling'
       });
 
-      // Start the enhanced crawl process - use only valid properties
-      const crawlResult = await EnhancedCrawlService.initiateCrawl({
-        url: data.url,
-        agentId,
-        excludePaths: data.excludePaths,
-        includePaths: data.includePaths,
-        respectRobots: data.respectRobots
-      });
+      // Emit another update event
+      window.dispatchEvent(new CustomEvent('sourceUpdated', {
+        detail: { sourceId: source.id }
+      }));
 
-      // Update status to crawled when complete
-      await AgentSourceService.updateSource(source.id, {
-        crawl_status: 'crawled',
-        requires_manual_training: true // Needs training
-      });
+      // Start the enhanced crawl process in the background
+      try {
+        const crawlResult = await EnhancedCrawlService.initiateCrawl({
+          url: data.url,
+          agentId,
+          excludePaths: data.excludePaths,
+          includePaths: data.includePaths,
+          respectRobots: data.respectRobots
+        });
 
-      // Emit crawling completed event
-      ToastNotificationService.showCrawlingCompleted();
-      window.dispatchEvent(new CustomEvent('crawlCompleted'));
-      window.dispatchEvent(new CustomEvent('sourceUpdated'));
+        console.log('✅ Enhanced crawl initiated:', crawlResult);
+
+        // Update status to crawled when complete
+        await AgentSourceService.updateSource(source.id, {
+          crawl_status: 'crawled',
+          requires_manual_training: true // Needs training
+        });
+
+        // Emit crawling completed event
+        ToastNotificationService.showCrawlingCompleted();
+        window.dispatchEvent(new CustomEvent('crawlCompleted', {
+          detail: { sourceId: source.id }
+        }));
+        window.dispatchEvent(new CustomEvent('sourceUpdated', {
+          detail: { sourceId: source.id }
+        }));
+
+      } catch (crawlError) {
+        console.error('❌ Crawl failed:', crawlError);
+        
+        // Update source status to failed
+        await AgentSourceService.updateSource(source.id, {
+          crawl_status: 'failed',
+          metadata: {
+            ...source.metadata,
+            error: crawlError.message,
+            failed_at: new Date().toISOString()
+          }
+        });
+
+        // Emit update event even for failures
+        window.dispatchEvent(new CustomEvent('sourceUpdated', {
+          detail: { sourceId: source.id }
+        }));
+      }
 
       return source;
     } catch (error) {
-      console.error('Website submission failed:', error);
+      console.error('❌ Website submission failed:', error);
       throw error;
     } finally {
       setIsSubmitting(false);

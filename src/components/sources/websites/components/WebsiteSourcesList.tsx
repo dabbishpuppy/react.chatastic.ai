@@ -1,5 +1,5 @@
 
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
@@ -68,6 +68,44 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     pageSize,
     enabled: !loading
   });
+
+  // Listen for source creation events to trigger refetch
+  useEffect(() => {
+    const handleSourceCreated = (event: CustomEvent) => {
+      const { sourceType } = event.detail;
+      if (sourceType === 'website') {
+        console.log('🔄 Website source created, refetching list');
+        refetch();
+      }
+    };
+
+    const handleSourceUpdated = () => {
+      console.log('🔄 Source updated, refetching list');
+      refetch();
+    };
+
+    const handleCrawlStarted = () => {
+      console.log('🔄 Crawl started, refetching list');
+      refetch();
+    };
+
+    const handleCrawlCompleted = () => {
+      console.log('🔄 Crawl completed, refetching list');
+      refetch();
+    };
+
+    window.addEventListener('sourceCreated', handleSourceCreated as EventListener);
+    window.addEventListener('sourceUpdated', handleSourceUpdated);
+    window.addEventListener('crawlStarted', handleCrawlStarted);
+    window.addEventListener('crawlCompleted', handleCrawlCompleted);
+
+    return () => {
+      window.removeEventListener('sourceCreated', handleSourceCreated as EventListener);
+      window.removeEventListener('sourceUpdated', handleSourceUpdated);
+      window.removeEventListener('crawlStarted', handleCrawlStarted);
+      window.removeEventListener('crawlCompleted', handleCrawlCompleted);
+    };
+  }, [refetch]);
 
   const allSources = paginatedData?.sources || [];
 

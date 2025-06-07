@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentSource, SourceType } from '@/types/rag';
@@ -118,7 +117,8 @@ export const useSourcesPaginated = ({
     enabled: enabled && !!agentId,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    staleTime: 30000, // 30 seconds
+    staleTime: 5000, // Reduced stale time for better real-time updates
+    refetchInterval: 10000, // Refetch every 10 seconds to catch updates
   });
 };
 
