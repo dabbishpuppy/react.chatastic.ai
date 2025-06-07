@@ -94,7 +94,8 @@ export class ProductionWorkerQueue {
         .from('source_pages')
         .update({
           status: 'in_progress',
-          started_at: new Date().toISOString()
+          started_at: new Date().toISOString(),
+          retry_count: supabase.rpc('increment_retry_count', { job_ids: jobIds })
         })
         .in('id', jobIds);
 
@@ -121,8 +122,7 @@ export class ProductionWorkerQueue {
           .from('source_pages')
           .update({
             status: 'pending',
-            started_at: null,
-            retry_count: supabase.raw('retry_count + 1')
+            started_at: null
           })
           .in('id', jobIds);
       } else {
@@ -185,6 +185,47 @@ export class ProductionWorkerQueue {
     }
   }
 
+  static async getQueueMetrics(): Promise<{
+    queueDepth: number;
+    totalPending: number;
+    totalInProgress: number;
+    totalCompleted: number;
+    totalFailed: number;
+    workerUtilization: number;
+    averageProcessingTime: number;
+  }> {
+    try {
+      const queueStatus = await this.getQueueStatus();
+      
+      // Calculate additional metrics
+      const totalJobs = queueStatus.pendingJobs + queueStatus.inProgressJobs + queueStatus.completedJobs + queueStatus.failedJobs;
+      const workerUtilization = totalJobs > 0 ? queueStatus.inProgressJobs / this.MAX_CONCURRENT_BATCHES : 0;
+      const averageProcessingTime = this.PROCESS_INTERVAL; // Simplified metric
+
+      return {
+        queueDepth: queueStatus.pendingJobs,
+        totalPending: queueStatus.pendingJobs,
+        totalInProgress: queueStatus.inProgressJobs,
+        totalCompleted: queueStatus.completedJobs,
+        totalFailed: queueStatus.failedJobs,
+        workerUtilization,
+        averageProcessingTime
+      };
+
+    } catch (error) {
+      console.error('❌ Error getting queue metrics:', error);
+      return {
+        queueDepth: 0,
+        totalPending: 0,
+        totalInProgress: 0,
+        totalCompleted: 0,
+        totalFailed: 0,
+        workerUtilization: 0,
+        averageProcessingTime: 0
+      };
+    }
+  }
+
   static async getHealthStatus(): Promise<{ healthy: boolean; details: any }> {
     try {
       const queueStatus = await this.getQueueStatus();
@@ -201,7 +242,10 @@ export class ProductionWorkerQueue {
         details: {
           ...queueStatus,
           isRunning: this.isRunning,
-          failureRate: Math.round(failureRate * 100)
+          failureRate: Math.round(failureRate * 100),
+          queueDepth: queueStatus.pendingJobs,
+          activeWorkers: this.MAX_CONCURRENT_BATCHES,
+          errorRate: failureRate
         }
       };
 
