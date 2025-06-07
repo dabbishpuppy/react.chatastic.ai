@@ -15,20 +15,44 @@ interface BackgroundJob {
   payload: any;
   attempts: number;
   max_attempts: number;
+  priority: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  scheduled_at: string;
 }
 
-class JobProcessor {
+interface JobMetrics {
+  processed: number;
+  failed: number;
+  avgProcessingTime: number;
+  queueDepth: number;
+}
+
+class EnhancedJobProcessor {
   private supabase: any;
+  private metrics: JobMetrics = {
+    processed: 0,
+    failed: 0,
+    avgProcessingTime: 0,
+    queueDepth: 0
+  };
 
   constructor(supabase: any) {
     this.supabase = supabase;
   }
 
   async processJob(job: BackgroundJob): Promise<void> {
+    const startTime = Date.now();
     console.log(`Processing job: ${job.job_type} for source: ${job.source_id}`);
 
     try {
       await this.updateJobStatus(job.id, 'processing');
+      await this.broadcastEvent({
+        topic: `source:${job.source_id}`,
+        type: 'STATUS_CHANGED',
+        sourceId: job.source_id,
+        status: 'processing',
+        metadata: { jobId: job.id, jobType: job.job_type }
+      });
 
       switch (job.job_type) {
         case 'crawl_pages':
@@ -37,21 +61,27 @@ class JobProcessor {
         case 'train_pages':
           await this.handleTrainPages(job);
           break;
+        case 'process_page':
+          await this.handleProcessPage(job);
+          break;
         default:
           throw new Error(`Unknown job type: ${job.job_type}`);
       }
 
       await this.updateJobStatus(job.id, 'completed');
-      console.log(`Job completed: ${job.id}`);
+      
+      const processingTime = Date.now() - startTime;
+      this.updateMetrics(true, processingTime);
+      
+      console.log(`Job completed: ${job.id} in ${processingTime}ms`);
 
     } catch (error) {
       console.error(`Job failed: ${job.id}`, error);
-      await this.updateJobStatus(job.id, 'failed', error.message);
-
-      // Retry logic
-      if (job.attempts < job.max_attempts) {
-        await this.retryJob(job);
-      }
+      
+      const processingTime = Date.now() - startTime;
+      this.updateMetrics(false, processingTime);
+      
+      await this.handleJobFailure(job, error.message);
     }
   }
 
@@ -59,9 +89,6 @@ class JobProcessor {
     const { source_id, config } = job.payload;
     
     console.log(`Starting crawl for source: ${source_id}`);
-    
-    // This would integrate with your existing crawl service
-    // For now, we'll simulate the crawl process
     
     // Transition source to CRAWLING status
     await this.supabase.rpc('transition_source_status', {
@@ -71,15 +98,40 @@ class JobProcessor {
       p_metadata: { job_id: job.id, config }
     });
 
-    // Simulate crawl completion after a delay
-    setTimeout(async () => {
-      await this.supabase.rpc('transition_source_status', {
-        p_source_id: source_id,
-        p_new_status: 'COMPLETED',
-        p_event_type: 'CRAWL_COMPLETED',
-        p_metadata: { job_id: job.id, completed_at: new Date().toISOString() }
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'STATUS_CHANGED',
+      sourceId: source_id,
+      status: 'CRAWLING'
+    });
+
+    // Simulate crawl process with progress updates
+    for (let i = 1; i <= 10; i++) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await this.broadcastEvent({
+        topic: `source:${source_id}`,
+        type: 'CRAWL_PROGRESS',
+        sourceId: source_id,
+        progress: i * 10,
+        metadata: { step: `Processing batch ${i}/10` }
       });
-    }, 5000);
+    }
+
+    // Complete crawl
+    await this.supabase.rpc('transition_source_status', {
+      p_source_id: source_id,
+      p_new_status: 'COMPLETED',
+      p_event_type: 'CRAWL_COMPLETED',
+      p_metadata: { job_id: job.id, completed_at: new Date().toISOString() }
+    });
+
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'SOURCE_COMPLETED',
+      sourceId: source_id,
+      status: 'COMPLETED'
+    });
   }
 
   private async handleTrainPages(job: BackgroundJob): Promise<void> {
@@ -87,7 +139,6 @@ class JobProcessor {
     
     console.log(`Starting training for source: ${source_id}`);
     
-    // Transition source to TRAINING status
     await this.supabase.rpc('transition_source_status', {
       p_source_id: source_id,
       p_new_status: 'TRAINING',
@@ -95,15 +146,85 @@ class JobProcessor {
       p_metadata: { job_id: job.id }
     });
 
-    // Simulate training completion
-    setTimeout(async () => {
-      await this.supabase.rpc('transition_source_status', {
-        p_source_id: source_id,
-        p_new_status: 'TRAINED',
-        p_event_type: 'TRAINING_COMPLETED',
-        p_metadata: { job_id: job.id, completed_at: new Date().toISOString() }
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'STATUS_CHANGED',
+      sourceId: source_id,
+      status: 'TRAINING'
+    });
+
+    // Simulate training with progress
+    for (let i = 1; i <= 5; i++) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      await this.broadcastEvent({
+        topic: `source:${source_id}`,
+        type: 'CRAWL_PROGRESS',
+        sourceId: source_id,
+        progress: i * 20,
+        metadata: { step: `Training phase ${i}/5` }
       });
-    }, 3000);
+    }
+
+    await this.supabase.rpc('transition_source_status', {
+      p_source_id: source_id,
+      p_new_status: 'TRAINED',
+      p_event_type: 'TRAINING_COMPLETED',
+      p_metadata: { job_id: job.id, completed_at: new Date().toISOString() }
+    });
+
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'SOURCE_COMPLETED',
+      sourceId: source_id,
+      status: 'TRAINED'
+    });
+  }
+
+  private async handleProcessPage(job: BackgroundJob): Promise<void> {
+    const { page_id, source_id } = job.payload;
+    
+    // Simulate page processing
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'PAGE_COMPLETED',
+      sourceId: source_id,
+      pageId: page_id,
+      status: 'completed'
+    });
+  }
+
+  private async handleJobFailure(job: BackgroundJob, errorMessage: string): Promise<void> {
+    if (job.attempts < job.max_attempts) {
+      // Calculate exponential backoff delay
+      const retryDelay = Math.pow(2, job.attempts) * 1000;
+      const scheduledAt = new Date(Date.now() + retryDelay).toISOString();
+      
+      console.log(`Scheduling retry for job ${job.id} in ${retryDelay}ms`);
+      
+      await this.supabase
+        .from('background_jobs')
+        .update({
+          status: 'pending',
+          attempts: job.attempts + 1,
+          scheduled_at: scheduledAt,
+          error_message: errorMessage
+        })
+        .eq('id', job.id);
+    } else {
+      // Mark as permanently failed
+      await this.updateJobStatus(job.id, 'failed', errorMessage);
+      
+      await this.broadcastEvent({
+        topic: `source:${job.source_id}`,
+        type: 'STATUS_CHANGED',
+        sourceId: job.source_id,
+        status: 'ERROR',
+        metadata: { error: errorMessage, jobId: job.id }
+      });
+    }
   }
 
   private async updateJobStatus(jobId: string, status: string, errorMessage?: string): Promise<void> {
@@ -128,19 +249,32 @@ class JobProcessor {
       .eq('id', jobId);
   }
 
-  private async retryJob(job: BackgroundJob): Promise<void> {
-    const retryDelay = Math.pow(2, job.attempts) * 1000; // Exponential backoff
+  private async broadcastEvent(event: any): Promise<void> {
+    try {
+      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/realtime-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify(event)
+      });
+    } catch (error) {
+      console.error('Failed to broadcast event:', error);
+    }
+  }
+
+  private updateMetrics(success: boolean, processingTime: number): void {
+    if (success) {
+      this.metrics.processed++;
+    } else {
+      this.metrics.failed++;
+    }
     
-    setTimeout(async () => {
-      await this.supabase
-        .from('background_jobs')
-        .update({
-          status: 'pending',
-          attempts: job.attempts + 1,
-          scheduled_at: new Date(Date.now() + retryDelay).toISOString()
-        })
-        .eq('id', job.id);
-    }, retryDelay);
+    // Update average processing time
+    const totalJobs = this.metrics.processed + this.metrics.failed;
+    this.metrics.avgProcessingTime = 
+      (this.metrics.avgProcessingTime * (totalJobs - 1) + processingTime) / totalJobs;
   }
 
   async pollAndProcessJobs(): Promise<void> {
@@ -160,6 +294,8 @@ class JobProcessor {
       return;
     }
 
+    this.metrics.queueDepth = jobs?.length || 0;
+
     if (jobs && jobs.length > 0) {
       console.log(`Processing ${jobs.length} jobs`);
       
@@ -167,6 +303,10 @@ class JobProcessor {
         await this.processJob(job);
       }
     }
+  }
+
+  getMetrics(): JobMetrics {
+    return { ...this.metrics };
   }
 }
 
@@ -180,20 +320,30 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const processor = new JobProcessor(supabase);
+    const processor = new EnhancedJobProcessor(supabase);
 
     if (req.method === 'POST') {
       // Manual job processing trigger
       await processor.pollAndProcessJobs();
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ 
+        success: true,
+        metrics: processor.getMetrics()
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Health check
-    return new Response(JSON.stringify({ status: 'healthy' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    if (req.method === 'GET') {
+      // Health check with metrics
+      return new Response(JSON.stringify({ 
+        status: 'healthy',
+        metrics: processor.getMetrics()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    return new Response('Method not allowed', { status: 405 })
 
   } catch (error) {
     console.error('Error in workflow-job-processor:', error)
