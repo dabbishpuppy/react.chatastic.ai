@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
 import { fetchMaybeSingle, handleSupabaseError } from '@/utils/safeSupabaseQueries';
 import { ProductionErrorMonitor } from '@/utils/productionErrorMonitoring';
+import { AgentSource } from '@/types/rag';
 
 interface UseSourceStatusRealtimeProps {
   sourceId: string;
@@ -16,7 +17,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   const [linksCount, setLinksCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
-  const [sourceData, setSourceData] = useState<any>(null);
+  const [sourceData, setSourceData] = useState<AgentSource | null>(null);
   
   const statusRef = useRef(status);
   const progressRef = useRef(progress);
@@ -36,7 +37,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
       
       // Refetch source data to get latest metadata
       if (sourceId) {
-        fetchMaybeSingle(
+        fetchMaybeSingle<AgentSource>(
           supabase
             .from('agent_sources')
             .select('*')
@@ -76,7 +77,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
 
     const fetchInitialData = async () => {
       try {
-        const source = await fetchMaybeSingle(
+        const source = await fetchMaybeSingle<AgentSource>(
           supabase
             .from('agent_sources')
             .select('*')
@@ -118,7 +119,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           filter: `id=eq.${sourceId}`
         },
         (payload) => {
-          const updatedSource = payload.new as any;
+          const updatedSource = payload.new as AgentSource;
           console.log('📡 Real-time update received:', updatedSource);
           
           setSourceData(updatedSource);

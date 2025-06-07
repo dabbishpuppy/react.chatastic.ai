@@ -30,7 +30,7 @@ const IntegrationsPage: React.FC = () => {
         setVisibilityError(false);
         const data = await getAgentVisibility(agentId);
         
-        if (data) {
+        if (data && data.visibility) {
           setVisibility(data.visibility);
         } else if (data === null) {
           // Agent not found

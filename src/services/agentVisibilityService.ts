@@ -2,10 +2,14 @@
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMaybeSingle } from "@/utils/safeSupabaseQueries";
 
+interface AgentVisibilityData {
+  visibility: string;
+}
+
 // Get the agent visibility from the database
-export const getAgentVisibility = async (agentId: string) => {
+export const getAgentVisibility = async (agentId: string): Promise<AgentVisibilityData | null> => {
   try {
-    const data = await fetchMaybeSingle(
+    const data = await fetchMaybeSingle<AgentVisibilityData>(
       supabase
         .from('agents')
         .select('visibility')
