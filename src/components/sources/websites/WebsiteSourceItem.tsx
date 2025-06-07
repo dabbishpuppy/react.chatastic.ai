@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import WebsiteSourceStatus from './components/WebsiteSourceStatus';
 import WebsiteSourceStatusBadges from './components/WebsiteSourceStatusBadges';
-import WorkflowControls from '@/components/workflow/WorkflowControls';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -41,7 +40,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url || '');
-  const [showWorkflowControls, setShowWorkflowControls] = useState(false);
 
   const handleEdit = () => {
     if (isEditing) {
@@ -153,19 +151,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                     )}
                   </div>
                 </div>
-
-                {/* Workflow Controls */}
-                {showWorkflowControls && (
-                  <div className="mt-3">
-                    <WorkflowControls 
-                      source={source}
-                      onRefresh={() => {
-                        // Trigger a refresh of the sources list
-                        window.dispatchEvent(new CustomEvent('sourceUpdated'));
-                      }}
-                    />
-                  </div>
-                )}
               </div>
 
               {/* Actions menu */}
@@ -176,13 +161,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setShowWorkflowControls(!showWorkflowControls)}>
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    {showWorkflowControls ? 'Hide' : 'Show'} Workflow Controls
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuSeparator />
-                  
                   <DropdownMenuItem onClick={() => setIsEditing(true)}>
                     <Edit2 className="h-4 w-4 mr-2" />
                     Edit URL
