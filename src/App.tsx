@@ -86,6 +86,13 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              {/* New route for website source details */}
+              <Route path="/agent/:agentId/sources/website/:sourceId" element={
+                <ProtectedRoute>
+                  <SourceDetailPage />
+                </ProtectedRoute>
+              } />
+              
               <Route path="/agent/:agentId/actions" element={
                 <ProtectedRoute>
                   <ActionsPage />
