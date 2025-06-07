@@ -22,7 +22,11 @@ const WebsiteFormSection: React.FC<WebsiteFormSectionProps> = () => {
     console.log('Crawl started with parent source ID:', parentSourceId);
   };
 
-  return <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />;
+  return (
+    <div>
+      <EnhancedWebsiteCrawlFormV3 onCrawlStarted={handleCrawlStarted} />
+    </div>
+  );
 };
 
 export default WebsiteFormSection;
