@@ -68,7 +68,9 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
       
       if (childData && parentData) {
         const childProcessingStatus = childData.processing_status || 'pending';
-        const parentTrainingStatus = parentData.metadata?.training_status || parentData.crawl_status;
+        // Safely access training_status from metadata
+        const metadata = parentData.metadata as any;
+        const parentTrainingStatus = metadata?.training_status || parentData.crawl_status;
         
         setChildProcessingStatus(childProcessingStatus);
         updateDisplayStatus(childData.status, childProcessingStatus, parentTrainingStatus);
@@ -105,7 +107,9 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
             .eq('id', parentSourceId)
             .single()
             .then(({ data: parentData }) => {
-              const parentTrainingStatus = parentData?.metadata?.training_status || parentData?.crawl_status;
+              // Safely access training_status from metadata
+              const metadata = parentData?.metadata as any;
+              const parentTrainingStatus = metadata?.training_status || parentData?.crawl_status;
               updateDisplayStatus(updatedChild.status, newProcessingStatus, parentTrainingStatus);
             });
         }
@@ -126,7 +130,9 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
         (payload) => {
           const updatedParent = payload.new as any;
           console.log('Parent source training update:', updatedParent);
-          const parentTrainingStatus = updatedParent.metadata?.training_status || updatedParent.crawl_status;
+          // Safely access training_status from metadata
+          const metadata = updatedParent.metadata as any;
+          const parentTrainingStatus = metadata?.training_status || updatedParent.crawl_status;
           
           // Get current child status to update display
           supabase
@@ -143,9 +149,19 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
       )
       .subscribe();
 
+    // Listen for training completion events
+    const handleTrainingCompleted = () => {
+      console.log('Training completed event - updating child status');
+      // Trigger a refetch of both child and parent data
+      fetchInitialState();
+    };
+
+    window.addEventListener('trainingCompleted', handleTrainingCompleted);
+
     return () => {
       supabase.removeChannel(childChannel);
       supabase.removeChannel(parentChannel);
+      window.removeEventListener('trainingCompleted', handleTrainingCompleted);
     };
   }, [status, parentSourceId, pageId]);
 

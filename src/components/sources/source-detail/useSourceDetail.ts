@@ -42,7 +42,7 @@ export const useSourceDetail = () => {
           const transformedSource: AgentSource = {
             id: pageData.id,
             title: pageData.url,
-            content: pageData.content || '',
+            content: '', // Child pages don't have content field, use empty string
             url: pageData.url,
             source_type: 'website',
             agent_id: agentId || '',
