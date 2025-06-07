@@ -67,6 +67,13 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   useEffect(() => {
     if (!sourceId) return;
 
+    // Validate that sourceId looks like a valid UUID for agent_sources table
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(sourceId)) {
+      console.warn('Invalid sourceId format for agent_sources query:', sourceId);
+      return;
+    }
+
     const fetchInitialData = async () => {
       try {
         const { data: source, error } = await supabase

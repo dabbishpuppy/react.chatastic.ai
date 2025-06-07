@@ -26,13 +26,12 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   parentSourceId,
   pageId
 }) => {
+  // Use the simple hook that doesn't make database calls for child pages
   const { displayStatus, isLoading } = useChildPageStatus({
     status,
     parentSourceId,
     pageId
   });
-
-  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'pageId:', pageId);
 
   return (
     <>

@@ -27,18 +27,19 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
   isChild = false,
   source
 }) => {
-  // Use the robust version if we have a sourceId
-  if (sourceId) {
+  // Only use the robust version for actual source IDs (not child page IDs)
+  // Child pages should not use the robust status hook as it makes invalid DB calls
+  if (sourceId && !isChild) {
     return (
       <WebsiteSourceStatusRobust 
         sourceId={sourceId}
         initialStatus={status}
-        showConnectionStatus={!isChild}
+        showConnectionStatus={true}
       />
     );
   }
 
-  // Compute status using workflow integration service if we have the full source
+  // For child pages or when no sourceId, compute status directly from props
   let computedStatus = status;
   if (source) {
     // Check if this source should use the workflow system
