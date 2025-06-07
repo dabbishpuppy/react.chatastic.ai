@@ -143,16 +143,17 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Only show expand/collapse arrow when there are actual child sources */}
-      {onToggleExpanded && hasChildSources && (
+      {/* Always show expand/collapse arrow for parent sources, but disable when no child sources */}
+      {onToggleExpanded && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onToggleExpanded}
-                className="h-6 w-6 p-0"
+                onClick={hasChildSources ? onToggleExpanded : undefined}
+                disabled={!hasChildSources}
+                className={`h-6 w-6 p-0 ${!hasChildSources ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {isExpanded ? (
                   <ChevronDown className="w-3 h-3" />
@@ -162,7 +163,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isExpanded ? 'Collapse' : 'Expand'} child sources</p>
+              <p>{hasChildSources ? (isExpanded ? 'Collapse' : 'Expand') + ' child sources' : 'No child sources'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
