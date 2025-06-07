@@ -31,6 +31,14 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
   const isFreePlan = true; // This would come from user subscription data
   const showSizeWarning = isFreePlan && totalSizeBytes >= SIZE_LIMIT_BYTES;
 
+  // Format total size with limit for free users
+  const formatTotalSizeWithLimit = () => {
+    if (isFreePlan) {
+      return `${totalSize} / 500 KB`;
+    }
+    return totalSize;
+  };
+
   const getButtonIcon = () => {
     if (buttonState.buttonText === 'Training Agent...') {
       return <Loader2 className="h-4 w-4 animate-spin" />;
@@ -98,10 +106,10 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
               {/* Divider */}
               <div className="border-t border-dotted border-gray-300 my-4"></div>
 
-              {/* Total Size */}
+              {/* Total Size with Limit */}
               <div className="flex justify-between items-center">
                 <span className="text-gray-700 font-medium">Total size:</span>
-                <span className="text-gray-900 font-semibold">{totalSize}</span>
+                <span className="text-gray-900 font-semibold">{formatTotalSizeWithLimit()}</span>
               </div>
 
               {/* Simplified Training Button */}
