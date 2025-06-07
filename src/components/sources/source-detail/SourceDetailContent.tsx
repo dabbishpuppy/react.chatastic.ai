@@ -89,9 +89,9 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
             )}
             
             <div className="prose max-w-none">
-              {isHtmlContent ? (
+              {isHtmlContent || isChildPage ? (
                 <div 
-                  className="font-sans text-gray-700"
+                  className="font-sans text-gray-700 prose prose-headings:text-gray-900 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-sm prose-p:text-gray-700 prose-strong:text-gray-900 prose-em:italic prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4"
                   style={{ 
                     fontSize: '0.875rem',
                     lineHeight: '1.5'
