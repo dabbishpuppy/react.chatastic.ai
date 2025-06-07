@@ -15,10 +15,12 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [sourceData, setSourceData] = useState<any>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   
   const statusRef = useRef(status);
   const progressRef = useRef(progress);
   const linksCountRef = useRef(linksCount);
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
 
   // Update refs when state changes
   useEffect(() => {
@@ -26,6 +28,17 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     progressRef.current = progress;
     linksCountRef.current = linksCount;
   }, [status, progress, linksCount]);
+
+  // Debounced status update function
+  const updateStatusDebounced = (newStatus: string, delay: number = 150) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      setStatus(newStatus);
+    }, delay);
+  };
 
   // Listen for training completion events
   useEffect(() => {
@@ -49,7 +62,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
               console.log('Refetched source data after training:', data);
               setSourceData(data);
               const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(data);
-              setStatus(mappedStatus);
+              updateStatusDebounced(mappedStatus, 50); // Quick update for training completion
               setLastUpdateTime(new Date());
             }
           });
@@ -62,7 +75,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
         console.log('🔄 Custom source status update received:', event.detail);
         setSourceData(event.detail.source);
         const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(event.detail.source);
-        setStatus(mappedStatus);
+        updateStatusDebounced(mappedStatus);
         setLastUpdateTime(new Date());
       }
     };
@@ -73,6 +86,9 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     return () => {
       window.removeEventListener('trainingCompleted', handleTrainingCompleted as EventListener);
       window.removeEventListener('sourceStatusUpdate', handleSourceStatusUpdate as EventListener);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
   }, [sourceId]);
 
@@ -90,6 +106,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
 
         if (error) {
           console.error('Error fetching source data:', error);
+          setIsInitializing(false);
           return;
         }
 
@@ -99,15 +116,17 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           
           // Use SimplifiedSourceStatusService to determine proper status
           const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
-          setStatus(mappedStatus);
+          setStatus(mappedStatus); // Set immediately without debounce for initial load
           console.log(`🔄 Initial status mapped to ${mappedStatus} for source ${sourceId}`);
           
           setProgress(source.progress || 0);
           setLinksCount(source.links_count || 0);
           setLastUpdateTime(new Date());
+          setIsInitializing(false);
         }
       } catch (error) {
         console.error('Error in fetchInitialData:', error);
+        setIsInitializing(false);
       }
     };
 
@@ -130,9 +149,9 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           setSourceData(updatedSource);
           
           // Use SimplifiedSourceStatusService to determine proper status
-          const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(updatedSource);
-          setStatus(mappedStatus);
-          console.log(`🔄 Real-time status mapped to ${mappedStatus} for source ${sourceId}`);
+          const mappatedStatus = SimplifiedSourceStatusService.getSourceStatus(updatedSource);
+          updateStatusDebounced(mappatedStatus);
+          console.log(`🔄 Real-time status mapped to ${mappatedStatus} for source ${sourceId}`);
           
           setProgress(updatedSource.progress || 0);
           setLinksCount(updatedSource.links_count || 0);
@@ -152,6 +171,9 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     return () => {
       console.log(`📡 Cleaning up real-time subscription for source: ${sourceId}`);
       supabase.removeChannel(channel);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
   }, [sourceId]);
 
@@ -161,6 +183,7 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
     linksCount,
     isConnected,
     lastUpdateTime,
-    sourceData
+    sourceData,
+    isInitializing
   };
 };

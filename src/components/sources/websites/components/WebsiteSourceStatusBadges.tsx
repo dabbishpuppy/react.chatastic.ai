@@ -23,13 +23,18 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
 }) => {
   const [crawlStatus, setCrawlStatus] = useState(initialCrawlStatus);
   const [sourceData, setSourceData] = useState(source);
+  const [isLoading, setIsLoading] = useState(!source); // Start as loading if no source data
 
   // Set up real-time subscription for status updates including metadata changes
   useEffect(() => {
     if (!sourceId) return;
 
-    setCrawlStatus(initialCrawlStatus);
-    setSourceData(source);
+    // Only update if we have initial data
+    if (source) {
+      setCrawlStatus(initialCrawlStatus);
+      setSourceData(source);
+      setIsLoading(false);
+    }
 
     console.log(`📡 Setting up real-time status tracking for source: ${sourceId}`);
 
@@ -50,6 +55,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
           // Update both crawl status and full source data for proper status computation
           setCrawlStatus(updatedSource.crawl_status);
           setSourceData(updatedSource);
+          setIsLoading(false);
         }
       )
       .subscribe((status) => {
@@ -71,6 +77,7 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
               console.log('🔄 Refetched source data in badges:', data);
               setSourceData(data);
               setCrawlStatus(data.crawl_status);
+              setIsLoading(false);
             }
           });
       }
@@ -86,10 +93,13 @@ const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
   }, [sourceId, initialCrawlStatus, source]);
 
   // Use SimplifiedSourceStatusService to determine the correct status
-  const computedStatus = sourceData ? SimplifiedSourceStatusService.getSourceStatus(sourceData) : crawlStatus;
+  const computedStatus = sourceData && !isLoading 
+    ? SimplifiedSourceStatusService.getSourceStatus(sourceData) 
+    : (isLoading ? 'pending' : crawlStatus); // Show pending while loading instead of unknown
+
   const statusConfig = getStatusConfig(computedStatus);
 
-  console.log('📊 WebsiteSourceStatusBadges - computed status:', computedStatus, 'for source:', sourceId, 'raw status:', crawlStatus);
+  console.log('📊 WebsiteSourceStatusBadges - computed status:', computedStatus, 'for source:', sourceId, 'raw status:', crawlStatus, 'isLoading:', isLoading);
 
   return (
     <div className="flex items-center gap-2">

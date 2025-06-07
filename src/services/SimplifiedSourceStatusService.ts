@@ -16,12 +16,12 @@ export interface ButtonState {
 
 export class SimplifiedSourceStatusService {
   static getSourceStatus(source: any): string {
-    if (!source) return 'unknown';
+    if (!source) return 'pending'; // Better fallback than 'unknown'
     
     const status = source.crawl_status;
     const metadata = source.metadata || {};
     
-    // Handle training completion states
+    // Handle training completion states first (highest priority)
     if (metadata.training_completed_at || metadata.last_trained_at) {
       return 'trained';
     }
@@ -44,7 +44,7 @@ export class SimplifiedSourceStatusService {
       return 'recrawling';
     }
     
-    // Standard status mapping
+    // Standard status mapping with better fallbacks
     switch (status) {
       case 'pending':
         return 'pending';
@@ -61,7 +61,10 @@ export class SimplifiedSourceStatusService {
       case 'trained':
         return 'trained';
       default:
-        return status || 'unknown';
+        // Instead of 'unknown', preserve the last known valid status or default to 'pending'
+        return status && ['pending', 'in_progress', 'completed', 'ready_for_training', 'training', 'trained', 'failed', 'recrawling'].includes(status) 
+          ? status 
+          : 'pending';
     }
   }
 

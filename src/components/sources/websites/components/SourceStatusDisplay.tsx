@@ -10,6 +10,7 @@ interface SourceStatusDisplayProps {
   linksCount: number;
   isConnected: boolean;
   showConnectionStatus: boolean;
+  isInitializing?: boolean;
 }
 
 const SourceStatusDisplay: React.FC<SourceStatusDisplayProps> = ({
@@ -17,9 +18,12 @@ const SourceStatusDisplay: React.FC<SourceStatusDisplayProps> = ({
   progress,
   linksCount,
   isConnected,
-  showConnectionStatus
+  showConnectionStatus,
+  isInitializing = false
 }) => {
-  const statusConfig = getStatusConfig(status);
+  // Show pending status while initializing to prevent "Unknown" flash
+  const displayStatus = isInitializing ? 'pending' : status;
+  const statusConfig = getStatusConfig(displayStatus);
 
   return (
     <div className="flex items-center gap-3">
@@ -28,7 +32,7 @@ const SourceStatusDisplay: React.FC<SourceStatusDisplayProps> = ({
         {statusConfig.text}
       </Badge>
       
-      {(status === 'in_progress' || status === 'recrawling') && (
+      {(displayStatus === 'in_progress' || displayStatus === 'recrawling') && (
         <div className="text-xs text-gray-500">
           {progress > 0 && `${progress}% • `}
           {linksCount > 0 && `${linksCount} links`}
