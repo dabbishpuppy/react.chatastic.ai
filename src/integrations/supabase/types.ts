@@ -2395,6 +2395,10 @@ export type Database = {
         Args: { target_customer_id: string }
         Returns: number
       }
+      increment_retry_count: {
+        Args: { job_ids: string[] }
+        Returns: number
+      }
       is_team_member: {
         Args: { team_id: string }
         Returns: boolean

@@ -87,20 +87,29 @@ export class ProductionWorkerQueue {
     console.log(`🔄 Processing batch of ${jobs.length} jobs for parent: ${parentSourceId}`);
 
     try {
-      // Mark jobs as in_progress
+      // Mark jobs as in_progress with incremented retry count
       const jobIds = jobs.map(job => job.id);
       
-      const { error: updateError } = await supabase
-        .from('source_pages')
-        .update({
-          status: 'in_progress',
-          started_at: new Date().toISOString(),
-          retry_count: supabase.rpc('increment_retry_count', { job_ids: jobIds })
-        })
-        .in('id', jobIds);
+      // First increment retry count for each job individually
+      const updatePromises = jobIds.map(async (jobId) => {
+        const job = jobs.find(j => j.id === jobId);
+        const newRetryCount = (job?.retry_count || 0) + 1;
+        
+        return supabase
+          .from('source_pages')
+          .update({
+            status: 'in_progress',
+            started_at: new Date().toISOString(),
+            retry_count: newRetryCount
+          })
+          .eq('id', jobId);
+      });
 
-      if (updateError) {
-        console.error('❌ Error updating job status:', updateError);
+      const updateResults = await Promise.all(updatePromises);
+      const updateErrors = updateResults.filter(result => result.error);
+      
+      if (updateErrors.length > 0) {
+        console.error('❌ Error updating job status:', updateErrors);
         return;
       }
 
