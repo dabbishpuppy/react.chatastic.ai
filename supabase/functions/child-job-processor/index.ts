@@ -27,7 +27,7 @@ serve(async (req) => {
     const { data: claimedJob, error: claimError } = await supabaseClient
       .from('source_pages')
       .update({
-        status: 'in_progress',
+        status: 'in_progress', // CLEAN STATUS TRANSITION: pending -> in_progress
         started_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -36,19 +36,19 @@ serve(async (req) => {
       .select()
       .single();
 
-    // FIXED: Return 200 success when job is already claimed (not an error)
+    // Return success when job is already claimed (not an error)
     if (claimError || !claimedJob) {
       console.log(`⚠️ Job ${childJobId} could not be claimed (already processed or in progress)`);
       return new Response(
         JSON.stringify({
-          success: true, // Changed to true - this is not an error
+          success: true,
           message: 'Job already claimed or completed by another worker',
           jobId: childJobId,
-          skipped: true // Add flag to indicate it was skipped
+          skipped: true
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200, // Changed from 409 to 200
+          status: 200,
         }
       );
     }
@@ -83,13 +83,19 @@ serve(async (req) => {
     if (!duplicateCheckError && existingPages && existingPages.length > 0) {
       console.log(`⚠️ URL ${claimedJob.url} already processed successfully, marking as duplicate`);
       
-      await updateJobStatus(supabaseClient, childJobId, 'completed', {
-        content_size: 0,
-        chunks_created: 0,
-        processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
-        error_message: 'Duplicate URL - already processed',
-        processing_status: 'processed'
-      });
+      // CLEAN STATUS TRANSITION: in_progress -> completed (no intermediate states)
+      await supabaseClient
+        .from('source_pages')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          content_size: 0,
+          chunks_created: 0,
+          processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
+          error_message: 'Duplicate URL - already processed',
+          processing_status: 'processed' // Mark as processed since it's a duplicate
+        })
+        .eq('id', childJobId);
 
       return new Response(
         JSON.stringify({
@@ -161,22 +167,19 @@ serve(async (req) => {
         const fallbackContent = `Page: ${title}`;
         console.log(`📝 Using fallback content: "${fallbackContent}"`);
         
-        // Mark job as completed but don't create chunks yet - wait for manual training
-        await updateJobStatus(supabaseClient, childJobId, 'completed', {
-          content_size: fallbackContent.length,
-          chunks_created: 0, // No chunks created yet
-          processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
-          content_hash: await generateContentHash(fallbackContent),
-          processing_status: 'pending' // Mark as pending processing
-        });
-
-        // Mark parent source as requiring manual training
+        // CLEAN STATUS TRANSITION: in_progress -> completed (single atomic update)
         await supabaseClient
-          .from('agent_sources')
-          .update({ requires_manual_training: true })
-          .eq('id', claimedJob.parent_source_id);
-
-        console.log(`✅ Crawled page ${childJobId} - content ready for manual training`);
+          .from('source_pages')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            content_size: fallbackContent.length,
+            chunks_created: 0,
+            processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
+            content_hash: await generateContentHash(fallbackContent),
+            processing_status: 'pending' // Mark as pending for future processing
+          })
+          .eq('id', childJobId);
 
         return new Response(
           JSON.stringify({
@@ -185,7 +188,7 @@ serve(async (req) => {
             parentSourceId: claimedJob.parent_source_id,
             contentSize: fallbackContent.length,
             chunksCreated: 0,
-            message: 'Page crawled successfully - ready for manual training'
+            message: 'Page crawled successfully - ready for training'
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -213,14 +216,20 @@ serve(async (req) => {
     if (!contentDupeError && duplicateContent && duplicateContent.length > 0) {
       console.log(`⚠️ Content from ${claimedJob.url} already exists (duplicate of ${duplicateContent[0].url})`);
       
-      await updateJobStatus(supabaseClient, childJobId, 'completed', {
-        content_size: contentSize,
-        chunks_created: 0,
-        processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
-        content_hash: contentHash,
-        processing_status: 'processed', // Mark as processed since it's a duplicate
-        error_message: `Duplicate content of ${duplicateContent[0].url}`
-      });
+      // CLEAN STATUS TRANSITION: in_progress -> completed (single atomic update)
+      await supabaseClient
+        .from('source_pages')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          content_size: contentSize,
+          chunks_created: 0,
+          processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
+          content_hash: contentHash,
+          processing_status: 'processed', // Mark as processed since it's a duplicate
+          error_message: `Duplicate content of ${duplicateContent[0].url}`
+        })
+        .eq('id', childJobId);
 
       return new Response(
         JSON.stringify({
@@ -238,14 +247,17 @@ serve(async (req) => {
       );
     }
 
-    // Store the crawled content but don't create chunks yet - wait for manual training
-    // Update the source_pages record with crawled content metadata
+    // CLEAN STATUS TRANSITION: in_progress -> completed (single atomic update with all data)
     await supabaseClient
       .from('source_pages')
       .update({
+        status: 'completed', // Final status - no more changes to this field
+        completed_at: new Date().toISOString(),
         content_hash: contentHash,
         content_size: contentSize,
-        processing_status: 'pending', // Mark as pending processing
+        chunks_created: 0, // Will be updated when chunks are actually created
+        processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
+        processing_status: 'pending', // Ready for chunk processing
         metadata: {
           title: extractTitle(htmlContent),
           crawled_at: new Date().toISOString(),
@@ -254,21 +266,7 @@ serve(async (req) => {
       })
       .eq('id', childJobId);
 
-    // Mark job as completed (crawled) but processing is pending
-    await updateJobStatus(supabaseClient, childJobId, 'completed', {
-      content_size: contentSize,
-      chunks_created: 0, // No chunks created yet
-      processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
-      content_hash: contentHash
-    });
-
-    // Mark parent source as requiring manual training
-    await supabaseClient
-      .from('agent_sources')
-      .update({ requires_manual_training: true })
-      .eq('id', claimedJob.parent_source_id);
-
-    console.log(`✅ Successfully crawled page ${childJobId} - content ready for manual training`);
+    console.log(`✅ Successfully crawled page ${childJobId} - content ready for processing`);
 
     return new Response(
       JSON.stringify({
@@ -277,7 +275,7 @@ serve(async (req) => {
         parentSourceId: claimedJob.parent_source_id,
         contentSize,
         chunksCreated: 0,
-        message: 'Page crawled successfully - ready for manual training'
+        message: 'Page crawled successfully - ready for processing'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -293,10 +291,15 @@ serve(async (req) => {
       const { childJobId } = await req.json().catch(() => ({}));
       if (childJobId) {
         const supabaseClient = getSupabaseClient();
-        await updateJobStatus(supabaseClient, childJobId, 'failed', {
-          error_message: error.message,
-          processing_time_ms: Date.now() - Date.now() // Fallback timing
-        });
+        await supabaseClient
+          .from('source_pages')
+          .update({
+            status: 'failed',
+            completed_at: new Date().toISOString(),
+            error_message: error.message,
+            processing_time_ms: Date.now() - Date.now() // Fallback timing
+          })
+          .eq('id', childJobId);
       }
     } catch (updateError) {
       console.error('Failed to update job status:', updateError);
