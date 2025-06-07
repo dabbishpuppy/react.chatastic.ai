@@ -6,22 +6,24 @@ import {
   RefreshCw, 
   Trash2,
   MoreHorizontal,
-  ChevronDown
+  ChevronDown,
+  Restore
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
-import { useChildPageStatus } from '../hooks/useChildPageStatus';
+import { SimpleStatusService } from '@/services/SimpleStatusService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChildPageActionsProps {
   url: string;
   pageId: string;
   parentSourceId: string;
-  status: string; // Original status for fallback
+  status: string;
   onDelete?: () => void;
 }
 
-type ConfirmationType = 'recrawl' | 'delete' | null;
+type ConfirmationType = 'recrawl' | 'delete' | 'restore' | null;
 
 const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
@@ -31,15 +33,28 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
+  const [sourceData, setSourceData] = useState<any>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
-  // Use the real-time status hook to get immediate updates
-  const { displayStatus } = useChildPageStatus({ 
-    status, 
-    parentSourceId, 
-    pageId 
-  });
   const navigate = useNavigate();
   const { agentId } = useParams();
+
+  // Fetch source data to determine status
+  React.useEffect(() => {
+    const fetchSourceData = async () => {
+      const { data } = await supabase
+        .from('agent_sources')
+        .select('*')
+        .eq('id', pageId)
+        .single();
+      
+      setSourceData(data);
+    };
+    
+    fetchSourceData();
+  }, [pageId]);
+
+  const displayStatus = sourceData ? SimpleStatusService.getSourceStatus(sourceData) : status;
+  const isRemoved = displayStatus === 'removed';
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -47,6 +62,10 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   const handleDeleteClick = () => {
     setConfirmationType('delete');
+  };
+
+  const handleRestoreClick = () => {
+    setConfirmationType('restore');
   };
 
   const handleViewClick = () => {
@@ -70,8 +89,30 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         }
         break;
       case 'delete':
-        if (onDelete) {
-          await onDelete();
+        try {
+          // Mark as removed instead of hard delete
+          await supabase
+            .from('agent_sources')
+            .update({ is_excluded: true })
+            .eq('id', pageId);
+          
+          console.log('Source marked as removed');
+        } catch (error) {
+          console.error('Delete failed:', error);
+        }
+        break;
+      case 'restore':
+        try {
+          // Restore by removing the excluded flag
+          await supabase
+            .from('agent_sources')
+            .update({ is_excluded: false })
+            .eq('id', pageId);
+          
+          console.log('Source restored');
+          setSourceData(prev => ({ ...prev, is_excluded: false }));
+        } catch (error) {
+          console.error('Restore failed:', error);
         }
         break;
     }
@@ -89,10 +130,17 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         };
       case 'delete':
         return {
-          title: 'Delete Page',
-          description: `Are you sure you want to permanently delete "${url}"? This action cannot be undone.`,
-          confirmText: 'Delete',
+          title: 'Remove Page',
+          description: `Are you sure you want to remove "${url}"? It will be marked for deletion and removed during the next training.`,
+          confirmText: 'Remove',
           isDestructive: true
+        };
+      case 'restore':
+        return {
+          title: 'Restore Page',
+          description: `Are you sure you want to restore "${url}"? It will be included in future training.`,
+          confirmText: 'Restore',
+          isDestructive: false
         };
       default:
         return {
@@ -105,7 +153,6 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const confirmConfig = getConfirmationConfig();
-  // Use the real-time display status instead of the original status
   const isViewEnabled = displayStatus === 'trained';
 
   return (
@@ -121,15 +168,22 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem onClick={handleRecrawlClick} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Recrawl
-          </DropdownMenuItem>
+          {!isRemoved && (
+            <DropdownMenuItem onClick={handleRecrawlClick} disabled={isLoading}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Recrawl
+            </DropdownMenuItem>
+          )}
           
-          {onDelete && (
+          {isRemoved ? (
+            <DropdownMenuItem onClick={handleRestoreClick}>
+              <Restore className="w-4 h-4 mr-2" />
+              Restore
+            </DropdownMenuItem>
+          ) : (
             <DropdownMenuItem onClick={handleDeleteClick} className="text-red-600">
               <Trash2 className="w-4 h-4 mr-2" />
-              Delete
+              Remove
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

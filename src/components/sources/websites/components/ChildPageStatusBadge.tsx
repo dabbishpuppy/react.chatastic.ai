@@ -1,43 +1,27 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, GraduationCap, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
-import { getStatusColor, getStatusText } from '../utils/childPageUtils';
+import { SimpleStatusService } from '@/services/SimpleStatusService';
+import { getSimpleStatusConfig } from '../services/simpleStatusConfig';
 
 interface ChildPageStatusBadgeProps {
   status: string;
-  isLoading: boolean;
+  isLoading?: boolean;
+  sourceData?: any;
 }
-
-const getStatusIcon = (status: string, isLoading: boolean) => {
-  if (isLoading) {
-    return <Loader2 className="w-3 h-3 animate-spin" />;
-  }
-
-  switch (status) {
-    case 'trained':
-      return <GraduationCap className="w-3 h-3" />;
-    case 'completed':
-      return <CheckCircle className="w-3 h-3" />;
-    case 'in_progress':
-      return <Loader2 className="w-3 h-3 animate-spin" />;
-    case 'pending':
-      return <Clock className="w-3 h-3" />;
-    case 'failed':
-      return <AlertTriangle className="w-3 h-3" />;
-    default:
-      return <Clock className="w-3 h-3" />;
-  }
-};
 
 const ChildPageStatusBadge: React.FC<ChildPageStatusBadgeProps> = ({
   status,
-  isLoading
+  isLoading = false,
+  sourceData
 }) => {
+  const displayStatus = sourceData ? SimpleStatusService.getSourceStatus(sourceData) : status;
+  const statusConfig = getSimpleStatusConfig(displayStatus);
+
   return (
-    <Badge className={`${getStatusColor(status)} text-xs px-2 py-0 flex items-center gap-1`}>
-      {getStatusIcon(status, isLoading)}
-      {getStatusText(status)}
+    <Badge className={`${statusConfig.className} border flex-shrink-0`}>
+      {statusConfig.icon}
+      {statusConfig.text}
     </Badge>
   );
 };
