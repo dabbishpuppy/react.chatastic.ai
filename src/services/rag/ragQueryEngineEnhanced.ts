@@ -1,4 +1,3 @@
-
 import { RAGQueryEngine, RAGQueryRequest, RAGQueryResult } from './queryProcessing/ragQueryEngine';
 import { SemanticSearchService } from './queryProcessing/semanticSearch';
 import { StreamingHandler, StreamingOptions } from './llm/streamingHandler';
@@ -98,6 +97,9 @@ export class RAGQueryEngineEnhanced {
 
       performanceMetrics.totalTime = performance.now() - startTime;
 
+      // Extract unique sources with proper structure
+      const uniqueSources = this.extractUniqueSources(searchResults);
+
       const enhancedResult: EnhancedRAGResult = {
         query: request.query,
         preprocessingResult: {
@@ -125,10 +127,7 @@ export class RAGQueryEngineEnhanced {
             finalScore: result.similarity,
             metadata: result.metadata
           })),
-          sources: this.extractUniqueSources(searchResults).map(source => ({
-            name: source.sourceName,
-            url: source.sourceId
-          })),
+          sources: uniqueSources,
           totalTokens: this.estimateTokenCount(searchResults),
           relevanceScore: this.calculateAverageRelevance(searchResults),
           diversityScore: this.calculateDiversityScore(searchResults),
@@ -226,7 +225,10 @@ export class RAGQueryEngineEnhanced {
         context,
         agentName: agentInfo.name,
         agentInstructions: agentInfo.instructions,
-        sources,
+        sources: sources.map(source => ({
+          name: source.sourceName,
+          url: source.sourceUrl
+        })),
         conversationHistory: request.conversationHistory,
         metadata: {
           searchResultsCount: searchResults.length,
@@ -317,12 +319,14 @@ export class RAGQueryEngineEnhanced {
     sourceName: string;
     chunkCount: number;
     averageRelevance: number;
+    sourceUrl?: string;
   }> {
     const sources = new Map<string, {
       sourceId: string;
       sourceName: string;
       chunkCount: number;
       totalRelevance: number;
+      sourceUrl?: string;
     }>();
     
     searchResults.forEach(result => {
@@ -336,7 +340,8 @@ export class RAGQueryEngineEnhanced {
             sourceId: result.sourceId,
             sourceName: result.metadata.sourceName,
             chunkCount: 1,
-            totalRelevance: result.similarity
+            totalRelevance: result.similarity,
+            sourceUrl: result.metadata.sourceUrl
           });
         }
       }
@@ -346,7 +351,8 @@ export class RAGQueryEngineEnhanced {
       sourceId: source.sourceId,
       sourceName: source.sourceName,
       chunkCount: source.chunkCount,
-      averageRelevance: source.totalRelevance / source.chunkCount
+      averageRelevance: source.totalRelevance / source.chunkCount,
+      sourceUrl: source.sourceUrl
     }));
   }
 

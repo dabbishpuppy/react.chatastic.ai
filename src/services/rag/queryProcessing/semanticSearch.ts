@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VectorSearchService } from '../vectorDatabase/vectorSearchService';
 
@@ -51,7 +50,7 @@ export class SemanticSearchService {
           maxResults: filters.maxResults || 20,
           minSimilarity: filters.minSimilarity || 0.7,
           agentId,
-          sourceTypes: filters.sourceTypes?.map(t => t as string) || []
+          sourceTypes: filters.sourceTypes || []
         }
       );
 
