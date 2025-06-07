@@ -18,7 +18,7 @@ export interface VectorSearchOptions {
 
 export class VectorSearchService {
   /**
-   * Approach 1: Using generic on .from() to short-circuit inference
+   * Approach 1: Using explicit typing without generics on .from()
    */
   static async searchSimilarChunks(
     queryEmbedding: number[],
@@ -32,9 +32,9 @@ export class VectorSearchService {
     } = options;
 
     try {
-      // Method 1: Generic on .from() with explicit type
+      // Fixed: Remove generic from .from() and use proper query building
       let query = supabase
-        .from<ChunkWithAgent>('source_chunks')
+        .from('source_chunks')
         .select(`
           id,
           source_id,
@@ -71,11 +71,14 @@ export class VectorSearchService {
         throw error;
       }
 
-      // Process results with proper typing
+      // Process results with proper typing - cast to our known type
       const results: VectorSearchResult[] = [];
       
       if (data) {
-        for (const item of data) {
+        // Type assertion since we know the query structure
+        const typedData = data as unknown as ChunkWithAgent[];
+        
+        for (const item of typedData) {
           const itemMetadata = item.metadata || {};
           
           results.push({
@@ -102,7 +105,7 @@ export class VectorSearchService {
   }
 
   /**
-   * Approach 2: Using generic on .select() method
+   * Approach 2: Using type assertion on the entire query
    */
   static async searchWithSelectGeneric(
     queryEmbedding: number[],
@@ -111,9 +114,10 @@ export class VectorSearchService {
     const { maxResults = 10, agentId } = options;
 
     try {
+      // Fixed: Use type assertion instead of malformed generic
       const { data, error } = await supabase
         .from('source_chunks')
-        .select<'*, agent_sources!inner(*)', ChunkWithAgent>(`
+        .select(`
           id,
           source_id,
           content,
@@ -127,11 +131,13 @@ export class VectorSearchService {
           )
         `)
         .eq('agent_sources.agent_id', agentId || '')
-        .limit(maxResults);
+        .limit(maxResults) as any;
 
       if (error) throw error;
 
-      return (data || []).map(item => ({
+      const typedData = data as ChunkWithAgent[];
+
+      return (typedData || []).map(item => ({
         chunkId: item.id,
         sourceId: item.source_id,
         content: item.content,
@@ -149,7 +155,7 @@ export class VectorSearchService {
   }
 
   /**
-   * Approach 3: Using PostgrestFilterBuilder annotation
+   * Approach 3: Using explicit any type to avoid inference
    */
   static async searchWithQueryTypeAnnotation(
     queryEmbedding: number[],
@@ -374,16 +380,10 @@ export class VectorSearchService {
     averageVectorSize: number;
   }> {
     try {
-      // Use explicit any type to avoid deep inference
-      const query: any = supabase
+      // Use type assertion to avoid deep inference
+      const { data, error } = await supabase
         .from('source_embeddings')
-        .select('model_name');
-
-      if (agentId) {
-        query.eq('agent_id', agentId);
-      }
-
-      const { data, error } = await query;
+        .select('model_name') as any;
 
       if (error) {
         throw error;
@@ -394,8 +394,7 @@ export class VectorSearchService {
       
       if (data && totalEmbeddings > 0) {
         for (const record of data) {
-          // Simple type assertion to avoid complex inference
-          const modelName = (record as any)?.model_name || 'unknown';
+          const modelName = record?.model_name || 'unknown';
           modelDistribution[modelName] = (modelDistribution[modelName] || 0) + 1;
         }
       }
