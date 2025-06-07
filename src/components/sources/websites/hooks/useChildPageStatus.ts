@@ -21,8 +21,13 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
       pageId
     });
 
+    // Ensure we have valid statuses
+    const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'trained', 'recrawling'];
+    const safeChildStatus = validStatuses.includes(childStatus) ? childStatus : 'pending';
+    const safeParentStatus = parentStatus || '';
+
     // If parent is recrawling, show recrawling status for child
-    if (parentStatus === 'recrawling') {
+    if (safeParentStatus === 'recrawling') {
       setDisplayStatus('recrawling');
       return;
     }
@@ -34,20 +39,22 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
     }
 
     // If child processing is completed (chunked), show "Trained" immediately
-    if (childStatus === 'completed' && processingStatus === 'processed') {
+    if (safeChildStatus === 'completed' && processingStatus === 'processed') {
       console.log('Setting child status to TRAINED - processing completed for this page');
       setDisplayStatus('trained');
       return;
     }
     
-    // Default to original status
-    setDisplayStatus(childStatus);
+    // Default to the safe child status
+    setDisplayStatus(safeChildStatus);
   };
 
   // Monitor child processing status and parent recrawl status
   useEffect(() => {
     if (!parentSourceId || !pageId) {
-      setDisplayStatus(status);
+      // Ensure we set a valid status even without parent/page IDs
+      const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'trained', 'recrawling'];
+      setDisplayStatus(validStatuses.includes(status) ? status : 'pending');
       return;
     }
 
@@ -75,7 +82,7 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
         const metadata = parentData.metadata as Record<string, any> | null;
         const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
                                   (metadata && metadata.is_recrawling === true);
-        setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status);
+        setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status || '');
       }
 
       updateDisplayStatus(
@@ -127,7 +134,7 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
           const metadata = updatedParent.metadata as Record<string, any> | null;
           const isParentRecrawling = updatedParent.crawl_status === 'recrawling' || 
                                     (metadata && metadata.is_recrawling === true);
-          const newParentStatus = isParentRecrawling ? 'recrawling' : updatedParent.crawl_status;
+          const newParentStatus = isParentRecrawling ? 'recrawling' : updatedParent.crawl_status || '';
           setParentRecrawlStatus(newParentStatus);
           
           updateDisplayStatus(status, childProcessingStatus, newParentStatus);
@@ -141,8 +148,10 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
     };
   }, [status, parentSourceId, pageId, childProcessingStatus, parentRecrawlStatus]);
 
+  const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending' || displayStatus === 'recrawling';
+
   return {
     displayStatus,
-    isLoading: displayStatus === 'in_progress' || displayStatus === 'pending' || displayStatus === 'recrawling'
+    isLoading
   };
 };

@@ -2,7 +2,10 @@
 import { CheckCircle, Clock, AlertCircle, XCircle, Loader2, GraduationCap, RotateCcw } from 'lucide-react';
 
 export const getStatusConfig = (status: string) => {
-  switch (status) {
+  // Ensure we handle any status gracefully
+  const normalizedStatus = status?.toLowerCase() || 'pending';
+  
+  switch (normalizedStatus) {
     case 'pending':
       return {
         text: 'Pending',
@@ -52,10 +55,12 @@ export const getStatusConfig = (status: string) => {
         icon: <XCircle className="w-3 h-3 mr-1" />
       };
     default:
+      // Fallback for any unrecognized status - treat as pending
+      console.warn(`Unknown status received: ${status}, defaulting to pending`);
       return {
-        text: 'Unknown',
+        text: 'Pending',
         className: 'bg-gray-100 text-gray-800 border-gray-200',
-        icon: <AlertCircle className="w-3 h-3 mr-1" />
+        icon: <Clock className="w-3 h-3 mr-1" />
       };
   }
 };

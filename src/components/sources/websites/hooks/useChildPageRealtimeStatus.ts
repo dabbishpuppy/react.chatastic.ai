@@ -45,7 +45,7 @@ export const useChildPageRealtimeStatus = ({
         const metadata = parentData.metadata as Record<string, any> | null;
         const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
                                   (metadata && metadata.is_recrawling === true);
-        setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status);
+        setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status || '');
       }
     };
 
@@ -90,7 +90,7 @@ export const useChildPageRealtimeStatus = ({
           const metadata = updatedSource.metadata as Record<string, any> | null;
           const isParentRecrawling = updatedSource.crawl_status === 'recrawling' || 
                                     (metadata && metadata.is_recrawling === true);
-          setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : updatedSource.crawl_status);
+          setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : updatedSource.crawl_status || '');
           
           // If parent training is completed and child is completed, mark as trained
           if (updatedSource.crawl_status === 'trained' && status === 'completed') {
@@ -110,6 +110,13 @@ export const useChildPageRealtimeStatus = ({
 
   // Determine display status based on processing state and parent recrawl status
   const getDisplayStatus = () => {
+    console.log('🔍 Determining display status:', {
+      parentRecrawlStatus,
+      status,
+      processingStatus,
+      pageId
+    });
+
     // If parent is recrawling, show recrawling status for child
     if (parentRecrawlStatus === 'recrawling') {
       return 'recrawling';
@@ -125,7 +132,9 @@ export const useChildPageRealtimeStatus = ({
       return 'trained';
     }
     
-    return status;
+    // Return the current status, ensuring it's a valid status
+    const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'trained', 'recrawling'];
+    return validStatuses.includes(status) ? status : 'pending';
   };
 
   const displayStatus = getDisplayStatus();
