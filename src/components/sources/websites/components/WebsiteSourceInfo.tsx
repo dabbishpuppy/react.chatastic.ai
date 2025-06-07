@@ -77,7 +77,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // Show total links from parent source metadata when available
   const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
 
-  // Get total child pages size from metadata - show for both trained and ready_for_training statuses
+  // Get total child pages size from metadata - FIXED: Show for trained status as well
   const childPagesSize = source?.metadata?.total_child_pages_size || 0;
   const shouldShowChildPagesSize = !isChild && childPagesSize > 0 && (
     crawlStatus === 'trained' || 

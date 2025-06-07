@@ -18,15 +18,18 @@ export class MetadataManager {
       size_calculation_method: 'child_page_aggregation'
     };
 
-    // Special handling for training completion events
-    if (eventType === 'training_completion_metadata_update' || eventType === 'training_completed') {
-      console.log('🎓 Training completion metadata update - preserving training info');
+    // Special handling for training completion events - FIXED: Handle all training completion event types
+    if (eventType === 'training_completion_metadata_update' || 
+        eventType === 'training_completed' || 
+        eventType === 'training_complete') {
+      console.log('🎓 Training completion metadata update - preserving training info and updating size');
       return {
         ...baseMetadata,
         training_metadata_updated: new Date().toISOString(),
         final_total_child_pages_size: totalChildSize,
         last_trained_at: parentSource.metadata?.last_trained_at || new Date().toISOString(),
-        training_status: 'completed'
+        training_status: 'completed',
+        training_completed_at: parentSource.metadata?.training_completed_at || new Date().toISOString()
       };
     }
 
@@ -45,7 +48,11 @@ export class MetadataManager {
       return {
         ...baseMetadata,
         training_metadata_updated: new Date().toISOString(),
-        final_total_child_pages_size: totalChildSize
+        final_total_child_pages_size: totalChildSize,
+        // Preserve existing training metadata
+        last_trained_at: parentSource.metadata?.last_trained_at,
+        training_completed_at: parentSource.metadata?.training_completed_at,
+        training_status: parentSource.metadata?.training_status
       };
     } else {
       console.log('📝 Normal processing - updating metadata with size info');

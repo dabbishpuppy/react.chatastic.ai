@@ -1,4 +1,3 @@
-
 export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed';
 
 export interface SourceStatusSummary {
@@ -54,16 +53,11 @@ export class SimplifiedSourceStatusService {
       return 'training';
     }
     
-    // Check if training completed - FIXED: Always show "training_completed" for parent website sources
+    // Check if training completed - FIXED: Always show "trained" for parent website sources after training
     if (metadata.training_completed_at || metadata.last_trained_at) {
-      // For website sources, distinguish between parent and child completion
+      // For website sources, always return "trained" after training completion
       if (source.source_type === 'website') {
-        // For child sources, they're "trained" when training is done
-        if (source.parent_source_id !== null) {
-          return 'trained';
-        }
-        // For parent sources, they should ALWAYS show "training_completed" when training is done
-        return 'training_completed';
+        return 'trained';
       }
       return 'trained';
     }

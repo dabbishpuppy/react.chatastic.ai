@@ -1,3 +1,4 @@
+
 import { ParentSource, SourcePage } from './types.ts';
 
 export class StatusCalculator {
@@ -12,21 +13,25 @@ export class StatusCalculator {
   ): string {
     let status = parentSource.crawl_status;
     const isRecrawling = parentSource.metadata?.is_recrawling === true;
-    const recrawlStartedAt = parentSource.metadata?.recrawl_started_at;
+    const metadata = parentSource.metadata || {};
 
     console.log(`🔍 Status calculation - eventType: ${eventType}, current status: ${status}, isRecrawling: ${isRecrawling}`);
 
-    // Special handling for training completion events
-    if (eventType === 'training_completion_metadata_update' || eventType === 'training_completed') {
-      console.log('🎓 Training completion event detected - preserving trained status');
-      // If the parent is already trained, keep it trained but allow metadata updates
-      if (status === 'trained' || status === 'completed') {
-        console.log(`✅ Preserving status: ${status} for training completion metadata update`);
-        return status;
+    // Special handling for training completion events - FIXED: Handle both event types
+    if (eventType === 'training_completion_metadata_update' || 
+        eventType === 'training_completed' || 
+        eventType === 'training_complete') {
+      console.log('🎓 Training completion event detected - setting to trained status');
+      
+      // For training completion, always set to 'trained' regardless of current status
+      if (metadata.training_completed_at || metadata.last_trained_at) {
+        console.log('✅ Setting status to trained after training completion');
+        return 'trained';
       }
-      // If training just completed but status isn't updated yet, set to trained
-      if (status === 'training' || status === 'ready_for_training') {
-        console.log('🎓 Setting status to trained after training completion');
+      
+      // If training metadata exists but status isn't updated yet, set to trained
+      if (status === 'training' || status === 'ready_for_training' || status === 'completed') {
+        console.log('🎓 Setting status to trained based on training completion event');
         return 'trained';
       }
     }

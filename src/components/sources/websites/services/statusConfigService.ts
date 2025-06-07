@@ -42,6 +42,7 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
         className: 'bg-purple-100 text-purple-800 border-purple-200'
       };
     case 'trained':
+    case 'training_completed':
       return {
         icon: React.createElement(GraduationCap, { size: 14, className: "mr-1" }),
         text: 'Trained',
@@ -51,12 +52,6 @@ export const getStatusConfig = (currentStatus: string): StatusConfig => {
       return {
         icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
         text: 'Completed',
-        className: 'bg-green-100 text-green-800 border-green-200'
-      };
-    case 'training_completed':
-      return {
-        icon: React.createElement(CheckCircle, { size: 14, className: "mr-1" }),
-        text: 'Training Completed',
         className: 'bg-green-100 text-green-800 border-green-200'
       };
     case 'ready_for_training':
