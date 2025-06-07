@@ -12,10 +12,11 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
   const [displayStatus, setDisplayStatus] = useState(status);
   const [childProcessingStatus, setChildProcessingStatus] = useState<string>('pending');
 
-  const updateDisplayStatus = (childStatus: string, processingStatus: string) => {
+  const updateDisplayStatus = (childStatus: string, processingStatus: string, parentTrainingStatus?: string) => {
     console.log('Updating child display status:', {
       childStatus,
       processingStatus,
+      parentTrainingStatus,
       pageId
     });
 
@@ -25,10 +26,16 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
       return;
     }
 
-    // If child processing is completed (chunked), show "Trained" immediately
+    // If child processing is completed (chunked) AND parent training is completed, show "Trained"
     if (childStatus === 'completed' && processingStatus === 'processed') {
-      console.log('Setting child status to TRAINED - processing completed for this page');
-      setDisplayStatus('trained');
+      // Check if parent has completed training
+      if (parentTrainingStatus === 'trained' || parentTrainingStatus === 'training_completed') {
+        console.log('Setting child status to TRAINED - parent training completed');
+        setDisplayStatus('trained');
+        return;
+      }
+      // If parent training not completed yet, show as completed
+      setDisplayStatus('completed');
       return;
     }
     
@@ -36,23 +43,36 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
     setDisplayStatus(childStatus);
   };
 
-  // Monitor child processing status
+  // Monitor both child processing status and parent training status
   useEffect(() => {
     if (!parentSourceId || !pageId) {
       setDisplayStatus(status);
       return;
     }
 
-    // Fetch initial child processing status
+    // Fetch initial state
     const fetchInitialState = async () => {
+      // Get child page status
       const { data: childData } = await supabase
         .from('source_pages')
         .select('processing_status, status')
         .eq('id', pageId)
         .single();
       
-      if (childData) {
-        setChildProcessingStatus(childData.processing_status || 'pending');
+      // Get parent source training status
+      const { data: parentData } = await supabase
+        .from('agent_sources')
+        .select('metadata, crawl_status')
+        .eq('id', parentSourceId)
+        .single();
+      
+      if (childData && parentData) {
+        const childProcessingStatus = childData.processing_status || 'pending';
+        const parentTrainingStatus = parentData.metadata?.training_status || parentData.crawl_status;
+        
+        setChildProcessingStatus(childProcessingStatus);
+        updateDisplayStatus(childData.status, childProcessingStatus, parentTrainingStatus);
+      } else if (childData) {
         updateDisplayStatus(childData.status, childData.processing_status || 'pending');
       } else {
         updateDisplayStatus(status, 'pending');
@@ -78,13 +98,54 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
           const newProcessingStatus = updatedChild.processing_status || 'pending';
           setChildProcessingStatus(newProcessingStatus);
           
-          updateDisplayStatus(updatedChild.status, newProcessingStatus);
+          // Also get current parent status for accurate display
+          supabase
+            .from('agent_sources')
+            .select('metadata, crawl_status')
+            .eq('id', parentSourceId)
+            .single()
+            .then(({ data: parentData }) => {
+              const parentTrainingStatus = parentData?.metadata?.training_status || parentData?.crawl_status;
+              updateDisplayStatus(updatedChild.status, newProcessingStatus, parentTrainingStatus);
+            });
+        }
+      )
+      .subscribe();
+
+    // Subscribe to parent source training status changes
+    const parentChannel = supabase
+      .channel(`parent-training-${parentSourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `id=eq.${parentSourceId}`
+        },
+        (payload) => {
+          const updatedParent = payload.new as any;
+          console.log('Parent source training update:', updatedParent);
+          const parentTrainingStatus = updatedParent.metadata?.training_status || updatedParent.crawl_status;
+          
+          // Get current child status to update display
+          supabase
+            .from('source_pages')
+            .select('processing_status, status')
+            .eq('id', pageId)
+            .single()
+            .then(({ data: childData }) => {
+              if (childData) {
+                updateDisplayStatus(childData.status, childData.processing_status || 'pending', parentTrainingStatus);
+              }
+            });
         }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(childChannel);
+      supabase.removeChannel(parentChannel);
     };
   }, [status, parentSourceId, pageId]);
 

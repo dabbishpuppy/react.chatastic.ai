@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRAGServices } from '@/hooks/useRAGServices';
@@ -48,6 +47,7 @@ export const useSourceDetail = () => {
             source_type: 'website',
             agent_id: agentId || '',
             is_active: true,
+            requires_manual_training: false,
             created_at: pageData.created_at,
             updated_at: pageData.updated_at,
             metadata: {

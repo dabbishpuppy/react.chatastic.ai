@@ -19,6 +19,7 @@ interface WebsiteSourceInfoProps {
   compressedContentSize?: number;
   source?: AgentSource;
   sourceId?: string;
+  showStatusBadge?: boolean;
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -32,7 +33,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   totalContentSize = 0,
   compressedContentSize = 0,
   source,
-  sourceId
+  sourceId,
+  showStatusBadge = true
 }) => {
   const formatUrl = (url: string) => {
     try {
@@ -103,14 +105,17 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             />
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <WebsiteSourceStatusBadges
-            crawlStatus={crawlStatus}
-            isExcluded={false}
-            linksCount={linksCount}
-            sourceId={sourceId}
-          />
-        </div>
+        {/* Only show status badges here for child sources */}
+        {showStatusBadge && isChild && (
+          <div className="flex items-center gap-2">
+            <WebsiteSourceStatusBadges
+              crawlStatus={crawlStatus}
+              isExcluded={false}
+              linksCount={linksCount}
+              sourceId={sourceId}
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
