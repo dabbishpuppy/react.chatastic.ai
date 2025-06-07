@@ -72,19 +72,25 @@ export class VectorSearchService {
         throw error;
       }
 
-      // Mock similarity calculation for now
-      const results: VectorSearchResult[] = data?.map((item: any) => ({
-        chunkId: item.id,
-        sourceId: item.source_id,
-        content: item.content,
-        similarity: Math.random() * 0.4 + 0.6, // Random similarity between 0.6-1.0
-        metadata: {
-          sourceName: item.agent_sources?.title,
-          sourceType: item.agent_sources?.source_type,
-          sourceUrl: item.agent_sources?.url,
-          ...item.metadata
+      // Mock similarity calculation for now - simplified to avoid type issues
+      const results: VectorSearchResult[] = [];
+      
+      if (data) {
+        for (const item of data) {
+          results.push({
+            chunkId: item.id,
+            sourceId: item.source_id,
+            content: item.content,
+            similarity: Math.random() * 0.4 + 0.6, // Random similarity between 0.6-1.0
+            metadata: {
+              sourceName: item.agent_sources?.title || 'Unknown',
+              sourceType: item.agent_sources?.source_type || 'text',
+              sourceUrl: item.agent_sources?.url,
+              ...item.metadata
+            }
+          });
         }
-      })) || [];
+      }
 
       // Filter by minimum similarity
       return results.filter(result => result.similarity >= minSimilarity);
