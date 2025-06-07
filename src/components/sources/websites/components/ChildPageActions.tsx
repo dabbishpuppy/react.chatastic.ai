@@ -17,7 +17,6 @@ interface ChildPageActionsProps {
   url: string;
   pageId: string;
   parentSourceId: string;
-  status: string; // Original status for fallback
   onDelete?: () => void;
 }
 
@@ -27,14 +26,12 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
   pageId,
   parentSourceId,
-  status,
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
-  // Use the real-time status hook to get immediate updates
   const { displayStatus } = useChildPageStatus({ 
-    status, 
+    status: 'completed', 
     parentSourceId, 
     pageId 
   });
@@ -105,7 +102,6 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const confirmConfig = getConfirmationConfig();
-  // Use the real-time display status instead of the original status
   const isViewEnabled = displayStatus === 'trained';
 
   return (

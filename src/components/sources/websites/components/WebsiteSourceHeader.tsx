@@ -7,9 +7,22 @@ import { Check, X } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceInfo from './WebsiteSourceInfo';
 
+interface SourcePage {
+  id: string;
+  url: string;
+  status: string;
+  created_at: string;
+  completed_at?: string;
+  error_message?: string;
+  content_size?: number;
+  chunks_created?: number;
+  processing_time_ms?: number;
+  parent_source_id: string;
+}
+
 interface WebsiteSourceHeaderProps {
   source: AgentSource;
-  childSources?: any[];
+  childSources: SourcePage[];
   isSelected: boolean;
   isEditing: boolean;
   editUrl: string;
@@ -21,7 +34,7 @@ interface WebsiteSourceHeaderProps {
 
 const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
   source,
-  childSources = [],
+  childSources,
   isSelected,
   isEditing,
   editUrl,
@@ -30,57 +43,71 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
   onSaveEdit,
   onCancelEdit
 }) => {
-  const isParentSource = !source.parent_source_id;
+  const handleSelectionChange = (checked: boolean) => {
+    onSelectionChange(checked);
+  };
+
+  // Calculate total content size from child pages
+  const totalContentSize = childSources.reduce((total, child) => {
+    return total + (child.content_size || 0);
+  }, 0);
+
+  // Calculate compressed content size from child pages
+  const compressedContentSize = childSources.reduce((total, child) => {
+    const originalSize = child.content_size || 0;
+    const compressionRatio = 0.3; // Default compression ratio
+    return total + Math.round(originalSize * compressionRatio);
+  }, 0);
 
   return (
-    <div className="flex items-start gap-3 flex-1">
+    <div className="flex items-start gap-3 flex-1 min-w-0">
       <Checkbox
         checked={isSelected}
-        onCheckedChange={onSelectionChange}
-        className="mt-1"
+        onCheckedChange={handleSelectionChange}
+        className="flex-shrink-0 mt-1"
       />
       
       <div className="flex-1 min-w-0">
         {isEditing ? (
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2">
             <Input
               value={editUrl}
               onChange={(e) => onEditUrlChange(e.target.value)}
               className="flex-1"
               placeholder="Enter website URL"
-              autoFocus
             />
-            <Button
-              size="sm"
+            <Button 
+              size="sm" 
               onClick={onSaveEdit}
-              className="h-8 w-8 p-0"
+              className="flex-shrink-0"
             >
               <Check className="w-4 h-4" />
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
+            <Button 
+              size="sm" 
+              variant="outline" 
               onClick={onCancelEdit}
-              className="h-8 w-8 p-0"
+              className="flex-shrink-0"
             >
               <X className="w-4 h-4" />
             </Button>
           </div>
-        ) : null}
-        
-        <WebsiteSourceInfo
-          title={source.title}
-          url={source.url}
-          createdAt={source.created_at}
-          linksCount={source.links_count}
-          crawlStatus={source.crawl_status}
-          metadata={source.metadata}
-          isChild={!isParentSource}
-          totalContentSize={source.total_content_size}
-          compressedContentSize={source.compressed_content_size}
-          source={source}
-          sourceId={source.id}
-        />
+        ) : (
+          <WebsiteSourceInfo
+            title={source.title}
+            url={source.url || ''}
+            createdAt={source.created_at}
+            linksCount={childSources.length}
+            lastCrawledAt={source.last_crawled_at}
+            crawlStatus={source.crawl_status}
+            metadata={source.metadata}
+            isChild={!!source.parent_source_id}
+            totalContentSize={totalContentSize}
+            compressedContentSize={compressedContentSize}
+            source={source}
+            sourceId={source.id}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRAGServices } from '@/hooks/useRAGServices';
@@ -37,47 +38,18 @@ export const useSourceDetail = () => {
             .single();
 
           if (error) throw error;
-          
-          console.log('🔍 Fetched page data:', pageData);
-
-          // Fetch the actual content from source_chunks table using parent_source_id and page_id in metadata
-          const { data: chunkData, error: chunkError } = await supabase
-            .from('source_chunks')
-            .select('content, chunk_index, metadata')
-            .eq('source_id', pageData.parent_source_id)
-            .contains('metadata', { page_id: pageId })
-            .order('chunk_index');
-
-          console.log('🔍 Fetched chunk data:', chunkData);
-
-          let extractedContent = '';
-          if (!chunkError && chunkData && chunkData.length > 0) {
-            // Join chunks with proper spacing and preserve structure
-            extractedContent = chunkData
-              .sort((a, b) => a.chunk_index - b.chunk_index)
-              .map(chunk => chunk.content)
-              .join('\n\n');
-          }
-          
-          // If no chunks found, show appropriate message
-          if (!extractedContent || extractedContent.trim() === '') {
-            extractedContent = 'This page has been processed but content chunks are not available. This may happen if the page content was very short or if there was an issue during processing.';
-          }
-
-          console.log('📄 Final extracted content length:', extractedContent.length);
 
           // Transform child page data to AgentSource format
           const transformedSource: AgentSource = {
             id: pageData.id,
             title: pageData.url,
-            content: extractedContent,
+            content: pageData.content || '',
             url: pageData.url,
             source_type: 'website',
             agent_id: agentId || '',
             is_active: true,
             created_at: pageData.created_at,
             updated_at: pageData.updated_at,
-            requires_manual_training: false,
             metadata: {
               isChildPage: true,
               parentSourceId: pageData.parent_source_id,
@@ -85,8 +57,7 @@ export const useSourceDetail = () => {
               chunksCreated: pageData.chunks_created,
               processingTimeMs: pageData.processing_time_ms,
               compressionRatio: pageData.compression_ratio,
-              duplicatesFound: pageData.duplicates_found,
-              chunkCount: chunkData?.length || 0
+              duplicatesFound: pageData.duplicates_found
             }
           };
 
@@ -101,7 +72,7 @@ export const useSourceDetail = () => {
           setEditContent(sourceData.content || '');
         }
       } catch (error) {
-        console.error('❌ Error fetching source:', error);
+        console.error('Error fetching source:', error);
         toast({
           title: 'Error',
           description: 'Failed to load source details',
