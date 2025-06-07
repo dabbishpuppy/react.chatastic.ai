@@ -75,6 +75,7 @@ export const useOptimisticWebsiteCrawl = () => {
         crawl_status: 'submitting',
         progress: 0,
         is_active: true,
+        requires_manual_training: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         isOptimistic: true,
