@@ -1,11 +1,10 @@
+
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Calendar, Link, Database, RefreshCw } from 'lucide-react';
+import { ExternalLink, Calendar, Link, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
-import { useStatusAggregationTrigger } from '@/hooks/useStatusAggregationTrigger';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -35,8 +34,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   source,
   sourceId
 }) => {
-  const { triggerStatusAggregation, isTriggering } = useStatusAggregationTrigger();
-
   const formatUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
@@ -80,19 +77,13 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // Show total links from parent source metadata when available
   const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
 
-  // Get total child pages size from metadata
+  // Get total child pages size from metadata - this is what we want to display
   const childPagesSize = source?.metadata?.total_child_pages_size || 0;
   const shouldShowChildPagesSize = !isChild && childPagesSize > 0;
 
   const compressionRatio = shouldShowCompressionMetrics 
     ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)
     : 0;
-
-  const handleRefreshMetadata = async () => {
-    if (sourceId && !isChild) {
-      await triggerStatusAggregation(sourceId);
-    }
-  };
 
   return (
     <div className="space-y-2">
@@ -115,18 +106,6 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             linksCount={linksCount}
             sourceId={sourceId}
           />
-          {!isChild && sourceId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRefreshMetadata}
-              disabled={isTriggering}
-              className="h-6 w-6 p-0"
-              title="Refresh metadata"
-            >
-              <RefreshCw className={`h-3 w-3 ${isTriggering ? 'animate-spin' : ''}`} />
-            </Button>
-          )}
         </div>
       </div>
 
