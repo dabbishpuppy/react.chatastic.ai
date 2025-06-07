@@ -42,8 +42,9 @@ export const useChildPageRealtimeStatus = ({
       }
 
       if (parentData) {
+        const metadata = parentData.metadata as Record<string, any> | null;
         const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
-                                  parentData.metadata?.is_recrawling === true;
+                                  (metadata && metadata.is_recrawling === true);
         setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status);
       }
     };
@@ -86,8 +87,9 @@ export const useChildPageRealtimeStatus = ({
           const updatedSource = payload.new as any;
           console.log('📡 Parent source update for recrawl:', updatedSource);
           
+          const metadata = updatedSource.metadata as Record<string, any> | null;
           const isParentRecrawling = updatedSource.crawl_status === 'recrawling' || 
-                                    updatedSource.metadata?.is_recrawling === true;
+                                    (metadata && metadata.is_recrawling === true);
           setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : updatedSource.crawl_status);
           
           // If parent training is completed and child is completed, mark as trained

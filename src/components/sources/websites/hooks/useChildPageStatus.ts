@@ -72,8 +72,9 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
       }
       
       if (parentData) {
+        const metadata = parentData.metadata as Record<string, any> | null;
         const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
-                                  parentData.metadata?.is_recrawling === true;
+                                  (metadata && metadata.is_recrawling === true);
         setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status);
       }
 
@@ -123,8 +124,9 @@ export const useChildPageStatus = ({ status, parentSourceId, pageId }: UseChildP
           const updatedParent = payload.new as any;
           console.log('Parent source update for child:', updatedParent);
           
+          const metadata = updatedParent.metadata as Record<string, any> | null;
           const isParentRecrawling = updatedParent.crawl_status === 'recrawling' || 
-                                    updatedParent.metadata?.is_recrawling === true;
+                                    (metadata && metadata.is_recrawling === true);
           const newParentStatus = isParentRecrawling ? 'recrawling' : updatedParent.crawl_status;
           setParentRecrawlStatus(newParentStatus);
           
