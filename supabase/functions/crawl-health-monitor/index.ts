@@ -13,6 +13,12 @@ interface HealthCheckResult {
   stalledJobs: any[];
   timeoutJobs: any[];
   actions: string[];
+  performance: {
+    totalJobs: number;
+    completedJobs: number;
+    failedJobs: number;
+    processingRate: number;
+  };
 }
 
 serve(async (req) => {
@@ -26,13 +32,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🏥 Starting crawl health monitoring check...');
+    console.log('🏥 Starting high-performance crawl health monitoring check...');
 
     const healthResult = await performHealthCheck(supabaseClient);
     
     if (!healthResult.healthy) {
-      console.log('🚨 Health issues detected, initiating auto-recovery...');
-      await performAutoRecovery(supabaseClient, healthResult);
+      console.log('🚨 Health issues detected, initiating immediate auto-recovery...');
+      await performFastRecovery(supabaseClient, healthResult);
     }
 
     return new Response(
@@ -68,60 +74,74 @@ async function performHealthCheck(supabaseClient: any): Promise<HealthCheckResul
   let stalledJobs: any[] = [];
   let timeoutJobs: any[] = [];
 
-  // Check for stalled pending jobs (>5 minutes)
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  // Check for stalled pending jobs (>2 minutes for faster detection)
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const { data: pendingJobs, error: pendingError } = await supabaseClient
     .from('source_pages')
     .select('*')
     .eq('status', 'pending')
-    .lt('created_at', fiveMinutesAgo);
+    .lt('created_at', twoMinutesAgo);
 
   if (pendingError) {
     console.error('Error checking pending jobs:', pendingError);
   } else if (pendingJobs && pendingJobs.length > 0) {
     stalledJobs = pendingJobs;
     issues.push(`${pendingJobs.length} jobs stalled in pending state`);
-    actions.push('Restart processing pipeline');
+    actions.push('Restart processing pipeline immediately');
   }
 
-  // Check for timeout in-progress jobs (>10 minutes)
-  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  // Check for timeout in-progress jobs (>5 minutes for faster recovery)
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { data: inProgressJobs, error: progressError } = await supabaseClient
     .from('source_pages')
     .select('*')
-    .eq('status', 'processing')
-    .lt('started_at', tenMinutesAgo);
+    .eq('status', 'in_progress')
+    .lt('started_at', fiveMinutesAgo);
 
   if (progressError) {
     console.error('Error checking in-progress jobs:', progressError);
   } else if (inProgressJobs && inProgressJobs.length > 0) {
     timeoutJobs = inProgressJobs;
     issues.push(`${inProgressJobs.length} jobs stuck in processing state`);
-    actions.push('Reset timeout jobs to pending');
+    actions.push('Reset timeout jobs to pending immediately');
   }
 
-  // Check for excessive error rates
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  // Check processing rate and throughput
   const { data: recentJobs, error: recentError } = await supabaseClient
     .from('source_pages')
-    .select('status')
-    .gte('updated_at', oneHourAgo);
+    .select('status, completed_at')
+    .gte('updated_at', fiveMinutesAgo);
 
-  if (!recentError && recentJobs && recentJobs.length > 10) {
-    const failedCount = recentJobs.filter(job => job.status === 'failed').length;
-    const errorRate = failedCount / recentJobs.length;
+  let processingRate = 0;
+  if (!recentError && recentJobs) {
+    const completedRecently = recentJobs.filter(job => job.status === 'completed').length;
+    processingRate = completedRecently / 5; // jobs per minute
     
-    if (errorRate > 0.3) { // >30% error rate
-      issues.push(`High error rate: ${(errorRate * 100).toFixed(1)}%`);
-      actions.push('Investigate error patterns');
+    if (processingRate < 0.5 && recentJobs.length > 10) { // Less than 0.5 jobs per minute
+      issues.push(`Low processing rate: ${processingRate.toFixed(2)} jobs/min`);
+      actions.push('Scale up worker capacity');
     }
   }
 
+  // Get overall performance metrics
+  const { data: allJobs, error: allJobsError } = await supabaseClient
+    .from('source_pages')
+    .select('status')
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+  const performance = {
+    totalJobs: allJobs?.length || 0,
+    completedJobs: allJobs?.filter(j => j.status === 'completed').length || 0,
+    failedJobs: allJobs?.filter(j => j.status === 'failed').length || 0,
+    processingRate
+  };
+
   const healthy = issues.length === 0;
 
-  console.log(`🏥 Health check complete: ${healthy ? 'HEALTHY' : 'ISSUES DETECTED'}`);
+  console.log(`🏥 High-performance health check complete: ${healthy ? 'HEALTHY' : 'ISSUES DETECTED'}`);
   if (issues.length > 0) {
     console.log('Issues found:', issues);
+    console.log('Immediate actions planned:', actions);
   }
 
   return {
@@ -129,76 +149,92 @@ async function performHealthCheck(supabaseClient: any): Promise<HealthCheckResul
     issues,
     stalledJobs,
     timeoutJobs,
-    actions
+    actions,
+    performance
   };
 }
 
-async function performAutoRecovery(supabaseClient: any, healthResult: HealthCheckResult): Promise<void> {
-  console.log('🔧 Starting auto-recovery procedures...');
+async function performFastRecovery(supabaseClient: any, healthResult: HealthCheckResult): Promise<void> {
+  console.log('🚀 Starting immediate fast-recovery procedures...');
 
-  // Recovery 1: Reset timeout jobs to pending
+  // Recovery 1: Immediately reset timeout jobs to pending
   if (healthResult.timeoutJobs.length > 0) {
-    console.log(`🔄 Resetting ${healthResult.timeoutJobs.length} timeout jobs to pending...`);
+    console.log(`⚡ Immediately resetting ${healthResult.timeoutJobs.length} timeout jobs...`);
     
-    for (const job of healthResult.timeoutJobs) {
-      const { error } = await supabaseClient
-        .from('source_pages')
-        .update({
-          status: 'pending',
-          started_at: null,
-          error_message: 'Auto-recovered from timeout',
-          retry_count: (job.retry_count || 0) + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', job.id);
+    const jobIds = healthResult.timeoutJobs.map(job => job.id);
+    const { error } = await supabaseClient
+      .from('source_pages')
+      .update({
+        status: 'pending',
+        started_at: null,
+        error_message: 'Auto-recovered from timeout (fast recovery)',
+        retry_count: supabaseClient.raw('retry_count + 1'),
+        updated_at: new Date().toISOString()
+      })
+      .in('id', jobIds);
 
-      if (error) {
-        console.error(`Failed to reset job ${job.id}:`, error);
-      }
+    if (error) {
+      console.error('❌ Failed to reset timeout jobs:', error);
+    } else {
+      console.log(`✅ Reset ${healthResult.timeoutJobs.length} timeout jobs`);
     }
   }
 
-  // Recovery 2: Trigger processing for stalled jobs
+  // Recovery 2: Immediately trigger batch processing for stalled jobs
   if (healthResult.stalledJobs.length > 0) {
-    console.log(`🚀 Triggering processing for ${healthResult.stalledJobs.length} stalled jobs...`);
+    console.log(`🚀 Immediately triggering processing for ${healthResult.stalledJobs.length} stalled jobs...`);
     
-    // Group by parent source to trigger processing efficiently
+    // Group by parent source for efficient batch processing
     const parentSources = [...new Set(healthResult.stalledJobs.map(job => job.parent_source_id))];
     
-    for (const parentSourceId of parentSources) {
+    // Process multiple parent sources concurrently for speed
+    const batchPromises = parentSources.map(async (parentSourceId) => {
       try {
         const { error } = await supabaseClient.functions.invoke('process-source-pages', {
-          body: { parentSourceId }
+          body: { 
+            parentSourceId,
+            fastRecovery: true,
+            batchMode: true,
+            priority: 'high'
+          }
         });
         
         if (error && !error.message?.includes('409')) {
           console.error(`Failed to trigger processing for ${parentSourceId}:`, error);
         } else {
-          console.log(`✅ Triggered processing for parent ${parentSourceId}`);
+          console.log(`✅ Fast processing triggered for parent ${parentSourceId}`);
         }
       } catch (error) {
-        console.error(`Error triggering processing for ${parentSourceId}:`, error);
+        console.error(`Error in fast recovery for ${parentSourceId}:`, error);
       }
-    }
+    });
+
+    await Promise.allSettled(batchPromises);
   }
 
-  // Recovery 3: Alert if too many failures
-  if (healthResult.issues.some(issue => issue.includes('High error rate'))) {
-    console.log('🚨 High error rate detected - logging for investigation');
+  // Recovery 3: Scale up processing if needed
+  if (healthResult.performance.processingRate < 1.0 && healthResult.performance.totalJobs > 100) {
+    console.log('📈 Triggering scale-up procedures for low throughput...');
     
-    // In production, this would send alerts to operators
-    // For now, we log detailed error information
-    const { data: errorJobs } = await supabaseClient
-      .from('source_pages')
-      .select('id, url, error_message, retry_count')
-      .eq('status', 'failed')
-      .gte('updated_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-      .limit(10);
+    // This could trigger additional worker instances or increase batch sizes
+    // For now, we'll trigger multiple processing calls to increase parallelism
+    try {
+      const scaleUpPromises = Array.from({ length: 3 }, (_, i) => 
+        supabaseClient.functions.invoke('process-source-pages', {
+          body: { 
+            scaleUp: true,
+            workerId: `scale-up-${i}`,
+            fastRecovery: true
+          }
+        })
+      );
 
-    if (errorJobs && errorJobs.length > 0) {
-      console.log('Recent error patterns:', errorJobs);
+      await Promise.allSettled(scaleUpPromises);
+      console.log('✅ Scale-up procedures initiated');
+    } catch (error) {
+      console.error('❌ Failed to scale up processing:', error);
     }
   }
 
-  console.log('✅ Auto-recovery procedures completed');
+  console.log('⚡ Fast recovery procedures completed');
 }

@@ -26,10 +26,10 @@ export class ResilientCrawlService {
     // Initial health check
     this.performHealthCheck();
     
-    // Set up periodic health checks every 2 minutes
+    // Set up periodic health checks every 30 seconds for faster recovery
     this.healthCheckInterval = window.setInterval(() => {
       this.performHealthCheck();
-    }, 2 * 60 * 1000);
+    }, 30 * 1000); // Changed from 2 minutes to 30 seconds
   }
 
   static stopHealthMonitoring(): void {
@@ -115,13 +115,23 @@ export class ResilientCrawlService {
         };
       },
       async () => {
-        // Fallback: simpler crawl approach
+        // Fallback: simpler crawl approach with all required fields
         console.log('⚡ Using fallback crawl method for:', url);
+        
+        // Get current user and agent context from options
+        const agentId = options.agentId;
+        const teamId = options.teamId;
+        
+        if (!agentId || !teamId) {
+          throw new Error('Missing required agentId or teamId for fallback crawl');
+        }
         
         // Create a basic source entry and queue it for later processing
         const { data: source, error } = await supabase
           .from('agent_sources')
           .insert({
+            agent_id: agentId,
+            team_id: teamId,
             url,
             title: url,
             source_type: 'website',

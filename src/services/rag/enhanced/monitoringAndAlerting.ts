@@ -1,23 +1,9 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { ProductionWorkerQueue } from './productionWorkerQueue';
-import { ProductionInfrastructureService } from './productionInfrastructureService';
 
-export interface SystemMetrics {
-  timestamp: string;
-  queueDepth: number;
-  workerUtilization: number;
-  errorRate: number;
-  avgProcessingTime: number;
-  compressionRatio: number;
-  storageUsageGB: number;
-  activeCustomers: number;
-  crawlsCompletedLast24h: number;
-}
-
-export interface Alert {
+interface SystemAlert {
   id: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  category: 'performance' | 'capacity' | 'security' | 'error_rate';
+  type: 'warning' | 'error' | 'critical';
   message: string;
   timestamp: string;
   resolved: boolean;
@@ -25,284 +11,221 @@ export interface Alert {
 }
 
 export class MonitoringAndAlertingService {
-  private static alerts: Alert[] = [];
-  private static isMonitoringActive = false;
-  private static metricsHistory: SystemMetrics[] = [];
-  private static readonly THRESHOLDS = {
-    queueDepthCritical: 5000,
-    queueDepthHigh: 1000,
-    errorRateCritical: 0.20, // 20%
-    errorRateHigh: 0.10, // 10%
-    processingTimeCritical: 300000, // 5 minutes
-    processingTimeHigh: 120000, // 2 minutes
-    storageQuotaCritical: 0.95, // 95% of quota
-    storageQuotaHigh: 0.80 // 80% of quota
-  };
+  private static monitoringInterval: number | null = null;
+  private static isRunning = false;
+  private static alerts: SystemAlert[] = [];
+  private static readonly MONITORING_INTERVAL = 15000; // 15 seconds
 
-  // Start comprehensive monitoring
   static async startMonitoring(): Promise<void> {
-    if (this.isMonitoringActive) {
-      console.log('Monitoring already active');
+    if (this.isRunning) {
+      console.log('📊 Monitoring already running');
       return;
     }
 
-    this.isMonitoringActive = true;
-    console.log('📊 Starting production monitoring and alerting');
+    console.log('📊 Starting monitoring and alerting service...');
+    this.isRunning = true;
 
-    // Collect metrics every 30 seconds
-    setInterval(async () => {
-      try {
-        const metrics = await this.collectSystemMetrics();
-        await this.evaluateAlerts(metrics);
-        await this.persistMetrics(metrics);
-      } catch (error) {
-        console.error('Error in monitoring cycle:', error);
-      }
-    }, 30000);
+    // Initial check
+    this.performSystemCheck();
 
-    // Cleanup old metrics and alerts every hour
-    setInterval(async () => {
-      await this.cleanupOldData();
-    }, 3600000);
-
-    console.log('✅ Monitoring system initialized');
+    // Set up periodic monitoring
+    this.monitoringInterval = window.setInterval(() => {
+      this.performSystemCheck();
+    }, this.MONITORING_INTERVAL);
   }
 
-  // Collect comprehensive system metrics
-  static async collectSystemMetrics(): Promise<SystemMetrics> {
+  static stopMonitoring(): void {
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
+    }
+    this.isRunning = false;
+    console.log('🛑 Stopped monitoring service');
+  }
+
+  private static async performSystemCheck(): Promise<void> {
     try {
-      // Get queue metrics
-      const queueMetrics = await ProductionWorkerQueue.getQueueMetrics();
+      // Check for stalled jobs
+      await this.checkForStalledJobs();
       
-      // Get infrastructure health
-      const infraHealth = await ProductionInfrastructureService.getInfrastructureHealth();
+      // Check error rates
+      await this.checkErrorRates();
       
-      // Calculate error rate
-      const totalJobs = queueMetrics.totalCompleted + queueMetrics.totalFailed;
-      const errorRate = totalJobs > 0 ? queueMetrics.totalFailed / totalJobs : 0;
+      // Check system performance
+      await this.checkSystemPerformance();
 
-      // Get storage metrics (simplified)
-      const { data: sources } = await supabase
-        .from('agent_sources')
-        .select('total_content_size, compressed_content_size')
-        .not('total_content_size', 'is', null);
+      // Clean up old resolved alerts
+      this.cleanupOldAlerts();
 
-      const totalStorageBytes = sources?.reduce((sum, s) => sum + (s.compressed_content_size || 0), 0) || 0;
-      const storageUsageGB = totalStorageBytes / (1024 * 1024 * 1024);
-
-      // Get active customers count
-      const { count: activeCustomers } = await supabase
-        .from('agent_sources')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      // Calculate compression ratio
-      const totalOriginalSize = sources?.reduce((sum, s) => sum + (s.total_content_size || 0), 0) || 1;
-      const totalCompressedSize = sources?.reduce((sum, s) => sum + (s.compressed_content_size || 0), 0) || 1;
-      const compressionRatio = totalCompressedSize / totalOriginalSize;
-
-      return {
-        timestamp: new Date().toISOString(),
-        queueDepth: queueMetrics.queueDepth,
-        workerUtilization: queueMetrics.workerUtilization,
-        errorRate,
-        avgProcessingTime: queueMetrics.averageProcessingTime,
-        compressionRatio,
-        storageUsageGB,
-        activeCustomers: activeCustomers || 0,
-        crawlsCompletedLast24h: queueMetrics.totalCompleted
-      };
     } catch (error) {
-      console.error('Failed to collect system metrics:', error);
-      return {
-        timestamp: new Date().toISOString(),
-        queueDepth: 0,
-        workerUtilization: 0,
-        errorRate: 0,
-        avgProcessingTime: 0,
-        compressionRatio: 0,
-        storageUsageGB: 0,
-        activeCustomers: 0,
-        crawlsCompletedLast24h: 0
-      };
+      console.error('❌ Error during system check:', error);
+      this.createAlert('error', 'System monitoring check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     }
   }
 
-  // Evaluate and trigger alerts based on metrics
-  static async evaluateAlerts(metrics: SystemMetrics): Promise<void> {
-    const newAlerts: Alert[] = [];
-
-    // Queue depth alerts
-    if (metrics.queueDepth > this.THRESHOLDS.queueDepthCritical) {
-      newAlerts.push({
-        id: `queue-depth-critical-${Date.now()}`,
-        severity: 'critical',
-        category: 'capacity',
-        message: `Queue depth critical: ${metrics.queueDepth} jobs pending`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { queueDepth: metrics.queueDepth }
-      });
-    } else if (metrics.queueDepth > this.THRESHOLDS.queueDepthHigh) {
-      newAlerts.push({
-        id: `queue-depth-high-${Date.now()}`,
-        severity: 'high',
-        category: 'capacity',
-        message: `Queue depth high: ${metrics.queueDepth} jobs pending`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { queueDepth: metrics.queueDepth }
-      });
-    }
-
-    // Error rate alerts
-    if (metrics.errorRate > this.THRESHOLDS.errorRateCritical) {
-      newAlerts.push({
-        id: `error-rate-critical-${Date.now()}`,
-        severity: 'critical',
-        category: 'error_rate',
-        message: `Error rate critical: ${(metrics.errorRate * 100).toFixed(1)}%`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { errorRate: metrics.errorRate }
-      });
-    } else if (metrics.errorRate > this.THRESHOLDS.errorRateHigh) {
-      newAlerts.push({
-        id: `error-rate-high-${Date.now()}`,
-        severity: 'high',
-        category: 'error_rate',
-        message: `Error rate high: ${(metrics.errorRate * 100).toFixed(1)}%`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { errorRate: metrics.errorRate }
-      });
-    }
-
-    // Processing time alerts
-    if (metrics.avgProcessingTime > this.THRESHOLDS.processingTimeCritical) {
-      newAlerts.push({
-        id: `processing-time-critical-${Date.now()}`,
-        severity: 'critical',
-        category: 'performance',
-        message: `Processing time critical: ${(metrics.avgProcessingTime / 1000).toFixed(1)}s average`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { avgProcessingTime: metrics.avgProcessingTime }
-      });
-    } else if (metrics.avgProcessingTime > this.THRESHOLDS.processingTimeHigh) {
-      newAlerts.push({
-        id: `processing-time-high-${Date.now()}`,
-        severity: 'high',
-        category: 'performance',
-        message: `Processing time high: ${(metrics.avgProcessingTime / 1000).toFixed(1)}s average`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { avgProcessingTime: metrics.avgProcessingTime }
-      });
-    }
-
-    // Storage alerts (assuming 100GB quota per customer)
-    const avgStoragePerCustomer = metrics.activeCustomers > 0 ? metrics.storageUsageGB / metrics.activeCustomers : 0;
-    const storageQuotaGB = 100; // Per customer quota
-    const storageUtilization = avgStoragePerCustomer / storageQuotaGB;
-
-    if (storageUtilization > this.THRESHOLDS.storageQuotaCritical) {
-      newAlerts.push({
-        id: `storage-quota-critical-${Date.now()}`,
-        severity: 'critical',
-        category: 'capacity',
-        message: `Storage quota critical: ${(storageUtilization * 100).toFixed(1)}% used`,
-        timestamp: metrics.timestamp,
-        resolved: false,
-        metadata: { storageUtilization, storageUsageGB: metrics.storageUsageGB }
-      });
-    }
-
-    // Add new alerts and log them
-    for (const alert of newAlerts) {
-      this.alerts.push(alert);
-      console.warn(`🚨 ${alert.severity.toUpperCase()} ALERT: ${alert.message}`, alert.metadata);
-      
-      // In production, this would send notifications (email, Slack, PagerDuty, etc.)
-      await this.sendAlert(alert);
-    }
-  }
-
-  // Send alert notifications (placeholder for real implementations)
-  private static async sendAlert(alert: Alert): Promise<void> {
+  private static async checkForStalledJobs(): Promise<void> {
     try {
-      // In production, implement actual alerting:
-      // - Email notifications
-      // - Slack webhooks
-      // - PagerDuty integration
-      // - SMS alerts for critical issues
-      
-      console.log(`📧 Sending ${alert.severity} alert: ${alert.message}`);
-      
-      // For now, just log the alert
-      // await emailService.sendAlert(alert);
-      // await slackService.sendAlert(alert);
-      
-    } catch (error) {
-      console.error('Failed to send alert:', error);
-    }
-  }
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
 
-  // Persist metrics for historical analysis (in memory since table doesn't exist)
-  private static async persistMetrics(metrics: SystemMetrics): Promise<void> {
-    try {
-      // Store metrics in memory for historical analysis
-      this.metricsHistory.push(metrics);
-      
-      // Keep only last 1000 entries
-      if (this.metricsHistory.length > 1000) {
-        this.metricsHistory = this.metricsHistory.slice(-1000);
+      // Check for stalled pending jobs
+      const { data: stalledPending, error: pendingError } = await supabase
+        .from('source_pages')
+        .select('id, url, parent_source_id')
+        .eq('status', 'pending')
+        .lt('created_at', fiveMinutesAgo);
+
+      if (!pendingError && stalledPending && stalledPending.length > 10) {
+        this.createAlert('warning', `${stalledPending.length} jobs stalled in pending state`, {
+          stalledJobs: stalledPending.length,
+          type: 'pending_stall'
+        });
       }
 
-      console.log(`📈 Collected metrics: Queue ${metrics.queueDepth}, Error rate ${(metrics.errorRate * 100).toFixed(1)}%, Storage ${metrics.storageUsageGB.toFixed(2)}GB`);
+      // Check for stalled in-progress jobs
+      const { data: stalledInProgress, error: inProgressError } = await supabase
+        .from('source_pages')
+        .select('id, url, parent_source_id')
+        .eq('status', 'in_progress')
+        .lt('started_at', tenMinutesAgo);
+
+      if (!inProgressError && stalledInProgress && stalledInProgress.length > 5) {
+        this.createAlert('error', `${stalledInProgress.length} jobs stuck in processing`, {
+          stalledJobs: stalledInProgress.length,
+          type: 'processing_timeout'
+        });
+      }
+
     } catch (error) {
-      console.error('Error persisting metrics:', error);
+      console.error('❌ Error checking for stalled jobs:', error);
     }
   }
 
-  // Clean up old data to prevent memory bloat
-  private static async cleanupOldData(): Promise<void> {
+  private static async checkErrorRates(): Promise<void> {
     try {
-      const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7 days ago
-      
-      // Clean up old metrics
-      this.metricsHistory = this.metricsHistory.filter(m => 
-        new Date(m.timestamp) > cutoffDate
-      );
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-      // Clean up resolved alerts older than 24 hours
-      const alertCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      this.alerts = this.alerts.filter(alert => 
-        !alert.resolved || new Date(alert.timestamp) > alertCutoff
-      );
+      const { data: recentJobs, error } = await supabase
+        .from('source_pages')
+        .select('status')
+        .gte('updated_at', oneHourAgo);
 
-      console.log('🧹 Cleaned up old monitoring data');
+      if (!error && recentJobs && recentJobs.length > 10) {
+        const failedCount = recentJobs.filter(job => job.status === 'failed').length;
+        const errorRate = failedCount / recentJobs.length;
+
+        if (errorRate > 0.3) { // >30% error rate
+          this.createAlert('critical', `High error rate detected: ${(errorRate * 100).toFixed(1)}%`, {
+            errorRate: errorRate,
+            failedJobs: failedCount,
+            totalJobs: recentJobs.length
+          });
+        } else if (errorRate > 0.15) { // >15% error rate
+          this.createAlert('warning', `Elevated error rate: ${(errorRate * 100).toFixed(1)}%`, {
+            errorRate: errorRate,
+            failedJobs: failedCount,
+            totalJobs: recentJobs.length
+          });
+        }
+      }
+
     } catch (error) {
-      console.error('Failed to cleanup old data:', error);
+      console.error('❌ Error checking error rates:', error);
     }
   }
 
-  // Get current alerts
-  static getActiveAlerts(): Alert[] {
+  private static async checkSystemPerformance(): Promise<void> {
+    try {
+      // Check processing throughput
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      
+      const { data: recentCompleted, error } = await supabase
+        .from('source_pages')
+        .select('id')
+        .eq('status', 'completed')
+        .gte('completed_at', fiveMinutesAgo);
+
+      if (!error) {
+        const throughput = recentCompleted?.length || 0;
+        
+        if (throughput < 2) { // Less than 2 jobs completed in 5 minutes
+          this.createAlert('warning', 'Low processing throughput detected', {
+            throughput: throughput,
+            timeWindow: '5 minutes'
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ Error checking system performance:', error);
+    }
+  }
+
+  private static createAlert(type: 'warning' | 'error' | 'critical', message: string, metadata?: any): void {
+    // Check if similar alert already exists
+    const existingAlert = this.alerts.find(alert => 
+      !alert.resolved && alert.message === message && alert.type === type
+    );
+
+    if (existingAlert) {
+      // Update timestamp of existing alert
+      existingAlert.timestamp = new Date().toISOString();
+      existingAlert.metadata = { ...existingAlert.metadata, ...metadata };
+      return;
+    }
+
+    const alert: SystemAlert = {
+      id: crypto.randomUUID(),
+      type,
+      message,
+      timestamp: new Date().toISOString(),
+      resolved: false,
+      metadata
+    };
+
+    this.alerts.push(alert);
+    console.log(`🚨 ALERT [${type.toUpperCase()}]: ${message}`, metadata);
+
+    // Auto-resolve warning alerts after 10 minutes
+    if (type === 'warning') {
+      setTimeout(() => {
+        this.resolveAlert(alert.id);
+      }, 10 * 60 * 1000);
+    }
+  }
+
+  private static resolveAlert(alertId: string): void {
+    const alert = this.alerts.find(a => a.id === alertId);
+    if (alert) {
+      alert.resolved = true;
+      console.log(`✅ Alert resolved: ${alert.message}`);
+    }
+  }
+
+  private static cleanupOldAlerts(): void {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    this.alerts = this.alerts.filter(alert => {
+      const alertTime = new Date(alert.timestamp).getTime();
+      return !alert.resolved || alertTime > oneHourAgo;
+    });
+  }
+
+  static getActiveAlerts(): SystemAlert[] {
     return this.alerts.filter(alert => !alert.resolved);
   }
 
-  // Get system health summary
+  static getAllAlerts(): SystemAlert[] {
+    return [...this.alerts];
+  }
+
   static async getSystemHealthSummary(): Promise<{
     status: 'healthy' | 'degraded' | 'critical';
     activeAlerts: number;
     criticalAlerts: number;
-    lastUpdated: string;
-    metrics: SystemMetrics;
+    lastCheck: string;
   }> {
-    const metrics = await this.collectSystemMetrics();
     const activeAlerts = this.getActiveAlerts();
-    const criticalAlerts = activeAlerts.filter(a => a.severity === 'critical');
+    const criticalAlerts = activeAlerts.filter(alert => alert.type === 'critical');
     
     let status: 'healthy' | 'degraded' | 'critical' = 'healthy';
     if (criticalAlerts.length > 0) {
@@ -315,25 +238,7 @@ export class MonitoringAndAlertingService {
       status,
       activeAlerts: activeAlerts.length,
       criticalAlerts: criticalAlerts.length,
-      lastUpdated: new Date().toISOString(),
-      metrics
+      lastCheck: new Date().toISOString()
     };
-  }
-
-  // Resolve an alert
-  static resolveAlert(alertId: string): boolean {
-    const alert = this.alerts.find(a => a.id === alertId);
-    if (alert) {
-      alert.resolved = true;
-      console.log(`✅ Resolved alert: ${alert.message}`);
-      return true;
-    }
-    return false;
-  }
-
-  // Stop monitoring
-  static stopMonitoring(): void {
-    this.isMonitoringActive = false;
-    console.log('🛑 Monitoring and alerting stopped');
   }
 }
