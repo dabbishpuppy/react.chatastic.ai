@@ -143,8 +143,8 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Always show expand/collapse arrow for parent sources (when onToggleExpanded is provided) */}
-      {onToggleExpanded && (
+      {/* Only show expand/collapse arrow when there are actual child sources */}
+      {onToggleExpanded && hasChildSources && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
