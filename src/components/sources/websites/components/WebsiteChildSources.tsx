@@ -1,148 +1,67 @@
 
-import React, { useState, useEffect } from 'react';
-import { AgentSource } from '@/types/rag';
-import { supabase } from '@/integrations/supabase/client';
-import { Skeleton } from '@/components/ui/skeleton';
-import WorkflowStatusBadge from './WorkflowStatusBadge';
-import WebsiteSourceActions from './WebsiteSourceActions';
+import React from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2 } from 'lucide-react';
+import { useChildSourcesData } from '../hooks/useChildSourcesData';
+import ChildPageCard from './ChildPageCard';
 
 interface WebsiteChildSourcesProps {
   parentSourceId: string;
   isCrawling?: boolean;
   onEdit: (sourceId: string, newUrl: string) => void;
-  onExclude: (source: AgentSource) => void;
-  onDelete: (source: AgentSource) => void;
-  onRecrawl: (source: AgentSource) => void;
+  onExclude: (source: any) => void;
+  onDelete: (source: any) => void;
+  onRecrawl: (source: any) => void;
 }
 
 const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   parentSourceId,
   isCrawling = false,
-  onEdit,
   onExclude,
-  onDelete,
-  onRecrawl
+  onDelete
 }) => {
-  const [childSources, setChildSources] = useState<AgentSource[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchChildSources = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('agent_sources')
-          .select('*')
-          .eq('parent_source_id', parentSourceId)
-          .eq('is_active', true)
-          .order('created_at', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching child sources:', error);
-          return;
-        }
-
-        // Transform the data to match AgentSource type
-        const transformedData: AgentSource[] = (data || []).map(item => ({
-          ...item,
-          metadata: typeof item.metadata === 'string' 
-            ? JSON.parse(item.metadata) 
-            : (item.metadata as Record<string, any> || {}),
-          workflow_metadata: typeof item.workflow_metadata === 'string' 
-            ? JSON.parse(item.workflow_metadata) 
-            : (item.workflow_metadata || {}),
-          status_history: typeof item.status_history === 'string' 
-            ? JSON.parse(item.status_history) 
-            : (Array.isArray(item.status_history) ? item.status_history : [])
-        }));
-
-        setChildSources(transformedData);
-      } catch (error) {
-        console.error('Error in fetchChildSources:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchChildSources();
-
-    // Set up real-time subscription for child sources
-    const channel = supabase
-      .channel(`child-sources-${parentSourceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'agent_sources',
-          filter: `parent_source_id=eq.${parentSourceId}`
-        },
-        () => {
-          fetchChildSources();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [parentSourceId]);
+  const { childPages, loading } = useChildSourcesData(parentSourceId);
 
   if (loading) {
     return (
-      <div className="space-y-2">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="flex items-center justify-between p-2 border border-gray-200 rounded">
-            <div className="flex-1">
-              <Skeleton className="h-4 w-3/4 mb-1" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-            <Skeleton className="h-6 w-16" />
-          </div>
-        ))}
+      <div className="mt-4 p-4 flex justify-center items-center bg-gray-50 rounded-lg border">
+        <Loader2 className="animate-spin mr-2" size={16} />
+        <span>Loading child pages...</span>
       </div>
     );
   }
 
-  if (childSources.length === 0) {
-    return (
-      <div className="text-center py-4 text-gray-500 text-sm">
-        {isCrawling ? 'Discovering pages...' : 'No child pages found'}
+  if (childPages.length === 0) {
+    return isCrawling ? (
+      <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
+        Crawling in progress. Child pages will appear here.
+      </div>
+    ) : (
+      <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
+        No child pages found.
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      {childSources.map((childSource) => (
-        <div
-          key={childSource.id}
-          className="flex items-center justify-between p-2 border border-gray-200 rounded hover:bg-gray-50"
-        >
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 truncate">
-              {childSource.title || childSource.url}
-            </div>
-            <div className="text-xs text-gray-500 truncate">
-              {childSource.url}
-            </div>
+    <div className="mt-4 border-t border-gray-200 pt-4">
+      <div className="text-sm font-medium mb-3 text-gray-700">
+        Child Pages ({childPages.length})
+      </div>
+      <div className="relative bg-gray-50 rounded-lg border p-3">
+        <ScrollArea className="h-96 w-full">
+          <div className="space-y-2 pr-4">
+            {childPages.map((page) => (
+              <ChildPageCard
+                key={page.id}
+                page={page}
+                onExclude={onExclude}
+                onDelete={onDelete}
+              />
+            ))}
           </div>
-          
-          <div className="flex items-center gap-2 ml-2">
-            <WorkflowStatusBadge
-              status={childSource.crawl_status || 'pending'}
-              workflowStatus={childSource.workflow_status}
-            />
-            
-            <WebsiteSourceActions
-              source={childSource}
-              onEdit={() => onEdit(childSource.id, childSource.url || '')}
-              onExclude={() => onExclude(childSource)}
-              onRecrawl={() => onRecrawl(childSource)}
-              onDelete={() => onDelete(childSource)}
-            />
-          </div>
-        </div>
-      ))}
+        </ScrollArea>
+      </div>
     </div>
   );
 };

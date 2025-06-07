@@ -108,8 +108,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             crawlStatus={crawlStatus}
             isExcluded={false}
             linksCount={linksCount}
-            sourceId={sourceId || ''}
-            source={source || null}
+            sourceId={sourceId}
           />
         </div>
       </div>

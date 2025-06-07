@@ -1,7 +1,7 @@
 
 import React from "react";
 import WebsiteSourcesList from "./components/WebsiteSourcesList";
-import WebsiteFormSection from "./components/WebsiteFormSection";
+import WebsiteCrawlForm from "./components/WebsiteCrawlForm";
 import { useWebsiteSourceOperations } from "./hooks/useWebsiteSourceOperations";
 
 const WebsiteSourcesContainer: React.FC = () => {
@@ -22,7 +22,7 @@ const WebsiteSourcesContainer: React.FC = () => {
 
   return (
     <div className="space-y-6 mt-4">
-      <WebsiteFormSection />
+      <WebsiteCrawlForm />
       <WebsiteSourcesList
         onEdit={handleEdit}
         onExclude={handleExclude}

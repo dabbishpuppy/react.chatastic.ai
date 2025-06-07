@@ -1,36 +1,69 @@
 
-import React from 'react';
-import WorkflowStatusBadge from './WorkflowStatusBadge';
+import React, { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Eye, EyeOff } from 'lucide-react';
+import { EyeOff } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { SimpleStatusService } from '@/services/SimpleStatusService';
+import { getSimpleStatusConfig } from '../services/simpleStatusConfig';
 
 interface WebsiteSourceStatusBadgesProps {
   crawlStatus: string;
   isExcluded: boolean;
   linksCount: number;
-  sourceId: string;
-  source: any;
+  progress?: number;
+  sourceId?: string;
+  source?: any;
 }
 
 const WebsiteSourceStatusBadges: React.FC<WebsiteSourceStatusBadgesProps> = ({
-  crawlStatus,
+  crawlStatus: initialCrawlStatus,
   isExcluded,
-  linksCount,
   sourceId,
   source
 }) => {
+  const [sourceData, setSourceData] = useState(source);
+
+  useEffect(() => {
+    if (!sourceId) return;
+
+    setSourceData(source);
+
+    const channel = supabase
+      .channel(`source-status-${sourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'agent_sources',
+          filter: `id=eq.${sourceId}`
+        },
+        (payload) => {
+          const updatedSource = payload.new as any;
+          console.log('Real-time source update received:', updatedSource);
+          setSourceData(updatedSource);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sourceId, source]);
+
+  const computedStatus = sourceData ? SimpleStatusService.getSourceStatus(sourceData) : initialCrawlStatus;
+  const statusConfig = getSimpleStatusConfig(computedStatus);
+
   return (
     <div className="flex items-center gap-2">
-      <WorkflowStatusBadge
-        status={crawlStatus}
-        workflowStatus={source?.workflow_status}
-        showProgress={crawlStatus === 'in_progress' || crawlStatus === 'CRAWLING'}
-        progress={source?.progress}
-      />
+      <Badge className={`${statusConfig.className} flex items-center`}>
+        {statusConfig.icon}
+        {statusConfig.text}
+      </Badge>
       
       {isExcluded && (
-        <Badge className="bg-gray-100 text-gray-600 border-gray-200 flex items-center gap-1">
-          <EyeOff size={12} />
+        <Badge variant="secondary">
+          <EyeOff className="w-3 h-3 mr-1" />
           Excluded
         </Badge>
       )}
