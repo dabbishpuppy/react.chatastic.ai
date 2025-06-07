@@ -125,7 +125,10 @@ export class RAGQueryEngineEnhanced {
             finalScore: result.similarity,
             metadata: result.metadata
           })),
-          sources: this.extractUniqueSources(searchResults),
+          sources: this.extractUniqueSources(searchResults).map(source => ({
+            name: source.sourceName,
+            url: source.sourceId
+          })),
           totalTokens: this.estimateTokenCount(searchResults),
           relevanceScore: this.calculateAverageRelevance(searchResults),
           diversityScore: this.calculateDiversityScore(searchResults),

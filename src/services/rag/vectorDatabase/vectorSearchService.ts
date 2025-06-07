@@ -13,7 +13,7 @@ export interface VectorSearchOptions {
   maxResults?: number;
   minSimilarity?: number;
   agentId?: string;
-  sourceTypes?: string[];
+  sourceTypes?: Array<'text' | 'file' | 'website' | 'qa'>;
 }
 
 export class VectorSearchService {
@@ -57,7 +57,12 @@ export class VectorSearchService {
 
       // Add source type filter if provided
       if (sourceTypes.length > 0) {
-        query = query.in('agent_sources.source_type', sourceTypes);
+        const validSourceTypes = sourceTypes.filter(type => 
+          ['text', 'file', 'website', 'qa'].includes(type)
+        );
+        if (validSourceTypes.length > 0) {
+          query = query.in('agent_sources.source_type', validSourceTypes);
+        }
       }
 
       const { data, error } = await query;
@@ -68,7 +73,7 @@ export class VectorSearchService {
       }
 
       // Mock similarity calculation for now
-      const results = data?.map((item: any) => ({
+      const results: VectorSearchResult[] = data?.map((item: any) => ({
         chunkId: item.id,
         sourceId: item.source_id,
         content: item.content,

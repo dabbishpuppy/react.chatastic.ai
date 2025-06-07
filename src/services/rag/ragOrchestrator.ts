@@ -10,7 +10,7 @@ export interface RAGRequest {
     searchFilters: {
       maxResults: number;
       minSimilarity: number;
-      sourceTypes: string[];
+      sourceTypes: Array<'text' | 'file' | 'website' | 'qa'>;
     };
     rankingOptions: {
       maxChunks: number;
@@ -71,7 +71,7 @@ export class RAGOrchestrator {
         searchFilters: {
           maxResults: request.options.searchFilters.maxResults,
           minSimilarity: request.options.searchFilters.minSimilarity,
-          sourceTypes: request.options.searchFilters.sourceTypes
+          sourceTypes: request.options.searchFilters.sourceTypes as Array<'text' | 'file' | 'website' | 'qa'>
         },
         rankingOptions: {
           maxChunks: request.options.rankingOptions.maxChunks,

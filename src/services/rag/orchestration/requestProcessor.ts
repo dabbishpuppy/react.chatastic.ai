@@ -27,7 +27,7 @@ export class RequestProcessor {
       searchFilters: {
         maxResults: request.options?.searchFilters?.maxResults || 10,
         minSimilarity: request.options?.searchFilters?.minSimilarity || 0.5,
-        sourceTypes: request.options?.searchFilters?.sourceTypes || [],
+        sourceTypes: (request.options?.searchFilters?.sourceTypes || []) as Array<'text' | 'file' | 'website' | 'qa'>,
         ...request.options?.searchFilters
       },
       rankingOptions: {
