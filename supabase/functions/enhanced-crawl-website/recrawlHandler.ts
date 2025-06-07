@@ -102,3 +102,122 @@ export async function handleChildPageRecrawl(
     }
   };
 }
+
+export async function handleAllChildrenRecrawl(
+  parentSourceId: string,
+  agentId: string
+) {
+  console.log('🔄 Processing all children recrawl for parent:', parentSourceId);
+  
+  // STEP 1: Mark parent as recrawling
+  console.log('🔄 Step 1: Setting parent to recrawling state...');
+  const { error: parentUpdateError } = await supabase
+    .from('agent_sources')
+    .update({
+      crawl_status: 'recrawling',
+      progress: 0,
+      metadata: {
+        is_recrawling: true,
+        recrawl_started_at: new Date().toISOString(),
+        recrawl_initiated_by: 'all_children_recrawl',
+        last_recrawl_update: new Date().toISOString()
+      }
+    })
+    .eq('id', parentSourceId);
+
+  if (parentUpdateError) {
+    console.error('❌ Error updating parent source for recrawl:', parentUpdateError);
+    throw new Error(`Failed to initiate parent recrawl: ${parentUpdateError.message}`);
+  }
+
+  // STEP 2: Get all existing child sources for this parent
+  console.log('🔄 Step 2: Getting all child sources...');
+  const { data: childSources, error: childSourcesError } = await supabase
+    .from('agent_sources')
+    .select('id, url')
+    .eq('parent_source_id', parentSourceId);
+
+  if (childSourcesError) {
+    console.error('❌ Error getting child sources:', childSourcesError);
+    throw new Error(`Failed to get child sources: ${childSourcesError.message}`);
+  }
+
+  if (!childSources || childSources.length === 0) {
+    console.log('ℹ️ No child sources found to recrawl');
+    return {
+      success: true,
+      message: 'No child sources found to recrawl',
+      parentSourceId: parentSourceId,
+      childrenRecrawled: 0
+    };
+  }
+
+  console.log(`✅ Found ${childSources.length} child sources to recrawl`);
+
+  // STEP 3: Set all child sources to recrawling status
+  console.log('🔄 Step 3: Setting all child sources to recrawling...');
+  const { error: childUpdateError } = await supabase
+    .from('agent_sources')
+    .update({
+      crawl_status: 'recrawling',
+      progress: 0,
+      metadata: {
+        is_recrawling: true,
+        recrawl_started_at: new Date().toISOString(),
+        recrawl_initiated_by: 'parent_recrawl',
+        last_recrawl_update: new Date().toISOString()
+      }
+    })
+    .eq('parent_source_id', parentSourceId);
+
+  if (childUpdateError) {
+    console.error('❌ Error updating child sources:', childUpdateError);
+    throw new Error(`Failed to update child sources: ${childUpdateError.message}`);
+  }
+
+  // STEP 4: Update corresponding source_pages to pending status
+  console.log('🔄 Step 4: Setting source_pages to pending for recrawl...');
+  for (const child of childSources) {
+    await supabase
+      .from('source_pages')
+      .update({
+        status: 'pending',
+        started_at: new Date().toISOString(),
+        completed_at: null,
+        error_message: null,
+        retry_count: 0,
+        updated_at: new Date().toISOString()
+      })
+      .eq('parent_source_id', parentSourceId)
+      .eq('url', child.url);
+  }
+
+  // STEP 5: Trigger processing for all child pages
+  console.log('🔄 Step 5: Triggering processing for all child pages...');
+  const { data: processData, error: processError } = await supabase.functions.invoke('process-source-pages', {
+    body: {
+      parentSourceId: parentSourceId,
+      priority: 'high'
+    }
+  });
+
+  if (processError) {
+    console.error('❌ Error calling process-source-pages:', processError);
+    throw new Error(`Failed to process child pages: ${processError.message}`);
+  }
+
+  console.log('✅ All children recrawl initiated successfully');
+  
+  return {
+    success: true,
+    message: `All child pages recrawl initiated for parent ${parentSourceId}`,
+    parentSourceId: parentSourceId,
+    childrenRecrawled: childSources.length,
+    debugInfo: {
+      recrawlInitiated: true,
+      parentStatus: 'recrawling',
+      childrenCount: childSources.length,
+      timestamp: new Date().toISOString()
+    }
+  };
+}

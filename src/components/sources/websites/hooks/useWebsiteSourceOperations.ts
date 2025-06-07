@@ -1,4 +1,3 @@
-
 import { useCallback, useRef } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { useRAGServices } from "@/hooks/useRAGServices";
@@ -96,8 +95,6 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
         await sourceService.updateSource(source.id, {
           crawl_status: 'recrawling',
           progress: 0,
-          links_count: 0,
-          last_crawled_at: new Date().toISOString(),
           metadata: {
             ...source.metadata,
             is_recrawling: true,
@@ -107,7 +104,7 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
           }
         });
 
-        // Get the supabase client and trigger enhanced crawl for all child pages
+        // Get the supabase client and trigger recrawl for all existing child pages
         const { supabase } = await import('@/integrations/supabase/client');
         
         const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
@@ -129,7 +126,7 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
           description: "Parent source and all child pages will be recrawled"
         });
       } else {
-        // For child sources, set proper status progression: recrawling → in_progress → completed
+        // For child sources, set proper status progression: recrawling → pending → in_progress → completed
         console.log(`🔄 Starting child page recrawl for: ${source.url}`);
         
         // First set to recrawling status
