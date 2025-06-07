@@ -14,7 +14,6 @@ import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
 import { SimpleStatusService } from '@/services/SimpleStatusService';
 import { supabase } from '@/integrations/supabase/client';
-import { SourceDeleteService } from '@/services/rag/operations/SourceDeleteService';
 
 interface ChildPageActionsProps {
   url: string;
@@ -91,9 +90,17 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         break;
       case 'delete':
         try {
-          // Perform actual deletion using SourceDeleteService
-          await SourceDeleteService.deleteSource(pageId);
-          console.log('Source deleted successfully');
+          // Delete from source_pages table (where child pages are stored)
+          const { error } = await supabase
+            .from('source_pages')
+            .delete()
+            .eq('id', pageId);
+
+          if (error) {
+            throw new Error(`Failed to delete source page: ${error.message}`);
+          }
+
+          console.log('Source page deleted successfully');
           
           // Call the onDelete callback if provided
           if (onDelete) {
