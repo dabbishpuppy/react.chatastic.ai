@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -35,7 +36,7 @@ serve(async (req) => {
 
     console.log(`📋 Current parent state - Status: ${parentSource.crawl_status}, Metadata:`, parentSource.metadata);
 
-    // Get source_pages statistics
+    // Get source_pages statistics including size data
     const { data: pages, error: pagesError } = await supabaseClient
       .from('source_pages')
       .select('*')
@@ -107,16 +108,19 @@ serve(async (req) => {
 
     console.log(`📊 Status decision - Old: ${parentSource.crawl_status}, New: ${status}`);
 
-    // Calculate compression stats from completed jobs
+    // Calculate compression stats and total size from completed jobs
     const completedJobsData = pages?.filter(job => job.status === 'completed') || [];
+    const totalChildSize = completedJobsData.reduce((sum, job) => sum + (job.content_size || 0), 0);
     const compressionStats = {
-      totalContentSize: completedJobsData.reduce((sum, job) => sum + (job.content_size || 0), 0),
+      totalContentSize: totalChildSize,
       avgCompressionRatio: completedJobsData.length > 0 
         ? completedJobsData.reduce((sum, job) => sum + (job.compression_ratio || 0), 0) / completedJobsData.length 
         : 0,
       totalUniqueChunks: completedJobsData.reduce((sum, job) => sum + (job.chunks_created || 0), 0),
       totalDuplicateChunks: completedJobsData.reduce((sum, job) => sum + (job.duplicates_found || 0), 0)
     };
+
+    console.log(`📏 Size calculation - Total child size: ${totalChildSize} bytes from ${completedJobsData.length} completed pages`);
 
     // Update parent source with aggregated data
     const updateData: any = {
@@ -132,21 +136,36 @@ serve(async (req) => {
       updated_at: new Date().toISOString()
     };
 
-    // Handle metadata updates - preserve recrawl state until completion
+    // Handle metadata updates - preserve recrawl state until completion and add child size info
     if (status === 'ready_for_training' || status === 'failed') {
       console.log(`🏁 Recrawl completed with status: ${status}, clearing recrawl flags`);
       updateData.metadata = {
         ...(parentSource.metadata || {}),
         is_recrawling: false,
         last_aggregation: new Date().toISOString(),
-        recrawl_completed_at: new Date().toISOString()
+        recrawl_completed_at: new Date().toISOString(),
+        total_child_pages_size: totalChildSize,
+        child_pages_count: completedJobsData.length,
+        size_calculation_method: 'child_page_aggregation'
       };
     } else if (isRecrawling) {
       console.log('🔄 Preserving recrawl metadata during processing');
-      // Preserve recrawl metadata but update aggregation timestamp
+      // Preserve recrawl metadata but update aggregation timestamp and size info
       updateData.metadata = {
         ...(parentSource.metadata || {}),
-        last_aggregation: new Date().toISOString()
+        last_aggregation: new Date().toISOString(),
+        total_child_pages_size: totalChildSize,
+        child_pages_count: completedJobsData.length,
+        size_calculation_method: 'child_page_aggregation'
+      };
+    } else {
+      // Normal processing - update metadata with size info
+      updateData.metadata = {
+        ...(parentSource.metadata || {}),
+        last_aggregation: new Date().toISOString(),
+        total_child_pages_size: totalChildSize,
+        child_pages_count: completedJobsData.length,
+        size_calculation_method: 'child_page_aggregation'
       };
     }
 
@@ -174,6 +193,7 @@ serve(async (req) => {
       pendingJobs,
       inProgressJobs,
       compressionStats,
+      totalChildSize,
       isRecrawling: isRecrawling || false,
       debugInfo: {
         originalStatus: parentSource.crawl_status,
