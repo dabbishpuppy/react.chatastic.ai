@@ -88,22 +88,83 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
     try {
       recrawlInProgressRef.current.add(source.id);
 
-      await sourceService.updateSource(source.id, {
-        crawl_status: 'pending',
-        progress: 0,
-        links_count: 0,
-        last_crawled_at: new Date().toISOString(),
-        metadata: {
-          ...source.metadata,
-          last_progress_update: new Date().toISOString(),
-          restart_count: (source.metadata?.restart_count || 0) + 1
-        }
-      });
+      // Check if this is a parent source (no parent_source_id)
+      const isParentSource = !source.parent_source_id;
       
-      toast({
-        title: "Recrawl initiated",
-        description: "The website will be recrawled and embeddings will be generated automatically"
-      });
+      if (isParentSource) {
+        // For parent sources, set status to 'recrawling' and trigger child page recrawls
+        await sourceService.updateSource(source.id, {
+          crawl_status: 'recrawling',
+          progress: 0,
+          links_count: 0,
+          last_crawled_at: new Date().toISOString(),
+          metadata: {
+            ...source.metadata,
+            is_recrawling: true,
+            recrawl_started_at: new Date().toISOString(),
+            last_progress_update: new Date().toISOString(),
+            restart_count: (source.metadata?.restart_count || 0) + 1
+          }
+        });
+
+        // Get the supabase client and trigger enhanced crawl for all child pages
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
+          body: {
+            mode: 'recrawl-all-children',
+            parentSourceId: source.id,
+            agentId: source.agent_id,
+            url: source.url,
+            priority: 'high'
+          }
+        });
+
+        if (error) {
+          throw new Error(`Failed to trigger child recrawls: ${error.message}`);
+        }
+
+        toast({
+          title: "Recrawl initiated",
+          description: "Parent source and all child pages will be recrawled"
+        });
+      } else {
+        // For child sources, trigger individual child page recrawl
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
+          body: {
+            mode: 'recrawl-child-page',
+            parentSourceId: source.parent_source_id,
+            childSourceId: source.id,
+            url: source.url,
+            agentId: source.agent_id,
+            priority: 'high'
+          }
+        });
+
+        if (error) {
+          throw new Error(`Failed to trigger child page recrawl: ${error.message}`);
+        }
+
+        // Update the child source status
+        await sourceService.updateSource(source.id, {
+          crawl_status: 'recrawling',
+          progress: 0,
+          last_crawled_at: new Date().toISOString(),
+          metadata: {
+            ...source.metadata,
+            is_recrawling: true,
+            recrawl_started_at: new Date().toISOString(),
+            last_progress_update: new Date().toISOString()
+          }
+        });
+
+        toast({
+          title: "Child page recrawl initiated",
+          description: "The selected page will be recrawled"
+        });
+      }
       
       refetch();
     } catch (error) {
@@ -148,12 +209,13 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
 
       // Update source status and trigger enhanced recrawl
       await sourceService.updateSource(source.id, {
-        crawl_status: 'pending',
+        crawl_status: 'recrawling',
         progress: 0,
         links_count: 0,
         last_crawled_at: new Date().toISOString(),
         metadata: {
           ...source.metadata,
+          is_recrawling: true,
           last_progress_update: new Date().toISOString(),
           restart_count: (source.metadata?.restart_count || 0) + 1,
           enhanced_extraction: true,

@@ -36,11 +36,8 @@ export class SimplifiedSourceStatusService {
       return 'ready_for_training';
     }
     
-    // Handle recrawling states
-    if (metadata.is_recrawling === true) {
-      if (status === 'ready_for_training' || status === 'completed') {
-        return 'ready_for_training';
-      }
+    // Handle recrawling states - prioritize metadata flag
+    if (metadata.is_recrawling === true || status === 'recrawling') {
       return 'recrawling';
     }
     
@@ -60,6 +57,8 @@ export class SimplifiedSourceStatusService {
         return 'failed';
       case 'trained':
         return 'trained';
+      case 'crawled':
+        return 'ready_for_training';
       default:
         return status || 'unknown';
     }
