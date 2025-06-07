@@ -1,7 +1,6 @@
 
 export interface CacheEntry<T = any> {
-  key: string;
-  value: T;
+  data: T;
   timestamp: number;
   ttl: number;
   accessCount: number;
@@ -9,206 +8,229 @@ export interface CacheEntry<T = any> {
 }
 
 export interface CacheStats {
-  totalEntries: number;
+  size: number;
   hitRate: number;
-  missRate: number;
+  totalRequests: number;
+  totalHits: number;
   memoryUsage: number;
-  oldestEntry: number;
-  newestEntry: number;
 }
 
 export interface CacheOptions {
-  maxSize?: number;
-  defaultTTL?: number;
-  enableStats?: boolean;
-  compressionThreshold?: number;
+  ttl?: number; // Time to live in milliseconds
+  maxSize?: number; // Maximum number of entries
+  enableLRU?: boolean; // Enable Least Recently Used eviction
 }
 
 export class CacheService {
   private cache = new Map<string, CacheEntry>();
   private stats = {
-    hits: 0,
-    misses: 0,
-    sets: 0,
-    deletes: 0,
-    evictions: 0
+    totalRequests: 0,
+    totalHits: 0
   };
-  
-  private readonly maxSize: number;
-  private readonly defaultTTL: number;
-  private readonly enableStats: boolean;
-  private readonly compressionThreshold: number;
+  private maxSize: number;
+  private defaultTTL: number;
+  private enableLRU: boolean;
 
   constructor(options: CacheOptions = {}) {
     this.maxSize = options.maxSize || 1000;
-    this.defaultTTL = options.defaultTTL || 300000; // 5 minutes
-    this.enableStats = options.enableStats !== false;
-    this.compressionThreshold = options.compressionThreshold || 10000; // 10KB
+    this.defaultTTL = options.ttl || 300000; // 5 minutes default
+    this.enableLRU = options.enableLRU !== false;
   }
 
-  async get<T>(key: string): Promise<T | null> {
-    const entry = this.cache.get(key);
+  /**
+   * Get value from cache
+   */
+  get<T>(key: string): T | null {
+    this.stats.totalRequests++;
     
+    const entry = this.cache.get(key);
     if (!entry) {
-      this.enableStats && this.stats.misses++;
       return null;
     }
 
     // Check if entry has expired
-    if (this.isExpired(entry)) {
+    if (Date.now() - entry.timestamp > entry.ttl) {
       this.cache.delete(key);
-      this.enableStats && this.stats.misses++;
       return null;
     }
 
     // Update access statistics
     entry.accessCount++;
     entry.lastAccessed = Date.now();
-    this.enableStats && this.stats.hits++;
+    this.stats.totalHits++;
 
-    return entry.value as T;
+    return entry.data as T;
   }
 
-  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-    // Ensure we don't exceed max size
-    if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
+  /**
+   * Set value in cache
+   */
+  set<T>(key: string, value: T, ttl?: number): void {
+    const now = Date.now();
+    const entryTTL = ttl || this.defaultTTL;
+
+    // Evict if cache is full
+    if (this.cache.size >= this.maxSize) {
       this.evictLRU();
     }
 
-    const now = Date.now();
-    const entry: CacheEntry<T> = {
-      key,
-      value,
+    this.cache.set(key, {
+      data: value,
       timestamp: now,
-      ttl: ttl || this.defaultTTL,
-      accessCount: 1,
+      ttl: entryTTL,
+      accessCount: 0,
       lastAccessed: now
-    };
-
-    this.cache.set(key, entry);
-    this.enableStats && this.stats.sets++;
+    });
   }
 
-  async delete(key: string): Promise<boolean> {
-    const deleted = this.cache.delete(key);
-    if (deleted && this.enableStats) {
-      this.stats.deletes++;
-    }
-    return deleted;
-  }
-
-  async clear(): Promise<void> {
-    this.cache.clear();
-    this.resetStats();
-  }
-
-  async has(key: string): Promise<boolean> {
+  /**
+   * Check if key exists in cache
+   */
+  has(key: string): boolean {
     const entry = this.cache.get(key);
-    return entry ? !this.isExpired(entry) : false;
+    if (!entry) {
+      return false;
+    }
+
+    // Check if expired
+    if (Date.now() - entry.timestamp > entry.ttl) {
+      this.cache.delete(key);
+      return false;
+    }
+
+    return true;
   }
 
+  /**
+   * Delete key from cache
+   */
+  delete(key: string): boolean {
+    return this.cache.delete(key);
+  }
+
+  /**
+   * Clear all cache entries
+   */
+  clear(): void {
+    this.cache.clear();
+    this.stats.totalRequests = 0;
+    this.stats.totalHits = 0;
+  }
+
+  /**
+   * Get cache statistics
+   */
   getStats(): CacheStats {
-    const entries = Array.from(this.cache.values());
-    const totalRequests = this.stats.hits + this.stats.misses;
-    
+    const hitRate = this.stats.totalRequests > 0 
+      ? (this.stats.totalHits / this.stats.totalRequests) * 100 
+      : 0;
+
+    // Estimate memory usage (rough calculation)
+    const memoryUsage = Array.from(this.cache.values()).reduce((total, entry) => {
+      return total + JSON.stringify(entry.data).length * 2; // Rough byte estimate
+    }, 0);
+
     return {
-      totalEntries: this.cache.size,
-      hitRate: totalRequests > 0 ? this.stats.hits / totalRequests : 0,
-      missRate: totalRequests > 0 ? this.stats.misses / totalRequests : 0,
-      memoryUsage: this.estimateMemoryUsage(),
-      oldestEntry: entries.length > 0 ? Math.min(...entries.map(e => e.timestamp)) : 0,
-      newestEntry: entries.length > 0 ? Math.max(...entries.map(e => e.timestamp)) : 0
+      size: this.cache.size,
+      hitRate: Math.round(hitRate * 100) / 100,
+      totalRequests: this.stats.totalRequests,
+      totalHits: this.stats.totalHits,
+      memoryUsage
     };
   }
 
-  // Cache specific methods for RAG operations
-  async getCachedQuery(queryHash: string): Promise<any> {
-    return this.get(`query:${queryHash}`);
-  }
-
-  async setCachedQuery(queryHash: string, result: any, ttl?: number): Promise<void> {
-    return this.set(`query:${queryHash}`, result, ttl);
-  }
-
-  async getCachedEmbedding(contentHash: string): Promise<number[] | null> {
-    return this.get(`embedding:${contentHash}`);
-  }
-
-  async setCachedEmbedding(contentHash: string, embedding: number[], ttl?: number): Promise<void> {
-    return this.set(`embedding:${contentHash}`, embedding, ttl);
-  }
-
-  async getCachedSearchResults(searchHash: string): Promise<any> {
-    return this.get(`search:${searchHash}`);
-  }
-
-  async setCachedSearchResults(searchHash: string, results: any, ttl?: number): Promise<void> {
-    return this.set(`search:${searchHash}`, results, ttl);
-  }
-
-  private isExpired(entry: CacheEntry): boolean {
-    return Date.now() - entry.timestamp > entry.ttl;
-  }
-
+  /**
+   * Evict least recently used entries
+   */
   private evictLRU(): void {
-    let oldestEntry: CacheEntry | null = null;
-    let oldestKey: string | null = null;
+    if (!this.enableLRU || this.cache.size === 0) {
+      return;
+    }
 
+    let oldestKey = '';
+    let oldestTime = Date.now();
+
+    // Find the least recently used entry
     for (const [key, entry] of this.cache.entries()) {
-      if (!oldestEntry || entry.lastAccessed < oldestEntry.lastAccessed) {
-        oldestEntry = entry;
+      if (entry.lastAccessed < oldestTime) {
+        oldestTime = entry.lastAccessed;
         oldestKey = key;
       }
     }
 
     if (oldestKey) {
       this.cache.delete(oldestKey);
-      this.enableStats && this.stats.evictions++;
     }
   }
 
-  private estimateMemoryUsage(): number {
-    let totalSize = 0;
-    for (const entry of this.cache.values()) {
-      totalSize += JSON.stringify(entry).length * 2; // Rough estimate (UTF-16)
-    }
-    return totalSize;
-  }
-
-  private resetStats(): void {
-    this.stats = {
-      hits: 0,
-      misses: 0,
-      sets: 0,
-      deletes: 0,
-      evictions: 0
-    };
-  }
-
-  // Utility method to generate cache keys
-  static generateKey(...parts: string[]): string {
-    return parts.map(part => encodeURIComponent(part)).join(':');
-  }
-
-  // Cleanup expired entries
-  async cleanup(): Promise<number> {
-    let removedCount = 0;
+  /**
+   * Clean up expired entries
+   */
+  cleanupExpired(): number {
     const now = Date.now();
+    let cleaned = 0;
 
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp > entry.ttl) {
         this.cache.delete(key);
-        removedCount++;
+        cleaned++;
       }
     }
 
-    return removedCount;
+    return cleaned;
+  }
+
+  /**
+   * Get cached value or execute function and cache result
+   */
+  async getOrSet<T>(
+    key: string,
+    fetchFn: () => Promise<T>,
+    ttl?: number
+  ): Promise<T> {
+    // Try to get from cache first
+    const cached = this.get<T>(key);
+    if (cached !== null) {
+      return cached;
+    }
+
+    // Execute function and cache result
+    try {
+      const result = await fetchFn();
+      this.set(key, result, ttl);
+      return result;
+    } catch (error) {
+      // Don't cache errors
+      throw error;
+    }
+  }
+
+  /**
+   * Generate cache key for RAG queries
+   */
+  static generateRAGCacheKey(
+    query: string, 
+    agentId: string, 
+    filters: any = {}
+  ): string {
+    const filterStr = JSON.stringify(filters);
+    const combined = `${query}|${agentId}|${filterStr}`;
+    
+    // Simple hash function for cache key
+    let hash = 0;
+    for (let i = 0; i < combined.length; i++) {
+      const char = combined.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return `rag_${Math.abs(hash)}`;
   }
 }
 
 // Global cache instance
 export const globalCache = new CacheService({
-  maxSize: 5000,
-  defaultTTL: 600000, // 10 minutes
-  enableStats: true
+  maxSize: 1000,
+  ttl: 300000, // 5 minutes
+  enableLRU: true
 });

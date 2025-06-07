@@ -1,20 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { HybridSearchEngine } from './search/hybridSearchEngine';
-import { SearchSuggestions } from './search/searchSuggestions';
-
-export interface SearchFilters {
-  sourceTypes?: string[];
-  agentIds?: string[];
-  dateRange?: {
-    start: Date;
-    end: Date;
-  };
-  minSimilarity?: number;
-  maxResults?: number;
-  excludeSources?: string[];
-  includeMetadata?: boolean;
-}
+import { VectorSearchService } from '../vectorDatabase/vectorSearchService';
 
 export interface SemanticSearchResult {
   chunkId: string;
@@ -25,124 +11,71 @@ export interface SemanticSearchResult {
     sourceName: string;
     sourceType: string;
     chunkIndex: number;
-    createdAt: string;
-    [key: string]: any;
+    sourceUrl?: string;
   };
-  embedding?: number[];
+}
+
+export interface SearchFilters {
+  maxResults?: number;
+  minSimilarity?: number;
+  sourceTypes?: string[];
+  dateRange?: {
+    start: Date;
+    end: Date;
+  };
 }
 
 export class SemanticSearchService {
+  /**
+   * Search for similar chunks using vector embeddings
+   */
   static async searchSimilarChunks(
     query: string,
     agentId: string,
-    filters?: SearchFilters
+    filters: SearchFilters = {}
   ): Promise<SemanticSearchResult[]> {
-    console.log('🔍 Semantic search:', {
-      query: query.substring(0, 50) + '...',
-      agentId,
-      filters
-    });
-
     try {
-      // Generate query embedding (placeholder - would use actual embedding service)
+      // Generate embedding for the query
       const queryEmbedding = await this.generateQueryEmbedding(query);
-
-      // Build search query with correct joins
-      let searchQuery = supabase
-        .from('source_chunks')
-        .select(`
-          id,
-          source_id,
-          content,
-          chunk_index,
-          metadata,
-          created_at
-        `);
-
-      // Join with agent_sources to filter by agent_id
-      const { data: agentSources } = await supabase
-        .from('agent_sources')
-        .select('id')
-        .eq('agent_id', agentId);
-
-      if (!agentSources || agentSources.length === 0) {
-        console.log('No sources found for agent');
+      
+      if (!queryEmbedding || queryEmbedding.length === 0) {
+        console.warn('Failed to generate query embedding');
         return [];
       }
 
-      const sourceIds = agentSources.map(source => source.id);
-      searchQuery = searchQuery.in('source_id', sourceIds);
-
-      // Apply additional filters
-      if (filters?.excludeSources?.length) {
-        searchQuery = searchQuery.not('source_id', 'in', `(${filters.excludeSources.join(',')})`);
-      }
-
-      if (filters?.dateRange) {
-        searchQuery = searchQuery
-          .gte('created_at', filters.dateRange.start.toISOString())
-          .lte('created_at', filters.dateRange.end.toISOString());
-      }
-
-      const limit = Math.min(filters?.maxResults || 10, 50);
-      searchQuery = searchQuery.limit(limit);
-
-      const { data: chunks, error } = await searchQuery;
-
-      if (error) {
-        console.error('Semantic search error:', error);
-        return [];
-      }
-
-      if (!chunks || chunks.length === 0) {
-        console.log('No chunks found for semantic search');
-        return [];
-      }
-
-      // Get source metadata for each chunk
-      const uniqueSourceIds = [...new Set(chunks.map(chunk => chunk.source_id))];
-      const { data: sources } = await supabase
-        .from('agent_sources')
-        .select('id, title, source_type')
-        .in('id', uniqueSourceIds);
-
-      const sourceMap = new Map(sources?.map(s => [s.id, s]) || []);
-
-      // Calculate similarity scores and build results
-      const results: SemanticSearchResult[] = chunks.map((chunk, index) => {
-        const source = sourceMap.get(chunk.source_id);
-        const chunkMetadata = chunk.metadata && typeof chunk.metadata === 'object' ? chunk.metadata : {};
-        
-        return {
-          chunkId: chunk.id,
-          sourceId: chunk.source_id,
-          content: chunk.content,
-          similarity: this.calculateMockSimilarity(query, chunk.content, index),
-          metadata: {
-            sourceName: source?.title || 'Unknown Source',
-            sourceType: source?.source_type || 'text',
-            chunkIndex: chunk.chunk_index,
-            createdAt: chunk.created_at || new Date().toISOString(),
-            ...(typeof chunkMetadata === 'object' ? chunkMetadata : {})
-          }
-        };
-      });
-
-      // Filter by minimum similarity
-      const filteredResults = results.filter(
-        result => result.similarity >= (filters?.minSimilarity || 0.3)
+      // Perform vector search
+      const vectorResults = await VectorSearchService.searchSimilarChunks(
+        queryEmbedding,
+        {
+          maxResults: filters.maxResults || 20,
+          minSimilarity: filters.minSimilarity || 0.7,
+          agentId,
+          sourceTypes: filters.sourceTypes
+        }
       );
 
-      // Sort by similarity
-      const sortedResults = filteredResults.sort((a, b) => b.similarity - a.similarity);
+      // Convert to semantic search results with enriched metadata
+      const results = await Promise.all(
+        vectorResults.map(async (result) => {
+          const metadata = await this.enrichChunkMetadata(result.sourceId, result.chunkId);
+          
+          return {
+            chunkId: result.chunkId,
+            sourceId: result.sourceId,
+            content: result.content,
+            similarity: result.similarity,
+            metadata: {
+              sourceName: metadata.sourceName || 'Unknown Source',
+              sourceType: metadata.sourceType || 'text',
+              chunkIndex: metadata.chunkIndex || 0,
+              sourceUrl: metadata.sourceUrl
+            }
+          };
+        })
+      );
 
-      console.log('✅ Semantic search complete:', {
-        totalChunks: chunks.length,
-        filteredResults: sortedResults.length,
-        avgSimilarity: sortedResults.reduce((sum, r) => sum + r.similarity, 0) / sortedResults.length
-      });
-
-      return sortedResults;
+      console.log(`🔍 Semantic search found ${results.length} results for query: "${query.substring(0, 50)}..."`);
+      return results;
 
     } catch (error) {
       console.error('❌ Semantic search failed:', error);
@@ -150,34 +83,18 @@ export class SemanticSearchService {
     }
   }
 
+  /**
+   * Search using keywords (fallback method)
+   */
   static async searchByKeywords(
     keywords: string[],
     agentId: string,
-    filters?: SearchFilters
+    filters: SearchFilters = {}
   ): Promise<SemanticSearchResult[]> {
-    console.log('🔤 Keyword search:', { keywords, agentId });
-
-    if (keywords.length === 0) {
-      return [];
-    }
-
     try {
-      // Create text search query
-      const searchTerm = keywords.join(' | ');
+      const keywordQuery = keywords.join(' OR ');
       
-      // Get agent sources first
-      const { data: agentSources } = await supabase
-        .from('agent_sources')
-        .select('id')
-        .eq('agent_id', agentId);
-
-      if (!agentSources || agentSources.length === 0) {
-        return [];
-      }
-
-      const sourceIds = agentSources.map(source => source.id);
-
-      let searchQuery = supabase
+      let query = supabase
         .from('source_chunks')
         .select(`
           id,
@@ -185,65 +102,41 @@ export class SemanticSearchService {
           content,
           chunk_index,
           metadata,
-          created_at
+          agent_sources!inner (
+            id,
+            title,
+            source_type,
+            url,
+            agent_id
+          )
         `)
-        .in('source_id', sourceIds)
-        .textSearch('content', searchTerm);
+        .eq('agent_sources.agent_id', agentId)
+        .textSearch('content', keywordQuery)
+        .limit(filters.maxResults || 20);
 
-      // Apply same filters as semantic search
-      if (filters?.excludeSources?.length) {
-        searchQuery = searchQuery.not('source_id', 'in', `(${filters.excludeSources.join(',')})`);
+      if (filters.sourceTypes && filters.sourceTypes.length > 0) {
+        query = query.in('agent_sources.source_type', filters.sourceTypes);
       }
 
-      const limit = Math.min(filters?.maxResults || 10, 30);
-      searchQuery = searchQuery.limit(limit);
-
-      const { data: chunks, error } = await searchQuery;
+      const { data, error } = await query;
 
       if (error) {
         console.error('Keyword search error:', error);
         return [];
       }
 
-      if (!chunks || chunks.length === 0) {
-        return [];
-      }
-
-      // Get source metadata
-      const uniqueSourceIds = [...new Set(chunks.map(chunk => chunk.source_id))];
-      const { data: sources } = await supabase
-        .from('agent_sources')
-        .select('id, title, source_type')
-        .in('id', uniqueSourceIds);
-
-      const sourceMap = new Map(sources?.map(s => [s.id, s]) || []);
-
-      // Calculate keyword-based similarity
-      const results: SemanticSearchResult[] = chunks.map((chunk) => {
-        const source = sourceMap.get(chunk.source_id);
-        const chunkMetadata = chunk.metadata && typeof chunk.metadata === 'object' ? chunk.metadata : {};
-        
-        return {
-          chunkId: chunk.id,
-          sourceId: chunk.source_id,
-          content: chunk.content,
-          similarity: this.calculateKeywordSimilarity(keywords, chunk.content),
-          metadata: {
-            sourceName: source?.title || 'Unknown Source',
-            sourceType: source?.source_type || 'text',
-            chunkIndex: chunk.chunk_index,
-            createdAt: chunk.created_at || new Date().toISOString(),
-            ...(typeof chunkMetadata === 'object' ? chunkMetadata : {})
-          }
-        };
-      });
-
-      const filteredResults = results.filter(
-        result => result.similarity >= (filters?.minSimilarity || 0.2)
-      );
-
-      console.log('✅ Keyword search complete:', { results: filteredResults.length });
-      return filteredResults.sort((a, b) => b.similarity - a.similarity);
+      return data?.map((item: any) => ({
+        chunkId: item.id,
+        sourceId: item.source_id,
+        content: item.content,
+        similarity: 0.8, // Assign default similarity for keyword search
+        metadata: {
+          sourceName: item.agent_sources.title,
+          sourceType: item.agent_sources.source_type,
+          chunkIndex: item.chunk_index,
+          sourceUrl: item.agent_sources.url
+        }
+      })) || [];
 
     } catch (error) {
       console.error('❌ Keyword search failed:', error);
@@ -251,49 +144,143 @@ export class SemanticSearchService {
     }
   }
 
+  /**
+   * Hybrid search combining vector and keyword search
+   */
   static async hybridSearch(
     query: string,
     agentId: string,
-    filters?: SearchFilters
+    filters: SearchFilters = {}
   ): Promise<SemanticSearchResult[]> {
-    return HybridSearchEngine.hybridSearch(query, agentId, filters);
+    try {
+      // Extract keywords from query
+      const keywords = this.extractKeywords(query);
+      
+      // Perform both searches in parallel
+      const [vectorResults, keywordResults] = await Promise.all([
+        this.searchSimilarChunks(query, agentId, { ...filters, maxResults: (filters.maxResults || 20) / 2 }),
+        this.searchByKeywords(keywords, agentId, { ...filters, maxResults: (filters.maxResults || 20) / 2 })
+      ]);
+
+      // Combine and deduplicate results
+      const combinedResults = this.combineAndRankResults(vectorResults, keywordResults);
+      
+      console.log(`🔍 Hybrid search found ${combinedResults.length} results`);
+      return combinedResults.slice(0, filters.maxResults || 20);
+
+    } catch (error) {
+      console.error('❌ Hybrid search failed:', error);
+      return [];
+    }
   }
 
-  static async getSearchSuggestions(
-    partialQuery: string,
-    agentId: string,
-    limit: number = 5
-  ): Promise<string[]> {
-    return SearchSuggestions.getSearchSuggestions(partialQuery, agentId, limit);
-  }
-
+  /**
+   * Generate embedding for query text
+   */
   private static async generateQueryEmbedding(query: string): Promise<number[]> {
-    // Placeholder for actual embedding generation
-    console.log('📊 Generating query embedding (placeholder)');
-    return new Array(1536).fill(0).map(() => Math.random());
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-embeddings', {
+        body: {
+          texts: [query],
+          model: 'text-embedding-3-small',
+          provider: 'openai'
+        }
+      });
+
+      if (error) {
+        console.error('Embedding generation error:', error);
+        return [];
+      }
+
+      return data.embeddings[0] || [];
+    } catch (error) {
+      console.error('Failed to generate query embedding:', error);
+      return [];
+    }
   }
 
-  private static calculateMockSimilarity(query: string, content: string, index: number): number {
-    // Mock similarity calculation for testing
-    const queryWords = query.toLowerCase().split(' ');
-    const contentWords = content.toLowerCase().split(' ');
-    
-    const commonWords = queryWords.filter(word => 
-      contentWords.some(cWord => cWord.includes(word) || word.includes(cWord))
-    );
-    
-    const baseSimilarity = commonWords.length / queryWords.length;
-    const positionPenalty = index * 0.05; // Later results get lower scores
-    
-    return Math.max(0.1, Math.min(0.95, baseSimilarity - positionPenalty));
+  /**
+   * Enrich chunk metadata with source information
+   */
+  private static async enrichChunkMetadata(sourceId: string, chunkId: string): Promise<{
+    sourceName: string;
+    sourceType: string;
+    chunkIndex: number;
+    sourceUrl?: string;
+  }> {
+    try {
+      const { data: chunk } = await supabase
+        .from('source_chunks')
+        .select(`
+          chunk_index,
+          agent_sources!inner (
+            title,
+            source_type,
+            url
+          )
+        `)
+        .eq('id', chunkId)
+        .single();
+
+      return {
+        sourceName: chunk?.agent_sources?.title || 'Unknown',
+        sourceType: chunk?.agent_sources?.source_type || 'text',
+        chunkIndex: chunk?.chunk_index || 0,
+        sourceUrl: chunk?.agent_sources?.url
+      };
+    } catch (error) {
+      console.error('Failed to enrich metadata:', error);
+      return {
+        sourceName: 'Unknown',
+        sourceType: 'text',
+        chunkIndex: 0
+      };
+    }
   }
 
-  private static calculateKeywordSimilarity(keywords: string[], content: string): number {
-    const contentLower = content.toLowerCase();
-    const matchingKeywords = keywords.filter(keyword => 
-      contentLower.includes(keyword.toLowerCase())
-    );
+  /**
+   * Extract keywords from query
+   */
+  private static extractKeywords(query: string): string[] {
+    const stopWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
     
-    return matchingKeywords.length / keywords.length;
+    return query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !stopWords.includes(word))
+      .slice(0, 10); // Limit to 10 keywords
+  }
+
+  /**
+   * Combine and rank results from different search methods
+   */
+  private static combineAndRankResults(
+    vectorResults: SemanticSearchResult[],
+    keywordResults: SemanticSearchResult[]
+  ): SemanticSearchResult[] {
+    const seenChunks = new Set<string>();
+    const combined: SemanticSearchResult[] = [];
+
+    // Add vector results first (higher priority)
+    for (const result of vectorResults) {
+      if (!seenChunks.has(result.chunkId)) {
+        seenChunks.add(result.chunkId);
+        combined.push({
+          ...result,
+          similarity: result.similarity * 1.1 // Boost vector search results
+        });
+      }
+    }
+
+    // Add keyword results that weren't already included
+    for (const result of keywordResults) {
+      if (!seenChunks.has(result.chunkId)) {
+        seenChunks.add(result.chunkId);
+        combined.push(result);
+      }
+    }
+
+    // Sort by similarity score
+    return combined.sort((a, b) => b.similarity - a.similarity);
   }
 }
