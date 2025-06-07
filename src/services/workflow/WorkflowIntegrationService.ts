@@ -1,6 +1,7 @@
 
 import { CrawlWorkflowService } from './CrawlWorkflowService';
 import { AgentSource } from '@/types/rag';
+import { SourceDeleteService } from '../rag/operations/SourceDeleteService';
 
 /**
  * Service to integrate the new workflow system with existing operations
@@ -8,15 +9,16 @@ import { AgentSource } from '@/types/rag';
  */
 export class WorkflowIntegrationService {
   /**
-   * Handle source removal using the workflow system
+   * Handle source removal using the comprehensive deletion service
    */
   static async handleSourceRemoval(source: AgentSource): Promise<void> {
-    console.log('🗑️ Handling source removal via workflow system:', source.id);
+    console.log('🗑️ Handling source removal via comprehensive deletion:', source.id);
     
     try {
-      await CrawlWorkflowService.markPendingRemoval(source.id);
+      // Use the comprehensive deletion service that properly handles foreign key constraints
+      await SourceDeleteService.deleteSource(source.id);
     } catch (error) {
-      console.error('❌ Error marking source for removal:', error);
+      console.error('❌ Error during source removal:', error);
       throw error;
     }
   }
