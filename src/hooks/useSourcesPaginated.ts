@@ -32,7 +32,7 @@ export const useSourcesPaginated = ({
         throw new Error('Agent ID is required');
       }
 
-      console.log('🔍 Fetching paginated sources:', {
+      console.log('🔍 DEBUG: Fetching paginated sources:', {
         agentId,
         sourceType,
         page,
@@ -40,13 +40,13 @@ export const useSourcesPaginated = ({
         timestamp: new Date().toISOString()
       });
 
-      // Build base query - include ALL sources for complete list view
-      // Remove the complex filtering to ensure we see all sources including pending deletion
+      // Build base query - include ALL sources including pending deletion
+      // CRITICAL: Only filter by is_active=true, DO NOT filter by pending_deletion or is_excluded
       let query = supabase
         .from('agent_sources')
         .select('*', { count: 'exact' })
         .eq('agent_id', agentId)
-        .eq('is_active', true); // Only filter by is_active, not by is_excluded or pending_deletion
+        .eq('is_active', true); // Only filter by is_active, keep everything else
 
       // Add source type filter if specified
       if (sourceType) {
@@ -62,15 +62,37 @@ export const useSourcesPaginated = ({
       const { data, error, count } = await query;
 
       if (error) {
-        console.error('Error fetching paginated sources:', error);
+        console.error('❌ DEBUG: Error fetching paginated sources:', error);
         throw error;
       }
 
-      console.log('📋 Sources fetched:', {
+      console.log('📋 DEBUG: Raw sources fetched from database:', {
         count: data?.length || 0,
         totalCount: count || 0,
-        sourcesWithPendingDeletion: data?.filter(s => s.pending_deletion).length || 0,
-        sourcesExcluded: data?.filter(s => s.is_excluded).length || 0,
+        sources: data?.map(s => ({
+          id: s.id,
+          title: s.title,
+          is_active: s.is_active,
+          pending_deletion: s.pending_deletion,
+          is_excluded: s.is_excluded,
+          source_type: s.source_type,
+          parent_source_id: s.parent_source_id
+        })) || [],
+        timestamp: new Date().toISOString()
+      });
+
+      const sourcesWithPendingDeletion = data?.filter(s => s.pending_deletion === true) || [];
+      const sourcesExcluded = data?.filter(s => s.is_excluded === true) || [];
+      
+      console.log('📊 DEBUG: Sources breakdown:', {
+        total: data?.length || 0,
+        withPendingDeletion: sourcesWithPendingDeletion.length,
+        excluded: sourcesExcluded.length,
+        pendingDeletionSources: sourcesWithPendingDeletion.map(s => ({
+          id: s.id,
+          title: s.title,
+          pending_deletion: s.pending_deletion
+        })),
         timestamp: new Date().toISOString()
       });
 
@@ -123,6 +145,13 @@ export const useSourcesPaginated = ({
         file_type: undefined,
       }));
 
+      console.log('📤 DEBUG: Transformed sources being returned:', {
+        count: sources.length,
+        sourcesWithPendingDeletion: sources.filter(s => s.pending_deletion === true).length,
+        sourcesExcluded: sources.filter(s => s.is_excluded === true).length,
+        timestamp: new Date().toISOString()
+      });
+
       return {
         sources,
         totalCount: count || 0,
@@ -133,8 +162,8 @@ export const useSourcesPaginated = ({
     enabled: enabled && !!agentId,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    staleTime: 2000, // Further reduced stale time for better real-time updates
-    refetchInterval: 5000, // More frequent refetch for real-time feel
+    staleTime: 2000,
+    refetchInterval: 5000,
   });
 };
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AgentSource } from '@/types/rag';
 import { WebsiteSourceItem } from '../WebsiteSourceItem';
@@ -23,6 +24,17 @@ const WebsiteSourcesContent: React.FC<WebsiteSourcesContentProps> = ({
   isSelected,
   toggleItem
 }) => {
+  console.log('🔍 DEBUG: WebsiteSourcesContent received sources:', {
+    count: sources.length,
+    sources: sources.map(s => ({
+      id: s.id,
+      title: s.title,
+      pending_deletion: s.pending_deletion,
+      is_excluded: s.is_excluded
+    })),
+    timestamp: new Date().toISOString()
+  });
+
   if (sources.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
@@ -33,20 +45,31 @@ const WebsiteSourcesContent: React.FC<WebsiteSourcesContentProps> = ({
   }
 
   return (
-    <div id="website-sources-list" role="list">
-      {sources.map((source) => (
-        <WebsiteSourceItem
-          key={source.id}
-          source={source}
-          childSources={getChildSources(source.id)}
-          onEdit={onEdit}
-          onExclude={onExclude}
-          onDelete={onDelete}
-          onRecrawl={onRecrawl}
-          isSelected={isSelected(source.id)}
-          onSelectionChange={() => toggleItem(source.id)}
-        />
-      ))}
+    <div className="space-y-4">
+      {sources.map((source) => {
+        console.log(`🔍 DEBUG: Rendering source ${source.id}:`, {
+          title: source.title,
+          pending_deletion: source.pending_deletion,
+          is_excluded: source.is_excluded,
+          timestamp: new Date().toISOString()
+        });
+        
+        return (
+          <WebsiteSourceItem
+            key={source.id}
+            source={source}
+            childSources={getChildSources(source.id)}
+            onEdit={onEdit}
+            onExclude={onExclude}
+            onDelete={onDelete}
+            onRecrawl={onRecrawl}
+            isSelected={isSelected(source.id)}
+            onSelectionChange={(selected) => {
+              toggleItem(source.id);
+            }}
+          />
+        );
+      })}
     </div>
   );
 };

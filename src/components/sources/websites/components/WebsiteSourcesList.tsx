@@ -1,3 +1,4 @@
+
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
@@ -125,18 +126,44 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   const allSources = paginatedData?.sources || [];
 
   const parentSources = useMemo(() => {
-    console.log('🔍 Processing website sources for list:', {
+    console.log('🔍 DEBUG: Processing website sources for list:', {
       totalSources: allSources.length,
       page,
       timestamp: new Date().toISOString()
     });
     
-    const parents = allSources.filter(source => 
-      !source.parent_source_id && 
-      source.source_type === 'website'
-    );
+    // Log all sources to see what we have
+    console.log('🔍 DEBUG: All sources received:', allSources.map(s => ({
+      id: s.id,
+      title: s.title,
+      url: s.url,
+      is_active: s.is_active,
+      pending_deletion: s.pending_deletion,
+      is_excluded: s.is_excluded,
+      parent_source_id: s.parent_source_id,
+      source_type: s.source_type
+    })));
     
-    console.log('📊 Parent website sources:', {
+    // Filter for parent sources (no parent_source_id) and include ALL active sources
+    // IMPORTANT: Do NOT filter out sources with pending_deletion or is_excluded
+    const parents = allSources.filter(source => {
+      const isParent = !source.parent_source_id;
+      const isWebsite = source.source_type === 'website';
+      const isActive = source.is_active === true;
+      
+      console.log(`🔍 DEBUG: Source ${source.id} filter check:`, {
+        isParent,
+        isWebsite,
+        isActive,
+        pending_deletion: source.pending_deletion,
+        is_excluded: source.is_excluded,
+        willInclude: isParent && isWebsite && isActive
+      });
+      
+      return isParent && isWebsite && isActive;
+    });
+    
+    console.log('📊 DEBUG: Final parent website sources:', {
       count: parents.length,
       sources: parents.map(s => ({ 
         id: s.id, 
