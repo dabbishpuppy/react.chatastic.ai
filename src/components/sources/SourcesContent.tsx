@@ -3,7 +3,11 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Loader2, FileText, RefreshCw } from "lucide-react";
+import { useEnhancedAgentRetraining } from "@/hooks/useEnhancedAgentRetraining";
+import { useParams } from "react-router-dom";
 import SourceRow from "./SourceRow";
+import TrainingProgressMessage from "./TrainingProgressMessage";
+import SizeLimitWarning from "./SizeLimitWarning";
 
 interface SourcesContentProps {
   totalSources: number;
@@ -30,6 +34,15 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
   isTrainingCompleted = false,
   trainingProgress
 }) => {
+  const { agentId } = useParams();
+  const { trainingProgress: enhancedTrainingProgress } = useEnhancedAgentRetraining(agentId);
+
+  // Calculate total size in bytes for limit checking
+  const totalSizeBytes = Object.values(sourcesByType).reduce((total, data) => total + data.size, 0);
+  const SIZE_LIMIT_BYTES = 500 * 1024; // 500KB
+  const isFreePlan = true; // This would come from user subscription data
+  const showSizeWarning = isFreePlan && totalSizeBytes >= SIZE_LIMIT_BYTES;
+
   const getRetrainButtonProps = () => {
     const status = trainingProgress?.status;
     
@@ -69,6 +82,15 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
 
   // Check if there are no sources
   const hasAnySources = Object.values(sourcesByType).some(data => data.count > 0);
+
+  // Get training status for progress message
+  const getTrainingStatus = () => {
+    if (enhancedTrainingProgress?.status === 'initializing') return 'initializing';
+    if (enhancedTrainingProgress?.status === 'training') return 'training';
+    if (trainingProgress?.status === 'initializing') return 'initializing';
+    if (trainingProgress?.status === 'training') return 'training';
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -117,16 +139,27 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               </div>
 
               {/* Simple Training Button */}
-              <Button
-                size="sm"
-                variant={buttonProps.variant}
-                onClick={onRetrainClick}
-                disabled={buttonProps.disabled}
-                className={buttonProps.className}
-              >
-                {buttonProps.icon}
-                {buttonProps.text}
-              </Button>
+              <div>
+                <Button
+                  size="sm"
+                  variant={buttonProps.variant}
+                  onClick={onRetrainClick}
+                  disabled={buttonProps.disabled}
+                  className={buttonProps.className}
+                >
+                  {buttonProps.icon}
+                  {buttonProps.text}
+                </Button>
+
+                {/* Training Progress Message */}
+                <TrainingProgressMessage status={getTrainingStatus()} />
+
+                {/* Size Limit Warning */}
+                <SizeLimitWarning 
+                  totalSize={totalSizeBytes} 
+                  isVisible={showSizeWarning} 
+                />
+              </div>
             </>
           )}
         </CardContent>

@@ -4,7 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Loader2, FileText, RefreshCw } from "lucide-react";
 import { useSimplifiedFlow } from "@/hooks/useSimplifiedFlow";
+import { useEnhancedAgentRetraining } from "@/hooks/useEnhancedAgentRetraining";
+import { useParams } from "react-router-dom";
 import SourceRow from "./SourceRow";
+import TrainingProgressMessage from "./TrainingProgressMessage";
+import SizeLimitWarning from "./SizeLimitWarning";
 
 interface SimplifiedSourcesWidgetProps {
   currentTab?: string;
@@ -17,7 +21,15 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
   sourcesByType = {},
   totalSize = "0 B"
 }) => {
+  const { agentId } = useParams();
   const { statusSummary, buttonState, startTraining } = useSimplifiedFlow();
+  const { trainingProgress } = useEnhancedAgentRetraining(agentId);
+
+  // Calculate total size in bytes for limit checking
+  const totalSizeBytes = Object.values(sourcesByType).reduce((total, data) => total + data.size, 0);
+  const SIZE_LIMIT_BYTES = 500 * 1024; // 500KB
+  const isFreePlan = true; // This would come from user subscription data
+  const showSizeWarning = isFreePlan && totalSizeBytes >= SIZE_LIMIT_BYTES;
 
   const getButtonIcon = () => {
     if (buttonState.buttonText === 'Training Agent...') {
@@ -37,6 +49,13 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
       return "bg-green-50 border-green-200 text-green-700 w-full";
     }
     return "bg-black hover:bg-gray-800 text-white w-full";
+  };
+
+  // Get training status for progress message
+  const getTrainingStatus = () => {
+    if (trainingProgress?.status === 'initializing') return 'initializing';
+    if (trainingProgress?.status === 'training') return 'training';
+    return null;
   };
 
   return (
@@ -87,16 +106,27 @@ const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
 
               {/* Simplified Training Button */}
               {buttonState.showButton && (
-                <Button
-                  size="sm"
-                  variant={buttonState.variant}
-                  onClick={startTraining}
-                  disabled={buttonState.disabled}
-                  className={getButtonClassName()}
-                >
-                  {getButtonIcon()}
-                  {buttonState.buttonText}
-                </Button>
+                <div>
+                  <Button
+                    size="sm"
+                    variant={buttonState.variant}
+                    onClick={startTraining}
+                    disabled={buttonState.disabled}
+                    className={getButtonClassName()}
+                  >
+                    {getButtonIcon()}
+                    {buttonState.buttonText}
+                  </Button>
+
+                  {/* Training Progress Message */}
+                  <TrainingProgressMessage status={getTrainingStatus()} />
+
+                  {/* Size Limit Warning */}
+                  <SizeLimitWarning 
+                    totalSize={totalSizeBytes} 
+                    isVisible={showSizeWarning} 
+                  />
+                </div>
               )}
             </>
           )}

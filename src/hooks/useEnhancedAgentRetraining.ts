@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { EnhancedRetrainingChecker, type EnhancedRetrainingStatus } from '@/services/rag/retraining/enhancedRetrainingChecker';
 import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
+import { ToastNotificationService } from '@/services/ToastNotificationService';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -45,49 +46,6 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
     console.log('🆔 Generated new session ID:', sessionId);
     return sessionId;
   }, [agentId]);
-
-  /**
-   * Phase 5: Show session-based toast with deduplication (without using 'id' property)
-   */
-  const showSessionToast = useCallback((
-    sessionId: string, 
-    type: SessionBasedToast['type'], 
-    title: string, 
-    description: string
-  ) => {
-    const sessionToasts = sessionToastsRef.current.get(sessionId) || [];
-    const existingToast = sessionToasts.find(t => t.type === type);
-    
-    if (existingToast && existingToast.shown) {
-      console.log(`🚫 Toast "${type}" already shown for session ${sessionId}`);
-      return;
-    }
-
-    const toastId = `${sessionId}-${type}`;
-    console.log(`🎯 Showing session toast: ${type} for session ${sessionId}`);
-    
-    // Phase 5: Use toast without 'id' property to avoid TS error
-    const toastResult = toast({
-      title,
-      description,
-      duration: 3000,
-    });
-
-    // Mark as shown using our own tracking
-    const newToast: SessionBasedToast = {
-      id: toastId,
-      sessionId,
-      type,
-      shown: true
-    };
-
-    if (existingToast) {
-      existingToast.shown = true;
-    } else {
-      sessionToasts.push(newToast);
-      sessionToastsRef.current.set(sessionId, sessionToasts);
-    }
-  }, [toast]);
 
   /**
    * Trigger status aggregation for website parent sources after training completion
@@ -164,37 +122,35 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
         lastLogTimeRef.current = now;
       }
       
-      // Phase 5: Handle training state transitions with session-based toasts
+      // Phase 5: Handle training state transitions with enhanced toasts
       if (trainingProgress.status === 'training' || trainingProgress.status === 'initializing') {
         isTrainingActiveRef.current = true;
         
         // Show "Starting Training" toast only once per session using debouncing
         if (trainingProgress.sessionId && !hasStartToastFiredRef.current) {
-          showSessionToast(trainingProgress.sessionId, 'training_started', '🧠 Training Started', 'Initializing training process...');
+          ToastNotificationService.showTrainingStarted();
           hasStartToastFiredRef.current = true;
         }
       } else if (trainingProgress.status === 'completed') {
         isTrainingActiveRef.current = false;
         hasStartToastFiredRef.current = false; // Reset for next session
         
-        // Show "Training Completed" toast only once per session
-        if (trainingProgress.sessionId && !sessionToastsRef.current.get(trainingProgress.sessionId)?.some(t => t.type === 'training_completed' && t.shown)) {
-          showSessionToast(trainingProgress.sessionId, 'training_completed', '🎉 Training Completed', 'Your AI agent is trained and ready.');
-          
-          // Phase 4: Dispatch training completed event for cross-tab sync
-          window.dispatchEvent(new CustomEvent('trainingCompleted', {
-            detail: { 
-              agentId,
-              sessionId: trainingProgress.sessionId,
-              status: 'completed'
-            }
-          }));
+        // Show enhanced "Training Completed" toast
+        ToastNotificationService.showTrainingCompleted();
+        
+        // Phase 4: Dispatch training completed event for cross-tab sync
+        window.dispatchEvent(new CustomEvent('trainingCompleted', {
+          detail: { 
+            agentId,
+            sessionId: trainingProgress.sessionId,
+            status: 'completed'
+          }
+        }));
 
-          // Trigger status aggregation for website sources to update metadata
-          setTimeout(() => {
-            triggerStatusAggregationForWebsiteSources();
-          }, 2000); // Wait 2 seconds for all training operations to complete
-        }
+        // Trigger status aggregation for website sources to update metadata
+        setTimeout(() => {
+          triggerStatusAggregationForWebsiteSources();
+        }, 2000); // Wait 2 seconds for all training operations to complete
         
         currentSessionRef.current = '';
       }
@@ -210,7 +166,7 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
                trainingProgress.status === 'initializing' ? 'pending' : 'pending'
       });
     }
-  }, [trainingProgress, showSessionToast, agentId, triggerStatusAggregationForWebsiteSources]);
+  }, [trainingProgress, agentId, triggerStatusAggregationForWebsiteSources]);
 
   /**
    * Phase 6: Enhanced retraining check with race condition prevention
@@ -320,23 +276,22 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
   }, []);
 
   /**
-   * Phase 5: Handle crawl events with session-based toasts
+   * Phase 5: Handle crawl events with enhanced toasts
    */
   const handleCrawlStarted = useCallback((eventData: any) => {
     const sessionId = generateSessionId();
-    showSessionToast(sessionId, 'crawl_started', '🕷️ Crawling Started', 'Discovering and fetching pages...');
-  }, [generateSessionId, showSessionToast]);
+    ToastNotificationService.showCrawlingStarted();
+  }, [generateSessionId]);
 
   const handleCrawlCompleted = useCallback((eventData: any) => {
-    const sessionId = currentSessionRef.current || generateSessionId();
-    showSessionToast(sessionId, 'crawl_completed', '✅ Crawling Completed', 'All pages have been crawled.');
+    ToastNotificationService.showCrawlingCompleted();
     
     // Phase 3: Wait for database writes to complete before checking retraining status
     setTimeout(() => {
       console.log('🔄 Checking retraining status after crawl completion...');
       checkRetrainingNeeded(true);
     }, 1000);
-  }, [showSessionToast, generateSessionId, checkRetrainingNeeded]);
+  }, [checkRetrainingNeeded]);
 
   // Phase 4: Listen for crawl events
   useEffect(() => {
