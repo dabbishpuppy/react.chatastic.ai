@@ -4,10 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
-  ExternalLink, 
   Edit2, 
-  Eye, 
-  EyeOff, 
   RefreshCw, 
   Trash2,
   ChevronDown,
@@ -123,22 +120,10 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={() => window.open(source.url, '_blank')}>
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open URL
-          </DropdownMenuItem>
-          
           {onEdit && (
             <DropdownMenuItem onClick={onEdit}>
               <Edit2 className="w-4 h-4 mr-2" />
               Edit URL
-            </DropdownMenuItem>
-          )}
-          
-          {onExclude && (
-            <DropdownMenuItem onClick={handleExcludeClick}>
-              {source.is_excluded ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
-              {source.is_excluded ? 'Include' : 'Exclude'}
             </DropdownMenuItem>
           )}
           
