@@ -1,11 +1,10 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ExternalLink, Calendar, Link, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
-import { supabase } from '@/integrations/supabase/client';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -20,7 +19,6 @@ interface WebsiteSourceInfoProps {
   compressedContentSize?: number;
   source?: AgentSource;
   sourceId?: string;
-  showStatusBadge?: boolean;
 }
 
 const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
@@ -34,57 +32,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   totalContentSize = 0,
   compressedContentSize = 0,
   source,
-  sourceId,
-  showStatusBadge = true
+  sourceId
 }) => {
-  const [realtimeCrawlStatus, setRealtimeCrawlStatus] = useState(crawlStatus);
-  const [realtimeSource, setRealtimeSource] = useState(source);
-
-  // Set up realtime subscription for parent source status changes
-  useEffect(() => {
-    if (!sourceId || isChild) return;
-
-    console.log(`📡 Setting up realtime status tracking for parent source: ${sourceId}`);
-
-    const channel = supabase
-      .channel(`source-info-${sourceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'agent_sources',
-          filter: `id=eq.${sourceId}`
-        },
-        (payload) => {
-          const updatedSource = payload.new as any;
-          console.log('📡 Source status update in WebsiteSourceInfo:', updatedSource);
-          
-          setRealtimeCrawlStatus(updatedSource.crawl_status);
-          setRealtimeSource(updatedSource);
-          
-          // Force immediate UI update by dispatching a custom event
-          window.dispatchEvent(new CustomEvent('sourceStatusUpdate', {
-            detail: { sourceId, status: updatedSource.crawl_status, source: updatedSource }
-          }));
-        }
-      )
-      .subscribe((status) => {
-        console.log(`📡 Source info subscription status for ${sourceId}:`, status);
-      });
-
-    return () => {
-      console.log(`🔌 Cleaning up source info subscription for: ${sourceId}`);
-      supabase.removeChannel(channel);
-    };
-  }, [sourceId, isChild]);
-
-  // Update local state when props change
-  useEffect(() => {
-    setRealtimeCrawlStatus(crawlStatus);
-    setRealtimeSource(source);
-  }, [crawlStatus, source]);
-
   const formatUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
@@ -119,21 +68,21 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   };
 
   const shouldShowLinksCount = !isChild && linksCount > 0;
-  const shouldShowRealtimeContentSize = !isChild && totalContentSize > 0;
+  const shouldShowContentSize = !isChild && totalContentSize > 0;
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
 
   // Show total child sources size when training is completed and we have child data
-  const shouldShowChildTotalSize = !isChild && (realtimeCrawlStatus === 'trained' || realtimeCrawlStatus === 'completed' || realtimeCrawlStatus === 'ready_for_training') && realtimeSource?.total_content_size > 0;
+  const shouldShowChildTotalSize = !isChild && (crawlStatus === 'trained' || crawlStatus === 'completed') && source?.total_content_size > 0;
 
   // Show total links from parent source metadata when available
-  const shouldShowTotalLinks = !isChild && realtimeSource?.total_jobs > 0;
+  const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
 
-  // Get total child pages size from metadata - Show for trained status as well
-  const childPagesSize = realtimeSource?.metadata?.total_child_pages_size || 0;
+  // Get total child pages size from metadata - FIXED: Show for trained status as well
+  const childPagesSize = source?.metadata?.total_child_pages_size || 0;
   const shouldShowChildPagesSize = !isChild && childPagesSize > 0 && (
-    realtimeCrawlStatus === 'trained' || 
-    realtimeCrawlStatus === 'completed' || 
-    realtimeCrawlStatus === 'ready_for_training'
+    crawlStatus === 'trained' || 
+    crawlStatus === 'completed' || 
+    crawlStatus === 'ready_for_training'
   );
 
   const compressionRatio = shouldShowCompressionMetrics 
@@ -154,18 +103,14 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             />
           </div>
         </div>
-        {/* Only show status badges here for child sources or when explicitly requested */}
-        {(isChild || showStatusBadge) && (
-          <div className="flex items-center gap-2">
-            <WebsiteSourceStatusBadges
-              crawlStatus={realtimeCrawlStatus}
-              isExcluded={false}
-              linksCount={linksCount}
-              sourceId={sourceId}
-              source={realtimeSource}
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <WebsiteSourceStatusBadges
+            crawlStatus={crawlStatus}
+            isExcluded={false}
+            linksCount={linksCount}
+            sourceId={sourceId}
+          />
+        </div>
       </div>
 
       <div className="flex items-center justify-between">
@@ -190,13 +135,22 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
                 <Link className="w-3 h-3" />
-                <span>{realtimeSource.total_jobs} links</span>
+                <span>{source.total_jobs} links</span>
               </div>
             </>
           )}
 
-          {/* Priority 1: Show realtime child source total size */}
-          {shouldShowRealtimeContentSize && (
+          {shouldShowChildPagesSize && (
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                <span>{formatBytes(childPagesSize)}</span>
+              </div>
+            </>
+          )}
+          
+          {shouldShowContentSize && !shouldShowChildPagesSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
@@ -206,24 +160,12 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </>
           )}
 
-          {/* Priority 2: Show metadata child pages size if no realtime data */}
-          {!shouldShowRealtimeContentSize && shouldShowChildPagesSize && (
+          {shouldShowChildTotalSize && !shouldShowChildPagesSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
                 <Database className="w-3 h-3" />
-                <span>{formatBytes(childPagesSize)}</span>
-              </div>
-            </>
-          )}
-
-          {/* Priority 3: Show source total content size if no other size data */}
-          {!shouldShowRealtimeContentSize && !shouldShowChildPagesSize && shouldShowChildTotalSize && (
-            <>
-              <span className="mx-2">•</span>
-              <div className="flex items-center gap-1">
-                <Database className="w-3 h-3" />
-                <span>{formatBytes(realtimeSource.total_content_size)}</span>
+                <span>{formatBytes(source.total_content_size)}</span>
               </div>
             </>
           )}

@@ -14,7 +14,6 @@ import {
 import { AgentSource } from '@/types/rag';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
-import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
@@ -26,7 +25,6 @@ interface WebsiteSourceActionsProps {
   onDelete?: () => void;
   onToggleExpanded?: () => void;
   isChild?: boolean;
-  linksCount?: number;
 }
 
 type ConfirmationType = 'recrawl' | 'exclude' | 'delete' | null;
@@ -40,8 +38,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   onRecrawl,
   onDelete,
   onToggleExpanded,
-  isChild = false,
-  linksCount = 0
+  isChild = false
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
 
@@ -112,16 +109,6 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2 ml-4">
-      {/* Show status badge for parent sources only */}
-      {!isChild && (
-        <WebsiteSourceStatusBadges
-          crawlStatus={source.crawl_status || 'unknown'}
-          isExcluded={false}
-          linksCount={linksCount}
-          sourceId={source.id}
-        />
-      )}
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

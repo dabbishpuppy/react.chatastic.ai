@@ -6,7 +6,6 @@ import SourceDetailContent from '@/components/sources/source-detail/SourceDetail
 import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
 import SimplifiedSourcesWidget from '@/components/sources/SimplifiedSourcesWidget';
 import { useSourceDetail } from '@/components/sources/source-detail/useSourceDetail';
-import { useAgentSourceStats } from '@/hooks/useAgentSourceStats';
 
 const SourceDetailPage: React.FC = () => {
   const {
@@ -28,33 +27,6 @@ const SourceDetailPage: React.FC = () => {
     handleCancelEdit,
     agentId
   } = useSourceDetail();
-
-  // Fetch agent source statistics for the widget
-  const { data: statsData, isLoading: statsLoading } = useAgentSourceStats();
-  
-  // Prepare data for SimplifiedSourcesWidget from the correct stats structure
-  const sourcesByType = statsData?.sourcesByType || {
-    text: { count: 0, size: 0 },
-    file: { count: 0, size: 0 },
-    website: { count: 0, size: 0 },
-    qa: { count: 0, size: 0 }
-  };
-
-  // Format total bytes to readable string
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    const size = bytes / Math.pow(k, i);
-    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
-    
-    return `${formattedSize} ${sizes[i]}`;
-  };
-
-  const totalSize = formatBytes(statsData?.totalBytes || 0);
 
   if (loading) {
     return (
@@ -107,10 +79,7 @@ const SourceDetailPage: React.FC = () => {
           </div>
 
           <div className="w-80 flex-shrink-0">
-            <SimplifiedSourcesWidget
-              sourcesByType={sourcesByType}
-              totalSize={totalSize}
-            />
+            <SimplifiedSourcesWidget />
           </div>
         </div>
 

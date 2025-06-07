@@ -34,6 +34,29 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   const isFileSource = source?.source_type === 'file';
   const isChildPage = source?.metadata?.isChildPage === true;
 
+  // Helper function to render content with proper line breaks
+  const renderPlainTextContent = (content: string) => {
+    return content.split('\n').map((line, index) => (
+      <React.Fragment key={index}>
+        {line}
+        {index < content.split('\n').length - 1 && <br />}
+      </React.Fragment>
+    ));
+  };
+
+  // Check if content looks like HTML (contains HTML tags)
+  const looksLikeHtml = (content: string) => {
+    return /<[^>]+>/.test(content);
+  };
+
+  console.log('🔍 Content rendering debug:', {
+    isHtmlContent,
+    isChildPage,
+    contentLength: source.content?.length,
+    contentPreview: source.content?.substring(0, 100),
+    looksLikeHtml: source.content ? looksLikeHtml(source.content) : false
+  });
+
   return (
     <Card>
       <CardContent className="p-6">
@@ -89,22 +112,31 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
             )}
             
             <div className="prose max-w-none">
-              {isHtmlContent ? (
-                <div 
-                  className="font-sans text-gray-700"
-                  style={{ 
-                    fontSize: '0.875rem',
-                    lineHeight: '1.5'
-                  }}
-                  dangerouslySetInnerHTML={{ __html: source.content || 'No content available' }}
-                />
+              {source.content ? (
+                <>
+                  {(isHtmlContent || (isChildPage && looksLikeHtml(source.content))) ? (
+                    <div 
+                      className="font-sans text-gray-700 prose prose-headings:text-gray-900 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-sm prose-p:text-gray-700 prose-strong:text-gray-900 prose-em:italic prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4"
+                      style={{ 
+                        fontSize: '0.875rem',
+                        lineHeight: '1.5'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: source.content }}
+                    />
+                  ) : (
+                    <div 
+                      className="font-sans text-gray-700 whitespace-pre-wrap"
+                      style={{ 
+                        fontSize: '0.875rem',
+                        lineHeight: '1.5'
+                      }}
+                    >
+                      {renderPlainTextContent(source.content)}
+                    </div>
+                  )}
+                </>
               ) : (
-                <pre 
-                  className="whitespace-pre-wrap font-sans text-gray-700"
-                  style={{ fontSize: '0.875rem' }}
-                >
-                  {source.content || 'No content available'}
-                </pre>
+                <div className="text-gray-500 italic">No content available</div>
               )}
             </div>
           </div>

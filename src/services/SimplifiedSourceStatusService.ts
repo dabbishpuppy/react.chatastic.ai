@@ -1,3 +1,4 @@
+export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed';
 
 export interface SourceStatusSummary {
   totalSources: number;
@@ -7,112 +8,120 @@ export interface SourceStatusSummary {
   isEmpty: boolean;
 }
 
-export interface ButtonState {
-  showButton: boolean;
-  buttonText: string;
-  disabled: boolean;
-  variant: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
+interface SourceMetadata {
+  training_status?: string;
+  training_completed_at?: string;
+  training_started_at?: string;
+  last_trained_at?: string;
+  children_training_completed?: boolean;
+  [key: string]: any;
 }
 
 export class SimplifiedSourceStatusService {
-  static getSourceStatus(source: any): string {
-    if (!source) return 'pending'; // Better fallback than 'unknown'
-    
-    const status = source.crawl_status;
-    const metadata = source.metadata || {};
-    
-    // Handle training completion states first (highest priority)
-    if (metadata.training_completed_at || metadata.last_trained_at) {
-      return 'trained';
-    }
-    
-    // Handle training in progress
-    if (status === 'training') {
-      return 'training';
-    }
-    
-    // Handle ready for training - this was missing proper handling
-    if (status === 'ready_for_training') {
-      return 'ready_for_training';
-    }
-    
-    // Handle recrawling states
-    if (metadata.is_recrawling === true) {
-      if (status === 'ready_for_training' || status === 'completed') {
-        return 'ready_for_training';
-      }
-      return 'recrawling';
-    }
-    
-    // Standard status mapping with better fallbacks
-    switch (status) {
-      case 'pending':
-        return 'pending';
-      case 'in_progress':
-        return 'in_progress';
-      case 'completed':
-        // Check if this should actually be ready_for_training
-        if (source.total_jobs > 0 && source.completed_jobs === source.total_jobs) {
-          return 'ready_for_training';
-        }
-        return 'completed';
-      case 'failed':
-        return 'failed';
-      case 'trained':
-        return 'trained';
-      default:
-        // Instead of 'unknown', preserve the last known valid status or default to 'pending'
-        return status && ['pending', 'in_progress', 'completed', 'ready_for_training', 'training', 'trained', 'failed', 'recrawling'].includes(status) 
-          ? status 
-          : 'pending';
-    }
-  }
-
   static analyzeSourceStatus(sources: any[]): SourceStatusSummary {
     const totalSources = sources.length;
     const isEmpty = totalSources === 0;
     
-    if (isEmpty) {
-      return {
-        totalSources: 0,
-        hasCrawledSources: false,
-        hasTrainingSources: false,
-        allSourcesCompleted: false,
-        isEmpty: true
-      };
-    }
-
-    const hasCrawledSources = sources.some(s => 
-      s.crawl_status && ['completed', 'ready_for_training', 'trained'].includes(s.crawl_status)
-    );
+    const crawledSources = sources.filter(s => this.getSourceStatus(s) === 'crawled');
+    const trainingSources = sources.filter(s => this.getSourceStatus(s) === 'training');
+    const trainedSources = sources.filter(s => this.getSourceStatus(s) === 'trained');
+    const completedSources = sources.filter(s => this.getSourceStatus(s) === 'completed' || this.getSourceStatus(s) === 'training_completed');
     
-    const hasTrainingSources = sources.some(s => s.requires_manual_training === true);
-    
-    const allSourcesCompleted = sources.every(s => {
-      const status = this.getSourceStatus(s);
-      return ['completed', 'ready_for_training', 'trained'].includes(status);
-    });
-
     return {
       totalSources,
-      hasCrawledSources,
-      hasTrainingSources,
-      allSourcesCompleted,
-      isEmpty: false
+      isEmpty,
+      hasCrawledSources: crawledSources.length > 0,
+      hasTrainingSources: trainingSources.length > 0,
+      allSourcesCompleted: totalSources > 0 && (trainedSources.length + completedSources.length) === totalSources
     };
   }
 
-  static determineButtonState(statusSummary: SourceStatusSummary): ButtonState {
-    if (statusSummary.isEmpty) {
+  static getSourceStatus(source: any): SourceStatus {
+    const metadata = (source.metadata as SourceMetadata) || {};
+    
+    console.log('SimplifiedSourceStatusService.getSourceStatus:', {
+      sourceId: source.id,
+      crawlStatus: source.crawl_status,
+      requiresManualTraining: source.requires_manual_training,
+      metadata: metadata,
+      sourceType: source.source_type,
+      parentSourceId: source.parent_source_id
+    });
+    
+    // Check if currently training
+    if (metadata.training_status === 'in_progress' || source.crawl_status === 'training') {
+      return 'training';
+    }
+    
+    // Check if training completed - FIXED: Always show "trained" for parent website sources after training
+    if (metadata.training_completed_at || metadata.last_trained_at) {
+      // For website sources, always return "trained" after training completion
+      if (source.source_type === 'website') {
+        return 'trained';
+      }
+      return 'trained';
+    }
+    
+    // For website sources, check crawl_status
+    if (source.source_type === 'website') {
+      // Handle "ready_for_training" status properly
+      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === true) {
+        return 'crawled'; // Ready for training
+      }
+      
+      // For parent sources, if crawl is completed/ready_for_training and no manual training required,
+      // but no training metadata exists yet, it should be "completed" (not yet trained)
+      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === false) {
+        // If this is a parent source and has no training metadata, it's just "completed" (crawling done, not trained yet)
+        if (source.parent_source_id === null && !metadata.training_completed_at && !metadata.last_trained_at) {
+          return 'completed';
+        }
+        // If it has training metadata, it should be handled by the training completion logic above
+        return 'completed';
+      }
+      
+      // If currently crawling or recrawling
+      if (source.crawl_status === 'in_progress' || source.crawl_status === 'recrawling') {
+        return 'crawling';
+      }
+      
+      // Default to pending for other states
+      return 'pending';
+    }
+    
+    // For other sources, derive status from requires_manual_training
+    if (source.requires_manual_training === true) {
+      return 'crawled'; // Needs training
+    }
+    
+    return 'completed'; // Already trained
+  }
+
+  static determineButtonState(summary: SourceStatusSummary): {
+    showButton: boolean;
+    buttonText: string;
+    disabled: boolean;
+    variant: 'default' | 'outline';
+  } {
+    if (summary.isEmpty) {
       return {
         showButton: false,
         buttonText: '',
-        disabled: true,
+        disabled: false,
         variant: 'default'
       };
     }
 
-    if (statusSummary.hasTrainingSources) {
+    if (summary.hasTrainingSources) {
+      return {
+        showButton: true,
+        buttonText: 'Training Agent...',
+        disabled: true,
+        variant: 'outline'
+      };
+    }
+
+    if (summary.hasCrawledSources) {
       return {
         showButton: true,
         buttonText: 'Train Agent',
@@ -121,19 +130,19 @@ export class SimplifiedSourceStatusService {
       };
     }
 
-    if (statusSummary.allSourcesCompleted) {
+    if (summary.allSourcesCompleted) {
       return {
         showButton: true,
         buttonText: 'Agent Trained',
         disabled: true,
-        variant: 'secondary'
+        variant: 'outline'
       };
     }
 
     return {
       showButton: false,
       buttonText: '',
-      disabled: true,
+      disabled: false,
       variant: 'default'
     };
   }

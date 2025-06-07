@@ -18,8 +18,7 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
     status,
     progress,
     linksCount,
-    isConnected,
-    isInitializing
+    isConnected
   } = useSourceStatusRealtime({ sourceId, initialStatus });
 
   return (
@@ -29,7 +28,6 @@ const WebsiteSourceStatusRobust: React.FC<WebsiteSourceStatusRobustProps> = ({
       linksCount={linksCount}
       isConnected={isConnected}
       showConnectionStatus={showConnectionStatus}
-      isInitializing={isInitializing}
     />
   );
 };

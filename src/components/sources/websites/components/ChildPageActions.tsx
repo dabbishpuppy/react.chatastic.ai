@@ -11,13 +11,13 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
-import { useChildPageStatusUnified } from '../hooks/useChildPageStatusUnified';
+import { useChildPageStatus } from '../hooks/useChildPageStatus';
 
 interface ChildPageActionsProps {
   url: string;
   pageId: string;
   parentSourceId: string;
-  initialStatus: string;
+  status: string; // Original status for fallback
   onDelete?: () => void;
 }
 
@@ -27,16 +27,16 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
   pageId,
   parentSourceId,
-  initialStatus,
+  status,
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
-  const { displayStatus } = useChildPageStatusUnified({ 
-    status: initialStatus,
-    pageId, 
+  // Use the real-time status hook to get immediate updates
+  const { displayStatus } = useChildPageStatus({ 
+    status, 
     parentSourceId, 
-    initialStatus 
+    pageId 
   });
   const navigate = useNavigate();
   const { agentId } = useParams();
@@ -105,6 +105,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const confirmConfig = getConfirmationConfig();
+  // Use the real-time display status instead of the original status
   const isViewEnabled = displayStatus === 'trained';
 
   return (
