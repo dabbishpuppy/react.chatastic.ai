@@ -106,7 +106,6 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
             compressedContentSize={compressedContentSize}
             source={source}
             sourceId={source.id}
-            showStatusInline={false}
           />
         )}
       </div>
