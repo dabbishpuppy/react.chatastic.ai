@@ -201,15 +201,18 @@ export class VectorSearchService {
       }
 
       const modelDistribution: Record<string, number> = {};
-      if (data) {
-        data.forEach(item => {
-          const modelName = item.model_name || 'unknown';
+      const totalEmbeddings = data?.length || 0;
+      
+      if (data && Array.isArray(data)) {
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          const modelName: string = (item as any)?.model_name || 'unknown';
           modelDistribution[modelName] = (modelDistribution[modelName] || 0) + 1;
-        });
+        }
       }
 
       return {
-        totalEmbeddings: data?.length || 0,
+        totalEmbeddings,
         modelDistribution,
         averageVectorSize: 1536 // Default for text-embedding-3-small
       };
