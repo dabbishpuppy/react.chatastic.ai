@@ -109,6 +109,33 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2 ml-4">
+      {/* Expand/collapse arrow for parent sources - positioned first */}
+      {onToggleExpanded && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={hasChildSources ? onToggleExpanded : undefined}
+                disabled={!hasChildSources}
+                className={`h-6 w-6 p-0 ${!hasChildSources ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-3 h-3" />
+                ) : (
+                  <ChevronRight className="w-3 h-3" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{hasChildSources ? (isExpanded ? 'Collapse' : 'Expand') + ' child sources' : 'No child sources'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
+      {/* Dropdown menu for actions */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -142,32 +169,6 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      {/* Always show expand/collapse arrow for parent sources, but disable when no child sources */}
-      {onToggleExpanded && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={hasChildSources ? onToggleExpanded : undefined}
-                disabled={!hasChildSources}
-                className={`h-6 w-6 p-0 ${!hasChildSources ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-3 h-3" />
-                ) : (
-                  <ChevronRight className="w-3 h-3" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{hasChildSources ? (isExpanded ? 'Collapse' : 'Expand') + ' child sources' : 'No child sources'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
 
       <WebsiteActionConfirmDialog
         open={confirmationType !== null}

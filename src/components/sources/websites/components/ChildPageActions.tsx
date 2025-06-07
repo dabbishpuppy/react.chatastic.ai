@@ -114,7 +114,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2">
-      {/* Right arrow for viewing source details */}
+      {/* Right arrow for viewing source details - only for child pages */}
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
