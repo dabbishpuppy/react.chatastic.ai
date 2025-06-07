@@ -44,6 +44,7 @@ export type Database = {
           metadata: Json | null
           original_size: number | null
           parent_source_id: string | null
+          pending_deletion: boolean | null
           progress: number | null
           raw_text: string | null
           requires_manual_training: boolean | null
@@ -95,6 +96,7 @@ export type Database = {
           metadata?: Json | null
           original_size?: number | null
           parent_source_id?: string | null
+          pending_deletion?: boolean | null
           progress?: number | null
           raw_text?: string | null
           requires_manual_training?: boolean | null
@@ -146,6 +148,7 @@ export type Database = {
           metadata?: Json | null
           original_size?: number | null
           parent_source_id?: string | null
+          pending_deletion?: boolean | null
           progress?: number | null
           raw_text?: string | null
           requires_manual_training?: boolean | null
