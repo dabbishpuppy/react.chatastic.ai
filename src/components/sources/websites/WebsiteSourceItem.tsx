@@ -154,6 +154,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
             onRecrawl={handleRecrawl}
             onDelete={handleDelete}
             onToggleExpanded={isParentSource ? handleToggleExpanded : undefined}
+            linksCount={realtimeChildPages.length}
           />
         </div>
 
