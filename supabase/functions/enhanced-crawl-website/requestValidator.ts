@@ -12,7 +12,6 @@ export interface EnhancedCrawlRequest {
   priority?: string;
   discoverOnly?: boolean;
   parentSourceId?: string;
-  mode?: string; // Added mode parameter for recrawl operations
 }
 
 export function validateRequest(requestBody: any): EnhancedCrawlRequest {
@@ -28,11 +27,10 @@ export function validateRequest(requestBody: any): EnhancedCrawlRequest {
     enableDeduplication = true,
     priority = 'normal',
     discoverOnly = false,
-    parentSourceId,
-    mode
+    parentSourceId
   } = requestBody;
 
-  console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths, discoverOnly, parentSourceId, mode });
+  console.log('🔧 Crawl settings:', { crawlMode, maxPages, excludePaths, includePaths, discoverOnly, parentSourceId });
 
   // Validate required fields
   if (!agentId || !url) {
@@ -56,8 +54,7 @@ export function validateRequest(requestBody: any): EnhancedCrawlRequest {
   console.log('🔍 Input type validation passed:', {
     agentId: `${typeof agentId} (${agentId})`,
     url: `${typeof url} (${url})`,
-    priority: `${typeof safePriority} (${safePriority})`,
-    mode: mode ? `${typeof mode} (${mode})` : 'not provided'
+    priority: `${typeof safePriority} (${safePriority})`
   });
 
   return {
@@ -72,7 +69,6 @@ export function validateRequest(requestBody: any): EnhancedCrawlRequest {
     enableDeduplication,
     priority: safePriority,
     discoverOnly,
-    parentSourceId,
-    mode
+    parentSourceId
   };
 }

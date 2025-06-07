@@ -36,12 +36,15 @@ export class SimplifiedSourceStatusService {
       return 'ready_for_training';
     }
     
-    // Handle recrawling states - prioritize metadata flag and ensure consistent status
-    if (metadata.is_recrawling === true || status === 'recrawling') {
+    // Handle recrawling states
+    if (metadata.is_recrawling === true) {
+      if (status === 'ready_for_training' || status === 'completed') {
+        return 'ready_for_training';
+      }
       return 'recrawling';
     }
     
-    // Standard status mapping with improved logic
+    // Standard status mapping
     switch (status) {
       case 'pending':
         return 'pending';
@@ -57,16 +60,7 @@ export class SimplifiedSourceStatusService {
         return 'failed';
       case 'trained':
         return 'trained';
-      case 'crawled':
-        return 'ready_for_training';
       default:
-        // For child pages/sources, if we don't have a recognized status, check if it's a common edge case
-        if (source.parent_source_id) {
-          // For child sources, if status is null/undefined but we have some data, assume completed
-          if (!status && (source.content || source.chunks_created > 0)) {
-            return 'completed';
-          }
-        }
         return status || 'unknown';
     }
   }

@@ -2,11 +2,7 @@
 import { CheckCircle, Clock, AlertCircle, XCircle, Loader2, GraduationCap, RotateCcw } from 'lucide-react';
 
 export const getStatusConfig = (status: string) => {
-  // Ensure we handle any status gracefully with proper logging
-  const normalizedStatus = status?.toLowerCase() || 'pending';
-  console.log('🎨 Getting status config for:', normalizedStatus, 'from original:', status);
-  
-  switch (normalizedStatus) {
+  switch (status) {
     case 'pending':
       return {
         text: 'Pending',
@@ -23,7 +19,7 @@ export const getStatusConfig = (status: string) => {
       return {
         text: 'Recrawling',
         className: 'bg-orange-100 text-orange-800 border-orange-200',
-        icon: <RotateCcw className="w-3 h-3 mr-1 animate-spin" />
+        icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />
       };
     case 'completed':
       return {
@@ -56,12 +52,10 @@ export const getStatusConfig = (status: string) => {
         icon: <XCircle className="w-3 h-3 mr-1" />
       };
     default:
-      // Enhanced fallback with better logging
-      console.warn(`⚠️ Unknown status received: "${status}" (normalized: "${normalizedStatus}"), defaulting to pending`);
       return {
-        text: 'Pending',
+        text: 'Unknown',
         className: 'bg-gray-100 text-gray-800 border-gray-200',
-        icon: <Clock className="w-3 h-3 mr-1" />
+        icon: <AlertCircle className="w-3 h-3 mr-1" />
       };
   }
 };

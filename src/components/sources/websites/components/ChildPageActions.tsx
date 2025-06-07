@@ -11,7 +11,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
-import { useChildPageStatusUnified } from '../hooks/useChildPageStatusUnified';
+import { useChildPageRealtimeStatus } from '../hooks/useChildPageRealtimeStatus';
 
 interface ChildPageActionsProps {
   url: string;
@@ -32,7 +32,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
-  const { displayStatus } = useChildPageStatusUnified({ 
+  const { displayStatus } = useChildPageRealtimeStatus({ 
     pageId, 
     parentSourceId, 
     initialStatus 

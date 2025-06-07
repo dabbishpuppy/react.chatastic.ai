@@ -16,7 +16,6 @@ export class StatusCalculator {
     const metadata = parentSource.metadata || {};
 
     console.log(`🔍 Status calculation - eventType: ${eventType}, current status: ${status}, isRecrawling: ${isRecrawling}`);
-    console.log(`📊 Job breakdown - Total: ${totalJobs}, Completed: ${completedJobs}, Failed: ${failedJobs}, Pending: ${pendingJobs}, InProgress: ${inProgressJobs}`);
 
     // Special handling for training completion events - FIXED: Handle both event types
     if (eventType === 'training_completion_metadata_update' || 
@@ -63,29 +62,12 @@ export class StatusCalculator {
       
       if (totalJobs === 0) {
         status = 'pending';
-        console.log('📋 No jobs yet, setting to pending');
-      } else if (pendingJobs > 0 || inProgressJobs > 0) {
-        // CRITICAL FIX: If ANY jobs are still pending or in progress, we must stay in progress/pending
-        if (completedJobs > 0 || failedJobs > 0) {
-          status = 'in_progress';
-          console.log(`🔄 Jobs still processing (${pendingJobs} pending, ${inProgressJobs} in progress) - keeping in_progress status`);
-        } else {
-          status = 'pending';
-          console.log('📋 All jobs still pending, keeping pending status');
-        }
-      } else if (completedJobs + failedJobs === totalJobs && totalJobs > 0 && pendingJobs === 0 && inProgressJobs === 0) {
-        // STRICT CHECK: Only transition when absolutely NO jobs are pending or in progress
-        if (completedJobs > 0) {
-          status = 'ready_for_training';
-          console.log(`✅ ALL jobs completely finished (${completedJobs} completed, ${failedJobs} failed, 0 pending, 0 in progress) - setting to ready_for_training`);
-        } else {
-          status = 'failed';
-          console.log('❌ All jobs failed, setting to failed');
-        }
-      } else {
-        // Fallback: if we have any activity but conditions above aren't met, stay in progress
+      } else if (completedJobs === totalJobs) {
+        status = 'ready_for_training';
+      } else if (completedJobs + failedJobs === totalJobs) {
+        status = 'ready_for_training';
+      } else if (inProgressJobs > 0 || completedJobs > 0) {
         status = 'in_progress';
-        console.log(`🔄 Jobs in mixed state - defaulting to in_progress (completed: ${completedJobs}, failed: ${failedJobs}, pending: ${pendingJobs}, inProgress: ${inProgressJobs})`);
       }
     }
 

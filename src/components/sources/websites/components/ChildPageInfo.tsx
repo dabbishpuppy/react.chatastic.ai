@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useChildPageStatusUnified } from '../hooks/useChildPageStatusUnified';
+import { useChildPageStatus } from '../hooks/useChildPageStatus';
 import ChildPageDetails from './ChildPageDetails';
 import ChildPageStatusBadge from './ChildPageStatusBadge';
 
@@ -26,19 +26,13 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
   parentSourceId,
   pageId
 }) => {
-  const { displayStatus, isLoading } = useChildPageStatusUnified({
-    pageId: pageId || '',
-    parentSourceId: parentSourceId || '',
-    initialStatus: status
+  const { displayStatus, isLoading } = useChildPageStatus({
+    status,
+    parentSourceId,
+    pageId
   });
 
-  console.log('ChildPageInfo - unified status:', {
-    pageId,
-    originalStatus: status,
-    displayStatus,
-    isLoading,
-    timestamp: new Date().toISOString()
-  });
+  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status);
 
   return (
     <>
