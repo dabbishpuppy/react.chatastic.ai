@@ -1,6 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { DataFetcher } from './dataFetcher.ts';
+import { StatisticsCalculator } from './statisticsCalculator.ts';
+import { StatusCalculator } from './statusCalculator.ts';
+import { MetadataManager } from './metadataManager.ts';
+import { StatusAggregatorResult } from './types.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,155 +24,55 @@ serve(async (req) => {
     );
 
     const { parentSourceId, eventType } = await req.json();
-
     console.log(`📊 Status aggregator triggered for parent: ${parentSourceId}, event: ${eventType}`);
 
-    // Get the parent source to check current state and recrawl mode
-    const { data: parentSource, error: parentError } = await supabaseClient
-      .from('agent_sources')
-      .select('crawl_status, metadata, updated_at')
-      .eq('id', parentSourceId)
-      .single();
+    // Fetch data
+    const parentSource = await DataFetcher.fetchParentSource(supabaseClient, parentSourceId);
+    const pages = await DataFetcher.fetchSourcePages(supabaseClient, parentSourceId);
 
-    if (parentError) {
-      console.error('❌ Error fetching parent source:', parentError);
-      throw parentError;
-    }
+    // Calculate statistics
+    const jobStats = StatisticsCalculator.calculateJobStatistics(pages);
+    const { stats: compressionStats, totalChildSize, completedJobsData } = StatisticsCalculator.calculateCompressionStats(pages);
+    
+    // Determine status
+    const status = StatusCalculator.determineStatus(
+      parentSource,
+      jobStats.totalJobs,
+      jobStats.completedJobs,
+      jobStats.failedJobs,
+      jobStats.pendingJobs,
+      jobStats.inProgressJobs
+    );
 
-    console.log(`📋 Current parent state - Status: ${parentSource.crawl_status}, Metadata:`, parentSource.metadata);
+    const progress = StatusCalculator.calculateProgress(
+      jobStats.totalJobs,
+      jobStats.completedJobs,
+      jobStats.failedJobs
+    );
 
-    // Get source_pages statistics including size data
-    const { data: pages, error: pagesError } = await supabaseClient
-      .from('source_pages')
-      .select('*')
-      .eq('parent_source_id', parentSourceId);
-
-    if (pagesError) {
-      console.error('❌ Error fetching source pages:', pagesError);
-      throw pagesError;
-    }
-
-    const totalJobs = pages?.length || 0;
-    const completedJobs = pages?.filter(page => page.status === 'completed').length || 0;
-    const failedJobs = pages?.filter(page => page.status === 'failed').length || 0;
-    const pendingJobs = pages?.filter(page => page.status === 'pending').length || 0;
-    const inProgressJobs = pages?.filter(page => page.status === 'in_progress').length || 0;
-
-    console.log(`📊 Job statistics - Total: ${totalJobs}, Completed: ${completedJobs}, Failed: ${failedJobs}, Pending: ${pendingJobs}, InProgress: ${inProgressJobs}`);
-
-    // Calculate progress
-    const progress = totalJobs > 0 ? Math.round(((completedJobs + failedJobs) / totalJobs) * 100) : 0;
-
-    // Determine status based on recrawl state with stronger logic
-    let status = parentSource.crawl_status;
+    // Prepare update data
     const isRecrawling = parentSource.metadata?.is_recrawling === true;
-    const recrawlStartedAt = parentSource.metadata?.recrawl_started_at;
+    const metadata = MetadataManager.createMetadata(
+      parentSource,
+      status,
+      totalChildSize,
+      completedJobsData,
+      isRecrawling
+    );
 
-    console.log(`🔍 Recrawl check - isRecrawling: ${isRecrawling}, recrawlStartedAt: ${recrawlStartedAt}`);
-
-    if (isRecrawling) {
-      console.log('🔄 Processing recrawl logic...');
-      
-      // We're in recrawl mode - be more conservative about status changes
-      if (totalJobs === 0) {
-        // No jobs yet, keep recrawling status
-        status = 'recrawling';
-        console.log('🔄 No jobs found, maintaining recrawling status');
-      } else if (inProgressJobs > 0 || pendingJobs > 0) {
-        // Still processing, keep recrawling status
-        status = 'recrawling';
-        console.log(`🔄 Still processing (pending: ${pendingJobs}, inProgress: ${inProgressJobs}), maintaining recrawling status`);
-      } else if (completedJobs + failedJobs === totalJobs && totalJobs > 0) {
-        // All jobs completed during recrawl
-        if (completedJobs > 0) {
-          status = 'ready_for_training';
-          console.log('✅ All recrawl jobs completed, setting to ready_for_training');
-        } else {
-          status = 'failed';
-          console.log('❌ All recrawl jobs failed, setting to failed');
-        }
-      } else {
-        // Default to recrawling if we're in recrawl mode
-        status = 'recrawling';
-        console.log('🔄 Default case during recrawl, maintaining recrawling status');
-      }
-    } else {
-      console.log('📝 Processing normal crawl logic...');
-      
-      // Normal crawl flow
-      if (totalJobs === 0) {
-        status = 'pending';
-      } else if (completedJobs === totalJobs) {
-        status = 'ready_for_training';
-      } else if (completedJobs + failedJobs === totalJobs) {
-        status = 'ready_for_training';
-      } else if (inProgressJobs > 0 || completedJobs > 0) {
-        status = 'in_progress';
-      }
-    }
-
-    console.log(`📊 Status decision - Old: ${parentSource.crawl_status}, New: ${status}`);
-
-    // Calculate compression stats and total size from completed jobs
-    const completedJobsData = pages?.filter(job => job.status === 'completed') || [];
-    const totalChildSize = completedJobsData.reduce((sum, job) => sum + (job.content_size || 0), 0);
-    const compressionStats = {
-      totalContentSize: totalChildSize,
-      avgCompressionRatio: completedJobsData.length > 0 
-        ? completedJobsData.reduce((sum, job) => sum + (job.compression_ratio || 0), 0) / completedJobsData.length 
-        : 0,
-      totalUniqueChunks: completedJobsData.reduce((sum, job) => sum + (job.chunks_created || 0), 0),
-      totalDuplicateChunks: completedJobsData.reduce((sum, job) => sum + (job.duplicates_found || 0), 0)
-    };
-
-    console.log(`📏 Size calculation - Total child size: ${totalChildSize} bytes from ${completedJobsData.length} completed pages`);
-
-    // Update parent source with aggregated data
-    const updateData: any = {
+    const updateData = {
       crawl_status: status,
       progress: progress,
-      total_jobs: totalJobs,
-      completed_jobs: completedJobs,
-      failed_jobs: failedJobs,
+      total_jobs: jobStats.totalJobs,
+      completed_jobs: jobStats.completedJobs,
+      failed_jobs: jobStats.failedJobs,
       total_content_size: compressionStats.totalContentSize,
       unique_chunks: compressionStats.totalUniqueChunks,
       duplicate_chunks: compressionStats.totalDuplicateChunks,
       global_compression_ratio: compressionStats.avgCompressionRatio,
+      metadata: metadata,
       updated_at: new Date().toISOString()
     };
-
-    // Handle metadata updates - preserve recrawl state until completion and add child size info
-    if (status === 'ready_for_training' || status === 'failed') {
-      console.log(`🏁 Recrawl completed with status: ${status}, clearing recrawl flags`);
-      updateData.metadata = {
-        ...(parentSource.metadata || {}),
-        is_recrawling: false,
-        last_aggregation: new Date().toISOString(),
-        recrawl_completed_at: new Date().toISOString(),
-        total_child_pages_size: totalChildSize,
-        child_pages_count: completedJobsData.length,
-        size_calculation_method: 'child_page_aggregation'
-      };
-    } else if (isRecrawling) {
-      console.log('🔄 Preserving recrawl metadata during processing');
-      // Preserve recrawl metadata but update aggregation timestamp and size info
-      updateData.metadata = {
-        ...(parentSource.metadata || {}),
-        last_aggregation: new Date().toISOString(),
-        total_child_pages_size: totalChildSize,
-        child_pages_count: completedJobsData.length,
-        size_calculation_method: 'child_page_aggregation'
-      };
-    } else {
-      // Normal processing - update metadata with size info
-      updateData.metadata = {
-        ...(parentSource.metadata || {}),
-        last_aggregation: new Date().toISOString(),
-        total_child_pages_size: totalChildSize,
-        child_pages_count: completedJobsData.length,
-        size_calculation_method: 'child_page_aggregation'
-      };
-    }
 
     console.log(`💾 Updating parent source with:`, updateData);
 
@@ -183,15 +88,15 @@ serve(async (req) => {
 
     console.log(`✅ Parent source ${parentSourceId} updated to status: ${status}`);
 
-    const result = {
+    const result: StatusAggregatorResult = {
       parentSourceId,
       status,
       progress,
-      totalJobs,
-      completedJobs,
-      failedJobs,
-      pendingJobs,
-      inProgressJobs,
+      totalJobs: jobStats.totalJobs,
+      completedJobs: jobStats.completedJobs,
+      failedJobs: jobStats.failedJobs,
+      pendingJobs: jobStats.pendingJobs,
+      inProgressJobs: jobStats.inProgressJobs,
       compressionStats,
       totalChildSize,
       isRecrawling: isRecrawling || false,
@@ -199,13 +104,13 @@ serve(async (req) => {
         originalStatus: parentSource.crawl_status,
         newStatus: status,
         wasRecrawling: isRecrawling,
-        recrawlStartedAt: recrawlStartedAt,
+        recrawlStartedAt: parentSource.metadata?.recrawl_started_at,
         jobBreakdown: {
-          total: totalJobs,
-          completed: completedJobs,
-          failed: failedJobs,
-          pending: pendingJobs,
-          inProgress: inProgressJobs
+          total: jobStats.totalJobs,
+          completed: jobStats.completedJobs,
+          failed: jobStats.failedJobs,
+          pending: jobStats.pendingJobs,
+          inProgress: jobStats.inProgressJobs
         }
       },
       timestamp: new Date().toISOString()
