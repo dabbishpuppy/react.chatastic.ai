@@ -29,6 +29,7 @@ export interface AgentSource {
   updated_at: string;
   is_active: boolean;
   is_excluded?: boolean;
+  pending_deletion?: boolean;
   crawl_status?: string;
   progress?: number;
   total_jobs?: number;

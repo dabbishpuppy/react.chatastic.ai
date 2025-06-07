@@ -60,7 +60,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
 
   const { 
     data: paginatedData, 
-    sources: allSources,
     refetch, 
     isLoading 
   } = useSourcesPaginated({
@@ -69,6 +68,8 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     pageSize,
     enabled: !loading
   });
+
+  const allSources = paginatedData?.sources || [];
 
   const parentSources = useMemo(() => {
     console.log('🔍 Processing website sources for list:', {

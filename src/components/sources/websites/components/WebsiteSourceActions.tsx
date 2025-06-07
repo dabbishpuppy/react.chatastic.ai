@@ -100,10 +100,15 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
       case 'delete':
         try {
           // Soft delete: mark as pending deletion instead of hard delete
-          await supabase
+          const { error } = await supabase
             .from('agent_sources')
             .update({ pending_deletion: true })
             .eq('id', source.id);
+          
+          if (error) {
+            console.error('Failed to mark source for deletion:', error);
+            throw error;
+          }
           
           console.log('Source marked for deletion');
           setSourceData(prev => ({ ...prev, pending_deletion: true }));
@@ -115,13 +120,18 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
       case 'restore':
         try {
           // Restore by removing the pending deletion flag
-          await supabase
+          const { error } = await supabase
             .from('agent_sources')
             .update({ 
               pending_deletion: false,
               is_excluded: false 
             })
             .eq('id', source.id);
+          
+          if (error) {
+            console.error('Failed to restore source:', error);
+            throw error;
+          }
           
           console.log('Source restored');
           setSourceData(prev => ({ 

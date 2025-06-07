@@ -1,11 +1,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { AgentSource } from '@/types/rag';
+import { AgentSource, SourceType } from '@/types/rag';
 import { useParams } from 'react-router-dom';
 
 interface UseSourcesPaginatedOptions {
-  sourceType?: string;
+  sourceType?: SourceType;
   page: number;
   pageSize: number;
   enabled?: boolean;
@@ -60,8 +60,16 @@ export const useSourcesPaginated = ({
 
       const totalPages = Math.ceil((count || 0) / pageSize);
 
+      // Transform the data to match AgentSource interface
+      const sources: AgentSource[] = (data || []).map(source => ({
+        ...source,
+        metadata: typeof source.metadata === 'string' 
+          ? JSON.parse(source.metadata) 
+          : (source.metadata as Record<string, any>) || {}
+      }));
+
       return {
-        sources: data || [],
+        sources,
         totalCount: count || 0,
         totalPages
       };
@@ -72,3 +80,8 @@ export const useSourcesPaginated = ({
     staleTime: 30000, // 30 seconds
   });
 };
+
+// Export for backward compatibility
+export const useQASourcesPaginated = useSourcesPaginated;
+export const useTextSourcesPaginated = useSourcesPaginated;
+export const useFileSourcesPaginated = useSourcesPaginated;
