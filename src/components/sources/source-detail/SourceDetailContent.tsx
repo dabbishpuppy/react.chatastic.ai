@@ -34,9 +34,6 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   const isFileSource = source?.source_type === 'file';
   const isChildPage = source?.metadata?.isChildPage === true;
 
-  // Extract meta title from metadata if available
-  const pageTitle = source?.metadata?.page_title || source?.metadata?.pageTitle;
-
   return (
     <Card>
       <CardContent className="p-6">
@@ -53,15 +50,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-start">
-              <div className="flex-1">
-                {pageTitle && isChildPage && (
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Page Title</h3>
-                    <p className="text-gray-700">{pageTitle}</p>
-                  </div>
-                )}
-                <h2 className="text-xl font-semibold">{source.title}</h2>
-              </div>
+              <h2 className="text-xl font-semibold">{source.title}</h2>
               {!isFileSource && !isChildPage && (
                 <Button
                   variant="outline"
@@ -72,10 +61,37 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
               )}
             </div>
             
+            {isChildPage && source.metadata && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  {source.metadata.contentSize && (
+                    <div>
+                      <span className="font-medium">Content Size:</span> {(source.metadata.contentSize / 1024).toFixed(1)}KB
+                    </div>
+                  )}
+                  {source.metadata.chunksCreated && (
+                    <div>
+                      <span className="font-medium">Chunks Created:</span> {source.metadata.chunksCreated}
+                    </div>
+                  )}
+                  {source.metadata.processingTimeMs && (
+                    <div>
+                      <span className="font-medium">Processing Time:</span> {(source.metadata.processingTimeMs / 1000).toFixed(2)}s
+                    </div>
+                  )}
+                  {source.metadata.compressionRatio && (
+                    <div>
+                      <span className="font-medium">Compression Ratio:</span> {(source.metadata.compressionRatio * 100).toFixed(1)}%
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div className="prose max-w-none">
-              {isHtmlContent ? (
+              {isHtmlContent || isChildPage ? (
                 <div 
-                  className="font-sans text-gray-700"
+                  className="font-sans text-gray-700 prose prose-headings:text-gray-900 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-sm prose-p:text-gray-700 prose-strong:text-gray-900 prose-em:italic prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4"
                   style={{ 
                     fontSize: '0.875rem',
                     lineHeight: '1.5'
