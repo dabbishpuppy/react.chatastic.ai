@@ -45,6 +45,7 @@ export type Database = {
           original_size: number | null
           parent_source_id: string | null
           pending_deletion: boolean | null
+          previous_status: Database["public"]["Enums"]["source_status"] | null
           progress: number | null
           raw_text: string | null
           requires_manual_training: boolean | null
@@ -61,6 +62,8 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           url: string | null
+          workflow_metadata: Json | null
+          workflow_status: Database["public"]["Enums"]["source_status"] | null
         }
         Insert: {
           agent_id: string
@@ -97,6 +100,7 @@ export type Database = {
           original_size?: number | null
           parent_source_id?: string | null
           pending_deletion?: boolean | null
+          previous_status?: Database["public"]["Enums"]["source_status"] | null
           progress?: number | null
           raw_text?: string | null
           requires_manual_training?: boolean | null
@@ -113,6 +117,8 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           url?: string | null
+          workflow_metadata?: Json | null
+          workflow_status?: Database["public"]["Enums"]["source_status"] | null
         }
         Update: {
           agent_id?: string
@@ -149,6 +155,7 @@ export type Database = {
           original_size?: number | null
           parent_source_id?: string | null
           pending_deletion?: boolean | null
+          previous_status?: Database["public"]["Enums"]["source_status"] | null
           progress?: number | null
           raw_text?: string | null
           requires_manual_training?: boolean | null
@@ -165,6 +172,8 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           url?: string | null
+          workflow_metadata?: Json | null
+          workflow_status?: Database["public"]["Enums"]["source_status"] | null
         }
         Relationships: [
           {
@@ -370,6 +379,78 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      background_jobs: {
+        Row: {
+          attempts: number | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          job_key: string | null
+          job_type: string
+          max_attempts: number | null
+          page_id: string | null
+          payload: Json | null
+          priority: number | null
+          scheduled_at: string | null
+          source_id: string
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          job_key?: string | null
+          job_type: string
+          max_attempts?: number | null
+          page_id?: string | null
+          payload?: Json | null
+          priority?: number | null
+          scheduled_at?: string | null
+          source_id: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          job_key?: string | null
+          job_type?: string
+          max_attempts?: number | null
+          page_id?: string | null
+          payload?: Json | null
+          priority?: number | null
+          scheduled_at?: string | null
+          source_id?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "background_jobs_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "source_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "background_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -1779,6 +1860,7 @@ export type Database = {
           id: string
           max_retries: number | null
           parent_source_id: string
+          previous_status: Database["public"]["Enums"]["page_status"] | null
           priority: string | null
           processing_status: string | null
           processing_time_ms: number | null
@@ -1787,6 +1869,7 @@ export type Database = {
           status: string
           updated_at: string
           url: string
+          workflow_status: Database["public"]["Enums"]["page_status"] | null
         }
         Insert: {
           chunks_created?: number | null
@@ -1801,6 +1884,7 @@ export type Database = {
           id?: string
           max_retries?: number | null
           parent_source_id: string
+          previous_status?: Database["public"]["Enums"]["page_status"] | null
           priority?: string | null
           processing_status?: string | null
           processing_time_ms?: number | null
@@ -1809,6 +1893,7 @@ export type Database = {
           status?: string
           updated_at?: string
           url: string
+          workflow_status?: Database["public"]["Enums"]["page_status"] | null
         }
         Update: {
           chunks_created?: number | null
@@ -1823,6 +1908,7 @@ export type Database = {
           id?: string
           max_retries?: number | null
           parent_source_id?: string
+          previous_status?: Database["public"]["Enums"]["page_status"] | null
           priority?: string | null
           processing_status?: string | null
           processing_time_ms?: number | null
@@ -1831,6 +1917,7 @@ export type Database = {
           status?: string
           updated_at?: string
           url?: string
+          workflow_status?: Database["public"]["Enums"]["page_status"] | null
         }
         Relationships: [
           {
@@ -2034,6 +2121,60 @@ export type Database = {
           },
         ]
       }
+      workflow_events: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          event_type: string
+          from_status: string | null
+          id: string
+          metadata: Json | null
+          page_id: string | null
+          processed_at: string | null
+          source_id: string
+          to_status: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json | null
+          page_id?: string | null
+          processed_at?: string | null
+          source_id: string
+          to_status: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          metadata?: Json | null
+          page_id?: string | null
+          processed_at?: string | null
+          source_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_events_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "source_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_events_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "agent_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       migration_progress: {
@@ -2121,8 +2262,30 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: boolean
       }
+      emit_workflow_event: {
+        Args: {
+          p_source_id: string
+          p_event_type: string
+          p_to_status: string
+          p_page_id?: string
+          p_from_status?: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
       encrypt_sensitive_data: {
         Args: { data: string } | { data: string; key_id?: string }
+        Returns: string
+      }
+      enqueue_job: {
+        Args: {
+          p_job_type: string
+          p_source_id: string
+          p_page_id?: string
+          p_job_key?: string
+          p_payload?: Json
+          p_priority?: number
+        }
         Returns: string
       }
       export_user_data: {
@@ -2309,6 +2472,24 @@ export type Database = {
         }
         Returns: number
       }
+      transition_page_status: {
+        Args: {
+          p_page_id: string
+          p_new_status: Database["public"]["Enums"]["page_status"]
+          p_event_type?: string
+          p_metadata?: Json
+        }
+        Returns: boolean
+      }
+      transition_source_status: {
+        Args: {
+          p_source_id: string
+          p_new_status: Database["public"]["Enums"]["source_status"]
+          p_event_type?: string
+          p_metadata?: Json
+        }
+        Returns: boolean
+      }
       vector_avg: {
         Args: { "": number[] }
         Returns: string
@@ -2344,6 +2525,24 @@ export type Database = {
         | "train"
         | "query"
       invitation_status: "pending" | "accepted" | "expired" | "cancelled"
+      page_status:
+        | "CREATED"
+        | "CRAWLING"
+        | "COMPLETED"
+        | "TRAINING"
+        | "TRAINED"
+        | "PENDING_REMOVAL"
+        | "REMOVED"
+        | "ERROR"
+      source_status:
+        | "CREATED"
+        | "CRAWLING"
+        | "COMPLETED"
+        | "TRAINING"
+        | "TRAINED"
+        | "PENDING_REMOVAL"
+        | "REMOVED"
+        | "ERROR"
       source_type: "text" | "file" | "website" | "qa"
       team_role: "owner" | "admin" | "member"
       training_status: "pending" | "in_progress" | "completed" | "failed"
@@ -2472,6 +2671,26 @@ export const Constants = {
         "query",
       ],
       invitation_status: ["pending", "accepted", "expired", "cancelled"],
+      page_status: [
+        "CREATED",
+        "CRAWLING",
+        "COMPLETED",
+        "TRAINING",
+        "TRAINED",
+        "PENDING_REMOVAL",
+        "REMOVED",
+        "ERROR",
+      ],
+      source_status: [
+        "CREATED",
+        "CRAWLING",
+        "COMPLETED",
+        "TRAINING",
+        "TRAINED",
+        "PENDING_REMOVAL",
+        "REMOVED",
+        "ERROR",
+      ],
       source_type: ["text", "file", "website", "qa"],
       team_role: ["owner", "admin", "member"],
       training_status: ["pending", "in_progress", "completed", "failed"],
