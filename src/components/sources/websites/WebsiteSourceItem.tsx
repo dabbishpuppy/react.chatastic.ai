@@ -86,7 +86,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              {/* Title and URL */}
+              {/* Title only */}
               {isEditing ? (
                 <div className="space-y-2">
                   <input
@@ -123,24 +123,11 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                       </a>
                     )}
                   </div>
-                  {source.url && (
-                    <p className="text-xs text-gray-500 truncate">
-                      {source.url}
-                    </p>
-                  )}
                 </div>
               )}
 
-              {/* Status and metadata */}
+              {/* Metadata only (no status badges here) */}
               <div className="mt-2 space-y-1">
-                <WebsiteSourceStatusBadges
-                  crawlStatus={status}
-                  isExcluded={source.is_excluded || false}
-                  linksCount={source.links_count || 0}
-                  sourceId={source.id}
-                  source={source}
-                />
-                
                 <div className="flex items-center gap-3 text-xs text-gray-400">
                   {source.links_count !== undefined && source.links_count > 0 && (
                     <span>{source.links_count} pages</span>
@@ -157,8 +144,17 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
               </div>
             </div>
 
-            {/* Child sources toggle and actions */}
-            <div className="flex items-center gap-1">
+            {/* Status badges, child sources toggle and actions - moved to right side */}
+            <div className="flex items-center gap-2">
+              {/* Status badges */}
+              <WebsiteSourceStatusBadges
+                crawlStatus={status}
+                isExcluded={source.is_excluded || false}
+                linksCount={source.links_count || 0}
+                sourceId={source.id}
+                source={source}
+              />
+
               {/* Child sources toggle - show if source has links_count > 0 */}
               {hasChildSources && (
                 <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
@@ -224,14 +220,11 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
       </div>
 
-      {/* Collapsible child sources */}
+      {/* Collapsible child sources (without the "Child Pages" text) */}
       {hasChildSources && (
         <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
           <CollapsibleContent>
             <div className="ml-6 mr-3 mb-3">
-              <div className="text-sm font-medium mb-2 text-gray-700">
-                Child Pages ({childSources.length}/{source.links_count})
-              </div>
               <WebsiteChildSources
                 parentSourceId={source.id}
                 isCrawling={status === 'in_progress'}
