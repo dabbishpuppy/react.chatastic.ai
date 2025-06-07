@@ -187,41 +187,7 @@ serve(async (req) => {
       );
     }
     
-    // Enhanced content extraction that preserves HTML structure
-    const extractCleanHtmlContent = (html) => {
-      // Remove unwanted elements but preserve content structure
-      let cleanHtml = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
-      cleanHtml = cleanHtml.replace(/<style[^>]*>.*?<\/style>/gis, '');
-      cleanHtml = cleanHtml.replace(/<nav[^>]*>.*?<\/nav>/gis, '');
-      cleanHtml = cleanHtml.replace(/<header[^>]*>.*?<\/header>/gis, '');
-      cleanHtml = cleanHtml.replace(/<footer[^>]*>.*?<\/footer>/gis, '');
-      cleanHtml = cleanHtml.replace(/<aside[^>]*>.*?<\/aside>/gis, '');
-      
-      // Extract main content area if it exists
-      const mainContentMatch = cleanHtml.match(/<main[^>]*>(.*?)<\/main>/gis);
-      if (mainContentMatch) {
-        cleanHtml = mainContentMatch[0];
-      } else {
-        // Try to extract article content
-        const articleMatch = cleanHtml.match(/<article[^>]*>(.*?)<\/article>/gis);
-        if (articleMatch) {
-          cleanHtml = articleMatch[0];
-        } else {
-          // Extract body content, removing head
-          const bodyMatch = cleanHtml.match(/<body[^>]*>(.*?)<\/body>/gis);
-          if (bodyMatch) {
-            cleanHtml = bodyMatch[0];
-          }
-        }
-      }
-      
-      // Clean up excessive whitespace while preserving HTML structure
-      cleanHtml = cleanHtml.replace(/\s+/g, ' ').trim();
-      
-      return cleanHtml;
-    };
-
-    // Also create a plain text version for fallback
+    // Simple content extraction (similar to what's in child-job-processor)
     const extractTextContent = (html) => {
       let text = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
       text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
@@ -235,60 +201,32 @@ serve(async (req) => {
       return titleMatch ? titleMatch[1].trim() : '';
     };
 
-    const createSemanticChunks = (content, maxTokens = 150, preserveHtml = false) => {
-      if (preserveHtml) {
-        // For HTML content, split on block elements while preserving structure
-        const blockElements = content.split(/(<\/(?:p|div|h[1-6]|li|blockquote|pre)>)/gi);
-        const chunks = [];
-        let currentChunk = '';
-        let tokenCount = 0;
+    const createSemanticChunks = (content, maxTokens = 150) => {
+      const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15);
+      const chunks = [];
+      let currentChunk = '';
+      let tokenCount = 0;
 
-        for (const element of blockElements) {
-          const elementTokens = element.length / 4; // Rough estimate
-          
-          if (tokenCount + elementTokens > maxTokens && currentChunk.trim()) {
+      for (const sentence of sentences) {
+        const sentenceTokens = sentence.trim().split(/\s+/).length;
+        
+        if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
+          if (currentChunk.trim().length > 30) {
             chunks.push(currentChunk.trim());
-            currentChunk = element;
-            tokenCount = elementTokens;
-          } else {
-            currentChunk += element;
-            tokenCount += elementTokens;
           }
+          currentChunk = sentence;
+          tokenCount = sentenceTokens;
+        } else {
+          currentChunk += (currentChunk ? '. ' : '') + sentence;
+          tokenCount += sentenceTokens;
         }
-        
-        if (currentChunk.trim()) {
-          chunks.push(currentChunk.trim());
-        }
-        
-        return chunks.filter(chunk => chunk.length > 20);
-      } else {
-        // Original text-based chunking
-        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15);
-        const chunks = [];
-        let currentChunk = '';
-        let tokenCount = 0;
-
-        for (const sentence of sentences) {
-          const sentenceTokens = sentence.trim().split(/\s+/).length;
-          
-          if (tokenCount + sentenceTokens > maxTokens && currentChunk) {
-            if (currentChunk.trim().length > 30) {
-              chunks.push(currentChunk.trim());
-            }
-            currentChunk = sentence;
-            tokenCount = sentenceTokens;
-          } else {
-            currentChunk += (currentChunk ? '. ' : '') + sentence;
-            tokenCount += sentenceTokens;
-          }
-        }
-        
-        if (currentChunk.trim().length > 30) {
-          chunks.push(currentChunk.trim());
-        }
-        
-        return chunks.filter(chunk => chunk.length > 20);
       }
+      
+      if (currentChunk.trim().length > 30) {
+        chunks.push(currentChunk.trim());
+      }
+      
+      return chunks.filter(chunk => chunk.length > 20);
     };
 
     const generateContentHash = async (content) => {
@@ -299,19 +237,10 @@ serve(async (req) => {
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     };
 
-    // Extract both HTML and text content
-    const htmlContentExtracted = extractCleanHtmlContent(htmlContent);
     const textContent = extractTextContent(htmlContent);
-    const contentSize = htmlContentExtracted.length;
+    const contentSize = textContent.length;
 
-    console.log(`📏 Content extracted: ${contentSize} characters (HTML) from ${page.url}`);
-    console.log(`📄 HTML preview: ${htmlContentExtracted.substring(0, 200)}...`);
-
-    // Determine if we should use HTML or text content for chunking
-    const hasStructure = /<(?:h[1-6]|p|div|ul|ol|li|strong|em|b|i)\s*[^>]*>/i.test(htmlContentExtracted);
-    const useHtmlContent = hasStructure && htmlContentExtracted.length > 100;
-
-    console.log(`🎯 Using ${useHtmlContent ? 'HTML' : 'text'} content for chunking (hasStructure: ${hasStructure})`);
+    console.log(`📏 Content extracted: ${contentSize} characters from ${page.url}`);
 
     // Handle minimal content case
     if (contentSize < 10) {
@@ -332,8 +261,7 @@ serve(async (req) => {
               extraction_method: 'title_fallback',
               page_title: title,
               processed_at: new Date().toISOString(),
-              original_content_length: textContent.length,
-              isHtml: false
+              original_content_length: textContent.length
             }
           }];
 
@@ -450,15 +378,14 @@ serve(async (req) => {
       }
     }
 
-    // Create semantic chunks from the content (HTML or text)
-    const contentToChunk = useHtmlContent ? htmlContentExtracted : textContent;
-    const chunks = createSemanticChunks(contentToChunk, 150, useHtmlContent);
-    console.log(`📝 Created ${chunks.length} semantic chunks using ${useHtmlContent ? 'HTML' : 'text'} content`);
+    // Create semantic chunks from the content
+    const chunks = createSemanticChunks(textContent);
+    console.log(`📝 Created ${chunks.length} semantic chunks`);
 
     // Generate content hash
     let contentHash;
     try {
-      contentHash = await generateContentHash(contentToChunk);
+      contentHash = await generateContentHash(textContent);
     } catch (error) {
       console.error('❌ Failed to generate content hash:', error);
       contentHash = 'hash-generation-failed';
@@ -475,11 +402,10 @@ serve(async (req) => {
           url: page.url,
           page_id: page.id,
           content_hash: contentHash,
-          extraction_method: useHtmlContent ? 'html_structure_preserving' : 'semantic_chunking',
+          extraction_method: 'semantic_chunking',
           page_title: extractTitle(htmlContent),
           processed_at: new Date().toISOString(),
-          original_content_length: htmlContentExtracted.length,
-          isHtml: useHtmlContent
+          original_content_length: textContent.length
         }
       }));
 

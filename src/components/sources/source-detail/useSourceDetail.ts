@@ -51,26 +51,12 @@ export const useSourceDetail = () => {
           console.log('🔍 Fetched chunk data:', chunkData);
 
           let extractedContent = '';
-          let isHtmlContent = false;
-          
           if (!chunkError && chunkData && chunkData.length > 0) {
-            // Check if any chunk has HTML content
-            isHtmlContent = chunkData.some(chunk => chunk.metadata?.isHtml === true);
-            
             // Join chunks with proper spacing and preserve structure
-            if (isHtmlContent) {
-              // For HTML content, join with minimal spacing to preserve structure
-              extractedContent = chunkData
-                .sort((a, b) => a.chunk_index - b.chunk_index)
-                .map(chunk => chunk.content)
-                .join(' ');
-            } else {
-              // For text content, join with proper paragraph spacing
-              extractedContent = chunkData
-                .sort((a, b) => a.chunk_index - b.chunk_index)
-                .map(chunk => chunk.content)
-                .join('\n\n');
-            }
+            extractedContent = chunkData
+              .sort((a, b) => a.chunk_index - b.chunk_index)
+              .map(chunk => chunk.content)
+              .join('\n\n');
           }
           
           // If no chunks found, show appropriate message
@@ -79,8 +65,6 @@ export const useSourceDetail = () => {
           }
 
           console.log('📄 Final extracted content length:', extractedContent.length);
-          console.log('🎨 Content is HTML:', isHtmlContent);
-          console.log('🔍 Content preview:', extractedContent.substring(0, 200));
 
           // Transform child page data to AgentSource format
           const transformedSource: AgentSource = {
@@ -96,7 +80,6 @@ export const useSourceDetail = () => {
             requires_manual_training: false,
             metadata: {
               isChildPage: true,
-              isHtml: isHtmlContent, // Add this flag
               parentSourceId: pageData.parent_source_id,
               contentSize: pageData.content_size,
               chunksCreated: pageData.chunks_created,
