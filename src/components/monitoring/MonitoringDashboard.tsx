@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ import { QueueMonitor } from './QueueMonitor';
 import { ProductionQueueDashboard } from './ProductionQueueDashboard';
 import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
 import { ProductionHealthCheck } from './ProductionHealthCheck';
+import { useToast } from '@/hooks/use-toast';
 
 export const MonitoringDashboard: React.FC = () => {
   const [orchestratorStatus, setOrchestratorStatus] = useState<any>(null);
@@ -24,23 +25,45 @@ export const MonitoringDashboard: React.FC = () => {
   const [wsStats, setWsStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const { toast } = useToast();
 
-  // Initialize orchestrator
-  useEffect(() => {
-    const orchestrator = ServiceOrchestrator.getInstance();
+  // Initialize orchestrator and load initial state
+  const initializeOrchestrator = useCallback(() => {
+    const orchestrator = ServiceOrchestrator.getInstance({
+      enableMetrics: true,
+      enableAlerting: true,
+      enablePerformanceMonitoring: true,
+      enableInfrastructureMonitoring: true,
+      enableIPPoolMonitoring: true,
+      enableEgressManagement: true,
+      enableAutoscaling: true,
+      enableWorkerQueue: true,
+      enableConnectionPooling: true,
+      enableDatabaseOptimization: true
+    });
+    
+    // Load current status immediately
     updateDashboard();
+    
+    return orchestrator;
+  }, []);
+
+  useEffect(() => {
+    const orchestrator = initializeOrchestrator();
     
     let interval: NodeJS.Timeout;
     if (autoRefresh) {
-      interval = setInterval(updateDashboard, 10000); // Update every 10 seconds
+      interval = setInterval(() => {
+        updateDashboard();
+      }, 5000); // Update every 5 seconds for better responsiveness
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoRefresh]);
+  }, [autoRefresh, initializeOrchestrator]);
 
-  const updateDashboard = async () => {
+  const updateDashboard = useCallback(async () => {
     try {
       const orchestrator = ServiceOrchestrator.getInstance();
       const status = orchestrator.getOrchestratorStatus();
@@ -55,16 +78,27 @@ export const MonitoringDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error updating dashboard:', error);
     }
-  };
+  }, []);
 
   const handleStartServices = async () => {
     setIsLoading(true);
     try {
       const orchestrator = ServiceOrchestrator.getInstance();
       await orchestrator.startServices();
+      
+      toast({
+        title: "Services Started",
+        description: "All enhanced services have been started successfully.",
+      });
+      
       await updateDashboard();
     } catch (error) {
       console.error('Error starting services:', error);
+      toast({
+        title: "Error Starting Services",
+        description: "Failed to start services. Check console for details.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -75,9 +109,20 @@ export const MonitoringDashboard: React.FC = () => {
     try {
       const orchestrator = ServiceOrchestrator.getInstance();
       await orchestrator.stopServices();
+      
+      toast({
+        title: "Services Stopped",
+        description: "All enhanced services have been stopped.",
+      });
+      
       await updateDashboard();
     } catch (error) {
       console.error('Error stopping services:', error);
+      toast({
+        title: "Error Stopping Services",
+        description: "Failed to stop services. Check console for details.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -87,9 +132,20 @@ export const MonitoringDashboard: React.FC = () => {
     try {
       const orchestrator = ServiceOrchestrator.getInstance();
       await orchestrator.restartService(serviceName);
+      
+      toast({
+        title: "Service Restarted",
+        description: `${serviceName} has been restarted successfully.`,
+      });
+      
       await updateDashboard();
     } catch (error) {
       console.error('Error restarting service:', error);
+      toast({
+        title: "Error Restarting Service",
+        description: `Failed to restart ${serviceName}. Check console for details.`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -111,6 +167,14 @@ export const MonitoringDashboard: React.FC = () => {
     }
   };
 
+  const handleManualRefresh = () => {
+    updateDashboard();
+    toast({
+      title: "Dashboard Refreshed",
+      description: "Latest metrics and status have been loaded.",
+    });
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -120,6 +184,13 @@ export const MonitoringDashboard: React.FC = () => {
           <p className="text-muted-foreground">
             Real-time monitoring and management of enhanced RAG services
           </p>
+          {orchestratorStatus && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Status: {orchestratorStatus.isRunning ? '🟢 Running' : '🔴 Stopped'} • 
+              Uptime: {Math.floor(orchestratorStatus.uptime / 60)}m {orchestratorStatus.uptime % 60}s • 
+              Health: {orchestratorStatus.overallHealth}%
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Button
@@ -133,7 +204,7 @@ export const MonitoringDashboard: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={updateDashboard}
+            onClick={handleManualRefresh}
             disabled={isLoading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -195,6 +266,11 @@ export const MonitoringDashboard: React.FC = () => {
                 onRestart={handleRestartService}
               />
             ))}
+            {(!orchestratorStatus?.services || orchestratorStatus.services.length === 0) && (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                No services found. Start the orchestrator to see service status.
+              </div>
+            )}
           </div>
         </TabsContent>
 
