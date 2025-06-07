@@ -65,27 +65,27 @@ export class StatusCalculator {
         status = 'pending';
         console.log('📋 No jobs yet, setting to pending');
       } else if (pendingJobs > 0 || inProgressJobs > 0) {
-        // FIXED: If there are still pending or in-progress jobs, stay in in_progress
+        // CRITICAL FIX: If ANY jobs are still pending or in progress, we must stay in progress/pending
         if (completedJobs > 0 || failedJobs > 0) {
           status = 'in_progress';
-          console.log(`🔄 Some jobs completed but ${pendingJobs} pending and ${inProgressJobs} in progress remain, setting to in_progress`);
+          console.log(`🔄 Jobs still processing (${pendingJobs} pending, ${inProgressJobs} in progress) - keeping in_progress status`);
         } else {
           status = 'pending';
-          console.log('📋 All jobs pending, setting to pending');
+          console.log('📋 All jobs still pending, keeping pending status');
         }
-      } else if (completedJobs + failedJobs === totalJobs && totalJobs > 0) {
-        // FIXED: Only move to ready_for_training when ALL jobs are done AND we have successful completions
+      } else if (completedJobs + failedJobs === totalJobs && totalJobs > 0 && pendingJobs === 0 && inProgressJobs === 0) {
+        // STRICT CHECK: Only transition when absolutely NO jobs are pending or in progress
         if (completedJobs > 0) {
           status = 'ready_for_training';
-          console.log(`✅ All ${totalJobs} jobs finished with ${completedJobs} completed, setting to ready_for_training`);
+          console.log(`✅ ALL jobs completely finished (${completedJobs} completed, ${failedJobs} failed, 0 pending, 0 in progress) - setting to ready_for_training`);
         } else {
           status = 'failed';
           console.log('❌ All jobs failed, setting to failed');
         }
       } else {
-        // This shouldn't happen, but default to in_progress if we have any activity
+        // Fallback: if we have any activity but conditions above aren't met, stay in progress
         status = 'in_progress';
-        console.log('🔄 Unexpected state, defaulting to in_progress');
+        console.log(`🔄 Jobs in mixed state - defaulting to in_progress (completed: ${completedJobs}, failed: ${failedJobs}, pending: ${pendingJobs}, inProgress: ${inProgressJobs})`);
       }
     }
 
