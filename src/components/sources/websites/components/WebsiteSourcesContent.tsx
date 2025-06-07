@@ -45,7 +45,7 @@ const WebsiteSourcesContent: React.FC<WebsiteSourcesContentProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div>
       {sources.map((source) => {
         console.log(`🔍 DEBUG: Rendering source ${source.id}:`, {
           title: source.title,

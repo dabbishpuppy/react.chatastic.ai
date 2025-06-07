@@ -78,27 +78,22 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       const { sourceType } = event.detail;
       if (sourceType === 'website') {
         console.log('🔄 Website source created event received (legacy)');
-        // Real-time subscription should handle this, but refetch as fallback
         setTimeout(() => refetch(), 100);
       }
     };
 
     const handleSourceUpdated = () => {
       console.log('🔄 Source updated event received (legacy)');
-      // Real-time subscription should handle this
     };
 
     const handleSourceRemoved = (event: CustomEvent) => {
       console.log('🗑️ Source removed event received (legacy):', event.detail);
-      // Real-time subscription should handle this
     };
 
     const handleSourceRestored = (event: CustomEvent) => {
       console.log('🔄 Source restored event received (legacy):', event.detail);
-      // Real-time subscription should handle this
     };
 
-    // Add event listeners as fallback
     window.addEventListener('sourceCreated', handleSourceCreated as EventListener);
     window.addEventListener('sourceUpdated', handleSourceUpdated);
     window.addEventListener('sourceRemoved', handleSourceRemoved as EventListener);
@@ -121,7 +116,6 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       timestamp: new Date().toISOString()
     });
     
-    // Log all sources to see what we have
     console.log('🔍 DEBUG: All sources received:', allSources.map(s => ({
       id: s.id,
       title: s.title,
@@ -135,13 +129,10 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       isOptimistic: (s as any).isOptimistic
     })));
     
-    // Filter for parent sources (no parent_source_id) and include ALL active sources
-    // CRITICAL FIX: Include sources with pending_deletion=true in the display
     const parents = allSources.filter(source => {
       const isParent = !source.parent_source_id;
       const isWebsite = source.source_type === 'website';
       const isActive = source.is_active === true;
-      // REMOVED the pending_deletion filter - we want to show these sources
       
       console.log(`🔍 DEBUG: Source ${source.id} filter check:`, {
         isParent,
@@ -249,13 +240,11 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
 
   if (error) {
     return (
-      <Card className="border border-gray-200">
-        <CardContent className="p-6">
-          <div className="text-center text-red-600">
-            <p>Error loading website sources: {error}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="text-center text-red-600">
+          <p>Error loading website sources: {error}</p>
+        </div>
+      </div>
     );
   }
 
@@ -264,13 +253,13 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
 
   return (
     <div className="relative">
-      <Card className="border border-gray-200">
+      <div className="bg-white border border-gray-200 rounded-lg">
         <WebsiteSourcesHeader
           sourcesCount={parentSources.length}
           allCurrentPageSelected={allCurrentPageSelected}
           onSelectAll={handleSelectAll}
         />
-        <CardContent className="space-y-4">
+        <div className="divide-y divide-gray-100">
           <WebsiteSourcesContent
             sources={parentSources}
             getChildSources={getChildSources}
@@ -283,21 +272,23 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
           />
 
           {paginatedData && totalCount > 0 && (
-            <PaginationControls
-              currentPage={page}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              totalItems={totalCount}
-              onPageChange={() => {}}
-              onPageSizeChange={changePageSize}
-              onFirstPage={goToFirstPage}
-              onPreviousPage={goToPreviousPage}
-              onNextPage={() => goToNextPage(totalPages)}
-              onLastPage={() => goToLastPage(totalPages)}
-            />
+            <div className="p-4">
+              <PaginationControls
+                currentPage={page}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={totalCount}
+                onPageChange={() => {}}
+                onPageSizeChange={changePageSize}
+                onFirstPage={goToFirstPage}
+                onPreviousPage={goToPreviousPage}
+                onNextPage={() => goToNextPage(totalPages)}
+                onLastPage={() => goToLastPage(totalPages)}
+              />
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <BulkActionBar
         selectedCount={selectedCount}
