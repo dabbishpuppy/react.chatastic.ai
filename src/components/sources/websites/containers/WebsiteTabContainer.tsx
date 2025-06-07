@@ -21,7 +21,9 @@ const WebsiteTabContainer: React.FC = () => {
   if (error) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-red-500">Error initializing workflow system: {error.message}</div>
+        <div className="text-red-500">
+          Error initializing workflow system: {typeof error === 'string' ? error : error.message || 'Unknown error'}
+        </div>
       </div>
     );
   }

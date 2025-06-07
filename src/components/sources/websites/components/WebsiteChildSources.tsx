@@ -41,7 +41,15 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
           return;
         }
 
-        setChildSources(data || []);
+        // Transform the data to match AgentSource type
+        const transformedData: AgentSource[] = (data || []).map(item => ({
+          ...item,
+          workflow_metadata: typeof item.workflow_metadata === 'string' 
+            ? JSON.parse(item.workflow_metadata) 
+            : (item.workflow_metadata || {})
+        }));
+
+        setChildSources(transformedData);
       } catch (error) {
         console.error('Error in fetchChildSources:', error);
       } finally {
@@ -121,10 +129,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
             
             <WebsiteSourceActions
               source={childSource}
-              onEdit={onEdit}
-              onExclude={onExclude}
-              onRecrawl={onRecrawl}
-              onDelete={onDelete}
+              onEdit={(sourceId, newUrl) => onEdit(sourceId, newUrl)}
+              onExclude={(source) => onExclude(source)}
+              onRecrawl={(source) => onRecrawl(source)}
+              onDelete={(source) => onDelete(source)}
             />
           </div>
         </div>
