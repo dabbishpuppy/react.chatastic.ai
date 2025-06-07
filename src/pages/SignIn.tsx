@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -165,7 +166,7 @@ const SignIn = () => {
         <CardFooter className="text-center">
           <p className="text-sm text-gray-600">
             Don't have an account?{" "}
-            <Link to="/" className="text-blue-500 hover:underline">
+            <Link to="/register" className="text-blue-500 hover:underline">
               Sign Up
             </Link>
           </p>

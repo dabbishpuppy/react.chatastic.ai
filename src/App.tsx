@@ -44,7 +44,7 @@ function App() {
         <Router>
           <div className="App">
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Register />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/register" element={<Register />} />
               <Route path="/accept-invitation/:invitationId" element={<AcceptInvitation />} />
