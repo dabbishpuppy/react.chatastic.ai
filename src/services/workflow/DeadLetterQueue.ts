@@ -116,18 +116,34 @@ export class DeadLetterQueue {
   static async cleanupOldDeadLetterJobs(): Promise<number> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data, error } = await supabase
+    // First get the count of jobs to be deleted
+    const { data: jobsToDelete, error: countError } = await supabase
       .from('background_jobs')
-      .delete()
+      .select('id')
       .eq('status', 'dead_letter')
       .lt('updated_at', thirtyDaysAgo);
 
-    if (error) {
-      console.error('Error cleaning up old dead letter jobs:', error);
-      throw error;
+    if (countError) {
+      console.error('Error counting old dead letter jobs:', countError);
+      throw countError;
     }
 
-    const deletedCount = data ? data.length : 0;
+    const deletedCount = jobsToDelete ? jobsToDelete.length : 0;
+
+    if (deletedCount > 0) {
+      // Now delete the jobs
+      const { error: deleteError } = await supabase
+        .from('background_jobs')
+        .delete()
+        .eq('status', 'dead_letter')
+        .lt('updated_at', thirtyDaysAgo);
+
+      if (deleteError) {
+        console.error('Error cleaning up old dead letter jobs:', deleteError);
+        throw deleteError;
+      }
+    }
+
     console.log(`🧹 Cleaned up ${deletedCount} old dead letter jobs`);
     return deletedCount;
   }
