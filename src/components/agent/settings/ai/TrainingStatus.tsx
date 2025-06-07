@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { CheckCircle, Clock, AlertTriangle, Calendar } from "lucide-react";
 import { AISettings } from "@/hooks/useAISettings";
 
@@ -47,14 +47,14 @@ export const TrainingStatus: React.FC<TrainingStatusProps> = ({ settings }) => {
               </div>
               <div className="flex items-center">
                 {settings?.last_trained_at ? (
-                  <div className="flex items-center space-x-1 text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs">
+                  <div className="flex items-center space-x-1 text-green-700 bg-green-100 border border-green-200 px-2 py-1 rounded-full text-xs">
                     <CheckCircle className="h-3 w-3" />
-                    <span>Trained</span>
+                    <span>Agent Trained</span>
                   </div>
                 ) : (
-                  <div className="flex items-center space-x-1 text-orange-600 bg-orange-50 px-2 py-1 rounded-full text-xs">
+                  <div className="flex items-center space-x-1 text-purple-700 bg-purple-100 border border-purple-200 px-2 py-1 rounded-full text-xs">
                     <Clock className="h-3 w-3" />
-                    <span>Pending</span>
+                    <span>Training Agent</span>
                   </div>
                 )}
               </div>
