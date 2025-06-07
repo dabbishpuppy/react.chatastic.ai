@@ -126,6 +126,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       parent_source_id: s.parent_source_id,
       source_type: s.source_type,
       crawl_status: s.crawl_status,
+      links_count: s.links_count,
       isOptimistic: (s as any).isOptimistic
     })));
     
@@ -140,6 +141,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         isActive,
         pending_deletion: source.pending_deletion,
         is_excluded: source.is_excluded,
+        links_count: source.links_count,
         isOptimistic: (source as any).isOptimistic,
         willInclude: isParent && isWebsite && isActive
       });
@@ -156,6 +158,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         pending_deletion: s.pending_deletion,
         is_excluded: s.is_excluded,
         crawl_status: s.crawl_status,
+        links_count: s.links_count,
         isOptimistic: (s as any).isOptimistic
       })),
       timestamp: new Date().toISOString()
@@ -165,7 +168,12 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   }, [allSources, page]);
 
   const getChildSources = useCallback((parentId: string): AgentSource[] => {
-    return allSources.filter(source => source.parent_source_id === parentId);
+    const childSources = allSources.filter(source => source.parent_source_id === parentId);
+    console.log(`🔍 DEBUG: Getting child sources for parent ${parentId}:`, {
+      foundChildren: childSources.length,
+      children: childSources.map(c => ({ id: c.id, url: c.url, title: c.title }))
+    });
+    return childSources;
   }, [allSources]);
 
   const currentPageSourceIds = parentSources.map(s => s.id);

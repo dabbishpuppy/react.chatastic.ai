@@ -69,7 +69,8 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     }
   };
 
-  const hasChildSources = childSources.length > 0;
+  // Check if source has potential child sources based on links_count
+  const hasChildSources = (source.links_count || 0) > 0;
 
   return (
     <div className="border-b border-gray-100 last:border-b-0">
@@ -158,7 +159,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
             {/* Child sources toggle and actions */}
             <div className="flex items-center gap-1">
-              {/* Child sources toggle */}
+              {/* Child sources toggle - show if source has links_count > 0 */}
               {hasChildSources && (
                 <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
                   <CollapsibleTrigger asChild>
@@ -229,7 +230,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
           <CollapsibleContent>
             <div className="ml-6 mr-3 mb-3">
               <div className="text-sm font-medium mb-2 text-gray-700">
-                Child Pages ({childSources.length})
+                Child Pages ({childSources.length}/{source.links_count})
               </div>
               <WebsiteChildSources
                 parentSourceId={source.id}
