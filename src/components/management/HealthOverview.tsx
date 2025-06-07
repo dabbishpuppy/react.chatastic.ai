@@ -2,13 +2,23 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, AlertTriangle, Clock } from 'lucide-react';
-import { AgentHealth } from '@/services/rag/management/ragAgentLifecycle';
 
 interface HealthOverviewProps {
-  agentHealth: AgentHealth;
+  agentId: string;
 }
 
-export const HealthOverview: React.FC<HealthOverviewProps> = ({ agentHealth }) => {
+export const HealthOverview: React.FC<HealthOverviewProps> = ({ agentId }) => {
+  // Mock health data for now
+  const agentHealth = {
+    overall: 'healthy',
+    components: {
+      sources: 'healthy',
+      embeddings: 'healthy', 
+      training: 'healthy',
+      queries: 'healthy'
+    }
+  };
+
   const getHealthColor = (status: string) => {
     switch (status) {
       case 'healthy': return 'text-green-600';

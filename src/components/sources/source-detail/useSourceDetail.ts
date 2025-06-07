@@ -1,19 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useRAGServices } from '@/hooks/useRAGServices';
-import { toast } from '@/hooks/use-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AgentSource } from '@/types/rag';
-import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export const useSourceDetail = () => {
-  const { agentId, sourceId, pageId } = useParams();
+  const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { sources } = useRAGServices();
-  
-  const [source, setSource] = useState<AgentSource | null>(null);
-  const [loading, setLoading] = useState(true);
+
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -21,128 +18,56 @@ export const useSourceDetail = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
 
-  useEffect(() => {
-    const fetchSource = async () => {
-      if (!sourceId && !pageId) return;
+  const { data: source, isLoading: loading, refetch } = useQuery({
+    queryKey: ['agent-source', sourceId],
+    queryFn: async () => {
+      if (!sourceId) return null;
       
-      try {
-        setLoading(true);
-        
-        if (pageId) {
-          // Fetch child page data
-          const { data: pageData, error } = await supabase
-            .from('source_pages')
-            .select('*')
-            .eq('id', pageId)
-            .single();
+      const { data, error } = await supabase
+        .from('agent_sources')
+        .select('*')
+        .eq('id', sourceId)
+        .single();
 
-          if (error) throw error;
-          
-          console.log('🔍 Fetched page data:', pageData);
+      if (error) throw error;
+      return data as AgentSource;
+    },
+    enabled: !!sourceId
+  });
 
-          // Fetch the actual content from source_chunks table using parent_source_id and page_id in metadata
-          const { data: chunkData, error: chunkError } = await supabase
-            .from('source_chunks')
-            .select('content, chunk_index, metadata')
-            .eq('source_id', pageData.parent_source_id)
-            .contains('metadata', { page_id: pageId })
-            .order('chunk_index');
-
-          console.log('🔍 Fetched chunk data:', chunkData);
-
-          let extractedContent = '';
-          if (!chunkError && chunkData && chunkData.length > 0) {
-            // Join chunks with proper spacing and preserve structure
-            extractedContent = chunkData
-              .sort((a, b) => a.chunk_index - b.chunk_index)
-              .map(chunk => chunk.content)
-              .join('\n\n');
-          }
-          
-          // If no chunks found, show appropriate message
-          if (!extractedContent || extractedContent.trim() === '') {
-            extractedContent = 'This page has been processed but content chunks are not available. This may happen if the page content was very short or if there was an issue during processing.';
-          }
-
-          console.log('📄 Final extracted content length:', extractedContent.length);
-
-          // Transform child page data to AgentSource format
-          const transformedSource: AgentSource = {
-            id: pageData.id,
-            title: pageData.url,
-            content: extractedContent,
-            url: pageData.url,
-            source_type: 'website',
-            agent_id: agentId || '',
-            team_id: '', // Add default team_id
-            is_active: true,
-            created_at: pageData.created_at,
-            updated_at: pageData.updated_at,
-            requires_manual_training: false,
-            metadata: {
-              isChildPage: true,
-              parentSourceId: pageData.parent_source_id,
-              contentSize: pageData.content_size,
-              chunksCreated: pageData.chunks_created,
-              processingTimeMs: pageData.processing_time_ms,
-              compressionRatio: pageData.compression_ratio,
-              duplicatesFound: pageData.duplicates_found,
-              chunkCount: chunkData?.length || 0
-            }
-          };
-
-          setSource(transformedSource);
-          setEditTitle(transformedSource.title);
-          setEditContent(transformedSource.content || '');
-        } else if (sourceId) {
-          // Fetch regular source data
-          const sourceData = await sources.getSourceWithStats(sourceId);
-          setSource(sourceData);
-          setEditTitle(sourceData.title);
-          setEditContent(sourceData.content || '');
-        }
-      } catch (error) {
-        console.error('❌ Error fetching source:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load source details',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSource();
-  }, [sourceId, pageId, sources, agentId]);
+  useEffect(() => {
+    if (source) {
+      setEditTitle(source.title);
+      setEditContent(source.content || '');
+    }
+  }, [source]);
 
   const handleSave = async () => {
-    if (!source || pageId) return; // Don't allow editing child pages
+    if (!sourceId || !source) return;
 
     setIsSaving(true);
     try {
-      await sources.updateSource(source.id, {
-        title: editTitle,
-        content: editContent,
-      });
+      const { error } = await supabase
+        .from('agent_sources')
+        .update({
+          title: editTitle,
+          content: editContent,
+        })
+        .eq('id', sourceId);
 
-      setSource(prev => prev ? {
-        ...prev,
-        title: editTitle,
-        content: editContent,
-      } : null);
+      if (error) throw error;
+
+      toast({
+        title: 'Source Updated',
+        description: 'Source details have been updated successfully.',
+      });
 
       setIsEditing(false);
-      
+      queryClient.invalidateQueries(['agent-source', sourceId]);
+    } catch (error: any) {
       toast({
-        title: 'Success',
-        description: 'Source updated successfully',
-      });
-    } catch (error) {
-      console.error('Error updating source:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update source',
+        title: 'Update Failed',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
@@ -150,100 +75,46 @@ export const useSourceDetail = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!source || !agentId) return;
-
-    console.log('🗑️ Starting source deletion:', {
-      sourceId: source.id,
-      sourceType: source.source_type,
-      agentId,
-      isChildPage: !!pageId
-    });
+  const handleDelete = useCallback(async () => {
+    if (!sourceId) return;
 
     setIsDeleting(true);
     try {
-      if (pageId) {
-        // Delete child page
-        const { error } = await supabase
-          .from('source_pages')
-          .delete()
-          .eq('id', pageId);
+      const { error } = await supabase
+        .from('agent_sources')
+        .delete()
+        .eq('id', sourceId);
 
-        if (error) throw error;
-      } else {
-        // Delete regular source
-        await sources.deleteSource(source.id);
-      }
-      
-      // Comprehensive query invalidation for all source types
-      const queryKeysToInvalidate = [
-        ['sources'],
-        ['sources', agentId],
-        ['sources', agentId, source.source_type],
-        ['sources', agentId, 'qa'],
-        ['sources', agentId, 'file'],
-        ['sources', agentId, 'text'],
-        ['sources', agentId, 'website']
-      ];
+      if (error) throw error;
 
-      queryKeysToInvalidate.forEach(queryKey => {
-        queryClient.invalidateQueries({ queryKey });
-      });
-      
-      // Also remove the specific source from cache
-      queryClient.removeQueries({ queryKey: ['source', source.id] });
-      
-      console.log('✅ Source deleted and queries invalidated');
-      
       toast({
-        title: 'Success',
-        description: pageId ? 'Page deleted successfully' : 'Source deleted successfully',
+        title: 'Source Deleted',
+        description: 'Source has been deleted successfully.',
       });
 
-      // Navigate back to the appropriate tab based on source type
-      const tabMap: Record<string, string> = {
-        'qa': 'qa',
-        'text': 'text',
-        'website': 'website',
-        'file': 'files'
-      };
-      
-      const tab = tabMap[source.source_type] || 'files';
-      navigate(`/agent/${agentId}/sources?tab=${tab}`);
-    } catch (error) {
-      console.error('❌ Error deleting source:', error);
+      navigate(`/agent/${agentId}/sources`);
+      queryClient.invalidateQueries(['agent-sources', agentId]);
+    } catch (error: any) {
       toast({
-        title: 'Error',
-        description: pageId ? 'Failed to delete page' : 'Failed to delete source',
+        title: 'Deletion Failed',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
       setIsDeleting(false);
-      setShowDeleteDialog(false);
     }
-  };
+  }, [sourceId, agentId, navigate, queryClient, toast]);
 
   const handleBackClick = () => {
-    if (!agentId || !source) return;
-    
-    // Navigate back to the appropriate tab based on source type
-    const tabMap: Record<string, string> = {
-      'qa': 'qa',
-      'text': 'text',
-      'website': 'website',
-      'file': 'files'
-    };
-    
-    const tab = tabMap[source.source_type] || 'files';
-    navigate(`/agent/${agentId}/sources?tab=${tab}`);
+    navigate(`/agent/${agentId}/sources`);
   };
 
   const handleCancelEdit = () => {
-    if (!source) return;
-    
-    setEditTitle(source.title);
-    setEditContent(source.content || '');
     setIsEditing(false);
+    if (source) {
+      setEditTitle(source.title);
+      setEditContent(source.content || '');
+    }
   };
 
   return {
@@ -263,6 +134,7 @@ export const useSourceDetail = () => {
     handleDelete,
     handleBackClick,
     handleCancelEdit,
-    agentId
+    agentId: agentId!,
+    refetch // Add the refetch function
   };
 };

@@ -69,6 +69,7 @@ export const useOptimisticWebsiteCrawl = () => {
       const optimisticSource: OptimisticSource = {
         id: clientId,
         agent_id: agentId!,
+        team_id: 'temp-team-id', // Add the required team_id
         title: url,
         url: url,
         source_type: 'website',

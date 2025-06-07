@@ -25,6 +25,7 @@ export class AuditService {
     if (error) throw new Error(`Failed to log action: ${error.message}`);
     return {
       ...log,
+      ip_address: log.ip_address as string || null,
       old_values: log.old_values as Record<string, any> || undefined,
       new_values: log.new_values as Record<string, any> || undefined
     };
@@ -46,6 +47,7 @@ export class AuditService {
     if (error) throw new Error(`Failed to fetch team logs: ${error.message}`);
     return (logs || []).map(log => ({
       ...log,
+      ip_address: log.ip_address as string || null,
       old_values: log.old_values as Record<string, any> || undefined,
       new_values: log.new_values as Record<string, any> || undefined
     }));
@@ -67,6 +69,7 @@ export class AuditService {
     if (error) throw new Error(`Failed to fetch agent logs: ${error.message}`);
     return (logs || []).map(log => ({
       ...log,
+      ip_address: log.ip_address as string || null,
       old_values: log.old_values as Record<string, any> || undefined,
       new_values: log.new_values as Record<string, any> || undefined
     }));
@@ -94,6 +97,7 @@ export class AuditService {
     if (error) throw new Error(`Failed to fetch logs by action: ${error.message}`);
     return (logs || []).map(log => ({
       ...log,
+      ip_address: log.ip_address as string || null,
       old_values: log.old_values as Record<string, any> || undefined,
       new_values: log.new_values as Record<string, any> || undefined
     }));
@@ -118,6 +122,7 @@ export class AuditService {
 
     return (logs || []).map(log => ({
       ...log,
+      ip_address: log.ip_address as string || null,
       old_values: log.old_values as Record<string, any> || undefined,
       new_values: log.new_values as Record<string, any> || undefined
     }));

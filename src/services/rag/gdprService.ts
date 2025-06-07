@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { UserConsent } from "@/types/rag";
 
@@ -29,7 +28,10 @@ export class GDPRService {
       .single();
 
     if (error) throw new Error(`Failed to record consent: ${error.message}`);
-    return consent;
+    return {
+      ...consent,
+      ip_address: consent.ip_address as string || null
+    };
   }
 
   // Get user consents
@@ -46,7 +48,10 @@ export class GDPRService {
     const { data: consents, error } = await query;
 
     if (error) throw new Error(`Failed to fetch consents: ${error.message}`);
-    return consents || [];
+    return (consents || []).map(consent => ({
+      ...consent,
+      ip_address: consent.ip_address as string || null
+    }));
   }
 
   // Withdraw consent
@@ -62,7 +67,10 @@ export class GDPRService {
       .single();
 
     if (error) throw new Error(`Failed to withdraw consent: ${error.message}`);
-    return consent;
+    return {
+      ...consent,
+      ip_address: consent.ip_address as string || null
+    };
   }
 
   // Export user data
