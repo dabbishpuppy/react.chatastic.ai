@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AgentSourceService } from '@/services/rag/agentSourceService';
@@ -62,7 +61,7 @@ export const useWebsiteSubmission = () => {
 
       // Update status to crawling and trigger UI update
       await AgentSourceService.updateSource(source.id, {
-        crawl_status: 'crawling'
+        crawl_status: 'in_progress'
       });
 
       // Emit another update event
@@ -82,20 +81,29 @@ export const useWebsiteSubmission = () => {
 
         console.log('✅ Enhanced crawl initiated:', crawlResult);
 
-        // Update status to crawled when complete
-        await AgentSourceService.updateSource(source.id, {
-          crawl_status: 'crawled',
-          requires_manual_training: true // Needs training
-        });
+        // Poll for completion and trigger status aggregation
+        const pollForCompletion = async () => {
+          try {
+            console.log('🔄 Checking crawl status...');
+            
+            // Wait a bit before checking status
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            
+            // Trigger status aggregation to ensure parent status is updated
+            await EnhancedCrawlService.triggerStatusAggregation(source.id);
+            
+            // Emit update event
+            window.dispatchEvent(new CustomEvent('sourceUpdated', {
+              detail: { sourceId: source.id }
+            }));
+            
+          } catch (error) {
+            console.error('Error in completion polling:', error);
+          }
+        };
 
-        // Emit crawling completed event
-        ToastNotificationService.showCrawlingCompleted();
-        window.dispatchEvent(new CustomEvent('crawlCompleted', {
-          detail: { sourceId: source.id }
-        }));
-        window.dispatchEvent(new CustomEvent('sourceUpdated', {
-          detail: { sourceId: source.id }
-        }));
+        // Start polling in background
+        setTimeout(pollForCompletion, 10000); // Check after 10 seconds
 
       } catch (crawlError) {
         console.error('❌ Crawl failed:', crawlError);

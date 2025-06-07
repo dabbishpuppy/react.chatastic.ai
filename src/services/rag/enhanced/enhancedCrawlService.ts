@@ -78,7 +78,7 @@ export class EnhancedCrawlService {
       
       const { data, error } = await supabase.functions.invoke('process-source-pages');
       
-      // FIXED: Handle 409 responses as success (processing conflicts are normal)
+      // Handle 409 responses as success (processing conflicts are normal)
       if (error && (error.message?.includes('409') || error.status === 409)) {
         console.log('🔄 Source page processing conflict resolved - normal operation');
         return { 
@@ -106,7 +106,7 @@ export class EnhancedCrawlService {
       
       return data;
     } catch (error) {
-      // FIXED: Filter out 409 errors from being thrown
+      // Filter out 409 errors from being thrown
       if (error.message?.includes('409') || error.status === 409) {
         console.log('🔄 Source page processing conflict resolved in catch block - normal operation');
         return { 
@@ -129,6 +129,33 @@ export class EnhancedCrawlService {
         message: 'Processing completed with warnings',
         warning: error.message 
       };
+    }
+  }
+
+  // Add method to trigger status aggregation manually
+  static async triggerStatusAggregation(parentSourceId: string) {
+    try {
+      const { supabase } = await import('../../../integrations/supabase/client');
+      
+      console.log(`🔄 Manually triggering status aggregation for parent: ${parentSourceId}`);
+      
+      const { data, error } = await supabase.functions.invoke('status-aggregator', {
+        body: {
+          parentSourceId,
+          eventType: 'manual_aggregation'
+        }
+      });
+      
+      if (error) {
+        console.error('Error triggering status aggregation:', error);
+        throw error;
+      }
+      
+      console.log('✅ Status aggregation triggered successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Failed to trigger status aggregation:', error);
+      throw error;
     }
   }
 }

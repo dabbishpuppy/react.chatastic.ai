@@ -1,4 +1,3 @@
-
 import { ParentSource, SourcePage } from './types.ts';
 
 export class StatusCalculator {
@@ -16,26 +15,26 @@ export class StatusCalculator {
     const metadata = parentSource.metadata || {};
 
     console.log(`🔍 Status calculation - eventType: ${eventType}, current status: ${status}, isRecrawling: ${isRecrawling}`);
+    console.log(`📊 Job stats - total: ${totalJobs}, completed: ${completedJobs}, failed: ${failedJobs}, pending: ${pendingJobs}, inProgress: ${inProgressJobs}`);
 
-    // Special handling for training completion events - FIXED: Handle both event types
+    // Special handling for training completion events
     if (eventType === 'training_completion_metadata_update' || 
         eventType === 'training_completed' || 
         eventType === 'training_complete') {
       console.log('🎓 Training completion event detected - setting to trained status');
       
-      // For training completion, always set to 'trained' regardless of current status
       if (metadata.training_completed_at || metadata.last_trained_at) {
         console.log('✅ Setting status to trained after training completion');
         return 'trained';
       }
       
-      // If training metadata exists but status isn't updated yet, set to trained
       if (status === 'training' || status === 'ready_for_training' || status === 'completed') {
         console.log('🎓 Setting status to trained based on training completion event');
         return 'trained';
       }
     }
 
+    // Handle recrawling logic
     if (isRecrawling) {
       console.log('🔄 Processing recrawl logic...');
       
@@ -53,21 +52,36 @@ export class StatusCalculator {
           status = 'failed';
           console.log('❌ All recrawl jobs failed, setting to failed');
         }
-      } else {
-        status = 'recrawling';
-        console.log('🔄 Default case during recrawl, maintaining recrawling status');
       }
     } else {
+      // Handle normal crawling logic
       console.log('📝 Processing normal crawl logic...');
       
       if (totalJobs === 0) {
-        status = 'pending';
-      } else if (completedJobs === totalJobs) {
+        // No jobs yet, keep current status or set to pending
+        status = status === 'pending' ? 'pending' : status;
+        console.log(`📝 No jobs found, status: ${status}`);
+      } else if (completedJobs === totalJobs && totalJobs > 0) {
+        // All jobs completed successfully
         status = 'ready_for_training';
-      } else if (completedJobs + failedJobs === totalJobs) {
-        status = 'ready_for_training';
+        console.log('✅ All jobs completed successfully, setting to ready_for_training');
+      } else if (completedJobs + failedJobs === totalJobs && totalJobs > 0) {
+        // All jobs are done (some may have failed)
+        if (completedJobs > 0) {
+          status = 'ready_for_training';
+          console.log('✅ All jobs processed (some completed), setting to ready_for_training');
+        } else {
+          status = 'failed';
+          console.log('❌ All jobs failed, setting to failed');
+        }
       } else if (inProgressJobs > 0 || completedJobs > 0) {
+        // Some jobs are in progress or completed, but not all done yet
         status = 'in_progress';
+        console.log(`🔄 Jobs in progress (completed: ${completedJobs}, inProgress: ${inProgressJobs}), setting to in_progress`);
+      } else if (pendingJobs > 0) {
+        // Jobs are pending but none started yet
+        status = 'pending';
+        console.log('⏳ Jobs pending, setting to pending');
       }
     }
 
