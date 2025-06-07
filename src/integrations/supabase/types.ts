@@ -2490,6 +2490,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_status_transition: {
+        Args: {
+          current_status: string
+          new_status: string
+          resource_type: string
+        }
+        Returns: boolean
+      }
       vector_avg: {
         Args: { "": number[] }
         Returns: string

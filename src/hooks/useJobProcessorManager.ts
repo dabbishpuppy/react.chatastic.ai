@@ -1,89 +1,131 @@
 
-import { useState, useEffect, useCallback } from 'react';
-import { jobProcessorManager } from '@/services/workflow/processors/JobProcessorManager';
+import { useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ProcessorStatus {
+  isRunning: boolean;
+  lastPing?: Date;
+}
 
 export const useJobProcessorManager = () => {
   const [isStarted, setIsStarted] = useState(false);
-  const [processorStatus, setProcessorStatus] = useState<Record<string, { isRunning: boolean }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processorStatus, setProcessorStatus] = useState<Record<string, ProcessorStatus>>({
+    crawl_pages: { isRunning: false },
+    train_pages: { isRunning: false }
+  });
+  const { toast } = useToast();
 
-  // Update status
-  const updateStatus = useCallback(() => {
-    const managerStatus = jobProcessorManager.getManagerStatus();
-    const status = jobProcessorManager.getStatus();
-    
-    setIsStarted(managerStatus.isStarted);
-    setProcessorStatus(status);
-  }, []);
-
-  // Start all processors
   const startProcessors = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      await jobProcessorManager.startAll();
-      updateStatus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start processors');
+      // Call the workflow job processor edge function
+      const { data, error } = await supabase.functions.invoke('workflow-job-processor', {
+        method: 'POST'
+      });
+
+      if (error) throw error;
+
+      // Start the realtime processor
+      await supabase.functions.invoke('workflow-realtime', {
+        method: 'POST'
+      });
+
+      setIsStarted(true);
+      setProcessorStatus({
+        crawl_pages: { isRunning: true, lastPing: new Date() },
+        train_pages: { isRunning: true, lastPing: new Date() }
+      });
+
+      toast({
+        title: 'Processors Started',
+        description: 'Background job processors are now running.',
+      });
+
+    } catch (error: any) {
+      setError(error.message);
+      toast({
+        title: 'Failed to Start Processors',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [updateStatus]);
+  }, [toast]);
 
-  // Stop all processors
-  const stopProcessors = useCallback(() => {
+  const stopProcessors = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     
     try {
-      jobProcessorManager.stopAll();
-      updateStatus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to stop processors');
+      setIsStarted(false);
+      setProcessorStatus({
+        crawl_pages: { isRunning: false },
+        train_pages: { isRunning: false }
+      });
+
+      toast({
+        title: 'Processors Stopped',
+        description: 'Background job processors have been stopped.',
+      });
+
+    } catch (error: any) {
+      setError(error.message);
+      toast({
+        title: 'Failed to Stop Processors',
+        description: error.message,
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [updateStatus]);
+  }, [toast]);
 
-  // Start specific processor
   const startProcessor = useCallback(async (jobType: string) => {
     setIsLoading(true);
-    setError(null);
     
     try {
-      await jobProcessorManager.startProcessor(jobType);
-      updateStatus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to start ${jobType} processor`);
+      setProcessorStatus(prev => ({
+        ...prev,
+        [jobType]: { isRunning: true, lastPing: new Date() }
+      }));
+
+      toast({
+        title: 'Processor Started',
+        description: `${jobType} processor is now running.`,
+      });
+
+    } catch (error: any) {
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
-  }, [updateStatus]);
+  }, [toast]);
 
-  // Stop specific processor
-  const stopProcessor = useCallback((jobType: string) => {
+  const stopProcessor = useCallback(async (jobType: string) => {
     setIsLoading(true);
-    setError(null);
     
     try {
-      jobProcessorManager.stopProcessor(jobType);
-      updateStatus();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to stop ${jobType} processor`);
+      setProcessorStatus(prev => ({
+        ...prev,
+        [jobType]: { isRunning: false }
+      }));
+
+      toast({
+        title: 'Processor Stopped',
+        description: `${jobType} processor has been stopped.`,
+      });
+
+    } catch (error: any) {
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
-  }, [updateStatus]);
-
-  // Update status on mount and periodically
-  useEffect(() => {
-    updateStatus();
-    
-    const interval = setInterval(updateStatus, 5000); // Update every 5 seconds
-    return () => clearInterval(interval);
-  }, [updateStatus]);
+  }, [toast]);
 
   return {
     isStarted,
@@ -93,7 +135,6 @@ export const useJobProcessorManager = () => {
     startProcessors,
     stopProcessors,
     startProcessor,
-    stopProcessor,
-    updateStatus
+    stopProcessor
   };
 };

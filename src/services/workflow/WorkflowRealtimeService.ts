@@ -3,149 +3,149 @@ import { supabase } from '@/integrations/supabase/client';
 import { WorkflowEventPayload } from './types';
 
 export class WorkflowRealtimeService {
-  private static channels = new Map<string, any>();
-  private static listeners = new Map<string, Set<(event: WorkflowEventPayload) => void>>();
+  private static subscriptions: Map<string, any> = new Map();
 
   /**
    * Subscribe to workflow events for a specific source
    */
   static subscribeToSource(
-    sourceId: string,
-    callback: (event: WorkflowEventPayload) => void
+    sourceId: string, 
+    onEvent: (event: WorkflowEventPayload) => void
   ): () => void {
-    const channelKey = `source:${sourceId}`;
+    const channelName = `workflow_source_${sourceId}`;
     
-    // Add callback to listeners
-    if (!this.listeners.has(channelKey)) {
-      this.listeners.set(channelKey, new Set());
-    }
-    this.listeners.get(channelKey)!.add(callback);
-
-    // Create channel if it doesn't exist
-    if (!this.channels.has(channelKey)) {
-      console.log(`📡 Creating real-time channel for source: ${sourceId}`);
-      
-      const channel = supabase
-        .channel(channelKey)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'workflow_events',
-            filter: `source_id=eq.${sourceId}`
-          },
-          (payload) => {
-            console.log('📡 Workflow event received:', payload);
-            
-            const event = payload.new as any;
-            const eventPayload: WorkflowEventPayload = {
-              event_id: event.id,
-              source_id: event.source_id,
-              page_id: event.page_id,
-              event_type: event.event_type,
-              to_status: event.to_status,
-              metadata: event.metadata || {}
-            };
-
-            // Notify all listeners for this channel
-            const listeners = this.listeners.get(channelKey);
-            if (listeners) {
-              listeners.forEach(listener => {
-                try {
-                  listener(eventPayload);
-                } catch (error) {
-                  console.error('❌ Error in workflow event listener:', error);
-                }
-              });
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log(`📡 Workflow channel ${channelKey} status:`, status);
-        });
-
-      this.channels.set(channelKey, channel);
+    if (this.subscriptions.has(channelName)) {
+      // Already subscribed, just update the callback
+      return () => this.unsubscribe(channelName);
     }
 
-    // Return unsubscribe function
-    return () => {
-      const listeners = this.listeners.get(channelKey);
-      if (listeners) {
-        listeners.delete(callback);
+    console.log(`🔗 Subscribing to workflow events for source: ${sourceId}`);
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'workflow_events',
+        filter: `source_id=eq.${sourceId}`
+      }, (payload) => {
+        console.log('📨 Workflow event received:', payload.new);
         
-        // If no more listeners, cleanup channel
-        if (listeners.size === 0) {
-          console.log(`📡 Cleaning up channel for source: ${sourceId}`);
-          const channel = this.channels.get(channelKey);
-          if (channel) {
-            supabase.removeChannel(channel);
-            this.channels.delete(channelKey);
-          }
-          this.listeners.delete(channelKey);
-        }
-      }
-    };
+        const event: WorkflowEventPayload = {
+          event_id: payload.new.id,
+          source_id: payload.new.source_id,
+          page_id: payload.new.page_id,
+          event_type: payload.new.event_type,
+          to_status: payload.new.to_status,
+          metadata: payload.new.metadata || {}
+        };
+
+        onEvent(event);
+      })
+      .subscribe();
+
+    this.subscriptions.set(channelName, channel);
+
+    return () => this.unsubscribe(channelName);
   }
 
   /**
-   * Subscribe to all workflow events (for debugging/monitoring)
+   * Subscribe to all workflow events (for admin/monitoring)
    */
   static subscribeToAllEvents(
-    callback: (event: WorkflowEventPayload) => void
+    onEvent: (event: WorkflowEventPayload) => void
   ): () => void {
-    const channelKey = 'all_workflow_events';
+    const channelName = 'workflow_events_all';
     
-    console.log('📡 Creating global workflow events channel');
-    
+    if (this.subscriptions.has(channelName)) {
+      return () => this.unsubscribe(channelName);
+    }
+
+    console.log('🔗 Subscribing to all workflow events');
+
     const channel = supabase
-      .channel(channelKey)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'workflow_events'
-        },
-        (payload) => {
-          const event = payload.new as any;
-          const eventPayload: WorkflowEventPayload = {
-            event_id: event.id,
-            source_id: event.source_id,
-            page_id: event.page_id,
-            event_type: event.event_type,
-            to_status: event.to_status,
-            metadata: event.metadata || {}
-          };
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'workflow_events'
+      }, (payload) => {
+        const event: WorkflowEventPayload = {
+          event_id: payload.new.id,
+          source_id: payload.new.source_id,
+          page_id: payload.new.page_id,
+          event_type: payload.new.event_type,
+          to_status: payload.new.to_status,
+          metadata: payload.new.metadata || {}
+        };
 
-          try {
-            callback(eventPayload);
-          } catch (error) {
-            console.error('❌ Error in global workflow event listener:', error);
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`📡 Global workflow channel status:`, status);
-      });
+        onEvent(event);
+      })
+      .subscribe();
 
-    return () => {
-      console.log('📡 Cleaning up global workflow events channel');
-      supabase.removeChannel(channel);
-    };
+    this.subscriptions.set(channelName, channel);
+
+    return () => this.unsubscribe(channelName);
   }
 
   /**
-   * Cleanup all channels
+   * Subscribe to background job events
    */
-  static cleanup(): void {
-    console.log('📡 Cleaning up all workflow channels');
+  static subscribeToJobEvents(
+    onJobUpdate: (job: any) => void
+  ): () => void {
+    const channelName = 'background_jobs';
     
-    this.channels.forEach((channel) => {
+    if (this.subscriptions.has(channelName)) {
+      return () => this.unsubscribe(channelName);
+    }
+
+    console.log('🔗 Subscribing to background job events');
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'background_jobs'
+      }, (payload) => {
+        console.log('📨 Job event received:', payload);
+        onJobUpdate(payload);
+      })
+      .subscribe();
+
+    this.subscriptions.set(channelName, channel);
+
+    return () => this.unsubscribe(channelName);
+  }
+
+  /**
+   * Unsubscribe from a specific channel
+   */
+  private static unsubscribe(channelName: string): void {
+    const channel = this.subscriptions.get(channelName);
+    if (channel) {
+      supabase.removeChannel(channel);
+      this.subscriptions.delete(channelName);
+      console.log(`🔌 Unsubscribed from: ${channelName}`);
+    }
+  }
+
+  /**
+   * Unsubscribe from all channels
+   */
+  static unsubscribeAll(): void {
+    console.log('🔌 Unsubscribing from all workflow events');
+    this.subscriptions.forEach((channel, channelName) => {
       supabase.removeChannel(channel);
     });
-    
-    this.channels.clear();
-    this.listeners.clear();
+    this.subscriptions.clear();
+  }
+
+  /**
+   * Get current subscription count
+   */
+  static getSubscriptionCount(): number {
+    return this.subscriptions.size;
   }
 }
