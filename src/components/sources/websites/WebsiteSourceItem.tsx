@@ -46,7 +46,15 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   // Check if this is a parent source (no parent_source_id)
   const isParentSource = !source.parent_source_id;
-  const hasChildSources = realtimeChildPages && realtimeChildPages.length > 0;
+  
+  // For parent sources, show expand button if either:
+  // 1. We have loaded child pages, OR
+  // 2. It's a parent source (could potentially have children)
+  const hasChildSources = isParentSource && (
+    (realtimeChildPages && realtimeChildPages.length > 0) ||
+    // Show expand button for parent sources even if children haven't loaded yet
+    isParentSource
+  );
 
   const handleToggleExpanded = () => {
     setIsExpanded(!isExpanded);
