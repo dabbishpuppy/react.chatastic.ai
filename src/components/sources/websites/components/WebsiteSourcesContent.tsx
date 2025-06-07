@@ -10,8 +10,8 @@ interface WebsiteSourcesContentProps {
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
   onRecrawl: (source: AgentSource) => void;
-  isSelected: (id: string) => boolean;
-  toggleItem: (id: string) => void;
+  isSelected: (sourceId: string) => boolean;
+  toggleItem: (sourceId: string) => void;
 }
 
 const WebsiteSourcesContent: React.FC<WebsiteSourcesContentProps> = ({
@@ -45,28 +45,28 @@ const WebsiteSourcesContent: React.FC<WebsiteSourcesContentProps> = ({
   }
 
   return (
-    <div>
+    <div className="divide-y divide-gray-100">
       {sources.map((source) => {
-        console.log(`🔍 DEBUG: Rendering source ${source.id}:`, {
+        console.log('🔍 DEBUG: Rendering source', source.id, ':', {
           title: source.title,
           pending_deletion: source.pending_deletion,
           is_excluded: source.is_excluded,
           timestamp: new Date().toISOString()
         });
+
+        const childSources = getChildSources(source.id);
         
         return (
           <WebsiteSourceItem
             key={source.id}
             source={source}
-            childSources={getChildSources(source.id)}
+            childSources={childSources}
             onEdit={onEdit}
             onExclude={onExclude}
             onDelete={onDelete}
             onRecrawl={onRecrawl}
             isSelected={isSelected(source.id)}
-            onSelectionChange={(selected) => {
-              toggleItem(source.id);
-            }}
+            onSelectionChange={(selected) => toggleItem(source.id)}
           />
         );
       })}

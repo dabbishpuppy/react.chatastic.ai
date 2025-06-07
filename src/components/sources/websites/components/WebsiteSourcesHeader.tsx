@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 
 interface WebsiteSourcesHeaderProps {
@@ -15,9 +14,11 @@ const WebsiteSourcesHeader: React.FC<WebsiteSourcesHeaderProps> = ({
   onSelectAll
 }) => {
   return (
-    <CardHeader className="pb-4">
+    <div className="p-4 border-b border-gray-200">
       <div className="flex items-center justify-between">
-        <CardTitle className="text-lg">Website Sources</CardTitle>
+        <h3 className="text-lg font-semibold text-gray-900">
+          Website Sources ({sourcesCount})
+        </h3>
         {sourcesCount > 0 && (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -38,7 +39,7 @@ const WebsiteSourcesHeader: React.FC<WebsiteSourcesHeaderProps> = ({
           </div>
         )}
       </div>
-    </CardHeader>
+    </div>
   );
 };
 

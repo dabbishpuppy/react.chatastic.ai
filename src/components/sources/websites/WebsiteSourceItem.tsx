@@ -1,22 +1,26 @@
 
 import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit2, Eye, EyeOff, Trash2, RotateCcw, ExternalLink, ChevronDown, ChevronRight, Calendar, Link, Database } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import WebsiteSourceStatus from './components/WebsiteSourceStatus';
-import WebsiteSourceStatusBadges from './components/WebsiteSourceStatusBadges';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  ChevronDown, 
+  ChevronRight, 
+  Globe, 
+  Clock, 
+  CheckCircle, 
+  XCircle,
+  AlertCircle,
+  ExternalLink,
+  Edit2,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Trash2
+} from 'lucide-react';
 import WebsiteChildSources from './components/WebsiteChildSources';
-import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
-import { formatDistanceToNow } from 'date-fns';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
@@ -39,77 +43,10 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   isSelected,
   onSelectionChange
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editUrl, setEditUrl] = useState(source.url || '');
-  const [isChildSourcesOpen, setIsChildSourcesOpen] = useState(false);
 
-  const handleEdit = () => {
-    if (isEditing) {
-      onEdit(source.id, editUrl);
-      setIsEditing(false);
-    } else {
-      setIsEditing(true);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditUrl(source.url || '');
-  };
-
-  const status = SimplifiedSourceStatusService.getSourceStatus(source);
-  const buttonState = SimplifiedSourceStatusService.determineButtonState(source);
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    
-    // DEBUG: Log the raw date values
-    console.log('🐛 DEBUG formatDate - Raw dateString:', JSON.stringify(dateString));
-    console.log('🐛 DEBUG formatDate - Type:', typeof dateString);
-    console.log('🐛 DEBUG formatDate - Length:', dateString.length);
-    
-    try {
-      const parsedDate = new Date(dateString);
-      console.log('🐛 DEBUG formatDate - Parsed date:', parsedDate);
-      console.log('🐛 DEBUG formatDate - Is valid:', !isNaN(parsedDate.getTime()));
-      
-      const formatted = formatDistanceToNow(parsedDate, { addSuffix: true });
-      console.log('🐛 DEBUG formatDate - Formatted result:', JSON.stringify(formatted));
-      
-      return formatted;
-    } catch (error) {
-      console.error('🐛 DEBUG formatDate - Error:', error);
-      return 'Invalid date';
-    }
-  };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    const size = bytes / Math.pow(k, i);
-    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
-    
-    return `${formattedSize} ${sizes[i]}`;
-  };
-
-  // Check if source has potential child sources based on links_count
-  const hasChildSources = (source.links_count || 0) > 0;
-
-  // Calculate total child source sizes for trained sources
-  const totalChildSize = React.useMemo(() => {
-    if (status === 'trained' && childSources.length > 0) {
-      return childSources.reduce((total, child) => {
-        return total + (child.total_content_size || 0);
-      }, 0);
-    }
-    return 0;
-  }, [status, childSources]);
-
-  // DEBUG: Log source data to identify the extra "0"
   console.log('🐛 DEBUG WebsiteSourceItem - Source data:', {
     id: source.id,
     title: source.title,
@@ -119,187 +56,255 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     created_at: JSON.stringify(source.created_at)
   });
 
-  return (
-    <div className="border-b border-gray-100 last:border-b-0">
-      <div className="flex items-start gap-3 p-3 hover:bg-gray-50">
-        {/* Selection checkbox */}
-        <Checkbox
-          checked={isSelected}
-          onCheckedChange={onSelectionChange}
-          className="mt-1"
-        />
+  const formatDate = (dateString: string | null | undefined) => {
+    console.log('🐛 DEBUG formatDate - Raw dateString:', JSON.stringify(dateString));
+    console.log('🐛 DEBUG formatDate - Type:', typeof dateString);
+    console.log('🐛 DEBUG formatDate - Length:', dateString?.length);
+    
+    if (!dateString) return 'Never';
+    
+    try {
+      const date = new Date(dateString);
+      console.log('🐛 DEBUG formatDate - Parsed date:', {
+        date,
+        isValid: !isNaN(date.getTime()),
+        iso: date.toISOString()
+      });
+      
+      if (isNaN(date.getTime())) return 'Invalid date';
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
 
-        {/* Main content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
+      let result;
+      if (diffMins < 1) {
+        result = 'Just now';
+      } else if (diffMins < 60) {
+        result = `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+      } else if (diffHours < 24) {
+        result = `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      } else if (diffDays < 7) {
+        result = `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      } else {
+        result = date.toLocaleDateString();
+      }
+      
+      console.log('🐛 DEBUG formatDate - Formatted result:', result);
+      return result;
+    } catch (error) {
+      console.error('🐛 DEBUG formatDate - Error:', error);
+      return 'Invalid date';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+      case 'trained':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'in_progress':
+      case 'crawling':
+        return <Clock className="w-4 h-4 text-blue-500" />;
+      case 'failed':
+      case 'error':
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'pending':
+        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+      default:
+        return <Globe className="w-4 h-4 text-gray-500" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'completed': return 'Completed';
+      case 'trained': return 'Trained';
+      case 'in_progress': return 'In Progress';
+      case 'crawling': return 'Crawling';
+      case 'failed': return 'Failed';
+      case 'error': return 'Error';
+      case 'pending': return 'Pending';
+      default: return status || 'Unknown';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+      case 'trained':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'in_progress':
+      case 'crawling':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'failed':
+      case 'error':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (editUrl.trim() && editUrl !== source.url) {
+      onEdit(source.id, editUrl.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditUrl(source.url || '');
+    setIsEditing(false);
+  };
+
+  const displayUrl = source.url || source.title || 'No URL';
+  const hasChildren = childSources.length > 0;
+
+  return (
+    <Card className="border border-gray-200">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={onSelectionChange}
+            />
+            
+            {hasChildren && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="p-1 h-auto"
+              >
+                {isExpanded ? 
+                  <ChevronDown className="w-4 h-4" /> : 
+                  <ChevronRight className="w-4 h-4" />
+                }
+              </Button>
+            )}
+
             <div className="flex-1 min-w-0">
-              {/* Title only */}
+              <div className="flex items-center gap-2 mb-1">
+                {getStatusIcon(source.crawl_status || 'pending')}
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs ${getStatusColor(source.crawl_status || 'pending')}`}
+                >
+                  {getStatusText(source.crawl_status || 'pending')}
+                </Badge>
+                {source.is_excluded && (
+                  <Badge variant="secondary" className="text-xs">
+                    <EyeOff className="w-2 h-2 mr-1" />
+                    Excluded
+                  </Badge>
+                )}
+                {hasChildren && (
+                  <Badge variant="outline" className="text-xs">
+                    {childSources.length} pages
+                  </Badge>
+                )}
+              </div>
+              
               {isEditing ? (
-                <div className="space-y-2">
+                <div className="flex items-center gap-2">
                   <input
-                    type="url"
+                    type="text"
                     value={editUrl}
                     onChange={(e) => setEditUrl(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="Enter website URL"
+                    className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded"
                     autoFocus
                   />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleEdit}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                  </div>
+                  <Button size="sm" onClick={handleSaveEdit}>Save</Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit}>Cancel</Button>
                 </div>
               ) : (
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium text-gray-900 truncate text-sm">
-                      {source.title || source.url || 'Untitled'}
-                    </h3>
-                    {source.url && (
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Metadata with icons */}
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-3 text-xs text-gray-400">
-                  {/* 1. Crawled time first with Calendar icon */}
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
-                  </div>
-                  
-                  {/* 2. Links count with Link icon */}
-                  {source.links_count !== undefined && source.links_count > 0 && (
-                    <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <Link className="w-3 h-3" />
-                        <span>{source.links_count} links</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* 3. Child source sizes for trained sources with Database icon */}
-                  {status === 'trained' && totalChildSize > 0 && (
-                    <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <Database className="w-3 h-3" />
-                        <span>{formatBytes(totalChildSize)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Status badges and actions */}
-            <div className="flex items-center gap-2">
-              {/* Status badges */}
-              <WebsiteSourceStatusBadges
-                crawlStatus={status}
-                isExcluded={source.is_excluded || false}
-                linksCount={source.links_count || 0}
-                sourceId={source.id}
-                source={source}
-              />
-
-              {/* Actions menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit URL
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuItem onClick={() => onExclude(source)}>
-                    {source.is_excluded ? (
-                      <>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Include
-                      </>
-                    ) : (
-                      <>
-                        <EyeOff className="h-4 w-4 mr-2" />
-                        Exclude
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  
-                  {buttonState.canRecrawl && (
-                    <DropdownMenuItem onClick={() => onRecrawl(source)}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Recrawl
-                    </DropdownMenuItem>
-                  )}
-                  
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem 
-                    onClick={() => onDelete(source)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Child sources toggle - moved to right side of actions */}
-              {hasChildSources && (
-                <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      {isChildSourcesOpen ? (
-                        <ChevronDown className="h-3 w-3" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
+                <>
+                  <p className="font-medium text-gray-900 truncate" title={displayUrl}>
+                    {source.title || displayUrl}
+                  </p>
+                  <p className="text-sm text-gray-500 truncate">
+                    {displayUrl}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Updated {formatDate(source.updated_at)}
+                    {source.last_crawled_at && ` • Last crawled ${formatDate(source.last_crawled_at)}`}
+                  </p>
+                </>
               )}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Collapsible child sources (without the "Child Pages" text) */}
-      {hasChildSources && (
-        <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-          <CollapsibleContent>
-            <div className="ml-6 mr-3 mb-3">
-              <WebsiteChildSources
-                parentSourceId={source.id}
-                isCrawling={status === 'in_progress'}
-                onEdit={onEdit}
-                onExclude={onExclude}
-                onDelete={onDelete}
-                onRecrawl={onRecrawl}
-              />
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </div>
+          <div className="flex items-center gap-1 ml-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.open(displayUrl, '_blank')}
+              className="h-8 w-8 p-0"
+              title="Open URL"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+              className="h-8 w-8 p-0"
+              title="Edit URL"
+            >
+              <Edit2 className="w-3 h-3" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onExclude(source)}
+              className="h-8 w-8 p-0"
+              title={source.is_excluded ? 'Include' : 'Exclude'}
+            >
+              {source.is_excluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRecrawl(source)}
+              className="h-8 w-8 p-0"
+              title="Recrawl"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(source)}
+              className="h-8 w-8 p-0 text-red-600"
+              title="Delete"
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+
+        {isExpanded && hasChildren && (
+          <div className="mt-4">
+            <WebsiteChildSources
+              parentSourceId={source.id}
+              isCrawling={source.crawl_status === 'in_progress' || source.crawl_status === 'crawling'}
+              onEdit={onEdit}
+              onExclude={onExclude}
+              onDelete={onDelete}
+              onRecrawl={onRecrawl}
+            />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
