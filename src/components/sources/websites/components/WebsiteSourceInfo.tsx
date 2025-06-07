@@ -1,10 +1,11 @@
-
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Calendar, Link, Database } from 'lucide-react';
+import { ExternalLink, Calendar, Link, Database, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceStatusBadges from './WebsiteSourceStatusBadges';
+import { useStatusAggregationTrigger } from '@/hooks/useStatusAggregationTrigger';
 
 interface WebsiteSourceInfoProps {
   title?: string;
@@ -34,6 +35,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   source,
   sourceId
 }) => {
+  const { triggerStatusAggregation, isTriggering } = useStatusAggregationTrigger();
+
   const formatUrl = (url: string) => {
     try {
       const urlObj = new URL(url);
@@ -85,6 +88,12 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
     ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)
     : 0;
 
+  const handleRefreshMetadata = async () => {
+    if (sourceId && !isChild) {
+      await triggerStatusAggregation(sourceId);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between">
@@ -106,6 +115,18 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             linksCount={linksCount}
             sourceId={sourceId}
           />
+          {!isChild && sourceId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshMetadata}
+              disabled={isTriggering}
+              className="h-6 w-6 p-0"
+              title="Refresh metadata"
+            >
+              <RefreshCw className={`h-3 w-3 ${isTriggering ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
         </div>
       </div>
 
