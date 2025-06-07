@@ -7,6 +7,13 @@ export interface StreamingOptions {
   maxTokens?: number;
 }
 
+export interface StreamingChunk {
+  id: string;
+  delta: string;
+  isComplete: boolean;
+  timestamp: number;
+}
+
 export interface StreamData {
   id: string;
   content: string;
@@ -230,5 +237,21 @@ export class StreamingHandler {
     }
 
     return cleaned;
+  }
+
+  /**
+   * Abort all active streams
+   */
+  static abortAllStreams(): number {
+    const count = this.activeStreams.size;
+    
+    for (const [streamId, controller] of this.activeStreams.entries()) {
+      controller.abort();
+    }
+    
+    this.activeStreams.clear();
+    this.streamData.clear();
+    
+    return count;
   }
 }

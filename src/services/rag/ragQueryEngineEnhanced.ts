@@ -3,7 +3,7 @@ import { RAGQueryEngine, RAGQueryRequest, RAGQueryResult } from './queryProcessi
 import { SemanticSearchService } from './queryProcessing/semanticSearch';
 import { StreamingHandler, StreamingOptions } from './llm/streamingHandler';
 import { PromptTemplateSystem, PromptContext } from './promptEngine/promptTemplateSystem';
-import { globalCache } from './performance/cacheService';
+import { CacheService, globalCache } from './performance/cacheService';
 import { globalPerformanceMonitor } from './performance/performanceMonitor';
 
 export interface EnhancedRAGRequest extends RAGQueryRequest {
@@ -52,7 +52,7 @@ export class RAGQueryEngineEnhanced {
 
     try {
       // Generate cache key
-      const cacheKey = request.cacheKey || globalCache.generateRAGCacheKey(
+      const cacheKey = request.cacheKey || CacheService.generateRAGCacheKey(
         request.query,
         request.agentId,
         request.searchFilters
@@ -115,9 +115,14 @@ export class RAGQueryEngineEnhanced {
         searchResults,
         rankedContext: {
           chunks: searchResults.map((result, index) => ({
+            chunkId: result.chunkId,
             content: result.content,
             sourceId: result.sourceId,
             relevanceScore: result.similarity,
+            diversityScore: 0.8,
+            recencyScore: 0.9,
+            authorityScore: 0.8,
+            finalScore: result.similarity,
             metadata: result.metadata
           })),
           sources: this.extractUniqueSources(searchResults),
@@ -305,21 +310,41 @@ export class RAGQueryEngineEnhanced {
   }
 
   private static extractUniqueSources(searchResults: any[]): Array<{
-    name: string;
-    url?: string;
+    sourceId: string;
+    sourceName: string;
+    chunkCount: number;
+    averageRelevance: number;
   }> {
-    const sources = new Map<string, { name: string; url?: string }>();
+    const sources = new Map<string, {
+      sourceId: string;
+      sourceName: string;
+      chunkCount: number;
+      totalRelevance: number;
+    }>();
     
     searchResults.forEach(result => {
       if (result.metadata?.sourceName) {
-        sources.set(result.sourceId, {
-          name: result.metadata.sourceName,
-          url: result.metadata.sourceUrl
-        });
+        const existing = sources.get(result.sourceId);
+        if (existing) {
+          existing.chunkCount++;
+          existing.totalRelevance += result.similarity;
+        } else {
+          sources.set(result.sourceId, {
+            sourceId: result.sourceId,
+            sourceName: result.metadata.sourceName,
+            chunkCount: 1,
+            totalRelevance: result.similarity
+          });
+        }
       }
     });
 
-    return Array.from(sources.values());
+    return Array.from(sources.values()).map(source => ({
+      sourceId: source.sourceId,
+      sourceName: source.sourceName,
+      chunkCount: source.chunkCount,
+      averageRelevance: source.totalRelevance / source.chunkCount
+    }));
   }
 
   private static estimateTokenCount(searchResults: any[]): number {

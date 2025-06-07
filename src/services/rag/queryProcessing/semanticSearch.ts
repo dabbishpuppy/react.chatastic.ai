@@ -12,13 +12,14 @@ export interface SemanticSearchResult {
     sourceType: string;
     chunkIndex: number;
     sourceUrl?: string;
+    createdAt?: Date;
   };
 }
 
 export interface SearchFilters {
   maxResults?: number;
   minSimilarity?: number;
-  sourceTypes?: string[];
+  sourceTypes?: Array<'text' | 'file' | 'website' | 'qa'>;
   dateRange?: {
     start: Date;
     end: Date;
@@ -50,7 +51,7 @@ export class SemanticSearchService {
           maxResults: filters.maxResults || 20,
           minSimilarity: filters.minSimilarity || 0.7,
           agentId,
-          sourceTypes: filters.sourceTypes
+          sourceTypes: filters.sourceTypes?.map(t => t as string) || []
         }
       );
 
@@ -68,7 +69,8 @@ export class SemanticSearchService {
               sourceName: metadata.sourceName || 'Unknown Source',
               sourceType: metadata.sourceType || 'text',
               chunkIndex: metadata.chunkIndex || 0,
-              sourceUrl: metadata.sourceUrl
+              sourceUrl: metadata.sourceUrl,
+              createdAt: metadata.createdAt
             }
           };
         })
@@ -102,6 +104,7 @@ export class SemanticSearchService {
           content,
           chunk_index,
           metadata,
+          created_at,
           agent_sources!inner (
             id,
             title,
@@ -134,7 +137,8 @@ export class SemanticSearchService {
           sourceName: item.agent_sources.title,
           sourceType: item.agent_sources.source_type,
           chunkIndex: item.chunk_index,
-          sourceUrl: item.agent_sources.url
+          sourceUrl: item.agent_sources.url,
+          createdAt: item.created_at ? new Date(item.created_at) : undefined
         }
       })) || [];
 
@@ -207,12 +211,14 @@ export class SemanticSearchService {
     sourceType: string;
     chunkIndex: number;
     sourceUrl?: string;
+    createdAt?: Date;
   }> {
     try {
       const { data: chunk } = await supabase
         .from('source_chunks')
         .select(`
           chunk_index,
+          created_at,
           agent_sources!inner (
             title,
             source_type,
@@ -226,7 +232,8 @@ export class SemanticSearchService {
         sourceName: chunk?.agent_sources?.title || 'Unknown',
         sourceType: chunk?.agent_sources?.source_type || 'text',
         chunkIndex: chunk?.chunk_index || 0,
-        sourceUrl: chunk?.agent_sources?.url
+        sourceUrl: chunk?.agent_sources?.url,
+        createdAt: chunk?.created_at ? new Date(chunk.created_at) : undefined
       };
     } catch (error) {
       console.error('Failed to enrich metadata:', error);

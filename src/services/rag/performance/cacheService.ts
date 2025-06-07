@@ -118,6 +118,23 @@ export class CacheService {
   }
 
   /**
+   * Clean up expired entries
+   */
+  cleanup(): number {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > entry.ttl) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+
+    return cleaned;
+  }
+
+  /**
    * Get cache statistics
    */
   getStats(): CacheStats {
