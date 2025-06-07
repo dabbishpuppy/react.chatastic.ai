@@ -13,9 +13,10 @@ export const useChildPageRealtimeStatus = ({
   parentSourceId, 
   initialStatus 
 }: UseChildPageRealtimeStatusProps) => {
-  const [status, setStatus] = useState(initialStatus);
+  const [rawStatus, setRawStatus] = useState(initialStatus);
   const [processingStatus, setProcessingStatus] = useState<string>('pending');
   const [parentRecrawlStatus, setParentRecrawlStatus] = useState<string>('');
+  const [lastStatusUpdate, setLastStatusUpdate] = useState<number>(Date.now());
 
   useEffect(() => {
     if (!pageId || !parentSourceId) return;
@@ -38,7 +39,7 @@ export const useChildPageRealtimeStatus = ({
       
       if (pageData) {
         console.log('📊 Initial page data:', pageData);
-        setStatus(pageData.status);
+        setRawStatus(pageData.status);
         setProcessingStatus(pageData.processing_status || 'pending');
       }
 
@@ -48,16 +49,18 @@ export const useChildPageRealtimeStatus = ({
         const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
                                   (metadata && metadata.is_recrawling === true);
         const newParentStatus = isParentRecrawling ? 'recrawling' : parentData.crawl_status || '';
-        console.log('📊 Parent recrawl status determined:', newParentStatus, { crawl_status: parentData.crawl_status, is_recrawling: metadata?.is_recrawling });
+        console.log('📊 Parent recrawl status determined:', newParentStatus);
         setParentRecrawlStatus(newParentStatus);
       }
+      
+      setLastStatusUpdate(Date.now());
     };
 
     fetchInitialStatus();
 
-    // Subscribe to child page changes
+    // Subscribe to child page changes with proper debouncing
     const pageChannel = supabase
-      .channel(`child-page-status-${pageId}`)
+      .channel(`child-page-realtime-${pageId}`)
       .on(
         'postgres_changes',
         {
@@ -68,17 +71,25 @@ export const useChildPageRealtimeStatus = ({
         },
         (payload) => {
           const updatedPage = payload.new as any;
-          console.log('📡 Child page status update:', updatedPage);
+          console.log('📡 Child page realtime update:', updatedPage);
           
-          setStatus(updatedPage.status);
+          // Debounce rapid updates
+          const now = Date.now();
+          if (now - lastStatusUpdate < 200) {
+            console.log('⏱️ Debouncing rapid update');
+            return;
+          }
+          
+          setRawStatus(updatedPage.status);
           setProcessingStatus(updatedPage.processing_status || 'pending');
+          setLastStatusUpdate(now);
         }
       )
       .subscribe();
 
-    // Subscribe to parent source changes for recrawl status
+    // Subscribe to parent source changes
     const parentChannel = supabase
-      .channel(`parent-recrawl-status-${parentSourceId}`)
+      .channel(`parent-recrawl-realtime-${parentSourceId}`)
       .on(
         'postgres_changes',
         {
@@ -89,19 +100,19 @@ export const useChildPageRealtimeStatus = ({
         },
         (payload) => {
           const updatedSource = payload.new as any;
-          console.log('📡 Parent source update for recrawl:', updatedSource);
+          console.log('📡 Parent source realtime update:', updatedSource);
           
           const metadata = updatedSource.metadata as Record<string, any> | null;
           const isParentRecrawling = updatedSource.crawl_status === 'recrawling' || 
                                     (metadata && metadata.is_recrawling === true);
           const newParentStatus = isParentRecrawling ? 'recrawling' : updatedSource.crawl_status || '';
-          console.log('📡 Parent status update - new recrawl status:', newParentStatus, { crawl_status: updatedSource.crawl_status, is_recrawling: metadata?.is_recrawling });
+          console.log('📡 Parent status realtime update:', newParentStatus);
           setParentRecrawlStatus(newParentStatus);
           
           // If parent training is completed and child is completed, mark as trained
-          if (updatedSource.crawl_status === 'trained' && status === 'completed') {
+          if (updatedSource.crawl_status === 'trained' && rawStatus === 'completed') {
             console.log('🎓 Parent training completed - updating child status to trained');
-            setStatus('trained');
+            setRawStatus('trained');
           }
         }
       )
@@ -112,13 +123,13 @@ export const useChildPageRealtimeStatus = ({
       supabase.removeChannel(pageChannel);
       supabase.removeChannel(parentChannel);
     };
-  }, [pageId, parentSourceId, status]);
+  }, [pageId, parentSourceId]);
 
-  // Determine display status based on processing state and parent recrawl status
+  // Determine display status with consistent logic
   const getDisplayStatus = () => {
-    console.log('🔍 Determining display status:', {
+    console.log('🔍 Determining realtime display status:', {
       parentRecrawlStatus,
-      status,
+      rawStatus,
       processingStatus,
       pageId
     });
@@ -136,27 +147,33 @@ export const useChildPageRealtimeStatus = ({
     }
 
     // PRIORITY 3: If child processing is completed (chunked) and parent is trained, show "Trained"
-    if (status === 'completed' && processingStatus === 'processed') {
+    if (rawStatus === 'completed' && processingStatus === 'processed') {
       console.log('🎓 Child processing completed - showing trained status');
       return 'trained';
     }
     
-    // PRIORITY 4: Return the current child status, ensuring it's a valid status
+    // PRIORITY 4: Return the current child status, ensuring it's valid
     const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'trained', 'recrawling'];
-    const finalStatus = validStatuses.includes(status) ? status : 'pending';
-    console.log('📊 Final status determined:', finalStatus, 'from original:', status);
+    const finalStatus = validStatuses.includes(rawStatus) ? rawStatus : 'pending';
+    console.log('📊 Final realtime status determined:', finalStatus, 'from original:', rawStatus);
     return finalStatus;
   };
 
   const displayStatus = getDisplayStatus();
   const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending' || displayStatus === 'recrawling';
 
-  console.log('🎯 Final hook result:', { displayStatus, isLoading, rawStatus: status, processingStatus, parentRecrawlStatus });
+  console.log('🎯 Final realtime hook result:', { 
+    displayStatus, 
+    isLoading, 
+    rawStatus, 
+    processingStatus, 
+    parentRecrawlStatus 
+  });
 
   return {
     displayStatus,
     isLoading,
-    rawStatus: status,
+    rawStatus,
     processingStatus
   };
 };
