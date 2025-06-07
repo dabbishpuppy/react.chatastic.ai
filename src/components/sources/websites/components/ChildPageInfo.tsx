@@ -32,7 +32,7 @@ const ChildPageInfo: React.FC<ChildPageInfoProps> = ({
     pageId
   });
 
-  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status);
+  console.log('ChildPageInfo - displayStatus:', displayStatus, 'originalStatus:', status, 'pageId:', pageId);
 
   return (
     <>
