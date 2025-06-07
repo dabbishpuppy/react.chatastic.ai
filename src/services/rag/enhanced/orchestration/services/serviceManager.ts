@@ -5,27 +5,29 @@ export class ServiceManager {
   private services = new Map<string, ServiceStatus>();
 
   addService(serviceName: string, initialStatus: ServiceStatus['status'] = 'stopped'): void {
-    const now = new Date().toISOString();
+    const now = new Date();
     
     this.services.set(serviceName, {
       name: serviceName,
       status: initialStatus,
       uptime: 0,
-      lastCheck: now,
-      health: initialStatus === 'running' ? 100 : 0
+      lastSeen: now,
+      health: initialStatus === 'running' ? 100 : 0,
+      errorCount: 0
     });
   }
 
   updateServiceStatus(serviceName: string, status: ServiceStatus['status']): void {
     const existing = this.services.get(serviceName);
-    const now = new Date().toISOString();
+    const now = new Date();
     
     this.services.set(serviceName, {
       name: serviceName,
       status,
       uptime: existing ? existing.uptime : 0,
-      lastCheck: now,
-      health: status === 'running' ? 100 : status === 'error' ? 0 : 50
+      lastSeen: now,
+      health: status === 'running' ? 100 : status === 'error' ? 0 : 50,
+      errorCount: existing ? existing.errorCount : 0
     });
   }
 

@@ -13,6 +13,13 @@ export class ConfigService {
     enableConnectionPooling: true,
     enableDatabaseOptimization: true,
     enableWorkerQueue: true,
+    maxRetries: 3,
+    healthCheckInterval: 30000,
+    alertThresholds: {
+      cpu: 80,
+      memory: 85,
+      errorRate: 5
+    }
   };
 
   static createConfig(userConfig: Partial<OrchestrationConfig> = {}): OrchestrationConfig {
