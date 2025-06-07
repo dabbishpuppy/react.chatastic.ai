@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { WorkflowCrawlIntegration } from '@/services/workflow/WorkflowCrawlIntegration';
 import { AgentSource } from '@/types/rag';
 
@@ -25,15 +25,15 @@ export const useWorkflowCrawlIntegration = () => {
     try {
       await WorkflowCrawlIntegration.initiateWebsiteCrawl(agentId, sourceId, url, options);
       toast({
-        title: 'Crawl Started',
-        description: 'Website crawl has been initiated successfully.',
+        title: "Crawl Started",
+        description: "Website crawling has been initiated successfully.",
       });
     } catch (error) {
       console.error('Error initiating crawl:', error);
       toast({
-        title: 'Crawl Failed',
-        description: 'Failed to start website crawl. Please try again.',
-        variant: 'destructive',
+        title: "Crawl Failed",
+        description: error instanceof Error ? error.message : "Failed to start crawl",
+        variant: "destructive",
       });
       throw error;
     } finally {
@@ -46,15 +46,15 @@ export const useWorkflowCrawlIntegration = () => {
     try {
       await WorkflowCrawlIntegration.initiateTraining(sourceId);
       toast({
-        title: 'Training Started',
-        description: 'Source training has been initiated successfully.',
+        title: "Training Started",
+        description: "Source training has been initiated successfully.",
       });
     } catch (error) {
       console.error('Error initiating training:', error);
       toast({
-        title: 'Training Failed',
-        description: 'Failed to start training. Please try again.',
-        variant: 'destructive',
+        title: "Training Failed",
+        description: error instanceof Error ? error.message : "Failed to start training",
+        variant: "destructive",
       });
       throw error;
     } finally {
@@ -67,15 +67,15 @@ export const useWorkflowCrawlIntegration = () => {
     try {
       await WorkflowCrawlIntegration.markSourceForRemoval(source);
       toast({
-        title: 'Source Marked for Removal',
-        description: 'Source has been marked for removal and will be processed in the background.',
+        title: "Source Marked for Removal",
+        description: "The source has been marked for removal and will be deleted shortly.",
       });
     } catch (error) {
       console.error('Error marking source for removal:', error);
       toast({
-        title: 'Removal Failed',
-        description: 'Failed to mark source for removal. Please try again.',
-        variant: 'destructive',
+        title: "Removal Failed",
+        description: error instanceof Error ? error.message : "Failed to mark source for removal",
+        variant: "destructive",
       });
       throw error;
     } finally {
@@ -88,15 +88,15 @@ export const useWorkflowCrawlIntegration = () => {
     try {
       await WorkflowCrawlIntegration.restoreSource(source);
       toast({
-        title: 'Source Restored',
-        description: 'Source has been restored successfully.',
+        title: "Source Restored",
+        description: "The source has been successfully restored.",
       });
     } catch (error) {
       console.error('Error restoring source:', error);
       toast({
-        title: 'Restore Failed',
-        description: 'Failed to restore source. Please try again.',
-        variant: 'destructive',
+        title: "Restore Failed",
+        description: error instanceof Error ? error.message : "Failed to restore source",
+        variant: "destructive",
       });
       throw error;
     } finally {

@@ -5,6 +5,8 @@ import { Loader2, AlertTriangle, CheckCircle, Clock, GraduationCap, RefreshCw } 
 import { supabase } from '@/integrations/supabase/client';
 import WebsiteSourceStatusRobust from './WebsiteSourceStatusRobust';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
+import { WorkflowIntegrationService } from '@/services/workflow/WorkflowIntegrationService';
+import WorkflowStatusBadge from './WorkflowStatusBadge';
 
 interface WebsiteSourceStatusProps {
   sourceId?: string;
@@ -36,83 +38,23 @@ const WebsiteSourceStatus: React.FC<WebsiteSourceStatusProps> = ({
     );
   }
 
-  // Compute status using SimplifiedSourceStatusService if we have the full source
-  const computedStatus = source ? SimplifiedSourceStatusService.getSourceStatus(source) : status;
-
-  // Fallback to simple status display for legacy usage
-  const getStatusConfig = (status?: string) => {
-    switch (status) {
-      case 'pending':
-        return {
-          icon: <Clock size={14} className="mr-1" />,
-          text: 'Pending',
-          className: 'bg-gray-100 text-gray-800 border-gray-200'
-        };
-      case 'in_progress':
-        return {
-          icon: <Loader2 size={14} className="mr-1 animate-spin" />,
-          text: 'Crawling',
-          className: 'bg-blue-100 text-blue-800 border-blue-200'
-        };
-      case 'recrawling':
-        return {
-          icon: <RefreshCw size={14} className="mr-1 animate-spin" />,
-          text: 'Recrawling',
-          className: 'bg-orange-100 text-orange-800 border-orange-200'
-        };
-      case 'completed':
-        return {
-          icon: <CheckCircle size={14} className="mr-1" />,
-          text: 'Completed',
-          className: 'bg-green-100 text-green-800 border-green-200'
-        };
-      case 'ready_for_training':
-        return {
-          icon: <CheckCircle size={14} className="mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-green-100 text-green-800 border-green-200'
-        };
-      case 'crawled':
-        return {
-          icon: <Clock size={14} className="mr-1" />,
-          text: 'Ready for Training',
-          className: 'bg-orange-100 text-orange-800 border-orange-200'
-        };
-      case 'training':
-        return {
-          icon: <Loader2 size={14} className="mr-1 animate-spin" />,
-          text: 'Training',
-          className: 'bg-blue-100 text-blue-800 border-blue-200'
-        };
-      case 'trained':
-        return {
-          icon: <GraduationCap size={14} className="mr-1" />,
-          text: 'Trained',
-          className: 'bg-purple-100 text-purple-800 border-purple-200'
-        };
-      case 'failed':
-        return {
-          icon: <AlertTriangle size={14} className="mr-1" />,
-          text: 'Failed',
-          className: 'bg-red-100 text-red-800 border-red-200'
-        };
-      default:
-        return {
-          icon: <Clock size={14} className="mr-1" />,
-          text: 'Unknown',
-          className: 'bg-gray-100 text-gray-800 border-gray-200'
-        };
+  // Compute status using workflow integration service if we have the full source
+  let computedStatus = status;
+  if (source) {
+    // Check if this source should use the workflow system
+    if (WorkflowIntegrationService.shouldUseWorkflow(source)) {
+      computedStatus = WorkflowIntegrationService.getDisplayStatus(source);
+    } else {
+      computedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
     }
-  };
-
-  const statusConfig = getStatusConfig(computedStatus);
+  }
 
   return (
     <div className="flex items-center gap-3">
-      <Badge className={`${statusConfig.className} border flex-shrink-0`}>
-        {statusConfig.icon}
-        {statusConfig.text}
-      </Badge>
+      <WorkflowStatusBadge
+        status={computedStatus || 'pending'}
+        workflowStatus={source?.workflow_status}
+      />
     </div>
   );
 };
