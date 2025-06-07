@@ -14,6 +14,7 @@ import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
 import { SimpleStatusService } from '@/services/SimpleStatusService';
 import { supabase } from '@/integrations/supabase/client';
+import { SourceDeleteService } from '@/services/rag/operations/SourceDeleteService';
 
 interface ChildPageActionsProps {
   url: string;
@@ -90,13 +91,14 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         break;
       case 'delete':
         try {
-          // Mark as removed instead of hard delete
-          await supabase
-            .from('agent_sources')
-            .update({ is_excluded: true })
-            .eq('id', pageId);
+          // Perform actual deletion using SourceDeleteService
+          await SourceDeleteService.deleteSource(pageId);
+          console.log('Source deleted successfully');
           
-          console.log('Source marked as removed');
+          // Call the onDelete callback if provided
+          if (onDelete) {
+            onDelete();
+          }
         } catch (error) {
           console.error('Delete failed:', error);
         }
@@ -130,14 +132,14 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         };
       case 'delete':
         return {
-          title: 'Remove Page',
-          description: `Are you sure you want to remove "${url}"? It will be marked for deletion and removed during the next training.`,
-          confirmText: 'Remove',
+          title: 'Delete Source',
+          description: `Are you sure you want to permanently delete "${url}"? This action cannot be undone and will remove all associated data.`,
+          confirmText: 'Delete',
           isDestructive: true
         };
       case 'restore':
         return {
-          title: 'Restore Page',
+          title: 'Restore Source',
           description: `Are you sure you want to restore "${url}"? It will be included in future training.`,
           confirmText: 'Restore',
           isDestructive: false
@@ -183,7 +185,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
           ) : (
             <DropdownMenuItem onClick={handleDeleteClick} className="text-red-600">
               <Trash2 className="w-4 h-4 mr-2" />
-              Remove
+              Exclude
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
