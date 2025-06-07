@@ -199,6 +199,20 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Show expand/collapse button only for parent sources with children */}
+      {hasChildSources && onToggleExpanded && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleExpanded}
+          className="h-6 w-6 p-0"
+          title={isExpanded ? "Collapse child pages" : "Expand child pages"}
+        >
+          <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </Button>
+      )}
+
+      {/* Show view button for trained sources */}
       <Button
         variant="ghost"
         size="sm"
