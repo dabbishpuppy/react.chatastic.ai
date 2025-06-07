@@ -77,6 +77,10 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   // Show total links from parent source metadata when available
   const shouldShowTotalLinks = !isChild && source?.total_jobs > 0;
 
+  // Get total child pages size from metadata
+  const childPagesSize = source?.metadata?.total_child_pages_size || 0;
+  const shouldShowChildPagesSize = !isChild && childPagesSize > 0;
+
   const compressionRatio = shouldShowCompressionMetrics 
     ? ((totalContentSize - compressedContentSize) / totalContentSize * 100).toFixed(1)
     : 0;
@@ -131,8 +135,18 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
               </div>
             </>
           )}
+
+          {shouldShowChildPagesSize && (
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                <span>{formatBytes(childPagesSize)}</span>
+              </div>
+            </>
+          )}
           
-          {shouldShowContentSize && (
+          {shouldShowContentSize && !shouldShowChildPagesSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
@@ -142,7 +156,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </>
           )}
 
-          {shouldShowChildTotalSize && (
+          {shouldShowChildTotalSize && !shouldShowChildPagesSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
