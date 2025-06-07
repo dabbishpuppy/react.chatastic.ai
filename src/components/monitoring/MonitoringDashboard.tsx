@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import { SystemOverview } from './SystemOverview';
 import { AlertsPanel } from './AlertsPanel';
 import { ServiceControlPanel } from './ServiceControlPanel';
 import { QueueMonitor } from './QueueMonitor';
+import { ProductionQueueDashboard } from './ProductionQueueDashboard';
 
 export const MonitoringDashboard: React.FC = () => {
   const [orchestratorStatus, setOrchestratorStatus] = useState<any>(null);
@@ -153,6 +153,7 @@ export const MonitoringDashboard: React.FC = () => {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
+          <TabsTrigger value="production">Production Queue</TabsTrigger>
           <TabsTrigger value="websockets">WebSockets</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
@@ -192,6 +193,10 @@ export const MonitoringDashboard: React.FC = () => {
           <QueueMonitor />
         </TabsContent>
 
+        <TabsContent value="production" className="space-y-4">
+          <ProductionQueueDashboard />
+        </TabsContent>
+
         <TabsContent value="websockets" className="space-y-4">
           <Card>
             <CardHeader>
@@ -210,16 +215,16 @@ export const MonitoringDashboard: React.FC = () => {
                       <p className="text-xs text-muted-foreground">Total Listeners</p>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold">{Object.keys(wsStats.connectionsBySource).length}</div>
+                      <div className="text-2xl font-bold">{Object.keys(wsStats.connectionsBySource || {}).length}</div>
                       <p className="text-xs text-muted-foreground">Sources Monitored</p>
                     </div>
                   </div>
                   
-                  {Object.entries(wsStats.connectionsBySource).length > 0 && (
+                  {Object.entries(wsStats.connectionsBySource || {}).length > 0 && (
                     <div className="space-y-2">
                       <h4 className="font-medium">Connection Status by Source</h4>
                       <div className="space-y-1">
-                        {Object.entries(wsStats.connectionsBySource).map(([sourceId, status]) => (
+                        {Object.entries(wsStats.connectionsBySource || {}).map(([sourceId, status]) => (
                           <div key={sourceId} className="flex items-center justify-between text-sm">
                             <span className="font-mono text-xs">{sourceId.slice(0, 8)}...</span>
                             <span className={`px-2 py-1 rounded text-xs ${
@@ -227,7 +232,7 @@ export const MonitoringDashboard: React.FC = () => {
                               status === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-red-100 text-red-800'
                             }`}>
-                              {status}
+                              {status as string}
                             </span>
                           </div>
                         ))}
