@@ -7,7 +7,7 @@ import {
   Trash2,
   MoreHorizontal,
   ChevronDown,
-  Restore
+  RotateCcw
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
@@ -177,7 +177,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
           
           {isRemoved ? (
             <DropdownMenuItem onClick={handleRestoreClick}>
-              <Restore className="w-4 h-4 mr-2" />
+              <RotateCcw className="w-4 h-4 mr-2" />
               Restore
             </DropdownMenuItem>
           ) : (

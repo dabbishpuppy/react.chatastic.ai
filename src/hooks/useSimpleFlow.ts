@@ -5,6 +5,15 @@ import { SimpleStatusService, SimpleStatusSummary } from '@/services/SimpleStatu
 import { ToastNotificationService } from '@/services/ToastNotificationService';
 import { supabase } from '@/integrations/supabase/client';
 
+interface SourceMetadata {
+  training_status?: string;
+  training_completed_at?: string;
+  training_started_at?: string;
+  training_error?: string;
+  last_trained_at?: string;
+  [key: string]: any;
+}
+
 export const useSimpleFlow = () => {
   const { agentId } = useParams();
   const [statusSummary, setStatusSummary] = useState<SimpleStatusSummary>({
@@ -106,7 +115,7 @@ export const useSimpleFlow = () => {
         setIsTraining(false);
         // Check if training completed
         const hasTrainedSources = sources?.some(s => {
-          const metadata = s.metadata || {};
+          const metadata = s.metadata as SourceMetadata || {};
           return metadata.training_completed_at || metadata.last_trained_at;
         });
         if (hasTrainedSources) {

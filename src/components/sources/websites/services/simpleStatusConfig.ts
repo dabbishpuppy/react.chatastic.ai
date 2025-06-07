@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Loader2, CheckCircle, GraduationCap, RefreshCw, Restore } from 'lucide-react';
+import { Loader2, CheckCircle, GraduationCap, RefreshCw, RotateCcw } from 'lucide-react';
 
 export interface SimpleStatusConfig {
   icon: React.ReactElement;
