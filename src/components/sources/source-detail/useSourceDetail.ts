@@ -38,18 +38,30 @@ export const useSourceDetail = () => {
 
           if (error) throw error;
 
+          // Fetch the actual content from source_chunks table
+          const { data: chunkData, error: chunkError } = await supabase
+            .from('source_chunks')
+            .select('content')
+            .eq('source_id', pageId)
+            .order('chunk_index');
+
+          let extractedContent = 'No content available';
+          if (!chunkError && chunkData && chunkData.length > 0) {
+            extractedContent = chunkData.map(chunk => chunk.content).join('\n\n');
+          }
+
           // Transform child page data to AgentSource format
           const transformedSource: AgentSource = {
             id: pageData.id,
             title: pageData.url,
-            content: '', // Child pages don't have content field, use empty string
+            content: extractedContent,
             url: pageData.url,
             source_type: 'website',
             agent_id: agentId || '',
             is_active: true,
-            requires_manual_training: false,
             created_at: pageData.created_at,
             updated_at: pageData.updated_at,
+            requires_manual_training: false,
             metadata: {
               isChildPage: true,
               parentSourceId: pageData.parent_source_id,

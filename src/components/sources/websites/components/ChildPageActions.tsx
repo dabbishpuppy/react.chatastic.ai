@@ -102,7 +102,6 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const confirmConfig = getConfirmationConfig();
-  // Arrow should be enabled when child is trained (after parent training is complete)
   const isViewEnabled = displayStatus === 'trained';
 
   return (
