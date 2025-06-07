@@ -37,8 +37,23 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   const navigate = useNavigate();
   const { agentId } = useParams();
 
+  // Debug logging to understand status
+  console.log('ChildPageActions status debug:', {
+    pageId,
+    originalStatus: status,
+    displayStatus,
+    url
+  });
+
   // Check if the page is ready for viewing (training completed)
   const isViewable = displayStatus === 'trained' || displayStatus === 'completed' || status === 'completed';
+
+  console.log('ChildPageActions viewability:', {
+    pageId,
+    isViewable,
+    displayStatus,
+    originalStatus: status
+  });
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -49,7 +64,9 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const handleViewClick = () => {
+    console.log('View click attempted:', { isViewable, agentId, pageId });
     if (isViewable && agentId) {
+      console.log('Navigating to:', `/agent/${agentId}/sources/website/${pageId}`);
       navigate(`/agent/${agentId}/sources/website/${pageId}`);
     }
   };
@@ -114,7 +131,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2">
-      {/* Navigation arrow for viewing child page details - only enabled when viewable */}
+      {/* Right arrow for viewing source details - only for child pages */}
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
