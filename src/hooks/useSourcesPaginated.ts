@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AgentSource, SourceType } from '@/types/rag';
@@ -102,6 +103,7 @@ export const useSourcesPaginated = ({
       const sources: AgentSource[] = (data || []).map(source => ({
         id: source.id,
         agent_id: source.agent_id,
+        team_id: source.team_id || 'unknown', // Add team_id with fallback
         title: source.title,
         content: source.content || undefined,
         source_type: source.source_type as SourceType,

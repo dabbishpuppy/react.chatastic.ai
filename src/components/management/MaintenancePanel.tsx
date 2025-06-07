@@ -4,20 +4,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play } from 'lucide-react';
-import { MaintenanceTask } from '@/services/rag/management/ragAgentLifecycle';
+
+interface MaintenanceTask {
+  id: string;
+  type: string;
+  description: string;
+  priority: string;
+  estimatedDuration: number;
+}
 
 interface MaintenancePanelProps {
-  maintenanceTasks: MaintenanceTask[];
-  isExecutingTask: boolean;
-  onExecuteMaintenanceTask: (taskId: string) => void;
-  onAutoScheduleMaintenance: () => void;
+  agentId: string;
+  maintenanceTasks?: MaintenanceTask[];
+  isExecutingTask?: boolean;
+  onExecuteMaintenanceTask?: (taskId: string) => void;
+  onAutoScheduleMaintenance?: () => void;
 }
 
 export const MaintenancePanel: React.FC<MaintenancePanelProps> = ({
-  maintenanceTasks,
-  isExecutingTask,
-  onExecuteMaintenanceTask,
-  onAutoScheduleMaintenance
+  agentId,
+  maintenanceTasks = [],
+  isExecutingTask = false,
+  onExecuteMaintenanceTask = () => {},
+  onAutoScheduleMaintenance = () => {}
 }) => {
   const getPriorityColor = (priority: string) => {
     switch (priority) {

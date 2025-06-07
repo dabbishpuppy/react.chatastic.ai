@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -63,7 +64,7 @@ export const useSourceDetail = () => {
       });
 
       setIsEditing(false);
-      queryClient.invalidateQueries(['agent-source', sourceId]);
+      queryClient.invalidateQueries({ queryKey: ['agent-source', sourceId] });
     } catch (error: any) {
       toast({
         title: 'Update Failed',
@@ -93,7 +94,7 @@ export const useSourceDetail = () => {
       });
 
       navigate(`/agent/${agentId}/sources`);
-      queryClient.invalidateQueries(['agent-sources', agentId]);
+      queryClient.invalidateQueries({ queryKey: ['agent-sources', agentId] });
     } catch (error: any) {
       toast({
         title: 'Deletion Failed',
@@ -135,6 +136,6 @@ export const useSourceDetail = () => {
     handleBackClick,
     handleCancelEdit,
     agentId: agentId!,
-    refetch // Add the refetch function
+    refetch
   };
 };
