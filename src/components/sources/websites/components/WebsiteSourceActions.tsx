@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -65,6 +66,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   }, [source.id, source]);
 
   const displayStatus = sourceData ? SimpleStatusService.getSourceStatus(sourceData) : 'crawling';
+  const isPendingDeletion = sourceData?.pending_deletion === true;
   const isRemoved = displayStatus === 'removed';
 
   const handleRecrawlClick = () => {
@@ -97,29 +99,36 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         break;
       case 'delete':
         try {
-          // Mark as removed instead of hard delete
+          // Soft delete: mark as pending deletion instead of hard delete
           await supabase
             .from('agent_sources')
-            .update({ is_excluded: true })
+            .update({ pending_deletion: true })
             .eq('id', source.id);
           
-          console.log('Source marked as removed');
-          setSourceData(prev => ({ ...prev, is_excluded: true }));
+          console.log('Source marked for deletion');
+          setSourceData(prev => ({ ...prev, pending_deletion: true }));
           onDelete();
         } catch (error) {
-          console.error('Delete failed:', error);
+          console.error('Soft delete failed:', error);
         }
         break;
       case 'restore':
         try {
-          // Restore by removing the excluded flag
+          // Restore by removing the pending deletion flag
           await supabase
             .from('agent_sources')
-            .update({ is_excluded: false })
+            .update({ 
+              pending_deletion: false,
+              is_excluded: false 
+            })
             .eq('id', source.id);
           
           console.log('Source restored');
-          setSourceData(prev => ({ ...prev, is_excluded: false }));
+          setSourceData(prev => ({ 
+            ...prev, 
+            pending_deletion: false,
+            is_excluded: false 
+          }));
         } catch (error) {
           console.error('Restore failed:', error);
         }
@@ -177,14 +186,14 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
-          {!isRemoved && (
+          {!isPendingDeletion && (
             <DropdownMenuItem onClick={handleRecrawlClick}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Recrawl
             </DropdownMenuItem>
           )}
           
-          {isRemoved ? (
+          {isPendingDeletion ? (
             <DropdownMenuItem onClick={handleRestoreClick}>
               <RotateCcw className="w-4 h-4 mr-2" />
               Restore

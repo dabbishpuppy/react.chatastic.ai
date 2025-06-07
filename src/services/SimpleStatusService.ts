@@ -19,7 +19,12 @@ interface SourceMetadata {
 
 export class SimpleStatusService {
   static getSourceStatus(source: any): SimpleSourceStatus {
-    // Check if marked as removed (soft deleted)
+    // Check if marked for deletion (soft delete)
+    if (source.pending_deletion === true) {
+      return 'removed';
+    }
+    
+    // Check if marked as excluded (legacy)
     if (source.is_excluded === true) {
       return 'removed';
     }
@@ -48,7 +53,9 @@ export class SimpleStatusService {
   }
 
   static analyzeSourceStatus(sources: any[]): SimpleStatusSummary {
-    const totalSources = sources.length;
+    // Filter out sources that are actually deleted (not just pending deletion)
+    const activeSources = sources.filter(s => !s.is_excluded || s.pending_deletion);
+    const totalSources = activeSources.length;
     const isEmpty = totalSources === 0;
     
     if (isEmpty) {
@@ -60,14 +67,14 @@ export class SimpleStatusService {
       };
     }
 
-    const statuses = sources.map(s => this.getSourceStatus(s));
+    const statuses = activeSources.map(s => this.getSourceStatus(s));
     const hasCompleted = statuses.includes('completed');
-    const hasRemoved = statuses.includes('removed');
+    const hasPendingDeletion = activeSources.some(s => s.pending_deletion === true);
     const isTraining = statuses.includes('training');
     
     return {
       totalSources,
-      canTrain: hasCompleted || hasRemoved,
+      canTrain: hasCompleted || hasPendingDeletion,
       isTraining,
       isEmpty: false
     };

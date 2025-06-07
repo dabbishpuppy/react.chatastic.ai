@@ -21,12 +21,70 @@ serve(async (req) => {
 
     console.log(`🚀 Starting simplified training for agent: ${agentId}`);
 
+    // First, permanently delete sources marked for deletion
+    const { data: sourcesToDelete, error: deleteQueryError } = await supabase
+      .from('agent_sources')
+      .select('id, title')
+      .eq('agent_id', agentId)
+      .eq('pending_deletion', true);
+
+    if (deleteQueryError) {
+      console.error('Error querying sources to delete:', deleteQueryError);
+    }
+
+    let deletedCount = 0;
+    if (sourcesToDelete && sourcesToDelete.length > 0) {
+      console.log(`🗑️ Permanently deleting ${sourcesToDelete.length} sources marked for deletion`);
+      
+      for (const source of sourcesToDelete) {
+        try {
+          // Delete source chunks first
+          await supabase
+            .from('source_chunks')
+            .delete()
+            .eq('source_id', source.id);
+
+          // Delete source embeddings
+          const { data: chunks } = await supabase
+            .from('source_chunks')
+            .select('id')
+            .eq('source_id', source.id);
+
+          if (chunks && chunks.length > 0) {
+            await supabase
+              .from('source_embeddings')
+              .delete()
+              .in('chunk_id', chunks.map(c => c.id));
+          }
+
+          // Delete child pages if any
+          await supabase
+            .from('source_pages')
+            .delete()
+            .eq('parent_source_id', source.id);
+
+          // Finally delete the source itself
+          await supabase
+            .from('agent_sources')
+            .delete()
+            .eq('id', source.id);
+
+          deletedCount++;
+          console.log(`✅ Deleted source: ${source.title}`);
+        } catch (error) {
+          console.error(`❌ Failed to delete source ${source.id}:`, error);
+        }
+      }
+    }
+
     // Find all sources that need training (requires_manual_training = true OR metadata.training_status = 'in_progress')
+    // Exclude sources marked for deletion since they're being deleted above
     const { data: sourcesToTrain, error: sourcesError } = await supabase
       .from('agent_sources')
       .select('id, title, source_type, content, crawl_status, requires_manual_training, metadata, parent_source_id')
       .eq('agent_id', agentId)
       .eq('is_active', true)
+      .neq('pending_deletion', true) // Exclude sources marked for deletion
       .or('requires_manual_training.eq.true,metadata->>training_status.eq.in_progress');
 
     if (sourcesError) {
@@ -38,8 +96,9 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'No sources requiring training',
-          processedSources: 0
+          message: deletedCount > 0 ? `Deleted ${deletedCount} sources, no sources requiring training` : 'No sources requiring training',
+          processedSources: 0,
+          deletedSources: deletedCount
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -243,14 +302,15 @@ serve(async (req) => {
       }
     }
 
-    console.log(`✅ Simplified training completed: ${processedCount} sources processed`);
+    console.log(`✅ Simplified training completed: ${processedCount} sources processed, ${deletedCount} sources deleted`);
 
     const result = {
       success: true,
       processedSources: processedCount,
+      deletedSources: deletedCount,
       totalSources: sourcesToTrain.length,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully trained ${processedCount} sources`,
+      message: `Successfully trained ${processedCount} sources and deleted ${deletedCount} sources`,
       parentSourcesUpdated: parentSourcesToUpdate.size
     };
 
