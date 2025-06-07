@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { validateRequest } from './requestValidator.ts';
 import { validateAgent } from './agentValidator.ts';
-import { handleChildPageRecrawl } from './recrawlHandler.ts';
+import { handleChildPageRecrawl, handleAllChildrenRecrawl } from './recrawlHandler.ts';
 import { handleUrlDiscovery } from './discoveryHandler.ts';
 import { handleParentSourceCreation, handleSourcePagesCreation } from './parentSourceHandler.ts';
 import { buildErrorResponse, buildSuccessResponse } from './responseBuilder.ts';
@@ -53,12 +53,46 @@ serve(async (req) => {
 
     // Validate request
     const validatedRequest = validateRequest(requestBody);
-    console.log('🚀 Starting enhanced crawl for agent', validatedRequest.agentId, ', URL:', validatedRequest.url);
+    console.log('🚀 Starting enhanced crawl for agent', validatedRequest.agentId, ', URL:', validatedRequest.url, ', Mode:', validatedRequest.mode);
 
     // Validate agent
     const agent = await validateAgent(validatedRequest.agentId);
 
+    // Handle recrawl-all-children mode
+    if (validatedRequest.mode === 'recrawl-all-children') {
+      console.log('🔄 Processing recrawl-all-children for parent:', validatedRequest.parentSourceId);
+      
+      if (!validatedRequest.parentSourceId) {
+        throw new Error('parentSourceId is required for recrawl-all-children mode');
+      }
+
+      const result = await handleAllChildrenRecrawl(
+        validatedRequest.parentSourceId,
+        validatedRequest.agentId
+      );
+
+      return buildSuccessResponse(result, corsHeaders);
+    }
+
     // Handle child page recrawl case
+    if (validatedRequest.mode === 'recrawl-child-page') {
+      console.log('🔄 Processing child page recrawl for parent:', validatedRequest.parentSourceId);
+      
+      if (!validatedRequest.parentSourceId) {
+        throw new Error('parentSourceId is required for recrawl-child-page mode');
+      }
+      
+      const result = await handleChildPageRecrawl(
+        validatedRequest.parentSourceId,
+        validatedRequest.url,
+        validatedRequest.priority,
+        validatedRequest.agentId
+      );
+
+      return buildSuccessResponse(result, corsHeaders);
+    }
+
+    // Handle single-page recrawl with parentSourceId (backward compatibility)
     if (validatedRequest.parentSourceId && validatedRequest.crawlMode === 'single-page') {
       console.log('🔄 Processing child page recrawl for parent:', validatedRequest.parentSourceId);
       
