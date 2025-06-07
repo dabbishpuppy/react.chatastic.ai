@@ -26,9 +26,46 @@ serve(async (req) => {
     const { parentSourceId, eventType } = await req.json();
     console.log(`📊 Status aggregator triggered for parent: ${parentSourceId}, event: ${eventType}`);
 
-    // Fetch data
-    const parentSource = await DataFetcher.fetchParentSource(supabaseClient, parentSourceId);
-    const pages = await DataFetcher.fetchSourcePages(supabaseClient, parentSourceId);
+    // Validate input
+    if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
+      console.error('❌ Invalid parentSourceId in request:', parentSourceId);
+      return new Response(
+        JSON.stringify({ error: 'Invalid parent source ID provided' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
+    // Fetch data with proper error handling
+    let parentSource, pages;
+    
+    try {
+      parentSource = await DataFetcher.fetchParentSource(supabaseClient, parentSourceId);
+    } catch (error) {
+      console.error('❌ Failed to fetch parent source:', error);
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch parent source: ${error.message}` }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
+    }
+
+    try {
+      pages = await DataFetcher.fetchSourcePages(supabaseClient, parentSourceId);
+    } catch (error) {
+      console.error('❌ Failed to fetch source pages:', error);
+      return new Response(
+        JSON.stringify({ error: `Failed to fetch source pages: ${error.message}` }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
 
     // Calculate statistics
     const jobStats = StatisticsCalculator.calculateJobStatistics(pages);
@@ -85,7 +122,13 @@ serve(async (req) => {
 
     if (updateError) {
       console.error('❌ Error updating parent source:', updateError);
-      throw updateError;
+      return new Response(
+        JSON.stringify({ error: `Failed to update parent source: ${updateError.message}` }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
     }
 
     console.log(`✅ Parent source ${parentSourceId} updated to status: ${status}`);
@@ -132,7 +175,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ Error in status aggregator:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error occurred',
+        stack: error.stack 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': "application/json" },
         status: 500,
