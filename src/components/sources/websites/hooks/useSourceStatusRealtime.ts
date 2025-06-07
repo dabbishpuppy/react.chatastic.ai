@@ -2,6 +2,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
+import { fetchMaybeSingle, handleSupabaseError } from '@/utils/safeSupabaseQueries';
+import { ProductionErrorMonitor } from '@/utils/productionErrorMonitoring';
 
 interface UseSourceStatusRealtimeProps {
   sourceId: string;
@@ -34,25 +36,23 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
       
       // Refetch source data to get latest metadata
       if (sourceId) {
-        supabase
-          .from('agent_sources')
-          .select('*')
-          .eq('id', sourceId)
-          .single()
-          .then(({ data, error }) => {
-            if (error) {
-              console.error('Error refetching source data:', error);
-              return;
-            }
-            
-            if (data) {
-              console.log('Refetched source data after training:', data);
-              setSourceData(data);
-              const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(data);
-              setStatus(mappedStatus);
-              setLastUpdateTime(new Date());
-            }
-          });
+        fetchMaybeSingle(
+          supabase
+            .from('agent_sources')
+            .select('*')
+            .eq('id', sourceId),
+          `trainingCompleted(${sourceId})`
+        ).then((data) => {
+          if (data) {
+            console.log('Refetched source data after training:', data);
+            setSourceData(data);
+            const mappedStatus = SimplifiedSourceStatusService.getSourceStatus(data);
+            setStatus(mappedStatus);
+            setLastUpdateTime(new Date());
+          }
+        }).catch((error) => {
+          ProductionErrorMonitor.trackError(error, 'trainingCompleted');
+        });
       }
     };
 
@@ -76,16 +76,13 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
 
     const fetchInitialData = async () => {
       try {
-        const { data: source, error } = await supabase
-          .from('agent_sources')
-          .select('*')
-          .eq('id', sourceId)
-          .single();
-
-        if (error) {
-          console.error('Error fetching source data:', error);
-          return;
-        }
+        const source = await fetchMaybeSingle(
+          supabase
+            .from('agent_sources')
+            .select('*')
+            .eq('id', sourceId),
+          `useSourceStatusRealtime(${sourceId})`
+        );
 
         if (source) {
           console.log('📋 Initial source data:', source);
@@ -99,9 +96,12 @@ export const useSourceStatusRealtime = ({ sourceId, initialStatus }: UseSourceSt
           setProgress(source.progress || 0);
           setLinksCount(source.links_count || 0);
           setLastUpdateTime(new Date());
+        } else {
+          console.warn(`Source ${sourceId} not found - may have been deleted`);
+          setStatus('not_found');
         }
       } catch (error) {
-        console.error('Error in fetchInitialData:', error);
+        ProductionErrorMonitor.trackError(error, 'useSourceStatusRealtime.fetchInitialData');
       }
     };
 

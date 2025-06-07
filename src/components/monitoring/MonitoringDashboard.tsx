@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { ServiceControlPanel } from './ServiceControlPanel';
 import { QueueMonitor } from './QueueMonitor';
 import { ProductionQueueDashboard } from './ProductionQueueDashboard';
 import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
+import { ProductionHealthCheck } from './ProductionHealthCheck';
 
 export const MonitoringDashboard: React.FC = () => {
   const [orchestratorStatus, setOrchestratorStatus] = useState<any>(null);
@@ -152,6 +154,7 @@ export const MonitoringDashboard: React.FC = () => {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="health">Health Check</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="production">Production Queue</TabsTrigger>
@@ -177,6 +180,10 @@ export const MonitoringDashboard: React.FC = () => {
               />
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="health" className="space-y-4">
+          <ProductionHealthCheck />
         </TabsContent>
 
         <TabsContent value="services" className="space-y-4">

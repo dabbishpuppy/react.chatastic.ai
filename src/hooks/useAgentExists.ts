@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMaybeSingle } from "@/utils/safeSupabaseQueries";
 
 export const useAgentExists = (agentId?: string) => {
   const [agentExists, setAgentExists] = useState<boolean | null>(null);
@@ -15,21 +16,18 @@ export const useAgentExists = (agentId?: string) => {
       }
       
       try {
-        const { data, error } = await supabase
-          .from('agents')
-          .select('id')
-          .eq('id', agentId)
-          .single();
-          
-        if (error) {
-          console.error("Error checking agent existence:", error);
-          setAgentExists(false);
-        } else {
-          setAgentExists(!!data);
-        }
+        const agent = await fetchMaybeSingle(
+          supabase
+            .from('agents')
+            .select('id')
+            .eq('id', agentId),
+          `useAgentExists(${agentId})`
+        );
+        
+        setAgentExists(agent !== null);
       } catch (error) {
-        console.error("Error in checkAgentExists:", error);
-        setAgentExists(false);
+        console.error("Error checking agent existence:", error);
+        setAgentExists(false); // Fail safe
       } finally {
         setIsLoading(false);
       }

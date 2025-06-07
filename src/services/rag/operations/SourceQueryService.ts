@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { AgentSource, SourceType } from "@/types/rag";
 import { BaseSourceService } from "../base/BaseSourceService";
+import { fetchMaybeSingle } from "@/utils/safeSupabaseQueries";
 
 export class SourceQueryService extends BaseSourceService {
   static async getSourcesByAgent(agentId: string): Promise<AgentSource[]> {
@@ -46,17 +47,14 @@ export class SourceQueryService extends BaseSourceService {
   static async getSourceWithStats(id: string): Promise<AgentSource & { chunks_count: number }> {
     console.log(`📖 Fetching source with stats: ${id}`);
     
-    // Get source with all fields including created_by and updated_by
-    const { data: source, error: sourceError } = await supabase
-      .from('agent_sources')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (sourceError) {
-      console.error('❌ Error fetching source:', sourceError);
-      throw new Error(`Failed to fetch source: ${sourceError.message}`);
-    }
+    // Use safe query for source fetch
+    const source = await fetchMaybeSingle(
+      supabase
+        .from('agent_sources')
+        .select('*')
+        .eq('id', id),
+      `getSourceWithStats(${id})`
+    );
 
     if (!source) {
       throw new Error('Source not found');

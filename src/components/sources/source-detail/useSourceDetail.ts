@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AgentSource } from '@/types/rag';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
 
 export const useSourceDetail = () => {
   const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
@@ -24,14 +25,20 @@ export const useSourceDetail = () => {
     queryFn: async () => {
       if (!sourceId) return null;
       
-      const { data, error } = await supabase
-        .from('agent_sources')
-        .select('*')
-        .eq('id', sourceId)
-        .single();
-
-      if (error) throw error;
-      return data as AgentSource;
+      try {
+        const data = await fetchMaybeSingle(
+          supabase
+            .from('agent_sources')
+            .select('*')
+            .eq('id', sourceId),
+          `useSourceDetail(${sourceId})`
+        ) as AgentSource | null;
+        
+        return data;
+      } catch (error) {
+        console.error('Failed to fetch source:', error);
+        return null;
+      }
     },
     enabled: !!sourceId
   });
