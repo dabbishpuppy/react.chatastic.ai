@@ -4,6 +4,20 @@ import { SourceStatus, PageStatus, WorkflowEvent, BackgroundJob } from './types'
 
 export class WorkflowEngine {
   /**
+   * Helper function to safely convert Json to Record<string, any>
+   */
+  private static parseJsonMetadata(json: any): Record<string, any> {
+    if (typeof json === 'string') {
+      try {
+        return JSON.parse(json);
+      } catch {
+        return {};
+      }
+    }
+    return json || {};
+  }
+
+  /**
    * Transition a source to a new status with event emission
    */
   static async transitionSourceStatus(
@@ -103,7 +117,19 @@ export class WorkflowEngine {
       throw error;
     }
 
-    return data || [];
+    // Convert the Supabase response to our typed interface
+    return (data || []).map(event => ({
+      id: event.id,
+      source_id: event.source_id,
+      page_id: event.page_id,
+      event_type: event.event_type,
+      from_status: event.from_status,
+      to_status: event.to_status,
+      metadata: this.parseJsonMetadata(event.metadata),
+      created_at: event.created_at,
+      processed_at: event.processed_at,
+      error_message: event.error_message
+    }));
   }
 
   /**
@@ -121,7 +147,25 @@ export class WorkflowEngine {
       throw error;
     }
 
-    return data || [];
+    // Convert the Supabase response to our typed interface
+    return (data || []).map(job => ({
+      id: job.id,
+      job_type: job.job_type,
+      source_id: job.source_id,
+      page_id: job.page_id,
+      job_key: job.job_key,
+      priority: job.priority,
+      payload: this.parseJsonMetadata(job.payload),
+      status: job.status as 'pending' | 'processing' | 'completed' | 'failed',
+      attempts: job.attempts,
+      max_attempts: job.max_attempts,
+      scheduled_at: job.scheduled_at,
+      started_at: job.started_at,
+      completed_at: job.completed_at,
+      error_message: job.error_message,
+      created_at: job.created_at,
+      updated_at: job.updated_at
+    }));
   }
 
   /**

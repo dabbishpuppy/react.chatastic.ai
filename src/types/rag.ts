@@ -1,78 +1,61 @@
-
-import { Database } from "@/integrations/supabase/types";
-
-// Use Supabase generated types as base and extend them
-type DbAgentSource = Database['public']['Tables']['agent_sources']['Row'];
-type DbSourceChunk = Database['public']['Tables']['source_chunks']['Row'];
-type DbSourceEmbedding = Database['public']['Tables']['source_embeddings']['Row'];
-type DbTrainingJob = Database['public']['Tables']['agent_training_jobs']['Row'];
-type DbAuditLog = Database['public']['Tables']['audit_logs']['Row'];
-type DbUserConsent = Database['public']['Tables']['user_consents']['Row'];
-type DbRetentionPolicy = Database['public']['Tables']['data_retention_policies']['Row'];
-
-// Core RAG types based on our database schema
-export type SourceType = Database['public']['Enums']['source_type'];
-export type TrainingStatus = Database['public']['Enums']['training_status'];
-export type AuditAction = Database['public']['Enums']['audit_action'];
+import { Json } from '@supabase/supabase-js';
 
 export interface AgentSource {
   id: string;
   agent_id: string;
   title: string;
-  content?: string;
-  source_type: SourceType;
   url?: string;
   file_path?: string;
-  file_type?: string;
-  parent_source_id?: string;
-  created_at: string;
-  updated_at: string;
+  source_type: 'website' | 'file' | 'text' | 'qa';
+  content?: string;
   is_active: boolean;
   is_excluded?: boolean;
-  pending_deletion?: boolean;
-  crawl_status?: string;
+  parent_source_id?: string;
+  links_count?: number;
   progress?: number;
+  crawl_status?: string;
+  created_at: string;
+  updated_at: string;
+  team_id: string;
+  created_by?: string;
+  updated_by?: string;
+  original_size?: number;
+  compressed_size?: number;
+  compression_ratio?: number;
+  raw_text?: Uint8Array;
+  last_crawled_at?: string;
+  
+  // Workflow-related properties
+  workflow_status?: 'CREATED' | 'CRAWLING' | 'COMPLETED' | 'TRAINING' | 'TRAINED' | 'PENDING_REMOVAL' | 'REMOVED' | 'ERROR';
+  previous_status?: 'CREATED' | 'CRAWLING' | 'COMPLETED' | 'TRAINING' | 'TRAINED' | 'PENDING_REMOVAL' | 'REMOVED' | 'ERROR';
+  workflow_metadata?: Record<string, any>;
+  pending_deletion?: boolean;
+  
+  // Legacy fields for backward compatibility
   total_jobs?: number;
   completed_jobs?: number;
   failed_jobs?: number;
-  last_crawled_at?: string;
-  discovery_completed?: boolean;
+  max_concurrent_jobs?: number;
+  respect_robots?: boolean;
   total_children?: number;
   children_completed?: number;
   children_failed?: number;
   children_pending?: number;
-  original_size?: number;
-  compressed_size?: number;
-  compression_ratio?: number;
-  global_compression_ratio?: number;
+  discovery_completed?: boolean;
   total_content_size?: number;
   compressed_content_size?: number;
   unique_chunks?: number;
   duplicate_chunks?: number;
+  global_compression_ratio?: number;
+  content_summary?: string;
+  keywords?: string[];
+  extraction_method?: string[];
+  include_paths?: string[];
+  exclude_paths?: string[];
+  requires_manual_training?: boolean;
+  total_processing_time_ms?: number;
   avg_compression_ratio?: number;
-  metadata?: Record<string, any>;
-  raw_text?: string;
-  created_by?: string;
-  updated_by?: string;
-  requires_manual_training: boolean;
-  links_count?: number;
-}
-
-export interface SourceChunk extends Omit<DbSourceChunk, 'metadata'> {
+  status_history?: any[];
+  error_message?: string;
   metadata?: Record<string, any>;
 }
-
-export interface SourceEmbedding extends Omit<DbSourceEmbedding, 'embedding'> {
-  embedding: number[];
-}
-
-export interface AgentTrainingJob extends DbTrainingJob {}
-
-export interface UserConsent extends DbUserConsent {}
-
-export interface AuditLog extends Omit<DbAuditLog, 'old_values' | 'new_values'> {
-  old_values?: Record<string, any>;
-  new_values?: Record<string, any>;
-}
-
-export interface DataRetentionPolicy extends DbRetentionPolicy {}
