@@ -203,10 +203,9 @@ export class VectorSearchService {
       const modelDistribution: Record<string, number> = {};
       const totalEmbeddings = data?.length || 0;
       
-      if (data && Array.isArray(data)) {
-        for (let i = 0; i < data.length; i++) {
-          const item = data[i];
-          const modelName: string = (item as any)?.model_name || 'unknown';
+      if (data && totalEmbeddings > 0) {
+        for (const record of data) {
+          const modelName = (record as { model_name?: string })?.model_name || 'unknown';
           modelDistribution[modelName] = (modelDistribution[modelName] || 0) + 1;
         }
       }
