@@ -12,7 +12,6 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
-import { SimpleStatusService } from '@/services/SimpleStatusService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChildPageActionsProps {
@@ -33,28 +32,13 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
-  const [sourceData, setSourceData] = useState<any>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
   const navigate = useNavigate();
   const { agentId } = useParams();
 
-  // Fetch source data to determine status
-  React.useEffect(() => {
-    const fetchSourceData = async () => {
-      const { data } = await supabase
-        .from('agent_sources')
-        .select('*')
-        .eq('id', pageId)
-        .single();
-      
-      setSourceData(data);
-    };
-    
-    fetchSourceData();
-  }, [pageId]);
-
-  const displayStatus = sourceData ? SimpleStatusService.getSourceStatus(sourceData) : status;
-  const isRemoved = displayStatus === 'removed';
+  // Use the status prop directly instead of fetching from database
+  const displayStatus = status;
+  const isRemoved = displayStatus === 'removed' || displayStatus === 'failed';
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -112,14 +96,17 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         break;
       case 'restore':
         try {
-          // Restore by removing the excluded flag
-          await supabase
-            .from('agent_sources')
-            .update({ is_excluded: false })
+          // Restore by updating the status in source_pages table
+          const { error } = await supabase
+            .from('source_pages')
+            .update({ status: 'pending' })
             .eq('id', pageId);
           
-          console.log('Source restored');
-          setSourceData(prev => ({ ...prev, is_excluded: false }));
+          if (error) {
+            throw new Error(`Failed to restore source page: ${error.message}`);
+          }
+          
+          console.log('Source page restored');
         } catch (error) {
           console.error('Restore failed:', error);
         }
@@ -147,7 +134,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
       case 'restore':
         return {
           title: 'Restore Source',
-          description: `Are you sure you want to restore "${url}"? It will be included in future training.`,
+          description: `Are you sure you want to restore "${url}"? It will be included in future processing.`,
           confirmText: 'Restore',
           isDestructive: false
         };
@@ -162,7 +149,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const confirmConfig = getConfirmationConfig();
-  const isViewEnabled = displayStatus === 'trained';
+  const isViewEnabled = displayStatus === 'completed';
 
   return (
     <div className="flex items-center gap-2">
@@ -192,7 +179,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
           ) : (
             <DropdownMenuItem onClick={handleDeleteClick} className="text-red-600">
               <Trash2 className="w-4 h-4 mr-2" />
-              Exclude
+              Delete
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -204,7 +191,7 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         onClick={handleViewClick}
         disabled={!isViewEnabled}
         className="h-6 w-6 p-0"
-        title={isViewEnabled ? "View source details" : "Available after training is complete"}
+        title={isViewEnabled ? "View source details" : "Available after processing is complete"}
       >
         <ChevronDown className={`w-3 h-3 ${!isViewEnabled ? 'text-gray-400' : ''}`} />
       </Button>
