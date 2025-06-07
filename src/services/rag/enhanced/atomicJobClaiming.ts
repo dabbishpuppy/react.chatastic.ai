@@ -28,8 +28,8 @@ export class AtomicJobClaiming {
           status: 'processing',
           started_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          // Store worker ID in metadata for tracking
-          payload: supabase.raw(`payload || '{"worker_id": "${workerId}"}'::jsonb`)
+          // Store worker ID in metadata by merging with existing payload
+          payload: { worker_id: workerId }
         })
         .in('id', batchIds)
         .eq('status', 'pending') // Only claim if still pending
