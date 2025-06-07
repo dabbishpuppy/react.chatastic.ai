@@ -32,13 +32,21 @@ export const useSourcesPaginated = ({
         throw new Error('Agent ID is required');
       }
 
-      // Build base query - exclude hard deleted sources (is_excluded without pending_deletion)
+      console.log('🔍 Fetching paginated sources:', {
+        agentId,
+        sourceType,
+        page,
+        pageSize,
+        timestamp: new Date().toISOString()
+      });
+
+      // Build base query - include ALL sources for complete list view
+      // Remove the complex filtering to ensure we see all sources including pending deletion
       let query = supabase
         .from('agent_sources')
         .select('*', { count: 'exact' })
         .eq('agent_id', agentId)
-        .eq('is_active', true)
-        .or('is_excluded.eq.false,and(is_excluded.eq.true,pending_deletion.eq.true)'); // Include non-excluded OR (excluded AND pending deletion)
+        .eq('is_active', true); // Only filter by is_active, not by is_excluded or pending_deletion
 
       // Add source type filter if specified
       if (sourceType) {
@@ -57,6 +65,14 @@ export const useSourcesPaginated = ({
         console.error('Error fetching paginated sources:', error);
         throw error;
       }
+
+      console.log('📋 Sources fetched:', {
+        count: data?.length || 0,
+        totalCount: count || 0,
+        sourcesWithPendingDeletion: data?.filter(s => s.pending_deletion).length || 0,
+        sourcesExcluded: data?.filter(s => s.is_excluded).length || 0,
+        timestamp: new Date().toISOString()
+      });
 
       const totalPages = Math.ceil((count || 0) / pageSize);
 
@@ -117,8 +133,8 @@ export const useSourcesPaginated = ({
     enabled: enabled && !!agentId,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    staleTime: 5000, // Reduced stale time for better real-time updates
-    refetchInterval: 10000, // Refetch every 10 seconds to catch updates
+    staleTime: 2000, // Further reduced stale time for better real-time updates
+    refetchInterval: 5000, // More frequent refetch for real-time feel
   });
 };
 

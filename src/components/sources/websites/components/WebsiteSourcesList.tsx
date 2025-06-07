@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
@@ -69,7 +68,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     enabled: !loading
   });
 
-  // Listen for source creation events to trigger refetch
+  // Enhanced event listening for all source events including remove/restore
   useEffect(() => {
     const handleSourceCreated = (event: CustomEvent) => {
       const { sourceType } = event.detail;
@@ -84,6 +83,16 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       refetch();
     };
 
+    const handleSourceRemoved = (event: CustomEvent) => {
+      console.log('🗑️ Source removed (soft delete), refetching list:', event.detail);
+      refetch();
+    };
+
+    const handleSourceRestored = (event: CustomEvent) => {
+      console.log('🔄 Source restored, refetching list:', event.detail);
+      refetch();
+    };
+
     const handleCrawlStarted = () => {
       console.log('🔄 Crawl started, refetching list');
       refetch();
@@ -94,14 +103,20 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       refetch();
     };
 
+    // Add all event listeners
     window.addEventListener('sourceCreated', handleSourceCreated as EventListener);
     window.addEventListener('sourceUpdated', handleSourceUpdated);
+    window.addEventListener('sourceRemoved', handleSourceRemoved as EventListener);
+    window.addEventListener('sourceRestored', handleSourceRestored as EventListener);
     window.addEventListener('crawlStarted', handleCrawlStarted);
     window.addEventListener('crawlCompleted', handleCrawlCompleted);
 
     return () => {
+      // Clean up all event listeners
       window.removeEventListener('sourceCreated', handleSourceCreated as EventListener);
       window.removeEventListener('sourceUpdated', handleSourceUpdated);
+      window.removeEventListener('sourceRemoved', handleSourceRemoved as EventListener);
+      window.removeEventListener('sourceRestored', handleSourceRestored as EventListener);
       window.removeEventListener('crawlStarted', handleCrawlStarted);
       window.removeEventListener('crawlCompleted', handleCrawlCompleted);
     };
@@ -123,7 +138,13 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     
     console.log('📊 Parent website sources:', {
       count: parents.length,
-      sources: parents.map(s => ({ id: s.id, title: s.title, url: s.url })),
+      sources: parents.map(s => ({ 
+        id: s.id, 
+        title: s.title, 
+        url: s.url,
+        pending_deletion: s.pending_deletion,
+        is_excluded: s.is_excluded
+      })),
       timestamp: new Date().toISOString()
     });
     

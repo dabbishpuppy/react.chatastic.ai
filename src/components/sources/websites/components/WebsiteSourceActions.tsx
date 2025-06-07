@@ -99,6 +99,8 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
         break;
       case 'delete':
         try {
+          console.log('🗑️ Starting soft delete for source:', source.id);
+          
           // Soft delete: mark as pending deletion instead of hard delete
           const { error } = await supabase
             .from('agent_sources')
@@ -110,15 +112,38 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
             throw error;
           }
           
-          console.log('Source marked for deletion');
+          console.log('✅ Source marked for deletion successfully');
+          
+          // Update local state immediately
           setSourceData(prev => ({ ...prev, pending_deletion: true }));
+          
+          // Dispatch remove event for real-time UI updates
+          window.dispatchEvent(new CustomEvent('sourceRemoved', {
+            detail: { 
+              sourceId: source.id,
+              agentId,
+              action: 'soft_delete'
+            }
+          }));
+          
+          // Also dispatch a general source update event
+          window.dispatchEvent(new CustomEvent('sourceUpdated', {
+            detail: { sourceId: source.id }
+          }));
+          
+          console.log('📡 Remove events dispatched for real-time UI update');
+          
+          // Call the parent onDelete handler to trigger any additional UI updates
           onDelete();
+          
         } catch (error) {
-          console.error('Soft delete failed:', error);
+          console.error('❌ Soft delete failed:', error);
         }
         break;
       case 'restore':
         try {
+          console.log('🔄 Starting restore for source:', source.id);
+          
           // Restore by removing the pending deletion flag
           const { error } = await supabase
             .from('agent_sources')
@@ -133,14 +158,33 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
             throw error;
           }
           
-          console.log('Source restored');
+          console.log('✅ Source restored successfully');
+          
+          // Update local state immediately
           setSourceData(prev => ({ 
             ...prev, 
             pending_deletion: false,
             is_excluded: false 
           }));
+          
+          // Dispatch restore event for real-time UI updates
+          window.dispatchEvent(new CustomEvent('sourceRestored', {
+            detail: { 
+              sourceId: source.id,
+              agentId,
+              action: 'restore'
+            }
+          }));
+          
+          // Also dispatch a general source update event
+          window.dispatchEvent(new CustomEvent('sourceUpdated', {
+            detail: { sourceId: source.id }
+          }));
+          
+          console.log('📡 Restore events dispatched for real-time UI update');
+          
         } catch (error) {
-          console.error('Restore failed:', error);
+          console.error('❌ Restore failed:', error);
         }
         break;
     }
