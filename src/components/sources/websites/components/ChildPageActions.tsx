@@ -6,7 +6,7 @@ import {
   RefreshCw, 
   Trash2,
   MoreHorizontal,
-  ChevronDown
+  ArrowRight
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
@@ -110,6 +110,17 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   return (
     <div className="flex items-center gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleViewClick}
+        disabled={!isViewEnabled}
+        className="h-6 w-6 p-0"
+        title={isViewEnabled ? "View source details" : "Available after training is complete"}
+      >
+        <ArrowRight className={`w-3 h-3 ${!isViewEnabled ? 'text-gray-400' : ''}`} />
+      </Button>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -134,17 +145,6 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleViewClick}
-        disabled={!isViewEnabled}
-        className="h-6 w-6 p-0"
-        title={isViewEnabled ? "View source details" : "Available after training is complete"}
-      >
-        <ChevronDown className={`w-3 h-3 ${!isViewEnabled ? 'text-gray-400' : ''}`} />
-      </Button>
 
       <WebsiteActionConfirmDialog
         open={confirmationType !== null}
