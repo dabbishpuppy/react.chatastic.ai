@@ -2,7 +2,7 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Loader2, FileText, RefreshCw } from "lucide-react";
+import { CheckCircle, Loader2, FileText, RefreshCw, Info } from "lucide-react";
 import { useEnhancedAgentRetraining } from "@/hooks/useEnhancedAgentRetraining";
 import { useParams } from "react-router-dom";
 import SourceRow from "./SourceRow";
@@ -100,6 +100,9 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     return null;
   };
 
+  // Show retraining info message when retraining is needed or button is available
+  const showRetrainingInfo = retrainingNeeded || (!isRetraining && buttonProps.text === "Retrain Agent");
+
   return (
     <div className="space-y-6">
       <Card className="border border-gray-200 bg-white">
@@ -147,7 +150,7 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
               </div>
 
               {/* Simple Training Button */}
-              <div>
+              <div className="space-y-3">
                 <Button
                   size="sm"
                   variant={buttonProps.variant}
@@ -158,6 +161,18 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
                   {buttonProps.icon}
                   {buttonProps.text}
                 </Button>
+
+                {/* Retraining Info Message */}
+                {showRetrainingInfo && (
+                  <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800">
+                      <span className="font-medium">Training time varies</span>
+                      <br />
+                      Retraining duration depends on the number of links and content in your sources. More content means longer training time.
+                    </div>
+                  </div>
+                )}
 
                 {/* Training Progress Message */}
                 <TrainingProgressMessage status={getTrainingStatus()} />
