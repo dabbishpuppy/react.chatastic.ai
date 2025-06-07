@@ -74,6 +74,7 @@ export const useSourceDetail = () => {
             url: pageData.url,
             source_type: 'website',
             agent_id: agentId || '',
+            team_id: '', // Add default team_id
             is_active: true,
             created_at: pageData.created_at,
             updated_at: pageData.updated_at,

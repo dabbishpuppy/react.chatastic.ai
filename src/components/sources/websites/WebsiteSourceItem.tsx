@@ -91,6 +91,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     const sourceForOperation: AgentSource = {
       id: childPage.id,
       agent_id: source.agent_id,
+      team_id: source.team_id, // Use parent source team_id
       title: childPage.url,
       source_type: 'website' as const,
       url: childPage.url,
@@ -108,6 +109,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     const sourceForOperation: AgentSource = {
       id: childPage.id,
       agent_id: source.agent_id,
+      team_id: source.team_id, // Use parent source team_id
       title: childPage.url,
       source_type: 'website' as const,
       url: childPage.url,
@@ -125,6 +127,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     const sourceForOperation: AgentSource = {
       id: childPage.id,
       agent_id: source.agent_id,
+      team_id: source.team_id, // Use parent source team_id
       title: childPage.url,
       source_type: 'website' as const,
       url: childPage.url,

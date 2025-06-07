@@ -7,12 +7,13 @@ export type SourceType = 'website' | 'file' | 'text' | 'qa';
 // Training status
 export type TrainingStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
 
-// Audit types
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'VIEW' | 'EXPORT';
+// Audit types - matching Supabase enum values
+export type AuditAction = 'create' | 'read' | 'update' | 'delete' | 'export' | 'train' | 'query';
 
 export interface AgentSource {
   id: string;
   agent_id: string;
+  team_id: string;
   title: string;
   url?: string;
   file_path?: string;
@@ -26,7 +27,6 @@ export interface AgentSource {
   crawl_status?: string;
   created_at: string;
   updated_at: string;
-  team_id: string;
   created_by?: string;
   updated_by?: string;
   original_size?: number;
