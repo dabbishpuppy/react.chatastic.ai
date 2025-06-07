@@ -37,29 +37,28 @@ export const useChildPageStatusUnified = ({
       timestamp
     });
 
-    // PRIORITY 1: Parent recrawling overrides everything
-    if (parentRecrawlStatus === 'recrawling') {
-      console.log('🔄 Parent recrawling - showing recrawling');
+    // PRIORITY 1: Parent recrawling overrides everything ONLY when child is pending/in_progress
+    if (parentRecrawlStatus === 'recrawling' && ['pending', 'in_progress'].includes(pageStatus)) {
+      console.log('🔄 Parent recrawling and child not completed - showing recrawling');
       return 'recrawling';
     }
 
     // PRIORITY 2: Use page status as primary indicator (this is the user-visible state)
-    // Only use processing_status for internal chunking phase
     const validStatuses = ['pending', 'in_progress', 'completed', 'failed', 'trained'];
     const primaryStatus = validStatuses.includes(pageStatus) ? pageStatus : 'pending';
 
-    // PRIORITY 3: Special handling for completed pages that are being processed for chunks
-    if (primaryStatus === 'completed' && processingStatus === 'processing') {
-      console.log('📝 Page completed, chunks being processed - staying completed');
-      return 'completed'; // Don't show intermediate processing state
+    // PRIORITY 3: If page is completed, show completed regardless of parent status
+    if (primaryStatus === 'completed') {
+      // Check if ready for training (processing completed)
+      if (processingStatus === 'processed') {
+        console.log('🎓 Page completed and processed - showing trained');
+        return 'trained';
+      }
+      console.log('✅ Page completed - showing completed');
+      return 'completed';
     }
 
-    // PRIORITY 4: Training state transition
-    if (primaryStatus === 'completed' && processingStatus === 'processed') {
-      console.log('🎓 Page ready for training - showing trained');
-      return 'trained';
-    }
-
+    // PRIORITY 4: Normal status flow
     console.log('📊 Using primary status:', primaryStatus);
     return primaryStatus;
   }, [pageId, displayStatus, lastUpdateTime]);
@@ -138,6 +137,7 @@ export const useChildPageStatusUnified = ({
               payload.old?.processing_status !== updatedPage.processing_status) {
             
             const timestamp = Date.now();
+            // Don't pass parent status here - let the parent subscription handle that
             const newStatus = determineDisplayStatus(
               updatedPage.status,
               updatedPage.processing_status || 'pending',
@@ -150,9 +150,11 @@ export const useChildPageStatusUnified = ({
               newDisplayStatus: newStatus
             });
             
-            setDisplayStatus(newStatus);
-            setIsLoading(newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'recrawling');
-            setLastUpdateTime(timestamp);
+            if (newStatus !== displayStatus) {
+              setDisplayStatus(newStatus);
+              setIsLoading(newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'recrawling');
+              setLastUpdateTime(timestamp);
+            }
           }
         }
       )
@@ -178,22 +180,25 @@ export const useChildPageStatusUnified = ({
                                     (metadata && metadata.is_recrawling === true);
           const parentRecrawlStatus = isParentRecrawling ? 'recrawling' : '';
           
-          const timestamp = Date.now();
-          const newStatus = determineDisplayStatus(
-            displayStatus, // Keep current page status
-            'pending', // Don't change processing status from parent update
-            parentRecrawlStatus,
-            timestamp
-          );
-          
-          if (newStatus !== displayStatus) {
-            console.log('📡 Parent update changed child status:', {
-              from: displayStatus,
-              to: newStatus
-            });
-            setDisplayStatus(newStatus);
-            setIsLoading(newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'recrawling');
-            setLastUpdateTime(timestamp);
+          // Only update if parent recrawl status affects this child
+          if (parentRecrawlStatus !== '' || displayStatus === 'recrawling') {
+            const timestamp = Date.now();
+            const newStatus = determineDisplayStatus(
+              displayStatus, // Keep current page status
+              'pending', // Don't change processing status from parent update
+              parentRecrawlStatus,
+              timestamp
+            );
+            
+            if (newStatus !== displayStatus) {
+              console.log('📡 Parent update changed child status:', {
+                from: displayStatus,
+                to: newStatus
+              });
+              setDisplayStatus(newStatus);
+              setIsLoading(newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'recrawling');
+              setLastUpdateTime(timestamp);
+            }
           }
         }
       )
@@ -205,7 +210,7 @@ export const useChildPageStatusUnified = ({
       console.log(`🔌 Cleaning up unified subscription for page: ${pageId}`);
       supabase.removeChannel(unifiedChannel);
     };
-  }, [pageId, parentSourceId, determineDisplayStatus]);
+  }, [pageId, parentSourceId, determineDisplayStatus, displayStatus]);
 
   console.log('🎯 Unified hook result:', { 
     pageId,
