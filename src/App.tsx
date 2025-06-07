@@ -35,6 +35,9 @@ import BillingSettings from '@/pages/settings/Billing';
 import ApiKeysSettings from '@/pages/settings/ApiKeys';
 import UsageSettings from '@/pages/settings/Usage';
 
+// Monitoring
+import { MonitoringDashboard } from '@/components/monitoring/MonitoringDashboard';
+
 const queryClient = new QueryClient();
 
 function App() {
@@ -52,6 +55,12 @@ function App() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/monitoring" element={
+                <ProtectedRoute>
+                  <MonitoringDashboard />
                 </ProtectedRoute>
               } />
               
