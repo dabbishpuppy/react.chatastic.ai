@@ -40,12 +40,12 @@ export async function handleChildPageRecrawl(
   // STEP 2: Wait a moment to ensure the status is set before proceeding
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // STEP 3: Update the existing source_pages entry to recrawling status
-  console.log('🔄 Step 2: Updating child page status to recrawling...');
+  // STEP 3: Update the existing source_pages entry to pending status (which will become in_progress when processed)
+  console.log('🔄 Step 2: Updating child page status to pending for processing...');
   const { error: updateError } = await supabase
     .from('source_pages')
     .update({
-      status: 'recrawling',
+      status: 'pending',
       started_at: new Date().toISOString(),
       completed_at: null,
       error_message: null,
@@ -60,7 +60,7 @@ export async function handleChildPageRecrawl(
     throw new Error(`Failed to update child page status: ${updateError.message}`);
   }
 
-  console.log('✅ Child page status updated to recrawling');
+  console.log('✅ Child page status updated to pending');
 
   // STEP 4: Call the process-source-pages function to handle the actual crawling
   console.log('🔄 Step 3: Initiating page processing...');
@@ -97,7 +97,7 @@ export async function handleChildPageRecrawl(
     debugInfo: {
       recrawlInitiated: true,
       parentStatus: 'recrawling',
-      childStatus: 'recrawling',
+      childStatus: 'pending',
       timestamp: new Date().toISOString()
     }
   };

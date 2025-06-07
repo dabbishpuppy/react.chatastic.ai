@@ -129,7 +129,23 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
           description: "Parent source and all child pages will be recrawled"
         });
       } else {
-        // For child sources, trigger individual child page recrawl
+        // For child sources, set proper status progression: recrawling → in_progress → completed
+        console.log(`🔄 Starting child page recrawl for: ${source.url}`);
+        
+        // First set to recrawling status
+        await sourceService.updateSource(source.id, {
+          crawl_status: 'recrawling',
+          progress: 0,
+          last_crawled_at: new Date().toISOString(),
+          metadata: {
+            ...source.metadata,
+            is_recrawling: true,
+            recrawl_started_at: new Date().toISOString(),
+            last_progress_update: new Date().toISOString()
+          }
+        });
+
+        // Trigger individual child page recrawl
         const { supabase } = await import('@/integrations/supabase/client');
         
         const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
@@ -144,21 +160,21 @@ export const useWebsiteSourceOperations = (refetch: () => void, removeSourceFrom
         });
 
         if (error) {
+          console.error('❌ Child page recrawl failed:', error);
+          // Set status to failed if the recrawl fails
+          await sourceService.updateSource(source.id, {
+            crawl_status: 'failed',
+            metadata: {
+              ...source.metadata,
+              is_recrawling: false,
+              recrawl_error: error.message,
+              last_error_at: new Date().toISOString()
+            }
+          });
           throw new Error(`Failed to trigger child page recrawl: ${error.message}`);
         }
 
-        // Update the child source status
-        await sourceService.updateSource(source.id, {
-          crawl_status: 'recrawling',
-          progress: 0,
-          last_crawled_at: new Date().toISOString(),
-          metadata: {
-            ...source.metadata,
-            is_recrawling: true,
-            recrawl_started_at: new Date().toISOString(),
-            last_progress_update: new Date().toISOString()
-          }
-        });
+        console.log('✅ Child page recrawl initiated successfully');
 
         toast({
           title: "Child page recrawl initiated",
