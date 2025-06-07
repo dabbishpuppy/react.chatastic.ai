@@ -1,146 +1,106 @@
 
-import React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { CheckCircle, Loader2, FileText, RefreshCw } from "lucide-react";
-import { useSimplifiedFlow } from "@/hooks/useSimplifiedFlow";
-import { useEnhancedAgentRetraining } from "@/hooks/useEnhancedAgentRetraining";
-import { useParams } from "react-router-dom";
-import SourceRow from "./SourceRow";
-import TrainingProgressMessage from "./TrainingProgressMessage";
-import SizeLimitWarning from "./SizeLimitWarning";
+import React, { useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useOptimizedAgentSources } from '@/hooks/useOptimizedAgentSources';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useQueryClient } from '@tanstack/react-query';
 
-interface SimplifiedSourcesWidgetProps {
-  currentTab?: string;
-  sourcesByType?: Record<string, { count: number; size: number }>;
-  totalSize?: string;
-}
-
-const SimplifiedSourcesWidget: React.FC<SimplifiedSourcesWidgetProps> = ({
-  currentTab,
-  sourcesByType = {},
-  totalSize = "0 B"
-}) => {
+const SimplifiedSourcesWidget: React.FC = () => {
   const { agentId } = useParams();
-  const { statusSummary, buttonState, startTraining } = useSimplifiedFlow();
-  const { trainingProgress } = useEnhancedAgentRetraining(agentId);
+  const queryClient = useQueryClient();
+  
+  const { data: stats, isLoading } = useOptimizedAgentSources(agentId || '');
 
-  // Calculate total size in bytes for limit checking
-  const totalSizeBytes = Object.values(sourcesByType).reduce((total, data) => total + data.size, 0);
-  const SIZE_LIMIT_BYTES = 500 * 1024; // 500KB
-  const isFreePlan = true; // This would come from user subscription data
-  const showSizeWarning = isFreePlan && totalSizeBytes >= SIZE_LIMIT_BYTES;
+  // Listen for real-time updates to invalidate queries
+  useEffect(() => {
+    const handleSourceUpdate = () => {
+      if (agentId) {
+        queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
+      }
+    };
 
-  // Format total size with limit for free users
-  const formatTotalSizeWithLimit = () => {
-    if (isFreePlan) {
-      return `${totalSize} / 500 KB`;
-    }
-    return totalSize;
-  };
+    const handleTrainingStateReset = () => {
+      if (agentId) {
+        queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
+      }
+    };
 
-  const getButtonIcon = () => {
-    if (buttonState.buttonText === 'Training Agent...') {
-      return <Loader2 className="h-4 w-4 animate-spin" />;
-    }
-    if (buttonState.buttonText === 'Agent Trained') {
-      return <CheckCircle className="h-4 w-4" />;
-    }
-    return <RefreshCw className="h-4 w-4" />;
-  };
+    const handleCrawlCompleted = () => {
+      if (agentId) {
+        queryClient.invalidateQueries({ queryKey: ['agent-source-stats', agentId] });
+      }
+    };
 
-  const getButtonClassName = () => {
-    if (buttonState.buttonText === 'Training Agent...') {
-      return "bg-blue-50 border-blue-200 text-blue-700 w-full";
-    }
-    if (buttonState.buttonText === 'Agent Trained') {
-      return "bg-green-50 border-green-200 text-green-700 w-full";
-    }
-    return "bg-black hover:bg-gray-800 text-white w-full";
-  };
+    window.addEventListener('sourceUpdated', handleSourceUpdate);
+    window.addEventListener('trainingStateReset', handleTrainingStateReset);
+    window.addEventListener('crawlCompletedReadyForTraining', handleCrawlCompleted);
+    
+    return () => {
+      window.removeEventListener('sourceUpdated', handleSourceUpdate);
+      window.removeEventListener('trainingStateReset', handleTrainingStateReset);
+      window.removeEventListener('crawlCompletedReadyForTraining', handleCrawlCompleted);
+    };
+  }, [agentId, queryClient]);
 
-  // Get training status for progress message
-  const getTrainingStatus = () => {
-    if (trainingProgress?.status === 'initializing') return 'initializing';
-    if (trainingProgress?.status === 'training') return 'training';
-    return null;
-  };
-
-  return (
-    <div className="space-y-6">
-      <Card className="border border-gray-200 bg-white">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-semibold text-gray-900 uppercase tracking-wide">
-            SOURCES
-          </CardTitle>
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sources Overview</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {statusSummary.isEmpty ? (
-            <div className="text-center py-8 space-y-4">
-              <div className="flex justify-center">
-                <FileText className="h-12 w-12 text-gray-400" />
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium text-gray-900">No sources added yet</h3>
-                <p className="text-gray-600 max-w-sm mx-auto">
-                  Add your first source to train your AI agent. You can upload files, add text content, websites, or Q&A pairs.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Sources List */}
-              <div className="space-y-1">
-                {Object.entries(sourcesByType)
-                  .filter(([, data]) => data.count > 0)
-                  .map(([type, data]) => (
-                    <SourceRow
-                      key={type}
-                      type={type}
-                      count={data.count}
-                      size={data.size}
-                    />
-                  ))}
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-dotted border-gray-300 my-4"></div>
-
-              {/* Total Size with Limit */}
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700 font-medium">Total size:</span>
-                <span className="text-gray-900 font-semibold">{formatTotalSizeWithLimit()}</span>
-              </div>
-
-              {/* Simplified Training Button */}
-              {buttonState.showButton && (
-                <div>
-                  <Button
-                    size="sm"
-                    variant={buttonState.variant}
-                    onClick={startTraining}
-                    disabled={buttonState.disabled}
-                    className={getButtonClassName()}
-                  >
-                    {getButtonIcon()}
-                    {buttonState.buttonText}
-                  </Button>
-
-                  {/* Training Progress Message */}
-                  <TrainingProgressMessage status={getTrainingStatus()} />
-
-                  {/* Size Limit Warning */}
-                  <SizeLimitWarning 
-                    totalSize={totalSizeBytes} 
-                    isVisible={showSizeWarning} 
-                  />
-                </div>
-              )}
-            </>
-          )}
+        <CardContent className="space-y-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
         </CardContent>
       </Card>
-    </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sources Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">No source data available</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Sources Overview</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex justify-between">
+          <span className="text-sm text-muted-foreground">Text Sources</span>
+          <span className="font-medium">{stats.text || 0}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-sm text-muted-foreground">Q&A Sources</span>
+          <span className="font-medium">{stats.qa || 0}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-sm text-muted-foreground">File Sources</span>
+          <span className="font-medium">{stats.file || 0}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-sm text-muted-foreground">Website Sources</span>
+          <span className="font-medium">{stats.website || 0}</span>
+        </div>
+        <div className="border-t pt-3 mt-3">
+          <div className="flex justify-between font-semibold">
+            <span>Total Sources</span>
+            <span>{(stats.text || 0) + (stats.qa || 0) + (stats.file || 0) + (stats.website || 0)}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
