@@ -32,11 +32,12 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
 }) => {
   const isHtmlContent = source?.metadata?.isHtml === true;
   const isFileSource = source?.source_type === 'file';
+  const isChildPage = source?.metadata?.isChildPage === true;
 
   return (
     <Card>
       <CardContent className="p-6">
-        {isEditing && !isFileSource ? (
+        {isEditing && !isFileSource && !isChildPage ? (
           <SourceEditForm
             editTitle={editTitle}
             editContent={editContent}
@@ -50,7 +51,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
           <div className="space-y-4">
             <div className="flex justify-between items-start">
               <h2 className="text-xl font-semibold">{source.title}</h2>
-              {!isFileSource && (
+              {!isFileSource && !isChildPage && (
                 <Button
                   variant="outline"
                   onClick={onStartEdit}
@@ -59,6 +60,33 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 </Button>
               )}
             </div>
+            
+            {isChildPage && source.metadata && (
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  {source.metadata.contentSize && (
+                    <div>
+                      <span className="font-medium">Content Size:</span> {(source.metadata.contentSize / 1024).toFixed(1)}KB
+                    </div>
+                  )}
+                  {source.metadata.chunksCreated && (
+                    <div>
+                      <span className="font-medium">Chunks Created:</span> {source.metadata.chunksCreated}
+                    </div>
+                  )}
+                  {source.metadata.processingTimeMs && (
+                    <div>
+                      <span className="font-medium">Processing Time:</span> {(source.metadata.processingTimeMs / 1000).toFixed(2)}s
+                    </div>
+                  )}
+                  {source.metadata.compressionRatio && (
+                    <div>
+                      <span className="font-medium">Compression Ratio:</span> {(source.metadata.compressionRatio * 100).toFixed(1)}%
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             <div className="prose max-w-none">
               {isHtmlContent ? (

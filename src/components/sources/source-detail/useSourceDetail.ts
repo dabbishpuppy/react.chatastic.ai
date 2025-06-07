@@ -5,9 +5,10 @@ import { useRAGServices } from '@/hooks/useRAGServices';
 import { toast } from '@/hooks/use-toast';
 import { AgentSource } from '@/types/rag';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useSourceDetail = () => {
-  const { agentId, sourceId } = useParams();
+  const { agentId, sourceId, pageId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { sources } = useRAGServices();
@@ -23,14 +24,53 @@ export const useSourceDetail = () => {
 
   useEffect(() => {
     const fetchSource = async () => {
-      if (!sourceId) return;
+      if (!sourceId && !pageId) return;
       
       try {
         setLoading(true);
-        const sourceData = await sources.getSourceWithStats(sourceId);
-        setSource(sourceData);
-        setEditTitle(sourceData.title);
-        setEditContent(sourceData.content || '');
+        
+        if (pageId) {
+          // Fetch child page data
+          const { data: pageData, error } = await supabase
+            .from('source_pages')
+            .select('*')
+            .eq('id', pageId)
+            .single();
+
+          if (error) throw error;
+
+          // Transform child page data to AgentSource format
+          const transformedSource: AgentSource = {
+            id: pageData.id,
+            title: pageData.url,
+            content: pageData.content || '',
+            url: pageData.url,
+            source_type: 'website',
+            agent_id: agentId || '',
+            is_active: true,
+            created_at: pageData.created_at,
+            updated_at: pageData.updated_at,
+            metadata: {
+              isChildPage: true,
+              parentSourceId: pageData.parent_source_id,
+              contentSize: pageData.content_size,
+              chunksCreated: pageData.chunks_created,
+              processingTimeMs: pageData.processing_time_ms,
+              compressionRatio: pageData.compression_ratio,
+              duplicatesFound: pageData.duplicates_found
+            }
+          };
+
+          setSource(transformedSource);
+          setEditTitle(transformedSource.title);
+          setEditContent(transformedSource.content || '');
+        } else if (sourceId) {
+          // Fetch regular source data
+          const sourceData = await sources.getSourceWithStats(sourceId);
+          setSource(sourceData);
+          setEditTitle(sourceData.title);
+          setEditContent(sourceData.content || '');
+        }
       } catch (error) {
         console.error('Error fetching source:', error);
         toast({
@@ -44,10 +84,10 @@ export const useSourceDetail = () => {
     };
 
     fetchSource();
-  }, [sourceId, sources]);
+  }, [sourceId, pageId, sources, agentId]);
 
   const handleSave = async () => {
-    if (!source) return;
+    if (!source || pageId) return; // Don't allow editing child pages
 
     setIsSaving(true);
     try {
@@ -86,12 +126,24 @@ export const useSourceDetail = () => {
     console.log('🗑️ Starting source deletion:', {
       sourceId: source.id,
       sourceType: source.source_type,
-      agentId
+      agentId,
+      isChildPage: !!pageId
     });
 
     setIsDeleting(true);
     try {
-      await sources.deleteSource(source.id);
+      if (pageId) {
+        // Delete child page
+        const { error } = await supabase
+          .from('source_pages')
+          .delete()
+          .eq('id', pageId);
+
+        if (error) throw error;
+      } else {
+        // Delete regular source
+        await sources.deleteSource(source.id);
+      }
       
       // Comprehensive query invalidation for all source types
       const queryKeysToInvalidate = [
@@ -115,7 +167,7 @@ export const useSourceDetail = () => {
       
       toast({
         title: 'Success',
-        description: 'Source deleted successfully',
+        description: pageId ? 'Page deleted successfully' : 'Source deleted successfully',
       });
 
       // Navigate back to the appropriate tab based on source type
@@ -132,7 +184,7 @@ export const useSourceDetail = () => {
       console.error('❌ Error deleting source:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete source',
+        description: pageId ? 'Failed to delete page' : 'Failed to delete source',
         variant: 'destructive',
       });
     } finally {

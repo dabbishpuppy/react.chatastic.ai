@@ -5,10 +5,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   RefreshCw, 
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  ArrowRight
 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
+import { useChildPageStatus } from '../hooks/useChildPageStatus';
 
 interface ChildPageActionsProps {
   url: string;
@@ -27,6 +30,13 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
+  const { displayStatus } = useChildPageStatus({ 
+    status: 'completed', 
+    parentSourceId, 
+    pageId 
+  });
+  const navigate = useNavigate();
+  const { agentId } = useParams();
 
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
@@ -34,6 +44,12 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
 
   const handleDeleteClick = () => {
     setConfirmationType('delete');
+  };
+
+  const handleViewClick = () => {
+    if (agentId) {
+      navigate(`/agent/${agentId}/sources/page/${pageId}`);
+    }
   };
 
   const handleConfirm = async () => {
@@ -86,9 +102,21 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   };
 
   const confirmConfig = getConfirmationConfig();
+  const isViewEnabled = displayStatus === 'trained';
 
   return (
     <div className="flex items-center gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleViewClick}
+        disabled={!isViewEnabled}
+        className="h-6 w-6 p-0"
+        title={isViewEnabled ? "View source details" : "Available after training is complete"}
+      >
+        <ArrowRight className={`w-3 h-3 ${!isViewEnabled ? 'text-gray-400' : ''}`} />
+      </Button>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

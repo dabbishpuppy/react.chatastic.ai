@@ -86,6 +86,12 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              <Route path="/agent/:agentId/sources/page/:pageId" element={
+                <ProtectedRoute>
+                  <SourceDetailPage />
+                </ProtectedRoute>
+              } />
+              
               <Route path="/agent/:agentId/actions" element={
                 <ProtectedRoute>
                   <ActionsPage />
