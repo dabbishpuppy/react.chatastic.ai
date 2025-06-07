@@ -13,6 +13,7 @@ import { AlertsPanel } from './AlertsPanel';
 import { ServiceControlPanel } from './ServiceControlPanel';
 import { QueueMonitor } from './QueueMonitor';
 import { ProductionQueueDashboard } from './ProductionQueueDashboard';
+import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
 
 export const MonitoringDashboard: React.FC = () => {
   const [orchestratorStatus, setOrchestratorStatus] = useState<any>(null);
@@ -154,6 +155,7 @@ export const MonitoringDashboard: React.FC = () => {
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="production">Production Queue</TabsTrigger>
+          <TabsTrigger value="production-crawl">Production Crawl</TabsTrigger>
           <TabsTrigger value="websockets">WebSockets</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
@@ -195,6 +197,10 @@ export const MonitoringDashboard: React.FC = () => {
 
         <TabsContent value="production" className="space-y-4">
           <ProductionQueueDashboard />
+        </TabsContent>
+
+        <TabsContent value="production-crawl" className="space-y-4">
+          <ProductionCrawlDashboard />
         </TabsContent>
 
         <TabsContent value="websockets" className="space-y-4">
@@ -270,17 +276,17 @@ export const MonitoringDashboard: React.FC = () => {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{systemMetrics.errorRate?.toFixed(1) || 0}%</div>
-                        <p className="text-xs text-muted-foreground">Error Rate</p>
+                        <div className="text-2xl font-bold">{systemMetrics.cpuUsage || 0}%</div>
+                        <p className="text-xs text-muted-foreground">CPU Usage</p>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold">{systemMetrics.throughput?.toFixed(1) || 0}</div>
-                        <p className="text-xs text-muted-foreground">Throughput</p>
+                        <div className="text-2xl font-bold">{systemMetrics.memoryUsage || 0}%</div>
+                        <p className="text-xs text-muted-foreground">Memory Usage</p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">Loading metrics...</p>
+                  <p className="text-muted-foreground">Loading performance metrics...</p>
                 )}
               </CardContent>
             </Card>
