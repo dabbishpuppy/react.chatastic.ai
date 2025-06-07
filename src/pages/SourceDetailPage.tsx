@@ -7,7 +7,6 @@ import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
 import SimplifiedSourcesWidget from '@/components/sources/SimplifiedSourcesWidget';
 import { useSourceDetail } from '@/components/sources/source-detail/useSourceDetail';
 import { useAgentSourceStats } from '@/hooks/useAgentSourceStats';
-import { useSourceSizeCalculations } from '@/hooks/useSourceSizeCalculations';
 
 const SourceDetailPage: React.FC = () => {
   const {
@@ -31,25 +30,31 @@ const SourceDetailPage: React.FC = () => {
   } = useSourceDetail();
 
   // Fetch agent source statistics for the widget
-  const { data: statsData, isLoading: statsLoading } = useAgentSourceStats(agentId);
+  const { data: statsData, isLoading: statsLoading } = useAgentSourceStats();
   
-  // Use empty array as fallback when stats are loading
-  const sourcesForCalculation = statsData?.sources || [];
-  
-  // Calculate source sections for the widget
-  const { sourcesByType: sourceSections } = useSourceSizeCalculations(sourcesForCalculation);
-  
-  // Prepare data for SimplifiedSourcesWidget
-  const sourcesByType = sourceSections.reduce((acc, section) => {
-    acc[section.type] = {
-      count: section.sources.length,
-      size: section.sources.reduce((total, source) => {
-        // Use total_content_size if available, otherwise fall back to content size estimation
-        return total + (source.total_content_size || (source.content?.length || 0));
-      }, 0)
-    };
-    return acc;
-  }, {} as Record<string, { count: number; size: number }>);
+  // Prepare data for SimplifiedSourcesWidget from the correct stats structure
+  const sourcesByType = statsData?.sourcesByType || {
+    text: { count: 0, size: 0 },
+    file: { count: 0, size: 0 },
+    website: { count: 0, size: 0 },
+    qa: { count: 0, size: 0 }
+  };
+
+  // Format total bytes to readable string
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    const size = bytes / Math.pow(k, i);
+    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
+    
+    return `${formattedSize} ${sizes[i]}`;
+  };
+
+  const totalSize = formatBytes(statsData?.totalBytes || 0);
 
   if (loading) {
     return (
@@ -104,7 +109,7 @@ const SourceDetailPage: React.FC = () => {
           <div className="w-80 flex-shrink-0">
             <SimplifiedSourcesWidget
               sourcesByType={sourcesByType}
-              totalSize={statsData?.totalSize || "0 B"}
+              totalSize={totalSize}
             />
           </div>
         </div>
