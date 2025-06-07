@@ -38,11 +38,12 @@ export const useSourceDetail = () => {
 
           if (error) throw error;
 
-          // Fetch the actual content from source_chunks table
+          // FIXED: Fetch the actual content from source_chunks table using the correct metadata filter
           const { data: chunkData, error: chunkError } = await supabase
             .from('source_chunks')
             .select('content')
-            .eq('source_id', pageId)
+            .eq('source_id', pageData.parent_source_id)
+            .contains('metadata', { page_id: pageId })
             .order('chunk_index');
 
           let extractedContent = 'No content available';
