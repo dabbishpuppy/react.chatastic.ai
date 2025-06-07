@@ -45,6 +45,10 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   // Use SimplifiedSourceStatusService to get the computed status
   const computedStatus = SimplifiedSourceStatusService.getSourceStatus(source);
 
+  // For parent sources (not child), always allow expand/collapse if onToggleExpanded is provided
+  const isParentSource = !source.parent_source_id;
+  const canExpand = isParentSource && onToggleExpanded;
+
   const handleRecrawlClick = () => {
     setConfirmationType('recrawl');
   };
@@ -107,19 +111,25 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
 
   const confirmConfig = getConfirmationConfig();
 
+  const getExpandTooltip = () => {
+    if (!canExpand) {
+      return 'No child sources';
+    }
+    return isExpanded ? 'Collapse child sources' : 'Expand child sources';
+  };
+
   return (
     <div className="flex items-center gap-2 ml-4">
       {/* Expand/collapse arrow for parent sources - positioned first */}
-      {onToggleExpanded && (
+      {canExpand && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={hasChildSources ? onToggleExpanded : undefined}
-                disabled={!hasChildSources}
-                className={`h-6 w-6 p-0 ${!hasChildSources ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                onClick={onToggleExpanded}
+                className="h-6 w-6 p-0 hover:bg-gray-100"
               >
                 {isExpanded ? (
                   <ChevronDown className="w-3 h-3" />
@@ -129,7 +139,7 @@ const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{hasChildSources ? (isExpanded ? 'Collapse' : 'Expand') + ' child sources' : 'No child sources'}</p>
+              <p>{getExpandTooltip()}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
