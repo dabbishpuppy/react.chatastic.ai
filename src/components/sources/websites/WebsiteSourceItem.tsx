@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit2, Eye, EyeOff, Trash2, RotateCcw, ExternalLink, ChevronDown, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, Edit2, Eye, EyeOff, Trash2, RotateCcw, ExternalLink, ChevronDown, ChevronRight, Calendar, Link, Database } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,8 +69,31 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     }
   };
 
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return "0 B";
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    const size = bytes / Math.pow(k, i);
+    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
+    
+    return `${formattedSize} ${sizes[i]}`;
+  };
+
   // Check if source has potential child sources based on links_count
   const hasChildSources = (source.links_count || 0) > 0;
+
+  // Calculate total child source sizes for trained sources
+  const totalChildSize = React.useMemo(() => {
+    if (status === 'trained' && childSources.length > 0) {
+      return childSources.reduce((total, child) => {
+        return total + (child.total_content_size || 0);
+      }, 0);
+    }
+    return 0;
+  }, [status, childSources]);
 
   return (
     <div className="border-b border-gray-100 last:border-b-0">
@@ -126,25 +149,41 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 </div>
               )}
 
-              {/* Metadata only (no status badges here) */}
+              {/* Metadata with icons */}
               <div className="mt-2 space-y-1">
                 <div className="flex items-center gap-3 text-xs text-gray-400">
+                  {/* 1. Crawled time first with Calendar icon */}
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
+                  </div>
+                  
+                  {/* 2. Links count with Link icon */}
                   {source.links_count !== undefined && source.links_count > 0 && (
-                    <span>{source.links_count} pages</span>
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <Link className="w-3 h-3" />
+                        <span>{source.links_count} links</span>
+                      </div>
+                    </>
                   )}
-                  <span>
-                    Updated {formatDate(source.updated_at)}
-                  </span>
-                  {source.last_crawled_at && (
-                    <span>
-                      Crawled {formatDate(source.last_crawled_at)}
-                    </span>
+
+                  {/* 3. Child source sizes for trained sources with Database icon */}
+                  {status === 'trained' && totalChildSize > 0 && (
+                    <>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <Database className="w-3 h-3" />
+                        <span>{formatBytes(totalChildSize)}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Status badges, child sources toggle and actions - moved to right side */}
+            {/* Status badges and actions */}
             <div className="flex items-center gap-2">
               {/* Status badges */}
               <WebsiteSourceStatusBadges
@@ -154,21 +193,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 sourceId={source.id}
                 source={source}
               />
-
-              {/* Child sources toggle - show if source has links_count > 0 */}
-              {hasChildSources && (
-                <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      {isChildSourcesOpen ? (
-                        <ChevronDown className="h-3 w-3" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
-              )}
 
               {/* Actions menu */}
               <DropdownMenu>
@@ -215,6 +239,21 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Child sources toggle - moved to right side of actions */}
+              {hasChildSources && (
+                <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      {isChildSourcesOpen ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                </Collapsible>
+              )}
             </div>
           </div>
         </div>
