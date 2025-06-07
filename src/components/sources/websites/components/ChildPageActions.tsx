@@ -11,12 +11,13 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
 import { useChildPageOperations } from '../hooks/useChildPageOperations';
-import { useChildPageStatus } from '../hooks/useChildPageStatus';
+import { useChildPageRealtimeStatus } from '../hooks/useChildPageRealtimeStatus';
 
 interface ChildPageActionsProps {
   url: string;
   pageId: string;
   parentSourceId: string;
+  initialStatus: string;
   onDelete?: () => void;
 }
 
@@ -26,14 +27,15 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
   url,
   pageId,
   parentSourceId,
+  initialStatus,
   onDelete
 }) => {
   const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
   const { recrawlChildPage, isLoading } = useChildPageOperations();
-  const { displayStatus } = useChildPageStatus({ 
-    status: 'completed', 
+  const { displayStatus } = useChildPageRealtimeStatus({ 
+    pageId, 
     parentSourceId, 
-    pageId 
+    initialStatus 
   });
   const navigate = useNavigate();
   const { agentId } = useParams();

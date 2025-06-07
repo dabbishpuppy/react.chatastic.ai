@@ -50,6 +50,7 @@ const ChildPageCard: React.FC<ChildPageCardProps> = ({
             url={page.url}
             pageId={page.id}
             parentSourceId={page.parent_source_id}
+            initialStatus={page.status}
             onDelete={onDelete ? handleDelete : undefined}
           />
         </div>
