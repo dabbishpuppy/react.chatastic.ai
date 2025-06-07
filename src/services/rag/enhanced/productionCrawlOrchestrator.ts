@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export class ProductionCrawlOrchestrator {
@@ -7,16 +6,57 @@ export class ProductionCrawlOrchestrator {
   private static healthCheckInterval: number | null = null;
   private static queueProcessInterval: number | null = null;
   private static recoveryInterval: number | null = null;
+  private static startTime = 0;
 
   private static readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
   private static readonly QUEUE_PROCESS_INTERVAL = 5000; // 5 seconds
   private static readonly RECOVERY_INTERVAL = 60000; // 1 minute
+  private static readonly PERSISTENCE_KEY = 'wonderwave_production_crawl_state';
 
   static getInstance(): ProductionCrawlOrchestrator {
     if (!this.instance) {
       this.instance = new ProductionCrawlOrchestrator();
+      this.loadPersistedState();
     }
     return this.instance;
+  }
+
+  /**
+   * Load persisted state from localStorage
+   */
+  private static loadPersistedState(): void {
+    try {
+      const savedState = localStorage.getItem(this.PERSISTENCE_KEY);
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        this.isRunning = state.isRunning || false;
+        this.startTime = state.startTime || 0;
+        
+        if (this.isRunning) {
+          console.log('🔄 Restoring production crawl orchestrator state from previous session');
+          // Auto-restart if it was running
+          this.getInstance().startOrchestrator();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load production crawl persisted state:', error);
+    }
+  }
+
+  /**
+   * Persist current state to localStorage
+   */
+  private static persistState(): void {
+    try {
+      const state = {
+        isRunning: this.isRunning,
+        startTime: this.startTime,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(this.PERSISTENCE_KEY, JSON.stringify(state));
+    } catch (error) {
+      console.error('Failed to persist production crawl state:', error);
+    }
   }
 
   async startOrchestrator(): Promise<void> {
@@ -27,6 +67,8 @@ export class ProductionCrawlOrchestrator {
 
     console.log('🚀 Starting production crawl orchestrator for 2000 concurrent URLs...');
     ProductionCrawlOrchestrator.isRunning = true;
+    ProductionCrawlOrchestrator.startTime = Date.now();
+    ProductionCrawlOrchestrator.persistState();
 
     // Start health monitoring
     ProductionCrawlOrchestrator.healthCheckInterval = window.setInterval(() => {
@@ -63,6 +105,7 @@ export class ProductionCrawlOrchestrator {
     }
 
     ProductionCrawlOrchestrator.isRunning = false;
+    ProductionCrawlOrchestrator.persistState();
     console.log('🛑 Production crawl orchestrator stopped');
   }
 
@@ -161,7 +204,7 @@ export class ProductionCrawlOrchestrator {
   }> {
     return {
       isRunning: ProductionCrawlOrchestrator.isRunning,
-      uptime: ProductionCrawlOrchestrator.isRunning ? Date.now() : 0,
+      uptime: ProductionCrawlOrchestrator.startTime,
       lastHealthCheck: new Date(),
       queueMetrics: await this.getLatestQueueMetrics()
     };
