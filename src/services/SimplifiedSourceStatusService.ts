@@ -1,149 +1,124 @@
-export type SourceStatus = 'pending' | 'crawling' | 'crawled' | 'training' | 'completed' | 'trained' | 'training_completed';
 
-export interface SourceStatusSummary {
-  totalSources: number;
-  hasCrawledSources: boolean;
-  hasTrainingSources: boolean;
-  allSourcesCompleted: boolean;
-  isEmpty: boolean;
-}
-
-interface SourceMetadata {
-  training_status?: string;
-  training_completed_at?: string;
-  training_started_at?: string;
-  last_trained_at?: string;
-  children_training_completed?: boolean;
-  [key: string]: any;
-}
-
+/**
+ * Service to map complex workflow states to simplified UI statuses
+ */
 export class SimplifiedSourceStatusService {
-  static analyzeSourceStatus(sources: any[]): SourceStatusSummary {
-    const totalSources = sources.length;
-    const isEmpty = totalSources === 0;
-    
-    const crawledSources = sources.filter(s => this.getSourceStatus(s) === 'crawled');
-    const trainingSources = sources.filter(s => this.getSourceStatus(s) === 'training');
-    const trainedSources = sources.filter(s => this.getSourceStatus(s) === 'trained');
-    const completedSources = sources.filter(s => this.getSourceStatus(s) === 'completed' || this.getSourceStatus(s) === 'training_completed');
-    
-    return {
-      totalSources,
-      isEmpty,
-      hasCrawledSources: crawledSources.length > 0,
-      hasTrainingSources: trainingSources.length > 0,
-      allSourcesCompleted: totalSources > 0 && (trainedSources.length + completedSources.length) === totalSources
-    };
-  }
-
-  static getSourceStatus(source: any): SourceStatus {
-    const metadata = (source.metadata as SourceMetadata) || {};
-    
-    console.log('SimplifiedSourceStatusService.getSourceStatus:', {
-      sourceId: source.id,
-      crawlStatus: source.crawl_status,
-      requiresManualTraining: source.requires_manual_training,
-      metadata: metadata,
-      sourceType: source.source_type,
-      parentSourceId: source.parent_source_id
-    });
-    
-    // Check if currently training
-    if (metadata.training_status === 'in_progress' || source.crawl_status === 'training') {
-      return 'training';
-    }
-    
-    // Check if training completed - FIXED: Always show "trained" for parent website sources after training
-    if (metadata.training_completed_at || metadata.last_trained_at) {
-      // For website sources, always return "trained" after training completion
-      if (source.source_type === 'website') {
-        return 'trained';
+  /**
+   * Map a source object to a simplified status for UI display
+   */
+  static getSourceStatus(source: any): string {
+    // Check workflow_status first (new system)
+    if (source.workflow_status) {
+      switch (source.workflow_status) {
+        case 'CREATED':
+          return 'pending';
+        case 'CRAWLING':
+          return 'crawling';
+        case 'COMPLETED':
+          return source.requires_manual_training ? 'ready_for_training' : 'crawled';
+        case 'TRAINING':
+          return 'training';
+        case 'TRAINED':
+          return 'trained';
+        case 'ERROR':
+          return 'failed';
+        case 'PENDING_REMOVAL':
+          return 'pending_removal';
+        case 'REMOVED':
+          return 'removed';
+        default:
+          return 'pending';
       }
+    }
+
+    // Fall back to legacy crawl_status
+    if (source.crawl_status) {
+      switch (source.crawl_status) {
+        case 'in_progress':
+          return 'crawling';
+        case 'completed':
+          return source.requires_manual_training ? 'ready_for_training' : 'crawled';
+        case 'failed':
+          return 'failed';
+        case 'training':
+          return 'training';
+        case 'training_completed':
+          return 'trained';
+        default:
+          return 'pending';
+      }
+    }
+
+    // Check if source has been trained
+    if (source.unique_chunks && source.unique_chunks > 0) {
       return 'trained';
     }
-    
-    // For website sources, check crawl_status
-    if (source.source_type === 'website') {
-      // Handle "ready_for_training" status properly
-      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === true) {
-        return 'crawled'; // Ready for training
-      }
-      
-      // For parent sources, if crawl is completed/ready_for_training and no manual training required,
-      // but no training metadata exists yet, it should be "completed" (not yet trained)
-      if ((source.crawl_status === 'ready_for_training' || source.crawl_status === 'completed') && source.requires_manual_training === false) {
-        // If this is a parent source and has no training metadata, it's just "completed" (crawling done, not trained yet)
-        if (source.parent_source_id === null && !metadata.training_completed_at && !metadata.last_trained_at) {
-          return 'completed';
-        }
-        // If it has training metadata, it should be handled by the training completion logic above
-        return 'completed';
-      }
-      
-      // If currently crawling or recrawling
-      if (source.crawl_status === 'in_progress' || source.crawl_status === 'recrawling') {
-        return 'crawling';
-      }
-      
-      // Default to pending for other states
-      return 'pending';
+
+    // Check if source has content but needs training
+    if (source.content || source.total_content_size > 0) {
+      return source.requires_manual_training ? 'ready_for_training' : 'crawled';
     }
-    
-    // For other sources, derive status from requires_manual_training
-    if (source.requires_manual_training === true) {
-      return 'crawled'; // Needs training
-    }
-    
-    return 'completed'; // Already trained
+
+    // Default fallback
+    return 'pending';
   }
 
-  static determineButtonState(summary: SourceStatusSummary): {
-    showButton: boolean;
-    buttonText: string;
-    disabled: boolean;
-    variant: 'default' | 'outline';
-  } {
-    if (summary.isEmpty) {
-      return {
-        showButton: false,
-        buttonText: '',
-        disabled: false,
-        variant: 'default'
-      };
+  /**
+   * Get progress percentage for a source
+   */
+  static getSourceProgress(source: any): number {
+    if (source.progress !== undefined && source.progress !== null) {
+      return Math.max(0, Math.min(100, source.progress));
     }
 
-    if (summary.hasTrainingSources) {
-      return {
-        showButton: true,
-        buttonText: 'Training Agent...',
-        disabled: true,
-        variant: 'outline'
-      };
+    // Calculate progress based on children if it's a parent source
+    if (source.total_children && source.total_children > 0) {
+      const completed = source.children_completed || 0;
+      return Math.round((completed / source.total_children) * 100);
     }
 
-    if (summary.hasCrawledSources) {
-      return {
-        showButton: true,
-        buttonText: 'Train Agent',
-        disabled: false,
-        variant: 'default'
-      };
+    // Default progress based on status
+    const status = this.getSourceStatus(source);
+    switch (status) {
+      case 'pending':
+        return 0;
+      case 'crawling':
+        return 25;
+      case 'crawled':
+      case 'ready_for_training':
+        return 50;
+      case 'training':
+        return 75;
+      case 'trained':
+        return 100;
+      case 'failed':
+        return 0;
+      default:
+        return 0;
     }
+  }
 
-    if (summary.allSourcesCompleted) {
-      return {
-        showButton: true,
-        buttonText: 'Agent Trained',
-        disabled: true,
-        variant: 'outline'
-      };
-    }
+  /**
+   * Check if a source is currently processing
+   */
+  static isSourceProcessing(source: any): boolean {
+    const status = this.getSourceStatus(source);
+    return ['crawling', 'training'].includes(status);
+  }
 
-    return {
-      showButton: false,
-      buttonText: '',
-      disabled: false,
-      variant: 'default'
-    };
+  /**
+   * Check if a source has completed successfully
+   */
+  static isSourceCompleted(source: any): boolean {
+    const status = this.getSourceStatus(source);
+    return ['trained'].includes(status);
+  }
+
+  /**
+   * Check if a source has failed
+   */
+  static isSourceFailed(source: any): boolean {
+    const status = this.getSourceStatus(source);
+    return ['failed'].includes(status);
   }
 }

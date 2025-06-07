@@ -5,7 +5,11 @@ import SourceDetailHeader from '@/components/sources/source-detail/SourceDetailH
 import SourceDetailContent from '@/components/sources/source-detail/SourceDetailContent';
 import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
 import SimplifiedSourcesWidget from '@/components/sources/SimplifiedSourcesWidget';
+import WorkflowEventTimeline from '@/components/workflow/WorkflowEventTimeline';
+import WorkflowJobsPanel from '@/components/workflow/WorkflowJobsPanel';
 import { useSourceDetail } from '@/components/sources/source-detail/useSourceDetail';
+import { useWorkflowRealtime } from '@/hooks/useWorkflowRealtime';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const SourceDetailPage: React.FC = () => {
   const {
@@ -27,6 +31,14 @@ const SourceDetailPage: React.FC = () => {
     handleCancelEdit,
     agentId
   } = useSourceDetail();
+
+  // Set up real-time workflow updates for this specific source
+  useWorkflowRealtime({ 
+    sourceId: source?.id,
+    onEvent: (event) => {
+      console.log('Source detail workflow event:', event);
+    }
+  });
 
   if (loading) {
     return (
@@ -64,18 +76,38 @@ const SourceDetailPage: React.FC = () => {
               onDeleteClick={() => setShowDeleteDialog(true)}
             />
 
-            <SourceDetailContent
-              source={source}
-              isEditing={isEditing}
-              editTitle={editTitle}
-              editContent={editContent}
-              isSaving={isSaving}
-              onStartEdit={() => setIsEditing(true)}
-              onTitleChange={setEditTitle}
-              onContentChange={setEditContent}
-              onSave={handleSave}
-              onCancel={handleCancelEdit}
-            />
+            <div className="mt-8">
+              <Tabs defaultValue="content" className="space-y-6">
+                <TabsList>
+                  <TabsTrigger value="content">Content</TabsTrigger>
+                  <TabsTrigger value="workflow">Workflow</TabsTrigger>
+                  <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="content">
+                  <SourceDetailContent
+                    source={source}
+                    isEditing={isEditing}
+                    editTitle={editTitle}
+                    editContent={editContent}
+                    isSaving={isSaving}
+                    onStartEdit={() => setIsEditing(true)}
+                    onTitleChange={setEditTitle}
+                    onContentChange={setEditContent}
+                    onSave={handleSave}
+                    onCancel={handleCancelEdit}
+                  />
+                </TabsContent>
+
+                <TabsContent value="workflow">
+                  <WorkflowEventTimeline sourceId={source.id} />
+                </TabsContent>
+
+                <TabsContent value="jobs">
+                  <WorkflowJobsPanel sourceId={source.id} />
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
 
           <div className="w-80 flex-shrink-0">
