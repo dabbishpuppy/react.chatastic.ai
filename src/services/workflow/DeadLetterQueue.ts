@@ -127,7 +127,7 @@ export class DeadLetterQueue {
       throw error;
     }
 
-    const deletedCount = data && Array.isArray(data) ? data.length : 0;
+    const deletedCount = data ? data.length : 0;
     console.log(`🧹 Cleaned up ${deletedCount} old dead letter jobs`);
     return deletedCount;
   }
