@@ -15,6 +15,7 @@ export const useChildPageRealtimeStatus = ({
 }: UseChildPageRealtimeStatusProps) => {
   const [status, setStatus] = useState(initialStatus);
   const [processingStatus, setProcessingStatus] = useState<string>('pending');
+  const [parentRecrawlStatus, setParentRecrawlStatus] = useState<string>('');
 
   useEffect(() => {
     if (!pageId || !parentSourceId) return;
@@ -29,9 +30,21 @@ export const useChildPageRealtimeStatus = ({
         .eq('id', pageId)
         .single();
       
+      const { data: parentData } = await supabase
+        .from('agent_sources')
+        .select('crawl_status, metadata')
+        .eq('id', parentSourceId)
+        .single();
+      
       if (pageData) {
         setStatus(pageData.status);
         setProcessingStatus(pageData.processing_status || 'pending');
+      }
+
+      if (parentData) {
+        const isParentRecrawling = parentData.crawl_status === 'recrawling' || 
+                                  parentData.metadata?.is_recrawling === true;
+        setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : parentData.crawl_status);
       }
     };
 
@@ -58,9 +71,9 @@ export const useChildPageRealtimeStatus = ({
       )
       .subscribe();
 
-    // Subscribe to parent source training completion
+    // Subscribe to parent source changes for recrawl status
     const parentChannel = supabase
-      .channel(`parent-training-${parentSourceId}`)
+      .channel(`parent-recrawl-status-${parentSourceId}`)
       .on(
         'postgres_changes',
         {
@@ -71,7 +84,11 @@ export const useChildPageRealtimeStatus = ({
         },
         (payload) => {
           const updatedSource = payload.new as any;
-          console.log('📡 Parent source update:', updatedSource);
+          console.log('📡 Parent source update for recrawl:', updatedSource);
+          
+          const isParentRecrawling = updatedSource.crawl_status === 'recrawling' || 
+                                    updatedSource.metadata?.is_recrawling === true;
+          setParentRecrawlStatus(isParentRecrawling ? 'recrawling' : updatedSource.crawl_status);
           
           // If parent training is completed and child is completed, mark as trained
           if (updatedSource.crawl_status === 'trained' && status === 'completed') {
@@ -89,8 +106,13 @@ export const useChildPageRealtimeStatus = ({
     };
   }, [pageId, parentSourceId, status]);
 
-  // Determine display status based on processing state
+  // Determine display status based on processing state and parent recrawl status
   const getDisplayStatus = () => {
+    // If parent is recrawling, show recrawling status for child
+    if (parentRecrawlStatus === 'recrawling') {
+      return 'recrawling';
+    }
+
     // If child is actively being processed (chunking), show "In Progress"
     if (processingStatus === 'processing') {
       return 'in_progress';
@@ -105,7 +127,7 @@ export const useChildPageRealtimeStatus = ({
   };
 
   const displayStatus = getDisplayStatus();
-  const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending';
+  const isLoading = displayStatus === 'in_progress' || displayStatus === 'pending' || displayStatus === 'recrawling';
 
   return {
     displayStatus,

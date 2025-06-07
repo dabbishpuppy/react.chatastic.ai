@@ -154,7 +154,7 @@ export async function handleAllChildrenRecrawl(
 
   console.log(`✅ Found ${childSources.length} child sources to recrawl`);
 
-  // STEP 3: Set all child sources to recrawling status
+  // STEP 3: Set all child sources to recrawling status first
   console.log('🔄 Step 3: Setting all child sources to recrawling...');
   const { error: childUpdateError } = await supabase
     .from('agent_sources')
@@ -175,7 +175,7 @@ export async function handleAllChildrenRecrawl(
     throw new Error(`Failed to update child sources: ${childUpdateError.message}`);
   }
 
-  // STEP 4: Update corresponding source_pages to pending status
+  // STEP 4: Update corresponding source_pages to pending status (this triggers the status flow)
   console.log('🔄 Step 4: Setting source_pages to pending for recrawl...');
   for (const child of childSources) {
     await supabase
@@ -191,6 +191,9 @@ export async function handleAllChildrenRecrawl(
       .eq('parent_source_id', parentSourceId)
       .eq('url', child.url);
   }
+
+  // Add small delay to ensure status updates are propagated
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
   // STEP 5: Trigger processing for all child pages
   console.log('🔄 Step 5: Triggering processing for all child pages...');

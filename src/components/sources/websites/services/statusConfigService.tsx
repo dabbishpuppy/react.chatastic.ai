@@ -19,7 +19,7 @@ export const getStatusConfig = (status: string) => {
       return {
         text: 'Recrawling',
         className: 'bg-orange-100 text-orange-800 border-orange-200',
-        icon: <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+        icon: <RotateCcw className="w-3 h-3 mr-1 animate-spin" />
       };
     case 'completed':
       return {
