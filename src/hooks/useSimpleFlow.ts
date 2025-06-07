@@ -31,7 +31,7 @@ export const useSimpleFlow = () => {
       setIsTraining(true);
       ToastNotificationService.showTrainingStarted();
 
-      // Update sources to training status
+      // Update sources to training status (not crawling)
       const { error: updateError } = await supabase
         .from('agent_sources')
         .update({ 

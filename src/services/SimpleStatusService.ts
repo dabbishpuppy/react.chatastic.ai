@@ -8,15 +8,24 @@ export interface SimpleStatusSummary {
   isEmpty: boolean;
 }
 
+interface SourceMetadata {
+  training_status?: string;
+  training_completed_at?: string;
+  training_started_at?: string;
+  training_error?: string;
+  last_trained_at?: string;
+  [key: string]: any;
+}
+
 export class SimpleStatusService {
   static getSourceStatus(source: any): SimpleSourceStatus {
-    // Check if marked as removed
+    // Check if marked as removed (soft deleted)
     if (source.is_excluded === true) {
       return 'removed';
     }
     
     // Check training status first
-    const metadata = source.metadata || {};
+    const metadata = (source.metadata as SourceMetadata) || {};
     if (metadata.training_status === 'in_progress' || source.crawl_status === 'training') {
       return 'training';
     }
