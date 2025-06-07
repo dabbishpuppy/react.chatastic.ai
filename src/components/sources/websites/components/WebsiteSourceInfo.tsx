@@ -70,7 +70,7 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
   };
 
   const shouldShowLinksCount = !isChild && linksCount > 0;
-  const shouldShowContentSize = !isChild && totalContentSize > 0;
+  const shouldShowRealtimeContentSize = !isChild && totalContentSize > 0;
   const shouldShowCompressionMetrics = !isChild && totalContentSize > 0 && compressedContentSize > 0;
 
   // Show total child sources size when training is completed and we have child data
@@ -145,17 +145,8 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </>
           )}
 
-          {shouldShowChildPagesSize && (
-            <>
-              <span className="mx-2">•</span>
-              <div className="flex items-center gap-1">
-                <Database className="w-3 h-3" />
-                <span>{formatBytes(childPagesSize)}</span>
-              </div>
-            </>
-          )}
-          
-          {shouldShowContentSize && !shouldShowChildPagesSize && (
+          {/* Priority 1: Show realtime child source total size */}
+          {shouldShowRealtimeContentSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
@@ -165,7 +156,19 @@ const WebsiteSourceInfo: React.FC<WebsiteSourceInfoProps> = ({
             </>
           )}
 
-          {shouldShowChildTotalSize && !shouldShowChildPagesSize && (
+          {/* Priority 2: Show metadata child pages size if no realtime data */}
+          {!shouldShowRealtimeContentSize && shouldShowChildPagesSize && (
+            <>
+              <span className="mx-2">•</span>
+              <div className="flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                <span>{formatBytes(childPagesSize)}</span>
+              </div>
+            </>
+          )}
+
+          {/* Priority 3: Show source total content size if no other size data */}
+          {!shouldShowRealtimeContentSize && !shouldShowChildPagesSize && shouldShowChildTotalSize && (
             <>
               <span className="mx-2">•</span>
               <div className="flex items-center gap-1">
