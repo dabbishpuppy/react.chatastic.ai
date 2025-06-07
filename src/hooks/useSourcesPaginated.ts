@@ -70,7 +70,6 @@ export const useSourcesPaginated = ({
         source_type: source.source_type as SourceType,
         url: source.url || undefined,
         file_path: source.file_path || undefined,
-        file_type: source.file_type || undefined,
         parent_source_id: source.parent_source_id || undefined,
         created_at: source.created_at,
         updated_at: source.updated_at,
@@ -105,6 +104,8 @@ export const useSourcesPaginated = ({
         updated_by: source.updated_by || undefined,
         requires_manual_training: source.requires_manual_training || false,
         links_count: source.links_count || undefined,
+        // Set optional properties that don't exist in DB to undefined
+        file_type: undefined,
       }));
 
       return {
