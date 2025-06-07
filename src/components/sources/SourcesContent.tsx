@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,8 +99,8 @@ const SourcesContent: React.FC<SourcesContentProps> = ({
     return null;
   };
 
-  // Show retraining info message when retraining is needed or button is available
-  const showRetrainingInfo = retrainingNeeded || (!isRetraining && buttonProps.text === "Retrain Agent");
+  // Show retraining info message when button is "Agent Trained" or "Retrain Agent"
+  const showRetrainingInfo = buttonProps.text === "Agent Trained" || buttonProps.text === "Retrain Agent";
 
   return (
     <div className="space-y-6">
