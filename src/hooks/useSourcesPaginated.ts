@@ -161,8 +161,9 @@ export const useSourcesPaginated = ({
     enabled: enabled && !!agentId,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
-    staleTime: 2000,
-    refetchInterval: 5000,
+    staleTime: 0, // INSTANT FEEDBACK: No stale time - rely on optimistic updates
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    // REMOVED refetchInterval - rely on WebSocket events and cache updates instead
   });
 };
 

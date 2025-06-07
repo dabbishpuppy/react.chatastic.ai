@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +6,7 @@ import { useRAGServices } from '@/hooks/useRAGServices';
 import { useSelectionState } from '@/hooks/useSelectionState';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { useSourcesPaginated } from '@/hooks/useSourcesPaginated';
+import { useRealtimeSourceStatus } from '@/hooks/useRealtimeSourceStatus';
 import WebsiteSourcesHeader from './WebsiteSourcesHeader';
 import WebsiteSourcesContent from './WebsiteSourcesContent';
 import WebsiteSourcesLoading from './WebsiteSourcesLoading';
@@ -33,6 +33,9 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
   const { sources: sourceService } = useRAGServices();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  // INSTANT FEEDBACK: Use real-time status updates
+  useRealtimeSourceStatus();
 
   const {
     selectedArray,
@@ -69,57 +72,43 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
     enabled: !loading
   });
 
-  // Enhanced event listening for all source events including remove/restore
+  // Legacy event listening - keeping for backward compatibility but real-time updates handle most cases
   useEffect(() => {
     const handleSourceCreated = (event: CustomEvent) => {
       const { sourceType } = event.detail;
       if (sourceType === 'website') {
-        console.log('🔄 Website source created, refetching list');
-        refetch();
+        console.log('🔄 Website source created event received (legacy)');
+        // Real-time subscription should handle this, but refetch as fallback
+        setTimeout(() => refetch(), 100);
       }
     };
 
     const handleSourceUpdated = () => {
-      console.log('🔄 Source updated, refetching list');
-      refetch();
+      console.log('🔄 Source updated event received (legacy)');
+      // Real-time subscription should handle this
     };
 
     const handleSourceRemoved = (event: CustomEvent) => {
-      console.log('🗑️ Source removed (soft delete), refetching list:', event.detail);
-      refetch();
+      console.log('🗑️ Source removed event received (legacy):', event.detail);
+      // Real-time subscription should handle this
     };
 
     const handleSourceRestored = (event: CustomEvent) => {
-      console.log('🔄 Source restored, refetching list:', event.detail);
-      refetch();
+      console.log('🔄 Source restored event received (legacy):', event.detail);
+      // Real-time subscription should handle this
     };
 
-    const handleCrawlStarted = () => {
-      console.log('🔄 Crawl started, refetching list');
-      refetch();
-    };
-
-    const handleCrawlCompleted = () => {
-      console.log('🔄 Crawl completed, refetching list');
-      refetch();
-    };
-
-    // Add all event listeners
+    // Add event listeners as fallback
     window.addEventListener('sourceCreated', handleSourceCreated as EventListener);
     window.addEventListener('sourceUpdated', handleSourceUpdated);
     window.addEventListener('sourceRemoved', handleSourceRemoved as EventListener);
     window.addEventListener('sourceRestored', handleSourceRestored as EventListener);
-    window.addEventListener('crawlStarted', handleCrawlStarted);
-    window.addEventListener('crawlCompleted', handleCrawlCompleted);
 
     return () => {
-      // Clean up all event listeners
       window.removeEventListener('sourceCreated', handleSourceCreated as EventListener);
       window.removeEventListener('sourceUpdated', handleSourceUpdated);
       window.removeEventListener('sourceRemoved', handleSourceRemoved as EventListener);
       window.removeEventListener('sourceRestored', handleSourceRestored as EventListener);
-      window.removeEventListener('crawlStarted', handleCrawlStarted);
-      window.removeEventListener('crawlCompleted', handleCrawlCompleted);
     };
   }, [refetch]);
 
@@ -141,7 +130,9 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
       pending_deletion: s.pending_deletion,
       is_excluded: s.is_excluded,
       parent_source_id: s.parent_source_id,
-      source_type: s.source_type
+      source_type: s.source_type,
+      crawl_status: s.crawl_status,
+      isOptimistic: (s as any).isOptimistic
     })));
     
     // Filter for parent sources (no parent_source_id) and include ALL active sources
@@ -158,6 +149,7 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         isActive,
         pending_deletion: source.pending_deletion,
         is_excluded: source.is_excluded,
+        isOptimistic: (source as any).isOptimistic,
         willInclude: isParent && isWebsite && isActive
       });
       
@@ -171,7 +163,9 @@ const WebsiteSourcesList: React.FC<WebsiteSourcesListProps> = ({
         title: s.title, 
         url: s.url,
         pending_deletion: s.pending_deletion,
-        is_excluded: s.is_excluded
+        is_excluded: s.is_excluded,
+        crawl_status: s.crawl_status,
+        isOptimistic: (s as any).isOptimistic
       })),
       timestamp: new Date().toISOString()
     });

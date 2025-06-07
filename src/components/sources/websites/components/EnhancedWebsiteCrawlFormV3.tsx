@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from '@/hooks/use-toast';
-import { useParams } from 'react-router-dom';
-import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
-import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
+import { useOptimisticWebsiteCrawl } from '@/hooks/useOptimisticWebsiteCrawl';
 import { Globe, FileText, Map } from 'lucide-react';
 
 interface EnhancedWebsiteCrawlFormV3Props {
@@ -19,7 +17,6 @@ interface EnhancedWebsiteCrawlFormV3Props {
 const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   onCrawlStarted
 }) => {
-  const { agentId } = useParams();
   const [activeTab, setActiveTab] = useState('website');
   const [url, setUrl] = useState('');
   const [protocol, setProtocol] = useState('https://');
@@ -28,15 +25,8 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   const [respectRobots, setRespectRobots] = useState(true);
   const [includePaths, setIncludePaths] = useState('');
   const [excludePaths, setExcludePaths] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { initiateCrawl, loading: crawlLoading } = useEnhancedCrawl();
-  const { infrastructureHealth, systemHealth, loading: infrastructureLoading, loadInfrastructureHealth } = useProductionInfrastructure();
-
-  // Initialize infrastructure on mount
-  useEffect(() => {
-    loadInfrastructureHealth();
-  }, [loadInfrastructureHealth]);
+  const { submitWebsite, isSubmitting } = useOptimisticWebsiteCrawl();
 
   const getUrlPlaceholder = () => {
     switch (activeTab) {
@@ -53,7 +43,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agentId || !url.trim()) {
+    if (!url.trim()) {
       toast({
         title: "Validation Error",
         description: "Please enter a valid URL",
@@ -62,20 +52,15 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const fullUrl = url.startsWith('http') ? url : `${protocol}${url.trim()}`;
-      console.log('🚀 Starting enhanced crawl with V3 form:', {
-        url: fullUrl,
-        activeTab,
-        maxPages,
-        maxDepth,
-        respectRobots,
-        includePaths,
-        excludePaths,
-        agentId
-      });
+    const fullUrl = url.startsWith('http') ? url : `${protocol}${url.trim()}`;
+    
+    console.log('⚡ INSTANT FEEDBACK: Starting optimistic crawl submission:', {
+      url: fullUrl,
+      activeTab,
+      timestamp: new Date().toISOString()
+    });
 
+    try {
       // Convert tab to the expected crawl mode format
       let finalCrawlMode: 'single-page' | 'sitemap-only' | 'full-website' = 'full-website';
       if (activeTab === 'single-site') {
@@ -90,9 +75,9 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       const includePathsArray = includePaths.split(',').map(p => p.trim()).filter(p => p.length > 0);
       const excludePathsArray = excludePaths.split(',').map(p => p.trim()).filter(p => p.length > 0);
 
-      const result = await initiateCrawl({
+      // INSTANT FEEDBACK: This will immediately show the source in the UI with "Submitting..." status
+      const result = await submitWebsite({
         url: fullUrl,
-        agentId,
         crawlMode: finalCrawlMode,
         maxPages,
         maxDepth,
@@ -101,20 +86,19 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         excludePaths: excludePathsArray
       });
 
-      if (result.parentSourceId) {
+      if (result?.parentSourceId) {
         onCrawlStarted?.(result.parentSourceId);
 
-        // Reset form
+        // Reset form after successful submission
         setUrl('');
         setIncludePaths('');
         setExcludePaths('');
-      } else {
-        throw new Error('Failed to start crawl: No parent source ID returned');
+        
+        console.log('✅ INSTANT FEEDBACK: Form reset after successful submission');
       }
     } catch (error: any) {
-      console.error('❌ Enhanced crawl submission failed:', error);
-    } finally {
-      setIsSubmitting(false);
+      console.error('❌ INSTANT FEEDBACK: Form submission failed:', error);
+      // Error handling is done in the optimistic hook
     }
   };
 
@@ -132,7 +116,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   };
 
   const getButtonText = () => {
-    if (isSubmitting || crawlLoading) {
+    if (isSubmitting) {
       switch (activeTab) {
         case 'website':
           return "Starting Website Crawl...";
@@ -155,8 +139,6 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
         return "Start Crawl";
     }
   };
-
-  const isLoading = isSubmitting || crawlLoading;
 
   return (
     <Card>
@@ -182,7 +164,6 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* URL Input - Common across all tabs */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
               <div className="md:col-span-2">
                 <Select value={protocol} onValueChange={setProtocol}>
@@ -196,16 +177,15 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                 </Select>
               </div>
               <div className="md:col-span-10">
-                <Input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder={getUrlPlaceholder()} required disabled={isLoading} />
+                <Input type="text" value={url} onChange={e => setUrl(e.target.value)} placeholder={getUrlPlaceholder()} required disabled={isSubmitting} />
               </div>
             </div>
 
             <TabsContent value="website" className="space-y-6 mt-0">
-              {/* Include/Exclude Paths */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="includePaths">Include Paths (optional)</Label>
-                  <Input id="includePaths" type="text" value={includePaths} onChange={e => setIncludePaths(e.target.value)} placeholder="/blog, /docs, /help" className="mt-1" disabled={isLoading} />
+                  <Input id="includePaths" type="text" value={includePaths} onChange={e => setIncludePaths(e.target.value)} placeholder="/blog, /docs, /help" className="mt-1" disabled={isSubmitting} />
                   <p className="text-sm text-gray-500 mt-1">
                     Comma-separated paths to include
                   </p>
@@ -213,7 +193,7 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                 
                 <div>
                   <Label htmlFor="excludePaths">Exclude Paths (optional)</Label>
-                  <Input id="excludePaths" type="text" value={excludePaths} onChange={e => setExcludePaths(e.target.value)} placeholder="/admin, /private, /login" className="mt-1" disabled={isLoading} />
+                  <Input id="excludePaths" type="text" value={excludePaths} onChange={e => setExcludePaths(e.target.value)} placeholder="/admin, /private, /login" className="mt-1" disabled={isSubmitting} />
                   <p className="text-sm text-gray-500 mt-1">
                     Comma-separated paths to exclude
                   </p>
@@ -241,16 +221,14 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
               </div>
             </TabsContent>
 
-            {/* Advanced Settings Accordion */}
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="advanced">
                 <AccordionTrigger>Advanced Settings</AccordionTrigger>
                 <AccordionContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Max Pages */}
                     <div>
                       <Label htmlFor="maxPages">Max Pages</Label>
-                      <Select value={maxPages.toString()} onValueChange={value => setMaxPages(parseInt(value))} disabled={isLoading}>
+                      <Select value={maxPages.toString()} onValueChange={value => setMaxPages(parseInt(value))} disabled={isSubmitting}>
                         <SelectTrigger className="mt-1">
                           <SelectValue />
                         </SelectTrigger>
@@ -266,10 +244,9 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                       </Select>
                     </div>
 
-                    {/* Max Depth - only show for website crawl */}
                     {activeTab === 'website' && <div>
                         <Label htmlFor="maxDepth">Max Depth</Label>
-                        <Select value={maxDepth.toString()} onValueChange={value => setMaxDepth(parseInt(value))} disabled={isLoading}>
+                        <Select value={maxDepth.toString()} onValueChange={value => setMaxDepth(parseInt(value))} disabled={isSubmitting}>
                           <SelectTrigger className="mt-1">
                             <SelectValue />
                           </SelectTrigger>
@@ -284,9 +261,8 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                       </div>}
                   </div>
 
-                  {/* Respect Robots */}
                   <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="respectRobots" checked={respectRobots} onChange={e => setRespectRobots(e.target.checked)} className="rounded border-gray-300" disabled={isLoading} />
+                    <input type="checkbox" id="respectRobots" checked={respectRobots} onChange={e => setRespectRobots(e.target.checked)} className="rounded border-gray-300" disabled={isSubmitting} />
                     <Label htmlFor="respectRobots" className="text-sm">
                       Respect robots.txt and crawl delays
                     </Label>
@@ -295,9 +271,8 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
               </AccordionItem>
             </Accordion>
 
-            {/* Submit Button - Right aligned */}
             <div className="flex justify-end">
-              <Button type="submit" disabled={isLoading || !url.trim()} className="px-8">
+              <Button type="submit" disabled={isSubmitting || !url.trim()} className="px-8">
                 {getButtonText()}
               </Button>
             </div>
