@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Check, X } from 'lucide-react';
 import { AgentSource } from '@/types/rag';
 import WebsiteSourceInfo from './WebsiteSourceInfo';
+import { useChildSourceSizeRealtime } from '../hooks/useChildSourceSizeRealtime';
 
 interface SourcePage {
   id: string;
@@ -47,17 +48,11 @@ const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
     onSelectionChange(checked);
   };
 
-  // Calculate total content size from child pages
-  const totalContentSize = childSources.reduce((total, child) => {
-    return total + (child.content_size || 0);
-  }, 0);
-
-  // Calculate compressed content size from child pages
-  const compressedContentSize = childSources.reduce((total, child) => {
-    const originalSize = child.content_size || 0;
-    const compressionRatio = 0.3; // Default compression ratio
-    return total + Math.round(originalSize * compressionRatio);
-  }, 0);
+  // Use realtime hook for size calculations
+  const { totalContentSize, compressedContentSize } = useChildSourceSizeRealtime({
+    parentSourceId: source.id,
+    initialChildSources: childSources
+  });
 
   return (
     <div className="flex items-start gap-3 flex-1 min-w-0">
