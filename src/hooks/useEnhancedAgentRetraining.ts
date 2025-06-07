@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { EnhancedRetrainingChecker, type EnhancedRetrainingStatus } from '@/services/rag/retraining/enhancedRetrainingChecker';
 import { useToast } from '@/hooks/use-toast';
 import { useTrainingNotifications } from '@/hooks/useTrainingNotifications';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Phase 5: Session-based toast management interface
@@ -88,6 +89,57 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
     }
   }, [toast]);
 
+  /**
+   * Trigger status aggregation for website parent sources after training completion
+   */
+  const triggerStatusAggregationForWebsiteSources = useCallback(async () => {
+    if (!agentId) return;
+
+    try {
+      console.log('🔄 Triggering status aggregation for website sources after training completion');
+      
+      // Get all website parent sources for this agent
+      const { data: websiteParentSources, error } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('agent_id', agentId)
+        .eq('source_type', 'website')
+        .is('parent_source_id', null)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching website parent sources:', error);
+        return;
+      }
+
+      if (websiteParentSources && websiteParentSources.length > 0) {
+        console.log(`📊 Found ${websiteParentSources.length} website parent sources to update`);
+        
+        // Trigger status aggregation for each parent source
+        for (const parentSource of websiteParentSources) {
+          try {
+            const { data, error: aggregationError } = await supabase.functions.invoke('status-aggregator', {
+              body: { 
+                parentSourceId: parentSource.id,
+                eventType: 'training_completion_metadata_update'
+              }
+            });
+
+            if (aggregationError) {
+              console.error(`❌ Failed to aggregate status for parent ${parentSource.id}:`, aggregationError);
+            } else {
+              console.log(`✅ Status aggregated for parent: ${parentSource.id}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error aggregating status for parent ${parentSource.id}:`, error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error triggering status aggregation:', error);
+    }
+  }, [agentId]);
+
   // ALL useEffect calls MUST come after custom hooks
   useEffect(() => {
     if (trainingProgress) {
@@ -137,6 +189,11 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
               status: 'completed'
             }
           }));
+
+          // Trigger status aggregation for website sources to update metadata
+          setTimeout(() => {
+            triggerStatusAggregationForWebsiteSources();
+          }, 2000); // Wait 2 seconds for all training operations to complete
         }
         
         currentSessionRef.current = '';
@@ -153,7 +210,7 @@ export const useEnhancedAgentRetraining = (agentId?: string) => {
                trainingProgress.status === 'initializing' ? 'pending' : 'pending'
       });
     }
-  }, [trainingProgress, showSessionToast, agentId]);
+  }, [trainingProgress, showSessionToast, agentId, triggerStatusAggregationForWebsiteSources]);
 
   /**
    * Phase 6: Enhanced retraining check with race condition prevention

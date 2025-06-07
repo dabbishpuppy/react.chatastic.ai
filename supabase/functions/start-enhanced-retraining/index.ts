@@ -49,6 +49,7 @@ serve(async (req) => {
 
     let processedCount = 0;
     let errors = [];
+    const parentSourcesToUpdate = new Set<string>();
 
     // Process each source
     for (const source of sourcesToTrain) {
@@ -167,6 +168,9 @@ serve(async (req) => {
             .eq('id', source.id);
 
           console.log(`✅ Parent source ${source.id} marked as training completed`);
+          
+          // Add to set for status aggregation
+          parentSourcesToUpdate.add(source.id);
         } else {
           // Mark child source as trained
           await supabase
@@ -192,6 +196,8 @@ serve(async (req) => {
         // If this is a child source, check if all siblings are trained and update parent
         if (source.parent_source_id) {
           await checkAndUpdateParentStatus(supabase, source.parent_source_id);
+          // Add parent to set for status aggregation
+          parentSourcesToUpdate.add(source.parent_source_id);
         }
 
       } catch (error) {
@@ -216,6 +222,27 @@ serve(async (req) => {
       }
     }
 
+    // After all training is complete, trigger status aggregation for all parent sources
+    console.log(`🔄 Triggering status aggregation for ${parentSourcesToUpdate.size} parent sources`);
+    for (const parentSourceId of parentSourcesToUpdate) {
+      try {
+        const aggregationResult = await supabase.functions.invoke('status-aggregator', {
+          body: { 
+            parentSourceId: parentSourceId,
+            eventType: 'training_completed'
+          }
+        });
+
+        if (aggregationResult.error) {
+          console.error(`❌ Failed to aggregate status for parent ${parentSourceId}:`, aggregationResult.error);
+        } else {
+          console.log(`✅ Status aggregated for parent: ${parentSourceId}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error aggregating status for parent ${parentSourceId}:`, error);
+      }
+    }
+
     console.log(`✅ Simplified training completed: ${processedCount} sources processed`);
 
     const result = {
@@ -223,7 +250,8 @@ serve(async (req) => {
       processedSources: processedCount,
       totalSources: sourcesToTrain.length,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Successfully trained ${processedCount} sources`
+      message: `Successfully trained ${processedCount} sources`,
+      parentSourcesUpdated: parentSourcesToUpdate.size
     };
 
     if (errors.length > 0) {
