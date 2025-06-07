@@ -32,7 +32,7 @@ export interface AgentSource {
   original_size?: number;
   compressed_size?: number;
   compression_ratio?: number;
-  raw_text?: string; // Changed from Uint8Array to string for database compatibility
+  raw_text?: string;
   last_crawled_at?: string;
   
   // Workflow-related properties
@@ -95,7 +95,7 @@ export interface AuditLog {
   resource_id?: string;
   old_values?: Json;
   new_values?: Json;
-  ip_address?: string | null; // Allow null for compatibility
+  ip_address?: string | null;
   user_agent?: string;
   created_at: string;
 }
@@ -118,7 +118,7 @@ export interface UserConsent {
   consented: boolean;
   consent_date?: string;
   withdrawal_date?: string;
-  ip_address?: string | null; // Allow null for compatibility
+  ip_address?: string | null;
   user_agent?: string;
   created_at: string;
   updated_at: string;

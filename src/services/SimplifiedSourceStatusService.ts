@@ -121,4 +121,62 @@ export class SimplifiedSourceStatusService {
     const status = this.getSourceStatus(source);
     return ['failed'].includes(status);
   }
+
+  /**
+   * Source status summary for analytics
+   */
+  static analyzeSourceStatus(sources: any[]): SourceStatusSummary {
+    const summary: SourceStatusSummary = {
+      total: sources.length,
+      pending: 0,
+      crawling: 0,
+      crawled: 0,
+      training: 0,
+      trained: 0,
+      failed: 0,
+      ready_for_training: 0
+    };
+
+    sources.forEach(source => {
+      const status = this.getSourceStatus(source);
+      summary[status as keyof SourceStatusSummary]++;
+    });
+
+    return summary;
+  }
+
+  /**
+   * Determine button state for source operations
+   */
+  static determineButtonState(source: any): ButtonState {
+    const status = this.getSourceStatus(source);
+    const isProcessing = this.isSourceProcessing(source);
+
+    return {
+      canEdit: !isProcessing,
+      canDelete: !isProcessing,
+      canRecrawl: ['failed', 'crawled', 'trained'].includes(status),
+      canTrain: status === 'ready_for_training',
+      showProgress: isProcessing
+    };
+  }
+}
+
+export interface SourceStatusSummary {
+  total: number;
+  pending: number;
+  crawling: number;
+  crawled: number;
+  training: number;
+  trained: number;
+  failed: number;
+  ready_for_training: number;
+}
+
+export interface ButtonState {
+  canEdit: boolean;
+  canDelete: boolean;
+  canRecrawl: boolean;
+  canTrain: boolean;
+  showProgress: boolean;
 }

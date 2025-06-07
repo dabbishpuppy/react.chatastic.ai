@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import HealthOverview from './HealthOverview';
-import RetrainingPanel from './RetrainingPanel';
-import MaintenancePanel from './MaintenancePanel';
+import { HealthOverview } from './HealthOverview';
+import { RetrainingPanel } from './RetrainingPanel';
+import { MaintenancePanel } from './MaintenancePanel';
 import WorkflowStatusDashboard from '@/components/workflow/WorkflowStatusDashboard';
 import { useWorkflowRealtime } from '@/hooks/useWorkflowRealtime';
 

@@ -7,6 +7,7 @@ import DeleteSourceDialog from '@/components/sources/DeleteSourceDialog';
 import SimplifiedSourcesWidget from '@/components/sources/SimplifiedSourcesWidget';
 import WorkflowEventTimeline from '@/components/workflow/WorkflowEventTimeline';
 import WorkflowJobsPanel from '@/components/workflow/WorkflowJobsPanel';
+import WorkflowControls from '@/components/workflow/WorkflowControls';
 import { useSourceDetail } from '@/components/sources/source-detail/useSourceDetail';
 import { useWorkflowRealtime } from '@/hooks/useWorkflowRealtime';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,7 +30,8 @@ const SourceDetailPage: React.FC = () => {
     handleDelete,
     handleBackClick,
     handleCancelEdit,
-    agentId
+    agentId,
+    refetch
   } = useSourceDetail();
 
   // Set up real-time workflow updates for this specific source
@@ -37,6 +39,7 @@ const SourceDetailPage: React.FC = () => {
     sourceId: source?.id,
     onEvent: (event) => {
       console.log('Source detail workflow event:', event);
+      refetch?.(); // Refresh source data when workflow events occur
     }
   });
 
@@ -82,6 +85,7 @@ const SourceDetailPage: React.FC = () => {
                   <TabsTrigger value="content">Content</TabsTrigger>
                   <TabsTrigger value="workflow">Workflow</TabsTrigger>
                   <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
+                  <TabsTrigger value="controls">Controls</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="content">
@@ -105,6 +109,10 @@ const SourceDetailPage: React.FC = () => {
 
                 <TabsContent value="jobs">
                   <WorkflowJobsPanel sourceId={source.id} />
+                </TabsContent>
+
+                <TabsContent value="controls">
+                  <WorkflowControls source={source} onRefresh={refetch} />
                 </TabsContent>
               </Tabs>
             </div>
