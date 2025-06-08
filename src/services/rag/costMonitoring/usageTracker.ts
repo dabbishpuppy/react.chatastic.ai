@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TokenUsage {
@@ -109,6 +108,7 @@ export class UsageTracker {
 
   private static calculateCost(provider: string, model: string, inputTokens: number, outputTokens: number): number {
     type Provider = keyof typeof this.COST_PER_TOKEN;
+    type CostStructure = { input: number; output: number };
     
     if (!(provider in this.COST_PER_TOKEN)) {
       console.warn(`⚠️ Unknown provider ${provider}, using default`);
@@ -122,7 +122,7 @@ export class UsageTracker {
       return (inputTokens + outputTokens) * 0.001; // Default fallback
     }
 
-    const modelCosts = providerCosts[model as keyof typeof providerCosts];
+    const modelCosts = providerCosts[model as keyof typeof providerCosts] as CostStructure;
     return (inputTokens * modelCosts.input) + (outputTokens * modelCosts.output);
   }
 
