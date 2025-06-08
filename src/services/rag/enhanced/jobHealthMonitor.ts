@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { JobRecoveryService } from './jobRecoveryService';
 import { ConcurrentJobProcessor } from './concurrentJobProcessor';
 import { fetchMaybeSingle, handleSupabaseError } from '@/utils/safeSupabaseQueries';
+import type { BackgroundJob, SourcePage } from "@/types/database";
 
 export interface JobHealthMetrics {
   queueHealth: {
@@ -124,7 +125,7 @@ export class JobHealthMonitor {
       // Get oldest pending job safely
       let oldestPendingAge = 0;
       try {
-        const oldestPending = await fetchMaybeSingle(
+        const oldestPending = await fetchMaybeSingle<Pick<BackgroundJob, 'created_at'>>(
           supabase
             .from('background_jobs')
             .select('created_at')
@@ -155,8 +156,8 @@ export class JobHealthMonitor {
 
         if (recentCompleted && recentCompleted.length > 0) {
           const waitTimes = recentCompleted
-            .filter(job => job.started_at && job.created_at)
-            .map(job => new Date(job.started_at!).getTime() - new Date(job.created_at).getTime());
+            .filter((job: BackgroundJob) => job.started_at && job.created_at)
+            .map((job: BackgroundJob) => new Date(job.started_at!).getTime() - new Date(job.created_at!).getTime());
           
           if (waitTimes.length > 0) {
             avgQueueWaitTime = waitTimes.reduce((sum, time) => sum + time, 0) / waitTimes.length;

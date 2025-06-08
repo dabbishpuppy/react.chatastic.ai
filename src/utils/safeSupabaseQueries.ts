@@ -23,7 +23,7 @@ export async function fetchMaybeSingle<T>(
       throw new Error(`${context} failed: ${error.message}`);
     }
     
-    return data;
+    return data as T | null;
   } catch (error: any) {
     // If it's already our custom error, re-throw
     if (error.message?.includes(`${context} failed:`)) {
@@ -59,7 +59,7 @@ export async function checkBulkExistence(
       throw new Error(`Bulk existence check failed: ${error.message}`);
     }
     
-    const existingIds = new Set(data?.map(row => row[idColumn]) || []);
+    const existingIds = new Set(data?.map((row: any) => row[idColumn]) || []);
     
     return ids.map(id => ({
       id,
@@ -107,7 +107,7 @@ export async function checkAgentExists(
   agentId: string
 ): Promise<boolean> {
   try {
-    const agent = await fetchMaybeSingle(
+    const agent = await fetchMaybeSingle<{ id: string }>(
       supabase
         .from('agents')
         .select('id')

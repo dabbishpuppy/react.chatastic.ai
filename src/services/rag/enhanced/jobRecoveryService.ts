@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { fetchMaybeSingle } from "@/utils/safeSupabaseQueries";
+import type { BackgroundJob, SourcePage } from "@/types/database";
 
 export interface JobRecoveryMetrics {
   recoveredJobs: number;
@@ -49,7 +50,7 @@ export class JobRecoveryService {
         console.log(`🔍 Found ${stalledJobs.length} stalled jobs`);
 
         // Reset stalled jobs back to pending
-        const jobIds = stalledJobs.map(job => job.id);
+        const jobIds = stalledJobs.map((job: BackgroundJob) => job.id);
         
         const { error: updateError } = await supabase
           .from('background_jobs')
@@ -108,7 +109,7 @@ export class JobRecoveryService {
         console.log(`🔍 Found ${pendingPages.length} potentially orphaned pages`);
 
         // Check which pages don't have background jobs
-        const pageIds = pendingPages.map(p => p.id);
+        const pageIds = pendingPages.map((p: SourcePage) => p.id);
         
         const { data: existingJobs, error: jobsError } = await supabase
           .from('background_jobs')
@@ -121,14 +122,14 @@ export class JobRecoveryService {
           return;
         }
 
-        const existingPageIds = new Set(existingJobs?.map(j => j.page_id) || []);
-        const orphanedPages = pendingPages.filter(page => !existingPageIds.has(page.id));
+        const existingPageIds = new Set(existingJobs?.map((j: BackgroundJob) => j.page_id) || []);
+        const orphanedPages = pendingPages.filter((page: SourcePage) => !existingPageIds.has(page.id));
 
         if (orphanedPages.length > 0) {
           console.log(`🔄 Creating background jobs for ${orphanedPages.length} orphaned pages`);
 
           // Create background jobs for orphaned pages
-          const newJobs = orphanedPages.map(page => ({
+          const newJobs = orphanedPages.map((page: SourcePage) => ({
             job_type: 'process_page',
             source_id: page.parent_source_id,
             page_id: page.id,
@@ -180,7 +181,7 @@ export class JobRecoveryService {
         .lt('started_at', stalledThreshold);
 
       // Use fetchMaybeSingle for potentially empty results
-      const oldestStalled = await fetchMaybeSingle(
+      const oldestStalled = await fetchMaybeSingle<Pick<BackgroundJob, 'started_at'>>(
         supabase
           .from('background_jobs')
           .select('started_at')

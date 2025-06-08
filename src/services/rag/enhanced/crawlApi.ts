@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedCrawlRequest, CrawlStatus } from "./crawlTypes";
+import type { AgentSource, SourcePage } from "@/types/database";
 
 export class CrawlApiService {
   static async initiateCrawl(request: EnhancedCrawlRequest): Promise<{ parentSourceId: string; totalJobs: number }> {
@@ -75,7 +76,7 @@ export class CrawlApiService {
       }
 
       // Get basic page counts safely
-      let pages = [];
+      let pages: SourcePage[] = [];
       try {
         const { data: pagesData, error: pagesError } = await supabase
           .from('source_pages')
@@ -93,10 +94,10 @@ export class CrawlApiService {
 
       const pageStats = {
         total: pages.length,
-        completed: pages.filter(p => p.status === 'completed').length,
-        failed: pages.filter(p => p.status === 'failed').length,
-        pending: pages.filter(p => p.status === 'pending').length,
-        inProgress: pages.filter(p => p.status === 'in_progress').length
+        completed: pages.filter((p: SourcePage) => p.status === 'completed').length,
+        failed: pages.filter((p: SourcePage) => p.status === 'failed').length,
+        pending: pages.filter((p: SourcePage) => p.status === 'pending').length,
+        inProgress: pages.filter((p: SourcePage) => p.status === 'in_progress').length
       };
 
       // Ensure status matches the expected union type
@@ -113,9 +114,10 @@ export class CrawlApiService {
         }
       };
 
+      const typedSource = source as AgentSource;
       return {
-        status: normalizeStatus(source.crawl_status),
-        progress: source.progress || 0,
+        status: normalizeStatus(typedSource.crawl_status),
+        progress: typedSource.progress || 0,
         totalJobs: pageStats.total,
         completedJobs: pageStats.completed,
         failedJobs: pageStats.failed,
@@ -155,7 +157,7 @@ export class CrawlApiService {
       }
 
       // Update each failed page to pending status with incremented retry count
-      const updatePromises = failedPages.map(async (page: any) => {
+      const updatePromises = failedPages.map(async (page: SourcePage) => {
         const { error: updateError } = await supabase
           .from('source_pages')
           .update({
@@ -185,7 +187,7 @@ export class CrawlApiService {
     }
   }
 
-  static async getCrawlJobs(parentSourceId: string) {
+  static async getCrawlJobs(parentSourceId: string): Promise<SourcePage[]> {
     try {
       const { data: pages, error } = await supabase
         .from('source_pages')

@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedJobClaimingCore } from './jobClaiming/enhancedJobClaimingCore';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
+import type { BackgroundJob } from "@/types/database";
 
 export interface ProcessingOptions {
   maxConcurrentJobs?: number;
@@ -189,7 +190,7 @@ export class ConcurrentJobProcessor {
       // Get recent job completion rates with safe queries
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       
-      let recentJobs = [];
+      let recentJobs: BackgroundJob[] = [];
       try {
         const { data, error } = await supabase
           .from('background_jobs')
@@ -205,15 +206,15 @@ export class ConcurrentJobProcessor {
         console.warn('Error fetching recent jobs:', error);
       }
 
-      const completedJobs = recentJobs.filter(j => j.status === 'completed');
-      const failedJobs = recentJobs.filter(j => j.status === 'failed');
+      const completedJobs = recentJobs.filter((j: BackgroundJob) => j.status === 'completed');
+      const failedJobs = recentJobs.filter((j: BackgroundJob) => j.status === 'failed');
       const totalRecentJobs = recentJobs.length;
 
       let avgProcessingTime = 0;
       if (completedJobs.length > 0) {
         const processingTimes = completedJobs
-          .filter(j => j.started_at && j.completed_at)
-          .map(j => {
+          .filter((j: BackgroundJob) => j.started_at && j.completed_at)
+          .map((j: BackgroundJob) => {
             try {
               return new Date(j.completed_at!).getTime() - new Date(j.started_at!).getTime();
             } catch (error) {
