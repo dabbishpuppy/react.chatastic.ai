@@ -1,5 +1,6 @@
+
 import { MultiProviderLLMService } from './multiProviderLLMService';
-import { ClaudeParams, OpenAIParams } from './llmTypes';
+import { LLMProvider, LLMRequest, LLMResponse, OpenAIParams, ClaudeParams } from './llmTypes';
 import { UsageTracker } from '../costMonitoring/usageTracker';
 
 export interface LLMResult {
@@ -87,4 +88,40 @@ export class LLMRouter {
       throw error;
     }
   }
+
+  static async generateResponse(request: LLMRequest, queryResult?: any): Promise<LLMResponse> {
+    // Static method for backward compatibility
+    const multiProviderService = new MultiProviderLLMService();
+    const router = new LLMRouter({ multiProviderService });
+    
+    const result = await router.processQuery(
+      request.query, 
+      request.context || '', 
+      {
+        provider: request.provider,
+        model: request.model,
+        temperature: request.temperature,
+        maxTokens: request.maxTokens,
+        agentId: request.agentId
+      }
+    );
+
+    return {
+      content: result.content,
+      provider: result.provider,
+      model: result.model || 'gpt-4o-mini',
+      tokensUsed: (result.usage?.prompt_tokens || 0) + (result.usage?.completion_tokens || 0),
+      cost: 0.001, // Placeholder
+      responseTime: 0, // Placeholder
+      usage: result.usage,
+      sources: queryResult?.rankedContext?.chunks?.map((chunk: any) => ({
+        sourceId: chunk.sourceId,
+        sourceName: chunk.metadata?.sourceName,
+        chunkIndex: chunk.metadata?.chunkIndex
+      })) || []
+    };
+  }
 }
+
+// Export types for external use
+export type { LLMProvider, LLMRequest, LLMResponse };

@@ -1,22 +1,14 @@
 
 // Export all LLM services for easy importing
 export { LLMRouter } from './llmRouter';
-export { StreamingHandler } from './streamingHandler';
-export { ResponsePostProcessor } from './responsePostProcessor';
+export { MultiProviderLLMService } from './multiProviderLLMService';
+export { EnhancedRAGLLMIntegration } from './ragLLMIntegrationEnhanced';
 
 // Export types
 export type { 
   LLMProvider, 
   LLMRequest, 
-  LLMResponse 
-} from './llmRouter';
-
-export type { 
-  StreamingChunk, 
-  StreamingOptions 
-} from './streamingHandler';
-
-export type { 
-  PostProcessingOptions, 
-  ProcessedResponse 
-} from './responsePostProcessor';
+  LLMResponse,
+  RAGQueryOptions,
+  RAGQueryResult
+} from './llmTypes';
