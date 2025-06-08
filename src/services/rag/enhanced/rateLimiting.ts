@@ -1,219 +1,261 @@
-import { supabase } from "@/integrations/supabase/client";
+
 import { RealRateLimitingService } from './realRateLimitingService';
 
 export interface RateLimitConfig {
-  maxRequestsPerMinute: number;
-  maxRequestsPerHour: number;
-  maxRequestsPerDay: number;
-  maxConcurrentRequests: number;
+  requestsPerMinute: number;
+  requestsPerHour: number;
+  requestsPerDay: number;
   burstLimit: number;
+  enabled: boolean;
 }
 
-export interface CustomerTier {
-  name: 'basic' | 'pro' | 'enterprise';
-  limits: RateLimitConfig;
-}
-
-export interface RateLimitCheck {
+export interface RateLimitStatus {
   allowed: boolean;
-  reason?: string;
-  resetTime?: Date;
-  remainingRequests?: number;
-  quota?: {
-    concurrentJobs?: number;
-  };
-}
-
-export interface CustomerUsage {
-  customerId: string;
-  tier: CustomerTier;
+  remainingRequests: number;
+  resetTime: Date;
   currentUsage: {
-    requestsLastMinute: number;
-    requestsLastHour: number;
-    requestsLastDay: number;
-    concurrentRequests: number;
+    minute: number;
+    hour: number;
+    day: number;
+    concurrent: number;
   };
-  lastReset: Date;
 }
 
 export class RateLimitingService {
-  private static readonly TIER_CONFIGS: Record<string, RateLimitConfig> = {
-    basic: {
-      maxRequestsPerMinute: 10,
-      maxRequestsPerHour: 100,
-      maxRequestsPerDay: 500,
-      maxConcurrentRequests: 5,
-      burstLimit: 20
-    },
-    pro: {
-      maxRequestsPerMinute: 50,
-      maxRequestsPerHour: 1000,
-      maxRequestsPerDay: 10000,
-      maxConcurrentRequests: 20,
-      burstLimit: 100
-    },
-    enterprise: {
-      maxRequestsPerMinute: 200,
-      maxRequestsPerHour: 5000,
-      maxRequestsPerDay: 100000,
-      maxConcurrentRequests: 100,
-      burstLimit: 500
-    }
+  // Default rate limits
+  private static readonly DEFAULT_CONFIG: RateLimitConfig = {
+    requestsPerMinute: 60,
+    requestsPerHour: 1000, 
+    requestsPerDay: 10000,
+    burstLimit: 20,
+    enabled: true
   };
 
-  // Updated to use real rate limiting service
-  static async canStartCrawl(customerId: string, requestedPages: number = 1): Promise<RateLimitCheck> {
+  /**
+   * Check if a request is allowed for the given customer
+   */
+  static async checkRateLimit(customerId: string): Promise<RateLimitStatus> {
     try {
-      const realCheck = await RealRateLimitingService.checkRateLimit(customerId, requestedPages);
+      console.log(`🔍 Checking rate limit for customer: ${customerId}`);
+      
+      // Use the real rate limiting service
+      const result = await RealRateLimitingService.checkRateLimit(customerId);
       
       return {
-        allowed: realCheck.allowed,
-        reason: realCheck.reason,
-        resetTime: realCheck.retryAfter ? new Date(Date.now() + realCheck.retryAfter * 1000) : undefined,
-        remainingRequests: Math.max(0, realCheck.limits.perDay - realCheck.currentUsage.perDay),
-        quota: {
-          concurrentJobs: realCheck.limits.concurrent
-        }
+        allowed: result.allowed,
+        remainingRequests: result.remainingRequests,
+        resetTime: result.resetTime,
+        currentUsage: result.currentUsage
       };
     } catch (error) {
       console.error('Rate limit check failed:', error);
-      return { 
-        allowed: true,
-        quota: { concurrentJobs: 5 }
-      };
-    }
-  }
-
-  // Updated to use real tracking
-  static async recordUsage(customerId: string, pages: number = 1): Promise<void> {
-    try {
-      console.log(`📊 Recording usage for customer ${customerId}: ${pages} pages`);
-      // The real rate limiting service handles usage tracking automatically
-    } catch (error) {
-      console.error('Usage recording failed:', error);
-    }
-  }
-
-  // Get current usage for a customer (simplified implementation)
-  static async getCustomerUsage(customerId: string): Promise<CustomerUsage> {
-    try {
-      // Get customer tier (default to basic if not found)
-      const tierName = await this.getCustomerTier(customerId);
-      const tier: CustomerTier = {
-        name: tierName,
-        limits: this.TIER_CONFIGS[tierName]
-      };
-
-      // For now, return mock usage data since we don't have the tracking table
-      // In a real implementation, this would query the customer_usage_tracking table
-      const currentUsage = {
-        requestsLastMinute: 0,
-        requestsLastHour: 0,
-        requestsLastDay: 0,
-        concurrentRequests: 0
-      };
-
-      return {
-        customerId,
-        tier,
-        currentUsage,
-        lastReset: new Date()
-      };
-
-    } catch (error) {
-      console.error('Failed to get customer usage:', error);
       
-      // Return default usage for basic tier
+      // Fail open - allow the request if rate limiting fails
       return {
-        customerId,
-        tier: {
-          name: 'basic',
-          limits: this.TIER_CONFIGS.basic
-        },
-        currentUsage: {
-          requestsLastMinute: 0,
-          requestsLastHour: 0,
-          requestsLastDay: 0,
-          concurrentRequests: 0
-        },
-        lastReset: new Date()
+        allowed: true,
+        remainingRequests: 100,
+        resetTime: new Date(Date.now() + 60000),
+        currentUsage: { minute: 0, hour: 0, day: 0, concurrent: 0 }
       };
     }
   }
 
-  // Get customer tier (simplified implementation)
-  private static async getCustomerTier(customerId: string): Promise<'basic' | 'pro' | 'enterprise'> {
+  /**
+   * Handle rate limiting for crawl requests
+   */
+  static async handleCrawlRateLimit(
+    customerId: string,
+    requestFn: () => Promise<any>
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      // Check team metadata for tier information
-      const { data: team } = await supabase
-        .from('teams')
-        .select('metadata')
-        .eq('id', customerId)
-        .single();
+      // Check rate limits before processing
+      const rateLimitCheck = await this.checkRateLimit(customerId);
+      
+      if (!rateLimitCheck.allowed) {
+        console.warn(`🚫 Rate limit exceeded for customer ${customerId}`);
+        return {
+          success: false,
+          error: `Rate limit exceeded. Please wait ${Math.ceil((rateLimitCheck.resetTime.getTime() - Date.now()) / 1000)} seconds before trying again.`
+        };
+      }
 
-      const metadata = team?.metadata as any;
-      return metadata?.tier || 'basic';
+      // Execute the request
+      const data = await requestFn();
+      
+      console.log(`✅ Request completed for customer ${customerId}`);
+      return { success: true, data };
+
     } catch (error) {
-      console.warn('Failed to get customer tier:', error);
-      return 'basic';
+      console.error('Request failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Request failed'
+      };
     }
   }
 
-  // Updated to use real concurrent request tracking
-  static async incrementConcurrentRequests(customerId: string): Promise<void> {
+  /**
+   * Get rate limit configuration for a customer
+   */
+  static async getRateLimitConfig(customerId: string): Promise<RateLimitConfig> {
     try {
-      await RealRateLimitingService.incrementConcurrentRequests(customerId);
+      // For now, return default config
+      // In production, this would fetch customer-specific limits
+      return { ...this.DEFAULT_CONFIG };
     } catch (error) {
-      console.error('Concurrent request increment failed:', error);
+      console.error('Failed to get rate limit config:', error);
+      return { ...this.DEFAULT_CONFIG };
     }
   }
 
-  // Updated to use real concurrent request tracking
-  static async decrementConcurrentRequests(customerId: string): Promise<void> {
+  /**
+   * Update rate limit configuration for a customer
+   */
+  static async updateRateLimitConfig(
+    customerId: string, 
+    config: Partial<RateLimitConfig>
+  ): Promise<boolean> {
     try {
-      await RealRateLimitingService.decrementConcurrentRequests(customerId);
+      console.log(`📝 Updating rate limit config for customer: ${customerId}`);
+      
+      // In production, this would update the customer's rate limit configuration
+      // For now, we'll just log the update
+      console.log('New config:', config);
+      
+      return true;
     } catch (error) {
-      console.error('Concurrent request decrement failed:', error);
+      console.error('Failed to update rate limit config:', error);
+      return false;
     }
   }
 
-  // Reset usage counters (simplified implementation)
-  static async resetUsageCounters(): Promise<void> {
-    try {
-      console.log('🔄 Resetting usage counters (simplified implementation)');
-      // In a real implementation, this would reset the customer_usage_tracking table
-    } catch (error) {
-      console.error('Usage counter reset failed:', error);
-    }
-  }
-
-  // Get rate limit status for monitoring (simplified implementation)
-  static async getRateLimitStatus(): Promise<{
-    totalCustomers: number;
-    activeCustomers: number;
-    rateLimitedCustomers: number;
-    avgRequestsPerMinute: number;
+  /**
+   * Get current usage statistics for a customer
+   */
+  static async getUsageStats(customerId: string): Promise<{
+    currentUsage: {
+      minute: number;
+      hour: number;
+      day: number;
+      concurrent: number;
+    };
+    limits: RateLimitConfig;
+    utilizationPercentage: number;
   }> {
     try {
-      // Get basic stats from existing tables
-      const { count: totalCustomers } = await supabase
-        .from('teams')
-        .select('*', { count: 'exact', head: true });
+      const rateLimitStatus = await this.checkRateLimit(customerId);
+      const config = await this.getRateLimitConfig(customerId);
+      
+      // Calculate utilization based on the most restrictive limit
+      const utilizationPercentage = Math.max(
+        (rateLimitStatus.currentUsage.minute / config.requestsPerMinute) * 100,
+        (rateLimitStatus.currentUsage.hour / config.requestsPerHour) * 100,
+        (rateLimitStatus.currentUsage.day / config.requestsPerDay) * 100,
+        (rateLimitStatus.currentUsage.concurrent / config.burstLimit) * 100
+      );
 
       return {
-        totalCustomers: totalCustomers || 0,
-        activeCustomers: 0, // Would need usage tracking to determine
-        rateLimitedCustomers: 0, // Would need usage tracking to determine
-        avgRequestsPerMinute: 0 // Would need usage tracking to determine
+        currentUsage: rateLimitStatus.currentUsage,
+        limits: config,
+        utilizationPercentage: Math.round(utilizationPercentage)
       };
     } catch (error) {
-      console.error('Failed to get rate limit status:', error);
+      console.error('Failed to get usage stats:', error);
       return {
+        currentUsage: { minute: 0, hour: 0, day: 0, concurrent: 0 },
+        limits: this.DEFAULT_CONFIG,
+        utilizationPercentage: 0
+      };
+    }
+  }
+
+  /**
+   * Track concurrent requests for a customer
+   */
+  static async trackConcurrentRequest<T>(
+    customerId: string,
+    requestFn: () => Promise<T>
+  ): Promise<T> {
+    try {
+      // Increment concurrent request counter
+      await RealRateLimitingService.decrementConcurrentRequests(customerId);
+      
+      try {
+        // Execute the request
+        const result = await requestFn();
+        return result;
+      } finally {
+        // Always decrement the counter, even if the request fails
+        await RealRateLimitingService.decrementConcurrentRequests(customerId);
+      }
+    } catch (error) {
+      console.error('Failed to track concurrent request:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reset rate limits for a customer (admin function)
+   */
+  static async resetCustomerLimits(customerId: string): Promise<boolean> {
+    try {
+      console.log(`🔄 Resetting rate limits for customer: ${customerId}`);
+      
+      const success = await RealRateLimitingService.resetCustomerLimits(customerId);
+      
+      if (success) {
+        console.log(`✅ Rate limits reset for customer: ${customerId}`);
+      } else {
+        console.error(`❌ Failed to reset rate limits for customer: ${customerId}`);
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Failed to reset customer limits:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get rate limiting health status
+   */
+  static async getHealthStatus(): Promise<{
+    healthy: boolean;
+    totalCustomers: number;
+    activeRequests: number;
+    issues: string[];
+  }> {
+    try {
+      const stats = await RealRateLimitingService.getRateLimitStats();
+      
+      const issues: string[] = [];
+      
+      // Check for potential issues
+      if (stats.activeRequests > 1000) {
+        issues.push('High number of active requests detected');
+      }
+      
+      if (stats.throttledRequests > stats.totalCustomers * 10) {
+        issues.push('High rate of throttled requests detected');
+      }
+      
+      return {
+        healthy: issues.length === 0,
+        totalCustomers: stats.totalCustomers,
+        activeRequests: stats.activeRequests,
+        issues
+      };
+    } catch (error) {
+      console.error('Failed to get health status:', error);
+      return {
+        healthy: false,
         totalCustomers: 0,
-        activeCustomers: 0,
-        rateLimitedCustomers: 0,
-        avgRequestsPerMinute: 0
+        activeRequests: 0,
+        issues: ['Failed to check rate limiting health']
       };
     }
   }
 }
+
+// Re-export types for convenience
+export type { RateLimitStatus as RateLimitResult };

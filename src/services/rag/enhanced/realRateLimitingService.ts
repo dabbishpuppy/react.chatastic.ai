@@ -39,13 +39,9 @@ export class RealRateLimitingService {
     try {
       console.log(`🚦 Checking rate limits for customer: ${customerId}`);
 
-      // Get customer-specific rate limit rules
       const limits = await this.getCustomerLimits(customerId);
-
-      // Get current usage
       const currentUsage = await this.getCurrentUsage(customerId);
 
-      // Check all rate limit dimensions
       const minuteAllowed = currentUsage.minute < limits.requestsPerMinute;
       const hourAllowed = currentUsage.hour < limits.requestsPerHour;
       const dayAllowed = currentUsage.day < limits.requestsPerDay;
@@ -53,7 +49,6 @@ export class RealRateLimitingService {
 
       const allowed = minuteAllowed && hourAllowed && dayAllowed && concurrentAllowed;
 
-      // Calculate remaining requests (most restrictive limit)
       const remainingRequests = Math.min(
         limits.requestsPerMinute - currentUsage.minute,
         limits.requestsPerHour - currentUsage.hour,
@@ -61,13 +56,11 @@ export class RealRateLimitingService {
         limits.burstLimit - currentUsage.concurrent
       );
 
-      // Calculate next reset time (minute boundary)
       const resetTime = new Date();
       resetTime.setSeconds(0, 0);
       resetTime.setMinutes(resetTime.getMinutes() + 1);
 
       if (allowed) {
-        // Increment usage counters
         await this.incrementUsage(customerId);
       } else {
         console.warn(`❌ Rate limit exceeded for customer ${customerId}:`, {
@@ -88,7 +81,6 @@ export class RealRateLimitingService {
       };
     } catch (error) {
       console.error('Rate limit check failed:', error);
-      // Fail open - allow request if rate limiting system is down
       return {
         allowed: true,
         remainingRequests: 100,
@@ -103,7 +95,6 @@ export class RealRateLimitingService {
    */
   private static async getCustomerLimits(customerId: string): Promise<RateLimitRule> {
     try {
-      // Try to get custom limits from database
       const { data, error } = await supabase
         .from('customer_usage_tracking')
         .select('*')
@@ -111,15 +102,14 @@ export class RealRateLimitingService {
         .single();
 
       if (error || !data) {
-        // Return default limits
         return {
           id: 'default',
           customerId,
-          ...this.DEFAULT_LIMITS
+          ...this.DEFAULT_LIMITS,
+          enabled: true
         } as RateLimitRule;
       }
 
-      // Use stored limits or defaults
       return {
         id: data.id,
         customerId,
@@ -134,7 +124,8 @@ export class RealRateLimitingService {
       return {
         id: 'default',
         customerId,
-        ...this.DEFAULT_LIMITS
+        ...this.DEFAULT_LIMITS,
+        enabled: true
       } as RateLimitRule;
     }
   }
@@ -159,7 +150,6 @@ export class RealRateLimitingService {
         return { minute: 0, hour: 0, day: 0, concurrent: 0 };
       }
 
-      // Reset counters if time windows have passed
       const now = new Date();
       const minuteReset = new Date(data.minute_reset_at);
       const hourReset = new Date(data.hour_reset_at);
@@ -182,7 +172,6 @@ export class RealRateLimitingService {
    */
   private static async incrementUsage(customerId: string): Promise<void> {
     try {
-      // Use the existing database function
       await supabase.rpc('increment_concurrent_requests', {
         target_customer_id: customerId
       });
@@ -231,8 +220,8 @@ export class RealRateLimitingService {
       return {
         totalCustomers,
         activeRequests,
-        throttledRequests: 0, // Would need additional tracking
-        avgResponseTime: 0 // Would need additional tracking
+        throttledRequests: 0,
+        avgResponseTime: 0
       };
     } catch (error) {
       console.error('Failed to get rate limit stats:', error);

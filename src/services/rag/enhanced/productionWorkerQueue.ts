@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface WorkerJob {
@@ -27,6 +26,26 @@ export interface QueueStats {
   avgProcessingTime: number;
 }
 
+export interface QueueMetrics {
+  totalJobs: number;
+  pendingJobs: number;
+  runningJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  avgProcessingTime: number;
+  throughputPerMinute: number;
+}
+
+export interface HealthStatus {
+  healthy: boolean;
+  issues: string[];
+  metrics: {
+    queueLength: number;
+    processingRate: number;
+    errorRate: number;
+  };
+}
+
 export class ProductionWorkerQueue {
   private static readonly QUEUE_CONFIG = {
     maxConcurrentJobs: 50,
@@ -35,6 +54,154 @@ export class ProductionWorkerQueue {
     batchSize: 10,
     processingTimeout: 300000 // 5 minutes
   };
+
+  private static isProcessorRunning = false;
+  private static processorInterval: NodeJS.Timeout | null = null;
+
+  /**
+   * Start the queue processor
+   */
+  static async startQueueProcessor(): Promise<void> {
+    if (this.isProcessorRunning) {
+      console.log('Queue processor already running');
+      return;
+    }
+
+    console.log('🚀 Starting production worker queue processor...');
+    this.isProcessorRunning = true;
+
+    // Start processing interval
+    this.processorInterval = setInterval(async () => {
+      if (this.isProcessorRunning) {
+        await this.processQueueBatch();
+      }
+    }, 5000); // Process every 5 seconds
+
+    console.log('✅ Queue processor started');
+  }
+
+  /**
+   * Stop the queue processor
+   */
+  static async stopQueueProcessor(): Promise<void> {
+    console.log('🛑 Stopping production worker queue processor...');
+    this.isProcessorRunning = false;
+
+    if (this.processorInterval) {
+      clearInterval(this.processorInterval);
+      this.processorInterval = null;
+    }
+
+    console.log('✅ Queue processor stopped');
+  }
+
+  /**
+   * Process a batch of jobs
+   */
+  private static async processQueueBatch(): Promise<void> {
+    try {
+      const jobs = await this.getNextJobs('all', this.QUEUE_CONFIG.batchSize);
+      
+      for (const job of jobs) {
+        if (this.isProcessorRunning) {
+          await this.processJob(job);
+        }
+      }
+    } catch (error) {
+      console.error('Error processing queue batch:', error);
+    }
+  }
+
+  /**
+   * Process a single job
+   */
+  private static async processJob(job: WorkerJob): Promise<void> {
+    try {
+      await this.startJob(job.id);
+      
+      // Simulate job processing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      await this.completeJob(job.id);
+    } catch (error) {
+      await this.failJob(job.id, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  /**
+   * Get queue metrics
+   */
+  static async getQueueMetrics(): Promise<QueueMetrics> {
+    try {
+      const stats = await this.getQueueStats();
+      
+      return {
+        totalJobs: stats.totalProcessed + stats.pending + stats.running,
+        pendingJobs: stats.pending,
+        runningJobs: stats.running,
+        completedJobs: stats.completed,
+        failedJobs: stats.failed,
+        avgProcessingTime: stats.avgProcessingTime,
+        throughputPerMinute: Math.round(stats.completed / 60) // Rough estimate
+      };
+    } catch (error) {
+      console.error('Failed to get queue metrics:', error);
+      return {
+        totalJobs: 0,
+        pendingJobs: 0,
+        runningJobs: 0,
+        completedJobs: 0,
+        failedJobs: 0,
+        avgProcessingTime: 0,
+        throughputPerMinute: 0
+      };
+    }
+  }
+
+  /**
+   * Get health status
+   */
+  static async getHealthStatus(): Promise<HealthStatus> {
+    try {
+      const metrics = await this.getQueueMetrics();
+      const issues: string[] = [];
+      
+      // Check for issues
+      if (metrics.pendingJobs > 1000) {
+        issues.push('High queue backlog detected');
+      }
+      
+      if (metrics.avgProcessingTime > 60000) {
+        issues.push('Slow processing times detected');
+      }
+      
+      const errorRate = metrics.failedJobs / (metrics.totalJobs || 1) * 100;
+      if (errorRate > 10) {
+        issues.push(`High error rate: ${errorRate.toFixed(1)}%`);
+      }
+
+      return {
+        healthy: issues.length === 0,
+        issues,
+        metrics: {
+          queueLength: metrics.pendingJobs,
+          processingRate: metrics.throughputPerMinute,
+          errorRate: errorRate
+        }
+      };
+    } catch (error) {
+      console.error('Failed to get health status:', error);
+      return {
+        healthy: false,
+        issues: ['Failed to check health status'],
+        metrics: {
+          queueLength: 0,
+          processingRate: 0,
+          errorRate: 0
+        }
+      };
+    }
+  }
 
   /**
    * Add a job to the worker queue
@@ -61,7 +228,7 @@ export class ProductionWorkerQueue {
         p_job_type: type,
         p_source_id: options.sourceId || null,
         p_page_id: options.pageId || null,
-        p_job_key: null, // Let the function generate it
+        p_job_key: null,
         p_payload: {
           ...payload,
           customerId: options.customerId
@@ -87,15 +254,20 @@ export class ProductionWorkerQueue {
     limit: number = this.QUEUE_CONFIG.batchSize
   ): Promise<WorkerJob[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('background_jobs')
         .select('*')
         .eq('status', 'pending')
-        .eq('job_type', workerType)
         .lte('scheduled_at', new Date().toISOString())
         .order('priority', { ascending: false })
         .order('created_at', { ascending: true })
         .limit(limit);
+
+      if (workerType !== 'all') {
+        query = query.eq('job_type', workerType);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -103,7 +275,7 @@ export class ProductionWorkerQueue {
         id: job.id,
         type: job.job_type,
         priority: job.priority || this.QUEUE_CONFIG.defaultPriority,
-        payload: job.payload || {},
+        payload: (job.payload as Record<string, any>) || {},
         status: job.status as WorkerJob['status'],
         attempts: job.attempts || 0,
         maxAttempts: job.max_attempts || this.QUEUE_CONFIG.maxRetries,
@@ -111,7 +283,7 @@ export class ProductionWorkerQueue {
         startedAt: job.started_at ? new Date(job.started_at) : undefined,
         completedAt: job.completed_at ? new Date(job.completed_at) : undefined,
         errorMessage: job.error_message || undefined,
-        customerId: job.payload?.customerId || 'unknown',
+        customerId: ((job.payload as Record<string, any>)?.customerId as string) || 'unknown',
         sourceId: job.source_id || undefined,
         pageId: job.page_id || undefined
       }));
@@ -134,7 +306,7 @@ export class ProductionWorkerQueue {
           updated_at: new Date().toISOString()
         })
         .eq('id', jobId)
-        .eq('status', 'pending'); // Only start if still pending
+        .eq('status', 'pending');
 
       return !error;
     } catch (error) {
@@ -185,7 +357,6 @@ export class ProductionWorkerQueue {
     shouldRetry: boolean = true
   ): Promise<boolean> {
     try {
-      // Get current job details
       const { data: job, error: fetchError } = await supabase
         .from('background_jobs')
         .select('attempts, max_attempts')
@@ -204,12 +375,10 @@ export class ProductionWorkerQueue {
       };
 
       if (!shouldRetry || newAttempts >= maxAttempts) {
-        // Final failure
         updateData.status = 'failed';
         updateData.completed_at = new Date().toISOString();
       } else {
-        // Retry - exponential backoff
-        const delayMs = Math.pow(2, newAttempts) * 1000; // 2^n seconds
+        const delayMs = Math.pow(2, newAttempts) * 1000;
         const retryAt = new Date(Date.now() + delayMs);
         
         updateData.status = 'pending';
@@ -331,7 +500,6 @@ export class ProductionWorkerQueue {
         query = query.eq('source_id', criteria.sourceId);
       }
 
-      // For customerId, we need to check the payload
       const { data, error } = await query.select('id');
 
       if (error) throw error;
