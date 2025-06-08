@@ -15,7 +15,7 @@ export async function handleUrlDiscovery(
     console.log(`🎯 Target: ${url}`);
     console.log(`📊 Max pages: ${maxPages}`);
     console.log(`🚫 Exclude paths: ${excludePaths.length} patterns`);
-    console.log(`✅ Include paths: ${includePaths.length} patterns`);
+    console.log(`✅ Include paths: ${includePaths.length} patterns (using universal defaults if none provided)`);
     
     const discoveryPromise = (async () => {
       switch (crawlMode) {
@@ -29,7 +29,7 @@ export async function handleUrlDiscovery(
           
         case 'full-website':
         default:
-          console.log('🌐 Full website mode: trying sitemap first, then HTML crawling');
+          console.log('🌐 Full website mode: comprehensive discovery with universal patterns');
           
           // Try sitemap first for full website mode
           try {

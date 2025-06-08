@@ -1,4 +1,3 @@
-
 // Enhanced URL discovery with comprehensive link extraction and smart filtering
 
 interface DiscoveryConfig {
@@ -30,14 +29,54 @@ const DEFAULT_EXCLUDES = [
   /\/filter\?/i,               // Filter results with query params
 ];
 
-// Great People specific include patterns
-const GREATPEOPLE_INCLUDES = [
+// Universal include patterns that work for all websites
+const UNIVERSAL_CONTENT_PATTERNS = [
   /^\/$/,                      // Homepage
-  /^\/en\//,                   // English section
-  /^\/radgivere\//,            // Adviser profiles
-  /^\/employee-category\//,    // Team categories
-  /^\/projects-engineering/,   // Projects
-  /^\/page\/\d+/,              // Pagination
+  /^\/about/i,                 // About pages
+  /^\/services/i,              // Services
+  /^\/products/i,              // Products
+  /^\/solutions/i,             // Solutions
+  /^\/team/i,                  // Team pages
+  /^\/staff/i,                 // Staff pages
+  /^\/people/i,                // People pages
+  /^\/employees/i,             // Employee pages
+  /^\/advisors/i,              // Advisors
+  /^\/consultants/i,           // Consultants
+  /^\/experts/i,               // Experts
+  /^\/contact/i,               // Contact pages
+  /^\/blog/i,                  // Blog posts
+  /^\/news/i,                  // News articles
+  /^\/articles/i,              // Articles
+  /^\/insights/i,              // Insights
+  /^\/resources/i,             // Resources
+  /^\/case-studies/i,          // Case studies
+  /^\/careers/i,               // Careers
+  /^\/jobs/i,                  // Job listings
+  /^\/positions/i,             // Positions
+  /^\/opportunities/i,         // Opportunities
+  /^\/industries/i,            // Industries
+  /^\/sectors/i,               // Sectors
+  /^\/expertise/i,             // Expertise areas
+  /^\/specialties/i,           // Specialties
+  /^\/capabilities/i,          // Capabilities
+  /^\/en\//i,                  // English language sections
+  /^\/de\//i,                  // German language sections
+  /^\/fr\//i,                  // French language sections
+  /^\/es\//i,                  // Spanish language sections
+  /^\/no\//i,                  // Norwegian language sections
+  /^\/sv\//i,                  // Swedish language sections
+  /^\/da\//i,                  // Danish language sections
+  /^\/author\//i,              // Author pages
+  /^\/category\//i,            // Category pages
+  /^\/tag\//i,                 // Tag pages
+  /^\/page\/\d+/i,             // Pagination
+  /\/radgivere/i,              // Advisors (Norwegian)
+  /\/tjenester/i,              // Services (Norwegian)
+  /\/bransjer/i,               // Industries (Norwegian)
+  /\/funksjoner/i,             // Functions (Norwegian)
+  /\/stillinger/i,             // Positions (Norwegian)
+  /\/om-oss/i,                 // About us (Norwegian)
+  /\/ekspertise/i,             // Expertise (Norwegian)
 ];
 
 export async function discoverLinks(
@@ -101,34 +140,60 @@ export async function discoverSitemapLinks(
     console.log('🗺️ Starting enhanced sitemap discovery for:', sitemapUrl);
     
     const baseUrl = new URL(sitemapUrl);
-    const actualSitemapUrl = sitemapUrl.includes('sitemap') 
-      ? sitemapUrl 
-      : `${baseUrl.protocol}//${baseUrl.hostname}/sitemap.xml`;
+    const sitemapLocations = [
+      `${baseUrl.protocol}//${baseUrl.hostname}/sitemap.xml`,
+      `${baseUrl.protocol}//${baseUrl.hostname}/sitemap_index.xml`,
+      `${baseUrl.protocol}//${baseUrl.hostname}/wp-sitemap.xml`,
+      `${baseUrl.protocol}//${baseUrl.hostname}/sitemap-index.xml`,
+    ];
     
-    console.log('🗺️ Fetching sitemap from:', actualSitemapUrl);
-    
-    const response = await fetch(actualSitemapUrl, {
-      headers: {
-        'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
-      },
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!response.ok) {
-      console.log('❌ Sitemap not found, falling back to HTML discovery');
-      return await discoverLinks(sitemapUrl, excludePaths, includePaths, 200);
-    }
-
-    const xmlText = await response.text();
     let allUrls: string[] = [];
     
-    // Check if this is a sitemap index
-    if (xmlText.includes('<sitemapindex')) {
-      console.log('📑 Found sitemap index, processing child sitemaps...');
-      allUrls = await processSitemapIndex(xmlText, baseUrl.origin);
-    } else {
-      console.log('📄 Processing regular sitemap...');
-      allUrls = parseSitemapXml(xmlText);
+    // Try different sitemap locations
+    for (const sitemapLocation of sitemapLocations) {
+      try {
+        console.log('🗺️ Trying sitemap URL:', sitemapLocation);
+        
+        const response = await fetch(sitemapLocation, {
+          headers: {
+            'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
+          },
+          signal: AbortSignal.timeout(30000)
+        });
+
+        if (!response.ok) {
+          console.log(`❌ Sitemap not found at ${sitemapLocation}`);
+          continue;
+        }
+
+        const xmlText = await response.text();
+        
+        // Check if this is a sitemap index
+        if (xmlText.includes('<sitemapindex')) {
+          console.log('📑 Found sitemap index, processing child sitemaps...');
+          const indexUrls = await processSitemapIndex(xmlText, baseUrl.origin);
+          allUrls.push(...indexUrls);
+        } else {
+          console.log('📄 Processing regular sitemap...');
+          const sitemapUrls = parseSitemapXml(xmlText);
+          allUrls.push(...sitemapUrls);
+        }
+        
+        // If we found URLs, break out of the loop
+        if (allUrls.length > 1) { // More than just the base URL
+          console.log(`✅ Successfully processed sitemap at ${sitemapLocation}`);
+          break;
+        }
+        
+      } catch (error) {
+        console.log(`❌ Error processing sitemap at ${sitemapLocation}:`, error);
+        continue;
+      }
+    }
+    
+    if (allUrls.length === 0) {
+      console.log('❌ No valid sitemaps found, falling back to HTML discovery');
+      return await discoverLinks(sitemapUrl, excludePaths, includePaths, 200);
     }
     
     console.log(`🗺️ Found ${allUrls.length} URLs in sitemap(s)`);
@@ -260,11 +325,11 @@ function filterAndNormalizeUrls(
     }
   });
   
-  // Prepare include patterns (use site-specific defaults if none provided)
+  // Prepare include patterns - use custom ones if provided, otherwise use universal patterns
   const includePatterns: RegExp[] = [];
-  const patternsToUse = includePaths.length > 0 ? includePaths : 
-    (baseHostname.includes('greatpeople.no') ? GREATPEOPLE_INCLUDES.map(p => p.source) : []);
+  const patternsToUse = includePaths.length > 0 ? includePaths : [];
   
+  // Convert custom include patterns
   patternsToUse.forEach(pattern => {
     try {
       includePatterns.push(new RegExp(pattern.replace(/\*/g, '.*'), 'i'));
@@ -293,9 +358,22 @@ function filterAndNormalizeUrls(
         continue;
       }
       
-      // Apply include filters (if any)
-      if (includePatterns.length > 0 && !includePatterns.some(pattern => pattern.test(path))) {
-        continue;
+      // Apply include filters
+      if (includePatterns.length > 0) {
+        // If custom include patterns are provided, URL must match at least one
+        if (!includePatterns.some(pattern => pattern.test(path))) {
+          continue;
+        }
+      } else {
+        // If no custom include patterns, use universal content patterns as a guide
+        // But be more permissive - only exclude if it's clearly not content
+        const isLikelyContent = UNIVERSAL_CONTENT_PATTERNS.some(pattern => pattern.test(path)) ||
+                              path === '/' || // Always include homepage
+                              (path.split('/').length <= 3 && !path.includes('?')); // Include shallow paths without query params
+        
+        if (!isLikelyContent) {
+          continue;
+        }
       }
       
       normalizedUrls.add(normalized);
