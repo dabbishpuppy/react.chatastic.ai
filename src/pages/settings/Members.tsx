@@ -88,6 +88,11 @@ const MembersSettings = () => {
               setSelectedMember(null);
             }}
             member={selectedMember}
+            onSuccess={() => {
+              refetch();
+              setManageTeamsDialogOpen(false);
+              setSelectedMember(null);
+            }}
           />
 
           <RemoveMemberDialog 
@@ -97,7 +102,7 @@ const MembersSettings = () => {
               setSelectedMember(null);
             }}
             member={selectedMember}
-            onRemove={() => {
+            onSuccess={() => {
               refetch();
               setRemoveMemberDialogOpen(false);
               setSelectedMember(null);
