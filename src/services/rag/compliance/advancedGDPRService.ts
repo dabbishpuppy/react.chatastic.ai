@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { GDPRService } from "../gdprService";
 import { DataClassificationService } from "../security/dataClassification";
@@ -94,8 +95,13 @@ export class AdvancedGDPRService extends GDPRService {
   static async conductPrivacyImpactAssessment(assessment: Omit<PrivacyImpactAssessment, 'id' | 'createdAt'>): Promise<PrivacyImpactAssessment> {
     const piaId = `pia-${Date.now()}`;
     const pia: PrivacyImpactAssessment = {
-      ...assessment,
       id: piaId,
+      teamId: assessment.teamId,
+      purpose: assessment.purpose,
+      dataTypes: assessment.dataTypes,
+      riskLevel: assessment.riskLevel,
+      mitigations: assessment.mitigations,
+      approved: assessment.approved,
       createdAt: new Date().toISOString()
     };
 
