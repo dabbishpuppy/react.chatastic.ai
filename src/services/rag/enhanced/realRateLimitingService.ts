@@ -1,255 +1,258 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export interface ProductionRateLimitCheck {
+export interface RateLimitRule {
+  id: string;
+  customerId: string;
+  requestsPerMinute: number;
+  requestsPerHour: number;
+  requestsPerDay: number;
+  burstLimit: number;
+  enabled: boolean;
+}
+
+export interface RateLimitResult {
   allowed: boolean;
-  reason?: string;
-  retryAfter?: number;
+  remainingRequests: number;
+  resetTime: Date;
   currentUsage: {
+    minute: number;
+    hour: number;
+    day: number;
     concurrent: number;
-    perMinute: number;
-    perHour: number;
-    perDay: number;
-  };
-  limits: {
-    concurrent: number;
-    perMinute: number;
-    perHour: number;
-    perDay: number;
   };
 }
 
 export class RealRateLimitingService {
-  private static readonly TIER_LIMITS = {
-    basic: { concurrent: 5, perMinute: 10, perHour: 100, perDay: 500 },
-    pro: { concurrent: 20, perMinute: 50, perHour: 1000, perDay: 10000 },
-    enterprise: { concurrent: 100, perMinute: 200, perHour: 5000, perDay: 100000 }
+  private static readonly DEFAULT_LIMITS = {
+    requestsPerMinute: 60,
+    requestsPerHour: 1000,
+    requestsPerDay: 10000,
+    burstLimit: 20,
+    maxConcurrent: 10
   };
 
-  // Check rate limits using real database functions with improved error handling
-  static async checkRateLimit(customerId: string, requestedJobs: number = 1): Promise<ProductionRateLimitCheck> {
+  /**
+   * Check if request is allowed under rate limits
+   */
+  static async checkRateLimit(customerId: string): Promise<RateLimitResult> {
     try {
-      console.log(`🔍 Checking rate limit for customer: ${customerId}, requested jobs: ${requestedJobs}`);
+      console.log(`🚦 Checking rate limits for customer: ${customerId}`);
 
-      // Get customer tier with error handling
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .select('metadata')
-        .eq('id', customerId)
-        .single();
+      // Get customer-specific rate limit rules
+      const limits = await this.getCustomerLimits(customerId);
 
-      if (teamError) {
-        console.error('Error fetching team data:', teamError);
-        // Fallback to basic tier on error
-        return this.createFailsafeResponse('Failed to fetch team data');
-      }
+      // Get current usage
+      const currentUsage = await this.getCurrentUsage(customerId);
 
-      const tierName = (teamData?.metadata as any)?.tier || 'basic';
-      const limits = this.TIER_LIMITS[tierName as keyof typeof this.TIER_LIMITS] || this.TIER_LIMITS.basic;
+      // Check all rate limit dimensions
+      const minuteAllowed = currentUsage.minute < limits.requestsPerMinute;
+      const hourAllowed = currentUsage.hour < limits.requestsPerHour;
+      const dayAllowed = currentUsage.day < limits.requestsPerDay;
+      const concurrentAllowed = currentUsage.concurrent < limits.burstLimit;
 
-      // Get current usage from the real tracking table with error handling
-      const { data: usage, error: usageError } = await supabase
-        .from('customer_usage_tracking')
-        .select('*')
-        .eq('customer_id', customerId)
-        .maybeSingle(); // Use maybeSingle instead of single to handle missing records
+      const allowed = minuteAllowed && hourAllowed && dayAllowed && concurrentAllowed;
 
-      if (usageError) {
-        console.error('Error fetching usage data:', usageError);
-        // Allow request but log the error
-        console.warn(`Usage tracking unavailable for customer ${customerId}, allowing request`);
-        return {
-          allowed: true,
-          currentUsage: { concurrent: 0, perMinute: 0, perHour: 0, perDay: 0 },
-          limits
-        };
-      }
+      // Calculate remaining requests (most restrictive limit)
+      const remainingRequests = Math.min(
+        limits.requestsPerMinute - currentUsage.minute,
+        limits.requestsPerHour - currentUsage.hour,
+        limits.requestsPerDay - currentUsage.day,
+        limits.burstLimit - currentUsage.concurrent
+      );
 
-      const currentUsage = {
-        concurrent: usage?.concurrent_requests || 0,
-        perMinute: usage?.requests_last_minute || 0,
-        perHour: usage?.requests_last_hour || 0,
-        perDay: usage?.requests_last_day || 0
-      };
+      // Calculate next reset time (minute boundary)
+      const resetTime = new Date();
+      resetTime.setSeconds(0, 0);
+      resetTime.setMinutes(resetTime.getMinutes() + 1);
 
-      // Check concurrent limit
-      if (currentUsage.concurrent + requestedJobs > limits.concurrent) {
-        return {
-          allowed: false,
-          reason: `Concurrent job limit exceeded (${limits.concurrent})`,
+      if (allowed) {
+        // Increment usage counters
+        await this.incrementUsage(customerId);
+      } else {
+        console.warn(`❌ Rate limit exceeded for customer ${customerId}:`, {
           currentUsage,
-          limits
-        };
-      }
-
-      // Check per-minute limit
-      if (currentUsage.perMinute + requestedJobs > limits.perMinute) {
-        return {
-          allowed: false,
-          reason: `Per-minute limit exceeded (${limits.perMinute})`,
-          retryAfter: 60,
-          currentUsage,
-          limits
-        };
-      }
-
-      // Check per-hour limit
-      if (currentUsage.perHour + requestedJobs > limits.perHour) {
-        return {
-          allowed: false,
-          reason: `Hourly limit exceeded (${limits.perHour})`,
-          retryAfter: 3600,
-          currentUsage,
-          limits
-        };
-      }
-
-      // Check per-day limit
-      if (currentUsage.perDay + requestedJobs > limits.perDay) {
-        return {
-          allowed: false,
-          reason: `Daily limit exceeded (${limits.perDay})`,
-          retryAfter: 86400,
-          currentUsage,
-          limits
-        };
+          limits,
+          minuteAllowed,
+          hourAllowed,
+          dayAllowed,
+          concurrentAllowed
+        });
       }
 
       return {
-        allowed: true,
-        currentUsage,
-        limits
+        allowed,
+        remainingRequests: Math.max(0, remainingRequests),
+        resetTime,
+        currentUsage
       };
-
     } catch (error) {
-      console.error('Rate limit check failed with unexpected error:', error);
-      return this.createFailsafeResponse('Unexpected error during rate limit check');
+      console.error('Rate limit check failed:', error);
+      // Fail open - allow request if rate limiting system is down
+      return {
+        allowed: true,
+        remainingRequests: 100,
+        resetTime: new Date(Date.now() + 60000),
+        currentUsage: { minute: 0, hour: 0, day: 0, concurrent: 0 }
+      };
     }
   }
 
-  // Create a failsafe response when rate limiting fails
-  private static createFailsafeResponse(reason: string): ProductionRateLimitCheck {
-    return {
-      allowed: false,
-      reason,
-      currentUsage: { concurrent: 0, perMinute: 0, perHour: 0, perDay: 0 },
-      limits: this.TIER_LIMITS.basic
-    };
-  }
-
-  // Increment concurrent requests using database function with improved error handling
-  static async incrementConcurrentRequests(customerId: string): Promise<number> {
+  /**
+   * Get customer-specific rate limits or defaults
+   */
+  private static async getCustomerLimits(customerId: string): Promise<RateLimitRule> {
     try {
-      console.log(`📈 Incrementing concurrent requests for customer: ${customerId}`);
-
-      const { data, error } = await supabase.rpc('increment_concurrent_requests', {
-        target_customer_id: customerId
-      });
-
-      if (error) {
-        console.error('Failed to increment concurrent requests:', error);
-        // Don't throw error, just log and return 0
-        return 0;
-      }
-
-      const newCount = data || 0;
-      console.log(`✅ Incremented concurrent requests for ${customerId}: ${newCount}`);
-      return newCount;
-    } catch (error) {
-      console.error('Error incrementing concurrent requests:', error);
-      return 0;
-    }
-  }
-
-  // Decrement concurrent requests using database function with improved error handling
-  static async decrementConcurrentRequests(customerId: string): Promise<number> {
-    try {
-      console.log(`📉 Decrementing concurrent requests for customer: ${customerId}`);
-
-      const { data, error } = await supabase.rpc('decrement_concurrent_requests', {
-        target_customer_id: customerId
-      });
-
-      if (error) {
-        console.error('Failed to decrement concurrent requests:', error);
-        // Don't throw error, just log and return 0
-        return 0;
-      }
-
-      const newCount = data || 0;
-      console.log(`✅ Decremented concurrent requests for ${customerId}: ${newCount}`);
-      return newCount;
-    } catch (error) {
-      console.error('Error decrementing concurrent requests:', error);
-      return 0;
-    }
-  }
-
-  // Get real usage statistics from database with improved error handling
-  static async getUsageStats(customerId: string): Promise<{
-    current: { concurrent: number; perMinute: number; perHour: number; perDay: number };
-    resetTimes: { minute: string; hour: string; day: string };
-  }> {
-    try {
-      console.log(`📊 Fetching usage stats for customer: ${customerId}`);
-
+      // Try to get custom limits from database
       const { data, error } = await supabase
         .from('customer_usage_tracking')
         .select('*')
         .eq('customer_id', customerId)
-        .maybeSingle(); // Use maybeSingle to handle missing records gracefully
+        .single();
 
-      if (error) {
-        console.error('Failed to get usage stats:', error);
-        return this.getDefaultUsageStats();
+      if (error || !data) {
+        // Return default limits
+        return {
+          id: 'default',
+          customerId,
+          ...this.DEFAULT_LIMITS
+        } as RateLimitRule;
       }
 
-      if (!data) {
-        console.log(`No usage data found for customer ${customerId}, returning defaults`);
-        return this.getDefaultUsageStats();
-      }
-
+      // Use stored limits or defaults
       return {
-        current: {
-          concurrent: data.concurrent_requests || 0,
-          perMinute: data.requests_last_minute || 0,
-          perHour: data.requests_last_hour || 0,
-          perDay: data.requests_last_day || 0
-        },
-        resetTimes: {
-          minute: data.minute_reset_at || new Date().toISOString(),
-          hour: data.hour_reset_at || new Date().toISOString(),
-          day: data.day_reset_at || new Date().toISOString()
-        }
+        id: data.id,
+        customerId,
+        requestsPerMinute: this.DEFAULT_LIMITS.requestsPerMinute,
+        requestsPerHour: this.DEFAULT_LIMITS.requestsPerHour,
+        requestsPerDay: this.DEFAULT_LIMITS.requestsPerDay,
+        burstLimit: this.DEFAULT_LIMITS.burstLimit,
+        enabled: true
       };
     } catch (error) {
-      console.error('Failed to get usage stats with unexpected error:', error);
-      return this.getDefaultUsageStats();
+      console.error('Failed to get customer limits:', error);
+      return {
+        id: 'default',
+        customerId,
+        ...this.DEFAULT_LIMITS
+      } as RateLimitRule;
     }
   }
 
-  // Get default usage stats when data is unavailable
-  private static getDefaultUsageStats() {
-    const now = new Date().toISOString();
-    return {
-      current: { concurrent: 0, perMinute: 0, perHour: 0, perDay: 0 },
-      resetTimes: {
-        minute: now,
-        hour: now,
-        day: now
+  /**
+   * Get current usage statistics
+   */
+  private static async getCurrentUsage(customerId: string): Promise<{
+    minute: number;
+    hour: number;
+    day: number;
+    concurrent: number;
+  }> {
+    try {
+      const { data, error } = await supabase
+        .from('customer_usage_tracking')
+        .select('*')
+        .eq('customer_id', customerId)
+        .single();
+
+      if (error || !data) {
+        return { minute: 0, hour: 0, day: 0, concurrent: 0 };
       }
-    };
+
+      // Reset counters if time windows have passed
+      const now = new Date();
+      const minuteReset = new Date(data.minute_reset_at);
+      const hourReset = new Date(data.hour_reset_at);
+      const dayReset = new Date(data.day_reset_at);
+
+      return {
+        minute: now > minuteReset ? 0 : (data.requests_last_minute || 0),
+        hour: now > hourReset ? 0 : (data.requests_last_hour || 0),
+        day: now > dayReset ? 0 : (data.requests_last_day || 0),
+        concurrent: data.concurrent_requests || 0
+      };
+    } catch (error) {
+      console.error('Failed to get current usage:', error);
+      return { minute: 0, hour: 0, day: 0, concurrent: 0 };
+    }
   }
 
-  // Initialize usage tracking for a customer if it doesn't exist
-  static async initializeCustomerUsage(customerId: string): Promise<void> {
+  /**
+   * Increment usage counters
+   */
+  private static async incrementUsage(customerId: string): Promise<void> {
     try {
-      console.log(`🔧 Initializing usage tracking for customer: ${customerId}`);
+      // Use the existing database function
+      await supabase.rpc('increment_concurrent_requests', {
+        target_customer_id: customerId
+      });
+    } catch (error) {
+      console.error('Failed to increment usage:', error);
+    }
+  }
 
+  /**
+   * Decrement concurrent request counter
+   */
+  static async decrementConcurrentRequests(customerId: string): Promise<void> {
+    try {
+      await supabase.rpc('decrement_concurrent_requests', {
+        target_customer_id: customerId
+      });
+    } catch (error) {
+      console.error('Failed to decrement concurrent requests:', error);
+    }
+  }
+
+  /**
+   * Get rate limiting statistics
+   */
+  static async getRateLimitStats(customerId?: string): Promise<{
+    totalCustomers: number;
+    activeRequests: number;
+    throttledRequests: number;
+    avgResponseTime: number;
+  }> {
+    try {
+      let query = supabase.from('customer_usage_tracking').select('*');
+      
+      if (customerId) {
+        query = query.eq('customer_id', customerId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const totalCustomers = data?.length || 0;
+      const activeRequests = data?.reduce((sum, customer) => 
+        sum + (customer.concurrent_requests || 0), 0) || 0;
+
+      return {
+        totalCustomers,
+        activeRequests,
+        throttledRequests: 0, // Would need additional tracking
+        avgResponseTime: 0 // Would need additional tracking
+      };
+    } catch (error) {
+      console.error('Failed to get rate limit stats:', error);
+      return {
+        totalCustomers: 0,
+        activeRequests: 0,
+        throttledRequests: 0,
+        avgResponseTime: 0
+      };
+    }
+  }
+
+  /**
+   * Reset rate limits for a customer (admin function)
+   */
+  static async resetCustomerLimits(customerId: string): Promise<boolean> {
+    try {
       const { error } = await supabase
         .from('customer_usage_tracking')
-        .upsert({
-          customer_id: customerId,
+        .update({
           concurrent_requests: 0,
           requests_last_minute: 0,
           requests_last_hour: 0,
@@ -257,18 +260,14 @@ export class RealRateLimitingService {
           minute_reset_at: new Date().toISOString(),
           hour_reset_at: new Date().toISOString(),
           day_reset_at: new Date().toISOString(),
-          last_request_at: new Date().toISOString()
-        }, {
-          onConflict: 'customer_id'
-        });
+          updated_at: new Date().toISOString()
+        })
+        .eq('customer_id', customerId);
 
-      if (error) {
-        console.error('Failed to initialize customer usage:', error);
-      } else {
-        console.log(`✅ Initialized usage tracking for customer: ${customerId}`);
-      }
+      return !error;
     } catch (error) {
-      console.error('Error initializing customer usage:', error);
+      console.error('Failed to reset customer limits:', error);
+      return false;
     }
   }
 }

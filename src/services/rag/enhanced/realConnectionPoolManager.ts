@@ -1,16 +1,4 @@
 
-import { supabase } from "@/integrations/supabase/client";
-
-export interface PoolMetrics {
-  poolName: string;
-  activeConnections: number;
-  idleConnections: number;
-  totalConnections: number;
-  queuedRequests: number;
-  avgResponseTime: number;
-  errorRate: number;
-}
-
 export interface ConnectionPoolConfig {
   poolName: string;
   minConnections: number;
@@ -20,295 +8,357 @@ export interface ConnectionPoolConfig {
   maxLifetimeMs: number;
 }
 
+export interface ConnectionStats {
+  poolName: string;
+  activeConnections: number;
+  idleConnections: number;
+  totalConnections: number;
+  maxConnections: number;
+  connectionsCreated: number;
+  connectionsDestroyed: number;
+  averageWaitTime: number;
+}
+
 export class RealConnectionPoolManager {
-  private static metricsCache = new Map<string, PoolMetrics>();
-  private static lastMetricsUpdate = 0;
-  private static readonly CACHE_TTL = 30000; // 30 seconds
+  private static pools: Map<string, ConnectionPool> = new Map();
+  private static readonly DEFAULT_CONFIG: Omit<ConnectionPoolConfig, 'poolName'> = {
+    minConnections: 5,
+    maxConnections: 100,
+    connectionTimeoutMs: 30000,
+    idleTimeoutMs: 600000, // 10 minutes
+    maxLifetimeMs: 3600000 // 1 hour
+  };
 
-  // Get pool configurations from database
-  static async getPoolConfigurations(): Promise<ConnectionPoolConfig[]> {
+  /**
+   * Initialize a connection pool
+   */
+  static async initializePool(config: ConnectionPoolConfig): Promise<boolean> {
     try {
-      const { data: poolConfigs } = await supabase
-        .from('connection_pool_config')
-        .select('*')
-        .order('pool_name');
+      console.log(`🏊 Initializing connection pool: ${config.poolName}`);
 
-      return (poolConfigs || []).map(config => ({
-        poolName: config.pool_name,
-        minConnections: config.min_connections,
-        maxConnections: config.max_connections,
-        connectionTimeoutMs: config.connection_timeout_ms,
-        idleTimeoutMs: config.idle_timeout_ms,
-        maxLifetimeMs: config.max_lifetime_ms
-      }));
-    } catch (error) {
-      console.error('Failed to get pool configurations:', error);
-      return [];
-    }
-  }
+      const pool = new ConnectionPool({
+        ...this.DEFAULT_CONFIG,
+        ...config
+      });
 
-  // Update pool configuration in database
-  static async updatePoolConfig(poolName: string, config: Partial<ConnectionPoolConfig>): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('connection_pool_config')
-        .update({
-          min_connections: config.minConnections,
-          max_connections: config.maxConnections,
-          connection_timeout_ms: config.connectionTimeoutMs,
-          idle_timeout_ms: config.idleTimeoutMs,
-          max_lifetime_ms: config.maxLifetimeMs,
-          updated_at: new Date().toISOString()
-        })
-        .eq('pool_name', poolName);
+      await pool.initialize();
+      this.pools.set(config.poolName, pool);
 
-      if (error) {
-        console.error('Failed to update pool config:', error);
-        return false;
-      }
-
-      console.log(`🔧 Updated pool configuration for ${poolName}`);
+      console.log(`✅ Connection pool initialized: ${config.poolName}`);
       return true;
     } catch (error) {
-      console.error('Error updating pool config:', error);
+      console.error(`Failed to initialize pool ${config.poolName}:`, error);
       return false;
     }
   }
 
-  // Route query based on type (read/write/analytics)
-  static async routeQuery<T>(
-    queryType: 'read' | 'write' | 'analytics',
-    queryFn: () => Promise<T>
-  ): Promise<T> {
-    const replica = await this.selectOptimalReplica(queryType);
-    
-    console.log(`🔀 Routing ${queryType} query to replica: ${replica.replica_name} (${replica.latency_ms}ms latency)`);
-    
+  /**
+   * Get a connection from the specified pool
+   */
+  static async getConnection(poolName: string): Promise<PooledConnection | null> {
     try {
-      // Execute query (in real implementation, this would switch connection)
-      const startTime = Date.now();
-      const result = await queryFn();
-      const duration = Date.now() - startTime;
-      
-      // Update replica metrics
-      await this.updateReplicaMetrics(replica.replica_name, { responseTime: duration });
-      
-      return result;
-    } catch (error) {
-      console.error(`Query failed on replica ${replica.replica_name}:`, error);
-      
-      // Try fallback replicas for read queries
-      if (queryType === 'read') {
-        const fallbackReplicas = await this.getFallbackReplicas(replica.replica_name);
-        for (const fallback of fallbackReplicas) {
-          try {
-            console.log(`🔄 Retrying on fallback replica: ${fallback.replica_name}`);
-            return await queryFn();
-          } catch (fallbackError) {
-            console.error(`Fallback query failed on ${fallback.replica_name}:`, fallbackError);
-          }
-        }
+      const pool = this.pools.get(poolName);
+      if (!pool) {
+        console.warn(`Pool not found: ${poolName}`);
+        return null;
       }
-      
-      throw error;
+
+      return await pool.acquire();
+    } catch (error) {
+      console.error(`Failed to get connection from pool ${poolName}:`, error);
+      return null;
     }
   }
 
-  // Select optimal replica based on query type and current load
-  private static async selectOptimalReplica(queryType: 'read' | 'write' | 'analytics') {
+  /**
+   * Release a connection back to the pool
+   */
+  static async releaseConnection(
+    poolName: string, 
+    connection: PooledConnection
+  ): Promise<boolean> {
     try {
-      let query = supabase
-        .from('read_replica_config')
-        .select('*')
-        .eq('is_active', true);
-
-      // Route based on query type
-      if (queryType === 'write') {
-        query = query.eq('replica_name', 'primary');
-      } else if (queryType === 'analytics') {
-        query = query.in('replica_name', ['analytics-replica', 'read-replica-2']);
-      } else {
-        query = query.neq('replica_name', 'primary'); // Prefer read replicas for read queries
+      const pool = this.pools.get(poolName);
+      if (!pool) {
+        console.warn(`Pool not found: ${poolName}`);
+        return false;
       }
 
-      const { data: replicas } = await query
-        .order('load_percentage', { ascending: true })
-        .order('latency_ms', { ascending: true })
-        .limit(1);
-
-      // Fallback to primary if no suitable replica found
-      if (!replicas || replicas.length === 0) {
-        const { data: primary } = await supabase
-          .from('read_replica_config')
-          .select('*')
-          .eq('replica_name', 'primary')
-          .single();
-        
-        return primary || {
-          replica_name: 'primary',
-          endpoint_url: 'primary.db.cluster',
-          region: 'us-east-1',
-          latency_ms: 10,
-          load_percentage: 50
-        };
-      }
-
-      return replicas[0];
+      await pool.release(connection);
+      return true;
     } catch (error) {
-      console.error('Failed to select optimal replica:', error);
-      return {
-        replica_name: 'primary',
-        endpoint_url: 'primary.db.cluster',
-        region: 'us-east-1',
-        latency_ms: 10,
-        load_percentage: 50
-      };
+      console.error(`Failed to release connection to pool ${poolName}:`, error);
+      return false;
     }
   }
 
-  // Get fallback replicas for failover
-  private static async getFallbackReplicas(excludeReplica: string) {
-    try {
-      const { data: replicas } = await supabase
-        .from('read_replica_config')
-        .select('*')
-        .eq('is_active', true)
-        .neq('replica_name', excludeReplica)
-        .order('latency_ms', { ascending: true })
-        .limit(3);
-
-      return replicas || [];
-    } catch (error) {
-      console.error('Failed to get fallback replicas:', error);
-      return [];
-    }
+  /**
+   * Get statistics for all pools
+   */
+  static getPoolStats(): ConnectionStats[] {
+    return Array.from(this.pools.entries()).map(([name, pool]) => ({
+      poolName: name,
+      ...pool.getStats()
+    }));
   }
 
-  // Update replica performance metrics
-  private static async updateReplicaMetrics(replicaName: string, metrics: { responseTime?: number; errorOccurred?: boolean }) {
-    try {
-      // Calculate new load percentage based on response time
-      const loadAdjustment = metrics.responseTime ? Math.min(metrics.responseTime / 100, 10) : 0;
-      const errorAdjustment = metrics.errorOccurred ? 5 : 0;
-      const totalAdjustment = loadAdjustment + errorAdjustment;
+  /**
+   * Get statistics for a specific pool
+   */
+  static getPoolStatsByName(poolName: string): ConnectionStats | null {
+    const pool = this.pools.get(poolName);
+    if (!pool) return null;
 
-      // Get current load percentage first
-      const { data: currentReplica } = await supabase
-        .from('read_replica_config')
-        .select('load_percentage')
-        .eq('replica_name', replicaName)
-        .single();
-
-      if (currentReplica) {
-        const newLoadPercentage = Math.min(100, Number(currentReplica.load_percentage) + totalAdjustment);
-        
-        await supabase
-          .from('read_replica_config')
-          .update({
-            load_percentage: newLoadPercentage,
-            latency_ms: metrics.responseTime || undefined,
-            updated_at: new Date().toISOString()
-          })
-          .eq('replica_name', replicaName);
-      }
-
-    } catch (error) {
-      console.error('Failed to update replica metrics:', error);
-    }
+    return {
+      poolName,
+      ...pool.getStats()
+    };
   }
 
-  // Get pool health metrics
-  static async getPoolHealth(): Promise<{
-    healthy: string[];
-    degraded: string[];
-    critical: string[];
-    overallScore: number;
+  /**
+   * Health check for all pools
+   */
+  static async healthCheck(): Promise<{
+    healthy: boolean;
+    pools: Array<{
+      name: string;
+      healthy: boolean;
+      error?: string;
+    }>;
   }> {
-    try {
-      const { data: replicas } = await supabase
-        .from('read_replica_config')
-        .select('replica_name, is_active, latency_ms, load_percentage');
+    const results = [];
+    let overallHealthy = true;
 
-      if (!replicas) {
-        return { healthy: [], degraded: [], critical: [], overallScore: 0 };
+    for (const [name, pool] of this.pools.entries()) {
+      try {
+        const healthy = await pool.healthCheck();
+        results.push({ name, healthy });
+        if (!healthy) overallHealthy = false;
+      } catch (error) {
+        results.push({ 
+          name, 
+          healthy: false, 
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        overallHealthy = false;
       }
+    }
 
-      const healthy: string[] = [];
-      const degraded: string[] = [];
-      const critical: string[] = [];
+    return {
+      healthy: overallHealthy,
+      pools: results
+    };
+  }
 
-      replicas.forEach(replica => {
-        if (!replica.is_active) {
-          critical.push(replica.replica_name);
-        } else if (replica.load_percentage > 90 || replica.latency_ms > 100) {
-          critical.push(replica.replica_name);
-        } else if (replica.load_percentage > 70 || replica.latency_ms > 50) {
-          degraded.push(replica.replica_name);
-        } else {
-          healthy.push(replica.replica_name);
-        }
+  /**
+   * Shutdown all pools
+   */
+  static async shutdown(): Promise<void> {
+    console.log('🔄 Shutting down all connection pools...');
+
+    const shutdownPromises = Array.from(this.pools.entries()).map(async ([name, pool]) => {
+      try {
+        await pool.shutdown();
+        console.log(`✅ Pool ${name} shut down successfully`);
+      } catch (error) {
+        console.error(`❌ Failed to shutdown pool ${name}:`, error);
+      }
+    });
+
+    await Promise.allSettled(shutdownPromises);
+    this.pools.clear();
+
+    console.log('🏁 All connection pools shut down');
+  }
+}
+
+class ConnectionPool {
+  private config: ConnectionPoolConfig;
+  private connections: PooledConnection[] = [];
+  private availableConnections: PooledConnection[] = [];
+  private waitingQueue: Array<{
+    resolve: (connection: PooledConnection) => void;
+    reject: (error: Error) => void;
+    timestamp: number;
+  }> = [];
+  private stats = {
+    connectionsCreated: 0,
+    connectionsDestroyed: 0,
+    totalWaitTime: 0,
+    waitingRequests: 0
+  };
+
+  constructor(config: ConnectionPoolConfig) {
+    this.config = config;
+  }
+
+  async initialize(): Promise<void> {
+    // Create minimum connections
+    for (let i = 0; i < this.config.minConnections; i++) {
+      const connection = await this.createConnection();
+      this.connections.push(connection);
+      this.availableConnections.push(connection);
+    }
+
+    // Start maintenance interval
+    setInterval(() => this.maintenance(), 30000); // Every 30 seconds
+  }
+
+  async acquire(): Promise<PooledConnection> {
+    // Check for available connection
+    if (this.availableConnections.length > 0) {
+      const connection = this.availableConnections.pop()!;
+      connection.lastUsed = new Date();
+      return connection;
+    }
+
+    // Create new connection if under max limit
+    if (this.connections.length < this.config.maxConnections) {
+      const connection = await this.createConnection();
+      this.connections.push(connection);
+      connection.lastUsed = new Date();
+      return connection;
+    }
+
+    // Wait for available connection
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      this.waitingQueue.push({
+        resolve: (connection) => {
+          this.stats.totalWaitTime += Date.now() - startTime;
+          this.stats.waitingRequests++;
+          resolve(connection);
+        },
+        reject,
+        timestamp: startTime
       });
 
-      // Calculate overall health score
-      const totalReplicas = replicas.length;
-      const healthyWeight = healthy.length * 100;
-      const degradedWeight = degraded.length * 70;
-      const criticalWeight = critical.length * 30;
-      const overallScore = Math.round((healthyWeight + degradedWeight + criticalWeight) / (totalReplicas * 100) * 100);
+      // Set timeout
+      setTimeout(() => {
+        const index = this.waitingQueue.findIndex(item => item.timestamp === startTime);
+        if (index !== -1) {
+          this.waitingQueue.splice(index, 1);
+          reject(new Error('Connection timeout'));
+        }
+      }, this.config.connectionTimeoutMs);
+    });
+  }
 
-      return { healthy, degraded, critical, overallScore };
-    } catch (error) {
-      console.error('Failed to get pool health:', error);
-      return { healthy: [], degraded: [], critical: [], overallScore: 0 };
+  async release(connection: PooledConnection): Promise<void> {
+    connection.lastUsed = new Date();
+
+    // If there are waiting requests, fulfill them
+    if (this.waitingQueue.length > 0) {
+      const waiter = this.waitingQueue.shift()!;
+      waiter.resolve(connection);
+      return;
+    }
+
+    // Return to available pool
+    this.availableConnections.push(connection);
+  }
+
+  private async createConnection(): Promise<PooledConnection> {
+    const connection: PooledConnection = {
+      id: `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date(),
+      lastUsed: new Date(),
+      isActive: true
+    };
+
+    this.stats.connectionsCreated++;
+    return connection;
+  }
+
+  private async destroyConnection(connection: PooledConnection): Promise<void> {
+    connection.isActive = false;
+    this.stats.connectionsDestroyed++;
+
+    // Remove from all arrays
+    const connIndex = this.connections.indexOf(connection);
+    if (connIndex !== -1) {
+      this.connections.splice(connIndex, 1);
+    }
+
+    const availIndex = this.availableConnections.indexOf(connection);
+    if (availIndex !== -1) {
+      this.availableConnections.splice(availIndex, 1);
     }
   }
 
-  // Auto-optimize replica load distribution
-  static async optimizeLoadDistribution(): Promise<{
-    rebalancedReplicas: string[];
-    expectedImprovementPercent: number;
-  }> {
-    try {
-      const { data: replicas } = await supabase
-        .from('read_replica_config')
-        .select('*')
-        .eq('is_active', true);
+  private async maintenance(): Promise<void> {
+    const now = new Date();
 
-      if (!replicas || replicas.length === 0) {
-        return { rebalancedReplicas: [], expectedImprovementPercent: 0 };
+    // Remove idle connections
+    const idleConnections = this.availableConnections.filter(conn => 
+      now.getTime() - conn.lastUsed.getTime() > this.config.idleTimeoutMs
+    );
+
+    for (const conn of idleConnections) {
+      if (this.connections.length > this.config.minConnections) {
+        await this.destroyConnection(conn);
       }
+    }
 
-      const avgLoad = replicas.reduce((sum, r) => sum + Number(r.load_percentage), 0) / replicas.length;
-      const overloadedReplicas = replicas.filter(r => Number(r.load_percentage) > avgLoad * 1.3);
+    // Remove expired connections
+    const expiredConnections = this.connections.filter(conn =>
+      now.getTime() - conn.createdAt.getTime() > this.config.maxLifetimeMs
+    );
+
+    for (const conn of expiredConnections) {
+      await this.destroyConnection(conn);
       
-      const rebalancedReplicas: string[] = [];
-      let expectedImprovementPercent = 0;
-
-      for (const replica of overloadedReplicas) {
-        const currentLoad = Number(replica.load_percentage);
-        const excessLoad = currentLoad - avgLoad;
-        const newLoad = Math.max(avgLoad, currentLoad * 0.8);
-        
-        await supabase
-          .from('read_replica_config')
-          .update({
-            load_percentage: newLoad,
-            updated_at: new Date().toISOString()
-          })
-          .eq('replica_name', replica.replica_name);
-
-        rebalancedReplicas.push(replica.replica_name);
-        expectedImprovementPercent += (excessLoad / currentLoad) * 100;
+      // Create replacement if needed
+      if (this.connections.length < this.config.minConnections) {
+        const newConnection = await this.createConnection();
+        this.connections.push(newConnection);
+        this.availableConnections.push(newConnection);
       }
-
-      expectedImprovementPercent = Math.min(expectedImprovementPercent / overloadedReplicas.length, 40);
-
-      console.log(`⚖️ Rebalanced ${rebalancedReplicas.length} replicas, expected improvement: ${expectedImprovementPercent.toFixed(1)}%`);
-
-      return { rebalancedReplicas, expectedImprovementPercent };
-    } catch (error) {
-      console.error('Failed to optimize load distribution:', error);
-      return { rebalancedReplicas: [], expectedImprovementPercent: 0 };
     }
   }
+
+  getStats(): Omit<ConnectionStats, 'poolName'> {
+    return {
+      activeConnections: this.connections.length - this.availableConnections.length,
+      idleConnections: this.availableConnections.length,
+      totalConnections: this.connections.length,
+      maxConnections: this.config.maxConnections,
+      connectionsCreated: this.stats.connectionsCreated,
+      connectionsDestroyed: this.stats.connectionsDestroyed,
+      averageWaitTime: this.stats.waitingRequests > 0 
+        ? this.stats.totalWaitTime / this.stats.waitingRequests 
+        : 0
+    };
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      // Test acquiring and releasing a connection
+      const connection = await this.acquire();
+      await this.release(connection);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async shutdown(): Promise<void> {
+    // Clear waiting queue
+    this.waitingQueue.forEach(waiter => {
+      waiter.reject(new Error('Pool is shutting down'));
+    });
+    this.waitingQueue = [];
+
+    // Destroy all connections
+    for (const connection of this.connections) {
+      await this.destroyConnection(connection);
+    }
+  }
+}
+
+interface PooledConnection {
+  id: string;
+  createdAt: Date;
+  lastUsed: Date;
+  isActive: boolean;
 }

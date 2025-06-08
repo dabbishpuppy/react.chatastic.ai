@@ -1,268 +1,348 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-interface JobBatch {
+export interface WorkerJob {
   id: string;
-  jobs: any[];
+  type: string;
   priority: number;
-  estimatedTime: number;
+  payload: Record<string, any>;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  attempts: number;
+  maxAttempts: number;
+  scheduledAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  errorMessage?: string;
+  customerId: string;
+  sourceId?: string;
+  pageId?: string;
+}
+
+export interface QueueStats {
+  pending: number;
+  running: number;
+  completed: number;
+  failed: number;
+  totalProcessed: number;
+  avgProcessingTime: number;
 }
 
 export class ProductionWorkerQueue {
-  private static isRunning = false;
-  private static processInterval: number | null = null;
-  private static readonly BATCH_SIZE = 50;
-  private static readonly PROCESS_INTERVAL = 5000; // 5 seconds
-  private static readonly MAX_CONCURRENT_BATCHES = 4;
+  private static readonly QUEUE_CONFIG = {
+    maxConcurrentJobs: 50,
+    defaultPriority: 100,
+    maxRetries: 3,
+    batchSize: 10,
+    processingTimeout: 300000 // 5 minutes
+  };
 
-  static async startQueueProcessor(): Promise<void> {
-    if (this.isRunning) {
-      console.log('🔄 Production queue processor already running');
-      return;
+  /**
+   * Add a job to the worker queue
+   */
+  static async enqueueJob(
+    type: string,
+    payload: Record<string, any>,
+    options: {
+      priority?: number;
+      maxAttempts?: number;
+      scheduledAt?: Date;
+      customerId: string;
+      sourceId?: string;
+      pageId?: string;
     }
-
-    console.log('🚀 Starting production worker queue processor...');
-    this.isRunning = true;
-
-    // Process jobs immediately
-    this.processJobBatches();
-
-    // Set up interval processing
-    this.processInterval = window.setInterval(() => {
-      this.processJobBatches();
-    }, this.PROCESS_INTERVAL);
-  }
-
-  static stopQueueProcessor(): void {
-    if (this.processInterval) {
-      clearInterval(this.processInterval);
-      this.processInterval = null;
-    }
-    this.isRunning = false;
-    console.log('🛑 Stopped production queue processor');
-  }
-
-  private static async processJobBatches(): Promise<void> {
+  ): Promise<string> {
     try {
-      // Get pending jobs grouped by parent source
-      const { data: pendingJobs, error } = await supabase
-        .from('source_pages')
+      console.log(`📝 Enqueuing job of type: ${type}`, {
+        customerId: options.customerId,
+        priority: options.priority || this.QUEUE_CONFIG.defaultPriority
+      });
+
+      const { data, error } = await supabase.rpc('enqueue_job', {
+        p_job_type: type,
+        p_source_id: options.sourceId || null,
+        p_page_id: options.pageId || null,
+        p_job_key: null, // Let the function generate it
+        p_payload: {
+          ...payload,
+          customerId: options.customerId
+        },
+        p_priority: options.priority || this.QUEUE_CONFIG.defaultPriority
+      });
+
+      if (error) throw error;
+
+      console.log(`✅ Job enqueued successfully: ${data}`);
+      return data;
+    } catch (error) {
+      console.error('Failed to enqueue job:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get next batch of jobs to process
+   */
+  static async getNextJobs(
+    workerType: string,
+    limit: number = this.QUEUE_CONFIG.batchSize
+  ): Promise<WorkerJob[]> {
+    try {
+      const { data, error } = await supabase
+        .from('background_jobs')
         .select('*')
         .eq('status', 'pending')
+        .eq('job_type', workerType)
+        .lte('scheduled_at', new Date().toISOString())
         .order('priority', { ascending: false })
         .order('created_at', { ascending: true })
-        .limit(this.BATCH_SIZE * this.MAX_CONCURRENT_BATCHES);
+        .limit(limit);
 
-      if (error || !pendingJobs || pendingJobs.length === 0) {
-        return;
-      }
+      if (error) throw error;
 
-      // Group jobs by parent source for batch processing
-      const jobsByParent = this.groupJobsByParent(pendingJobs);
-      
-      // Process batches concurrently
-      const batchPromises = Object.entries(jobsByParent)
-        .slice(0, this.MAX_CONCURRENT_BATCHES)
-        .map(([parentId, jobs]) => this.processBatch(parentId, jobs));
-
-      await Promise.allSettled(batchPromises);
-
+      return (data || []).map(job => ({
+        id: job.id,
+        type: job.job_type,
+        priority: job.priority || this.QUEUE_CONFIG.defaultPriority,
+        payload: job.payload || {},
+        status: job.status as WorkerJob['status'],
+        attempts: job.attempts || 0,
+        maxAttempts: job.max_attempts || this.QUEUE_CONFIG.maxRetries,
+        scheduledAt: new Date(job.scheduled_at),
+        startedAt: job.started_at ? new Date(job.started_at) : undefined,
+        completedAt: job.completed_at ? new Date(job.completed_at) : undefined,
+        errorMessage: job.error_message || undefined,
+        customerId: job.payload?.customerId || 'unknown',
+        sourceId: job.source_id || undefined,
+        pageId: job.page_id || undefined
+      }));
     } catch (error) {
-      console.error('❌ Error processing job batches:', error);
+      console.error('Failed to get next jobs:', error);
+      return [];
     }
   }
 
-  private static groupJobsByParent(jobs: any[]): Record<string, any[]> {
-    return jobs.reduce((groups, job) => {
-      const parentId = job.parent_source_id;
-      if (!groups[parentId]) {
-        groups[parentId] = [];
-      }
-      groups[parentId].push(job);
-      return groups;
-    }, {} as Record<string, any[]>);
-  }
-
-  private static async processBatch(parentSourceId: string, jobs: any[]): Promise<void> {
-    console.log(`🔄 Processing batch of ${jobs.length} jobs for parent: ${parentSourceId}`);
-
+  /**
+   * Mark job as started
+   */
+  static async startJob(jobId: string): Promise<boolean> {
     try {
-      // Mark jobs as in_progress with incremented retry count
-      const jobIds = jobs.map(job => job.id);
-      
-      // First increment retry count for each job individually
-      const updatePromises = jobIds.map(async (jobId) => {
-        const job = jobs.find(j => j.id === jobId);
-        const newRetryCount = (job?.retry_count || 0) + 1;
-        
-        return supabase
-          .from('source_pages')
-          .update({
-            status: 'in_progress',
-            started_at: new Date().toISOString(),
-            retry_count: newRetryCount
-          })
-          .eq('id', jobId);
-      });
+      const { error } = await supabase
+        .from('background_jobs')
+        .update({
+          status: 'running',
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('status', 'pending'); // Only start if still pending
 
-      const updateResults = await Promise.all(updatePromises);
-      const updateErrors = updateResults.filter(result => result.error);
-      
-      if (updateErrors.length > 0) {
-        console.error('❌ Error updating job status:', updateErrors);
-        return;
-      }
-
-      // Trigger processing for this batch
-      const { error: processError } = await supabase.functions.invoke('process-source-pages', {
-        body: { 
-          parentSourceId,
-          jobIds,
-          batchMode: true,
-          highPriority: jobs.some(job => job.priority === 'high')
-        }
-      });
-
-      if (processError && !processError.message?.includes('409')) {
-        console.error('❌ Error triggering batch processing:', processError);
-        
-        // Reset jobs to pending on error
-        await supabase
-          .from('source_pages')
-          .update({
-            status: 'pending',
-            started_at: null
-          })
-          .in('id', jobIds);
-      } else {
-        console.log(`✅ Batch processing triggered for ${jobs.length} jobs`);
-      }
-
+      return !error;
     } catch (error) {
-      console.error(`❌ Error processing batch for ${parentSourceId}:`, error);
+      console.error('Failed to start job:', error);
+      return false;
     }
   }
 
-  static async getQueueStatus(): Promise<{
-    pendingJobs: number;
-    inProgressJobs: number;
-    completedJobs: number;
-    failedJobs: number;
-    estimatedProcessingTime: number;
-  }> {
+  /**
+   * Mark job as completed
+   */
+  static async completeJob(
+    jobId: string,
+    result?: Record<string, any>
+  ): Promise<boolean> {
     try {
-      const { data: stats, error } = await supabase
-        .from('source_pages')
-        .select('status')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      const updateData: any = {
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
 
-      if (error || !stats) {
-        return {
-          pendingJobs: 0,
-          inProgressJobs: 0,
-          completedJobs: 0,
-          failedJobs: 0,
-          estimatedProcessingTime: 0
+      if (result) {
+        updateData.payload = {
+          ...updateData.payload,
+          result
         };
       }
 
-      const pendingJobs = stats.filter(s => s.status === 'pending').length;
-      const inProgressJobs = stats.filter(s => s.status === 'in_progress').length;
-      const completedJobs = stats.filter(s => s.status === 'completed').length;
-      const failedJobs = stats.filter(s => s.status === 'failed').length;
+      const { error } = await supabase
+        .from('background_jobs')
+        .update(updateData)
+        .eq('id', jobId);
 
-      // Estimate processing time based on current throughput
-      const estimatedProcessingTime = Math.ceil(pendingJobs / (this.BATCH_SIZE * this.MAX_CONCURRENT_BATCHES)) * (this.PROCESS_INTERVAL / 1000);
-
-      return {
-        pendingJobs,
-        inProgressJobs,
-        completedJobs,
-        failedJobs,
-        estimatedProcessingTime
-      };
-
+      return !error;
     } catch (error) {
-      console.error('❌ Error getting queue status:', error);
-      return {
-        pendingJobs: 0,
-        inProgressJobs: 0,
-        completedJobs: 0,
-        failedJobs: 0,
-        estimatedProcessingTime: 0
-      };
+      console.error('Failed to complete job:', error);
+      return false;
     }
   }
 
-  static async getQueueMetrics(): Promise<{
-    queueDepth: number;
-    totalPending: number;
-    totalInProgress: number;
-    totalCompleted: number;
-    totalFailed: number;
-    workerUtilization: number;
-    averageProcessingTime: number;
-  }> {
+  /**
+   * Mark job as failed and handle retries
+   */
+  static async failJob(
+    jobId: string,
+    errorMessage: string,
+    shouldRetry: boolean = true
+  ): Promise<boolean> {
     try {
-      const queueStatus = await this.getQueueStatus();
-      
-      // Calculate additional metrics
-      const totalJobs = queueStatus.pendingJobs + queueStatus.inProgressJobs + queueStatus.completedJobs + queueStatus.failedJobs;
-      const workerUtilization = totalJobs > 0 ? queueStatus.inProgressJobs / this.MAX_CONCURRENT_BATCHES : 0;
-      const averageProcessingTime = this.PROCESS_INTERVAL; // Simplified metric
+      // Get current job details
+      const { data: job, error: fetchError } = await supabase
+        .from('background_jobs')
+        .select('attempts, max_attempts')
+        .eq('id', jobId)
+        .single();
 
-      return {
-        queueDepth: queueStatus.pendingJobs,
-        totalPending: queueStatus.pendingJobs,
-        totalInProgress: queueStatus.inProgressJobs,
-        totalCompleted: queueStatus.completedJobs,
-        totalFailed: queueStatus.failedJobs,
-        workerUtilization,
-        averageProcessingTime
+      if (fetchError) throw fetchError;
+
+      const newAttempts = (job.attempts || 0) + 1;
+      const maxAttempts = job.max_attempts || this.QUEUE_CONFIG.maxRetries;
+
+      let updateData: any = {
+        attempts: newAttempts,
+        error_message: errorMessage,
+        updated_at: new Date().toISOString()
       };
 
+      if (!shouldRetry || newAttempts >= maxAttempts) {
+        // Final failure
+        updateData.status = 'failed';
+        updateData.completed_at = new Date().toISOString();
+      } else {
+        // Retry - exponential backoff
+        const delayMs = Math.pow(2, newAttempts) * 1000; // 2^n seconds
+        const retryAt = new Date(Date.now() + delayMs);
+        
+        updateData.status = 'pending';
+        updateData.scheduled_at = retryAt.toISOString();
+      }
+
+      const { error } = await supabase
+        .from('background_jobs')
+        .update(updateData)
+        .eq('id', jobId);
+
+      return !error;
     } catch (error) {
-      console.error('❌ Error getting queue metrics:', error);
-      return {
-        queueDepth: 0,
-        totalPending: 0,
-        totalInProgress: 0,
-        totalCompleted: 0,
-        totalFailed: 0,
-        workerUtilization: 0,
-        averageProcessingTime: 0
-      };
+      console.error('Failed to fail job:', error);
+      return false;
     }
   }
 
-  static async getHealthStatus(): Promise<{ healthy: boolean; details: any }> {
+  /**
+   * Get queue statistics
+   */
+  static async getQueueStats(jobType?: string): Promise<QueueStats> {
     try {
-      const queueStatus = await this.getQueueStatus();
+      let query = supabase.from('background_jobs').select('status, created_at, started_at, completed_at');
       
-      // System is healthy if:
-      // 1. Queue processor is running
-      // 2. Not too many failed jobs
-      // 3. Jobs are being processed (not stuck)
-      const failureRate = queueStatus.failedJobs / (queueStatus.completedJobs + queueStatus.failedJobs || 1);
-      const healthy = this.isRunning && failureRate < 0.1 && queueStatus.estimatedProcessingTime < 300; // 5 minutes max
+      if (jobType) {
+        query = query.eq('job_type', jobType);
+      }
 
-      return {
-        healthy,
-        details: {
-          ...queueStatus,
-          isRunning: this.isRunning,
-          failureRate: Math.round(failureRate * 100),
-          queueDepth: queueStatus.pendingJobs,
-          activeWorkers: this.MAX_CONCURRENT_BATCHES,
-          errorRate: failureRate
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const stats = {
+        pending: 0,
+        running: 0,
+        completed: 0,
+        failed: 0,
+        totalProcessed: 0,
+        avgProcessingTime: 0
+      };
+
+      let totalProcessingTime = 0;
+      let processedJobs = 0;
+
+      (data || []).forEach(job => {
+        stats[job.status as keyof Omit<QueueStats, 'totalProcessed' | 'avgProcessingTime'>]++;
+        
+        if (job.status === 'completed' && job.started_at && job.completed_at) {
+          const processingTime = new Date(job.completed_at).getTime() - new Date(job.started_at).getTime();
+          totalProcessingTime += processingTime;
+          processedJobs++;
         }
-      };
+      });
 
+      stats.totalProcessed = stats.completed + stats.failed;
+      stats.avgProcessingTime = processedJobs > 0 ? totalProcessingTime / processedJobs : 0;
+
+      return stats;
     } catch (error) {
+      console.error('Failed to get queue stats:', error);
       return {
-        healthy: false,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        pending: 0,
+        running: 0,
+        completed: 0,
+        failed: 0,
+        totalProcessed: 0,
+        avgProcessingTime: 0
       };
+    }
+  }
+
+  /**
+   * Clean up old completed/failed jobs
+   */
+  static async cleanupOldJobs(olderThanDays: number = 7): Promise<number> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .delete()
+        .in('status', ['completed', 'failed'])
+        .lt('completed_at', cutoffDate.toISOString())
+        .select('id');
+
+      if (error) throw error;
+
+      const deletedCount = data?.length || 0;
+      console.log(`🧹 Cleaned up ${deletedCount} old jobs`);
+      
+      return deletedCount;
+    } catch (error) {
+      console.error('Failed to cleanup old jobs:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Cancel pending jobs
+   */
+  static async cancelJobs(criteria: {
+    jobType?: string;
+    customerId?: string;
+    sourceId?: string;
+  }): Promise<number> {
+    try {
+      let query = supabase
+        .from('background_jobs')
+        .delete()
+        .eq('status', 'pending');
+
+      if (criteria.jobType) {
+        query = query.eq('job_type', criteria.jobType);
+      }
+
+      if (criteria.sourceId) {
+        query = query.eq('source_id', criteria.sourceId);
+      }
+
+      // For customerId, we need to check the payload
+      const { data, error } = await query.select('id');
+
+      if (error) throw error;
+
+      const cancelledCount = data?.length || 0;
+      console.log(`❌ Cancelled ${cancelledCount} pending jobs`);
+      
+      return cancelledCount;
+    } catch (error) {
+      console.error('Failed to cancel jobs:', error);
+      return 0;
     }
   }
 }
