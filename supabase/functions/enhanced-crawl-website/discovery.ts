@@ -1,4 +1,45 @@
 
+// Enhanced URL discovery with comprehensive link extraction and smart filtering
+
+interface DiscoveryConfig {
+  excludePaths: string[];
+  includePaths: string[];
+  maxPages: number;
+}
+
+// Targeted exclusions for non-content URLs
+const DEFAULT_EXCLUDES = [
+  /^\/feed\/?$/i,              // RSS feeds
+  /^\/comments\/feed\/?$/i,    // Comment feeds
+  /#.+$/,                      // URL fragments
+  /\.(js|css|scss|sass|less|map|woff|woff2|ttf|eot|otf)$/i,  // Assets
+  /\.(jpg|jpeg|png|gif|svg|webp|ico|bmp|tiff|avif)$/i,       // Images
+  /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|rar|tar|gz)$/i,     // Documents
+  /\.(json|xml|csv|txt|log)$/i,                               // Data files
+  /\.(mp4|mp3|wav|avi|mov|webm|flv|mkv|wmv)$/i,              // Media
+  /\/wp-admin\//i,             // WordPress admin
+  /\/wp-content\//i,           // WordPress content
+  /\/wp-json\//i,              // WordPress API
+  /\/api\//i,                  // API endpoints
+  /\/admin\//i,                // Admin areas
+  /\/login/i,                  // Login pages
+  /\/logout/i,                 // Logout pages
+  /\/register/i,               // Registration pages
+  /\/dashboard/i,              // Dashboards
+  /\/search\?/i,               // Search results with query params
+  /\/filter\?/i,               // Filter results with query params
+];
+
+// Great People specific include patterns
+const GREATPEOPLE_INCLUDES = [
+  /^\/$/,                      // Homepage
+  /^\/en\//,                   // English section
+  /^\/radgivere\//,            // Adviser profiles
+  /^\/employee-category\//,    // Team categories
+  /^\/projects-engineering/,   // Projects
+  /^\/page\/\d+/,              // Pagination
+];
+
 export async function discoverLinks(
   url: string,
   excludePaths: string[] = [],
@@ -6,7 +47,7 @@ export async function discoverLinks(
   maxPages: number = 100
 ): Promise<string[]> {
   try {
-    console.log('🔍 Starting link discovery for:', url);
+    console.log('🔍 Starting enhanced link discovery for:', url);
     console.log('📋 Exclude paths:', excludePaths);
     console.log('📋 Include paths:', includePaths);
 
@@ -14,55 +55,37 @@ export async function discoverLinks(
       headers: {
         'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
       },
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(15000)
     });
 
     if (!response.ok) {
       console.log('❌ Failed to fetch main URL, using fallback');
-      return [url]; // Fallback to just the main URL
+      return [url];
     }
 
     const html = await response.text();
-    const linkPattern = /href\s*=\s*["']([^"']+)["']/gi;
     const discovered = new Set<string>([url]); // Always include the main URL
-
-    let match;
-    while ((match = linkPattern.exec(html)) !== null) {
-      try {
-        const linkUrl = new URL(match[1], url);
-        
-        // Only include same-domain links
-        if (linkUrl.hostname === new URL(url).hostname) {
-          const fullUrl = linkUrl.href;
-          const path = linkUrl.pathname;
-          
-          console.log('🔗 Checking path:', path);
-          
-          // Apply exclude filters first
-          if (shouldExcludePath(path, excludePaths)) {
-            console.log('❌ Excluding path:', path);
-            continue;
-          }
-          
-          // Apply include filters if specified
-          if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) {
-            console.log('⚠️ Path not in include list:', path);
-            continue;
-          }
-          
-          console.log('✅ Including path:', path);
-          discovered.add(fullUrl);
-          
-          // Limit discovery to prevent runaway crawls
-          if (discovered.size >= maxPages) break;
-        }
-      } catch (e) {
-        continue; // Invalid URL, skip
-      }
-    }
-
+    
+    // Extract all links from the document (no semantic container restrictions)
+    const allLinks = extractAllLinks(html, url);
+    console.log(`🔗 Found ${allLinks.length} total links in HTML`);
+    
+    // Apply filtering and normalization
+    const filteredLinks = filterAndNormalizeUrls(allLinks, url, {
+      excludePaths,
+      includePaths,
+      maxPages
+    });
+    
+    // Add filtered links to discovered set
+    filteredLinks.forEach(link => discovered.add(link));
+    
     console.log(`📊 Discovery completed: ${discovered.size} URLs found after filtering`);
-    return Array.from(discovered);
+    
+    // Return up to maxPages URLs
+    const result = Array.from(discovered).slice(0, maxPages);
+    return result;
+    
   } catch (error) {
     console.error('❌ Error discovering links:', error);
     return [url]; // Fallback to just the main URL
@@ -75,16 +98,14 @@ export async function discoverSitemapLinks(
   includePaths: string[] = []
 ): Promise<string[]> {
   try {
-    console.log('🗺️ Discovering links from sitemap:', sitemapUrl);
-    console.log('📋 Exclude paths:', excludePaths);
-    console.log('📋 Include paths:', includePaths);
+    console.log('🗺️ Starting enhanced sitemap discovery for:', sitemapUrl);
     
-    // Try to find sitemap.xml if not explicitly provided
-    let actualSitemapUrl = sitemapUrl;
-    if (!sitemapUrl.includes('sitemap')) {
-      const baseUrl = new URL(sitemapUrl);
-      actualSitemapUrl = `${baseUrl.protocol}//${baseUrl.hostname}/sitemap.xml`;
-    }
+    const baseUrl = new URL(sitemapUrl);
+    const actualSitemapUrl = sitemapUrl.includes('sitemap') 
+      ? sitemapUrl 
+      : `${baseUrl.protocol}//${baseUrl.hostname}/sitemap.xml`;
+    
+    console.log('🗺️ Fetching sitemap from:', actualSitemapUrl);
     
     const response = await fetch(actualSitemapUrl, {
       headers: {
@@ -94,120 +115,235 @@ export async function discoverSitemapLinks(
     });
 
     if (!response.ok) {
-      console.log('❌ Sitemap not found, falling back to main URL');
-      return [sitemapUrl];
+      console.log('❌ Sitemap not found, falling back to HTML discovery');
+      return await discoverLinks(sitemapUrl, excludePaths, includePaths, 200);
     }
 
     const xmlText = await response.text();
-    const allUrls = parseSitemapXml(xmlText);
+    let allUrls: string[] = [];
+    
+    // Check if this is a sitemap index
+    if (xmlText.includes('<sitemapindex')) {
+      console.log('📑 Found sitemap index, processing child sitemaps...');
+      allUrls = await processSitemapIndex(xmlText, baseUrl.origin);
+    } else {
+      console.log('📄 Processing regular sitemap...');
+      allUrls = parseSitemapXml(xmlText);
+    }
+    
+    console.log(`🗺️ Found ${allUrls.length} URLs in sitemap(s)`);
     
     // Apply filtering to sitemap URLs
-    const filteredUrls = allUrls.filter(url => {
-      try {
-        const urlObj = new URL(url);
-        const path = urlObj.pathname;
-        
-        // Apply exclude filters
-        if (shouldExcludePath(path, excludePaths)) {
-          console.log('❌ Excluding sitemap URL:', path);
-          return false;
-        }
-        
-        // Apply include filters if specified
-        if (includePaths.length > 0 && !shouldIncludePath(path, includePaths)) {
-          console.log('⚠️ Sitemap URL not in include list:', path);
-          return false;
-        }
-        
-        console.log('✅ Including sitemap URL:', path);
-        return true;
-      } catch (e) {
-        return false;
-      }
+    const filteredUrls = filterAndNormalizeUrls(allUrls, sitemapUrl, {
+      excludePaths,
+      includePaths,
+      maxPages: 500 // Higher limit for sitemap
     });
     
-    console.log(`✅ Discovered ${filteredUrls.length} URLs from sitemap after filtering (${allUrls.length} total)`);
+    console.log(`✅ Sitemap discovery completed: ${filteredUrls.length} URLs after filtering`);
     return filteredUrls;
     
   } catch (error) {
     console.error('❌ Error discovering sitemap links:', error);
-    return [sitemapUrl];
+    console.log('🔄 Falling back to HTML discovery');
+    return await discoverLinks(sitemapUrl, excludePaths, includePaths, 200);
   }
+}
+
+function extractAllLinks(html: string, baseUrl: string): string[] {
+  const links: string[] = [];
+  const linkPattern = /href\s*=\s*["']([^"']+)["']/gi;
+  
+  let match;
+  while ((match = linkPattern.exec(html)) !== null) {
+    try {
+      const href = match[1].trim();
+      
+      // Skip empty hrefs, fragments, and javascript/mailto links
+      if (!href || href === '#' || href.startsWith('#') || 
+          href.startsWith('javascript:') || href.startsWith('mailto:') || 
+          href.startsWith('tel:')) {
+        continue;
+      }
+      
+      // Resolve to absolute URL
+      const absoluteUrl = new URL(href, baseUrl);
+      
+      // Only include same-domain links
+      const baseHostname = new URL(baseUrl).hostname;
+      if (absoluteUrl.hostname === baseHostname) {
+        links.push(absoluteUrl.href);
+      }
+    } catch (e) {
+      // Invalid URL, skip
+      continue;
+    }
+  }
+  
+  return links;
+}
+
+async function processSitemapIndex(xmlText: string, baseOrigin: string): Promise<string[]> {
+  const sitemapUrls: string[] = [];
+  const sitemapRegex = /<sitemap>[\s\S]*?<loc>(.*?)<\/loc>[\s\S]*?<\/sitemap>/g;
+  
+  let match;
+  while ((match = sitemapRegex.exec(xmlText)) !== null) {
+    const sitemapUrl = match[1].trim();
+    if (sitemapUrl && sitemapUrl.startsWith('http')) {
+      sitemapUrls.push(sitemapUrl);
+    }
+  }
+  
+  console.log(`📑 Found ${sitemapUrls.length} child sitemaps`);
+  
+  const allUrls: string[] = [];
+  
+  // Process each child sitemap
+  for (const sitemapUrl of sitemapUrls) {
+    try {
+      console.log(`📄 Processing child sitemap: ${sitemapUrl}`);
+      
+      const response = await fetch(sitemapUrl, {
+        headers: {
+          'User-Agent': 'WonderWave-Bot/2.0 (+https://wonderwave.no/bot)',
+        },
+        signal: AbortSignal.timeout(15000)
+      });
+      
+      if (response.ok) {
+        const childXml = await response.text();
+        const childUrls = parseSitemapXml(childXml);
+        allUrls.push(...childUrls);
+        console.log(`📄 Added ${childUrls.length} URLs from ${sitemapUrl}`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Failed to process child sitemap: ${sitemapUrl}`, error);
+    }
+  }
+  
+  return allUrls;
 }
 
 function parseSitemapXml(xmlText: string): string[] {
   const urls: string[] = [];
+  const locRegex = /<loc>(.*?)<\/loc>/g;
   
-  try {
-    // Simple regex-based XML parsing
-    const locRegex = /<loc>(.*?)<\/loc>/g;
-    let match;
-    
-    while ((match = locRegex.exec(xmlText)) !== null) {
-      const url = match[1].trim();
-      if (url && url.startsWith('http')) {
-        urls.push(url);
-      }
+  let match;
+  while ((match = locRegex.exec(xmlText)) !== null) {
+    const url = match[1].trim();
+    if (url && url.startsWith('http')) {
+      urls.push(url);
     }
-    
-    // If no URLs found, try sitemapindex format
-    if (urls.length === 0) {
-      const sitemapRegex = /<sitemap>[\s\S]*?<loc>(.*?)<\/loc>[\s\S]*?<\/sitemap>/g;
-      while ((match = sitemapRegex.exec(xmlText)) !== null) {
-        const sitemapUrl = match[1].trim();
-        if (sitemapUrl && sitemapUrl.startsWith('http')) {
-          urls.push(sitemapUrl);
-        }
-      }
-    }
-    
-  } catch (error) {
-    console.error('❌ Error parsing sitemap XML:', error);
   }
   
   return urls;
 }
 
-function shouldExcludePath(path: string, excludePaths: string[]): boolean {
-  const defaultExcludes = [
-    '/wp-json/*', '/wp-admin/*', '/wp-content/*', '/xmlrpc.php', '/checkout/*', 
-    '/cart/*', '/admin/*', '/api/*', '*.json', '*.xml', '*.rss', '*.css', '*.js',
-    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.svg', '*.ico', '*.pdf'
-  ];
+function filterAndNormalizeUrls(
+  urls: string[], 
+  baseUrl: string, 
+  config: DiscoveryConfig
+): string[] {
+  const { excludePaths, includePaths, maxPages } = config;
+  const baseHostname = new URL(baseUrl).hostname;
+  const normalizedUrls = new Set<string>();
   
-  const allExcludes = [...defaultExcludes, ...excludePaths];
-  
-  return allExcludes.some(pattern => {
-    // Handle glob patterns
-    if (pattern.includes('*')) {
-      const regex = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
-      return regex.test(path);
+  // Combine default excludes with custom excludes
+  const allExcludePatterns = [...DEFAULT_EXCLUDES];
+  excludePaths.forEach(pattern => {
+    try {
+      allExcludePatterns.push(new RegExp(pattern.replace(/\*/g, '.*'), 'i'));
+    } catch (e) {
+      // If regex fails, treat as literal string
+      allExcludePatterns.push(new RegExp(escapeRegex(pattern), 'i'));
     }
-    
-    // Handle exact matches or prefix matches
-    if (pattern.endsWith('/')) {
-      return path.toLowerCase().startsWith(pattern.toLowerCase());
-    }
-    
-    return path.toLowerCase().includes(pattern.toLowerCase());
   });
+  
+  // Prepare include patterns (use site-specific defaults if none provided)
+  const includePatterns: RegExp[] = [];
+  const patternsToUse = includePaths.length > 0 ? includePaths : 
+    (baseHostname.includes('greatpeople.no') ? GREATPEOPLE_INCLUDES.map(p => p.source) : []);
+  
+  patternsToUse.forEach(pattern => {
+    try {
+      includePatterns.push(new RegExp(pattern.replace(/\*/g, '.*'), 'i'));
+    } catch (e) {
+      includePatterns.push(new RegExp(escapeRegex(pattern), 'i'));
+    }
+  });
+  
+  for (const url of urls) {
+    try {
+      // Normalize URL
+      const normalized = normalizeUrl(url);
+      if (!normalized) continue;
+      
+      const urlObj = new URL(normalized);
+      
+      // Only same domain
+      if (urlObj.hostname.toLowerCase() !== baseHostname.toLowerCase()) {
+        continue;
+      }
+      
+      const path = urlObj.pathname + urlObj.search;
+      
+      // Apply exclude filters
+      if (allExcludePatterns.some(pattern => pattern.test(path))) {
+        continue;
+      }
+      
+      // Apply include filters (if any)
+      if (includePatterns.length > 0 && !includePatterns.some(pattern => pattern.test(path))) {
+        continue;
+      }
+      
+      normalizedUrls.add(normalized);
+      
+      // Stop if we've reached max pages
+      if (normalizedUrls.size >= maxPages) {
+        break;
+      }
+      
+    } catch (e) {
+      continue;
+    }
+  }
+  
+  return Array.from(normalizedUrls);
 }
 
-function shouldIncludePath(path: string, includePaths: string[]): boolean {
-  if (includePaths.length === 0) return true;
-  
-  return includePaths.some(pattern => {
-    // Handle glob patterns
-    if (pattern.includes('*')) {
-      const regex = new RegExp(pattern.replace(/\*/g, '.*'), 'i');
-      return regex.test(path);
+function normalizeUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    
+    // Normalize hostname to lowercase
+    urlObj.hostname = urlObj.hostname.toLowerCase();
+    
+    // Remove tracking parameters
+    const trackingParams = [
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'fbclid', 'gclid', 'mc_cid', 'mc_eid', '_ga', '_gl'
+    ];
+    
+    trackingParams.forEach(param => {
+      urlObj.searchParams.delete(param);
+    });
+    
+    // Remove fragment
+    urlObj.hash = '';
+    
+    // Remove trailing slash for non-root paths
+    if (urlObj.pathname.length > 1 && urlObj.pathname.endsWith('/')) {
+      urlObj.pathname = urlObj.pathname.slice(0, -1);
     }
     
-    // Handle exact matches or prefix matches
-    if (pattern.endsWith('/')) {
-      return path.toLowerCase().startsWith(pattern.toLowerCase());
-    }
-    
-    return path.toLowerCase().includes(pattern.toLowerCase());
-  });
+    return urlObj.toString();
+  } catch (e) {
+    return null;
+  }
+}
+
+function escapeRegex(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

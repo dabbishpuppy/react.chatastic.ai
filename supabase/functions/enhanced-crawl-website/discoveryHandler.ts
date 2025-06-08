@@ -11,39 +11,96 @@ export async function handleUrlDiscovery(
   let discoveredUrls: string[] = [];
   
   try {
-    console.log(`🔍 Starting URL discovery for mode: ${crawlMode}`);
+    console.log(`🔍 Starting enhanced URL discovery for mode: ${crawlMode}`);
+    console.log(`🎯 Target: ${url}`);
+    console.log(`📊 Max pages: ${maxPages}`);
+    console.log(`🚫 Exclude paths: ${excludePaths.length} patterns`);
+    console.log(`✅ Include paths: ${includePaths.length} patterns`);
     
     const discoveryPromise = (async () => {
       switch (crawlMode) {
         case 'single-page':
+          console.log('📄 Single page mode: returning target URL only');
           return [url];
+          
         case 'sitemap-only':
+          console.log('🗺️ Sitemap-only mode: processing sitemap(s) with enhanced logic');
           return await discoverSitemapLinks(url, excludePaths, includePaths);
+          
         case 'full-website':
         default:
+          console.log('🌐 Full website mode: trying sitemap first, then HTML crawling');
+          
+          // Try sitemap first for full website mode
+          try {
+            const sitemapUrls = await discoverSitemapLinks(url, excludePaths, includePaths);
+            if (sitemapUrls.length > 1) { // More than just the base URL
+              console.log(`✅ Sitemap discovery successful: ${sitemapUrls.length} URLs found`);
+              return sitemapUrls;
+            }
+          } catch (sitemapError) {
+            console.log('⚠️ Sitemap discovery failed, falling back to HTML crawling');
+          }
+          
+          // Fallback to enhanced HTML crawling
+          console.log('🔗 Using enhanced HTML link discovery');
           return await discoverLinks(url, excludePaths, includePaths, maxPages);
       }
     })();
 
-    // Add timeout to discovery
+    // Add timeout to discovery with longer timeout for comprehensive crawling
+    const timeoutDuration = crawlMode === 'full-website' ? 60000 : 30000; // 60s for full, 30s for others
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('URL discovery timeout')), 30000); // 30 second timeout
+      setTimeout(() => reject(new Error(`URL discovery timeout after ${timeoutDuration}ms`)), timeoutDuration);
     });
 
     discoveredUrls = await Promise.race([discoveryPromise, timeoutPromise]) as string[];
     
+    console.log(`📊 Discovery completed successfully:`);
+    console.log(`   • Mode: ${crawlMode}`);
+    console.log(`   • URLs discovered: ${discoveredUrls.length}`);
+    console.log(`   • First 5 URLs:`, discoveredUrls.slice(0, 5));
+    
   } catch (discoveryError) {
     console.error('❌ URL discovery error:', discoveryError);
-    // Fallback to single URL to ensure we have something to process
-    discoveredUrls = [url];
-    console.log('🔄 Falling back to single URL due to discovery error');
+    
+    // Enhanced fallback logic
+    console.log('🔄 Implementing enhanced fallback strategy...');
+    
+    if (crawlMode === 'sitemap-only') {
+      // For sitemap mode, try basic HTML discovery as fallback
+      try {
+        discoveredUrls = await discoverLinks(url, excludePaths, includePaths, Math.min(maxPages, 50));
+        console.log(`🔄 Fallback HTML discovery found ${discoveredUrls.length} URLs`);
+      } catch (fallbackError) {
+        console.error('❌ Fallback discovery also failed:', fallbackError);
+        discoveredUrls = [url];
+      }
+    } else {
+      // For other modes, just use the original URL
+      discoveredUrls = [url];
+    }
+    
+    console.log('🔄 Using fallback result due to discovery error');
   }
-
-  console.log(`📊 Discovery completed: ${discoveredUrls.length} URLs found`);
 
   if (discoveredUrls.length === 0) {
-    throw new Error('No URLs discovered for crawling');
+    console.warn('⚠️ No URLs discovered, adding original URL as fallback');
+    discoveredUrls = [url];
   }
 
-  return discoveredUrls;
+  // Final deduplication and validation
+  const finalUrls = [...new Set(discoveredUrls)].filter(discoveredUrl => {
+    try {
+      new URL(discoveredUrl); // Validate URL format
+      return true;
+    } catch (e) {
+      console.warn(`⚠️ Removing invalid URL: ${discoveredUrl}`);
+      return false;
+    }
+  });
+
+  console.log(`🎉 Final discovery result: ${finalUrls.length} valid URLs`);
+  
+  return finalUrls;
 }

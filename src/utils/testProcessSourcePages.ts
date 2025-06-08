@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TestResult {
@@ -60,12 +59,15 @@ export class ProcessSourcePagesTestSuite {
 
   private static async testInvalidJSON(): Promise<TestResult> {
     try {
-      // This will test the edge function's ability to handle malformed JSON
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/process-source-pages`, {
+      // Get the Supabase URL and key from environment or use hardcoded values for testing
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/process-source-pages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': `Bearer ${supabaseKey}`
         },
         body: 'invalid json{'
       });
@@ -173,8 +175,8 @@ export class ProcessSourcePagesTestSuite {
   }
 
   static generateCurlExamples(): string[] {
-    const baseUrl = supabase.supabaseUrl;
-    const authHeader = `Bearer ${supabase.supabaseKey}`;
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
+    const authHeader = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'}`;
     
     return [
       `# Test 1: Empty request body
