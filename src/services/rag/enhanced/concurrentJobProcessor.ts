@@ -168,7 +168,7 @@ export class ConcurrentJobProcessor {
   private static async markJobFailed(jobId: string, errorMessage: string): Promise<void> {
     try {
       const { error } = await supabase
-        .from<BackgroundJob>('background_jobs')
+        .from('background_jobs')
         .update({
           status: 'failed',
           error_message: errorMessage,
@@ -196,7 +196,7 @@ export class ConcurrentJobProcessor {
       let recentJobs: JobTimestampFields[] = [];
       try {
         const { data, error } = await supabase
-          .from<BackgroundJob>('background_jobs')
+          .from('background_jobs')
           .select('status, created_at, started_at, completed_at')
           .gte('created_at', oneHourAgo);
 

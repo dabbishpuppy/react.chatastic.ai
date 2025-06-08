@@ -116,9 +116,9 @@ export class JobHealthMonitor {
     try {
       // Use Promise.allSettled to handle individual query failures
       const [pendingResult, processingResult, failedResult] = await Promise.allSettled([
-        supabase.from<BackgroundJob>('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from<BackgroundJob>('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
-        supabase.from<BackgroundJob>('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'failed')
+        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
+        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'failed')
       ]);
 
       // Extract counts with safe fallbacks
@@ -131,7 +131,7 @@ export class JobHealthMonitor {
       try {
         const oldestPending = await fetchMaybeSingle<Pick<BackgroundJob, 'created_at'>>(
           supabase
-            .from<BackgroundJob>('background_jobs')
+            .from('background_jobs')
             .select('created_at')
             .eq('status', 'pending')
             .order('created_at', { ascending: true })
@@ -151,7 +151,7 @@ export class JobHealthMonitor {
       try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         const { data: recentCompleted } = await supabase
-          .from<BackgroundJob>('background_jobs')
+          .from('background_jobs')
           .select('created_at, started_at')
           .eq('status', 'completed')
           .gte('completed_at', oneHourAgo)
@@ -210,7 +210,7 @@ export class JobHealthMonitor {
       try {
         const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
         const { data: recentJobs } = await supabase
-          .from<BackgroundJob>('background_jobs')
+          .from('background_jobs')
           .select('completed_at')
           .eq('status', 'completed')
           .gte('completed_at', oneMinuteAgo);
@@ -256,7 +256,7 @@ export class JobHealthMonitor {
       try {
         const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
         const { count } = await supabase
-          .from<SourcePage>('source_pages')
+          .from('source_pages')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending')
           .lt('created_at', thirtyMinutesAgo);

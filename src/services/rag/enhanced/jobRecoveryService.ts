@@ -38,7 +38,7 @@ export class JobRecoveryService {
       const stalledThreshold = new Date(Date.now() - this.STALLED_TIMEOUT_MS).toISOString();
       
       const { data: stalledJobs, error } = await supabase
-        .from<BackgroundJob>('background_jobs')
+        .from('background_jobs')
         .select('id, started_at')
         .eq('status', 'processing')
         .lt('started_at', stalledThreshold);
@@ -57,7 +57,7 @@ export class JobRecoveryService {
         const jobIds = stalledJobs.map((job: StalledJobFields) => job.id);
         
         const { error: updateError } = await supabase
-          .from<BackgroundJob>('background_jobs')
+          .from('background_jobs')
           .update({
             status: 'pending',
             started_at: null,
@@ -99,7 +99,7 @@ export class JobRecoveryService {
       const orphanedThreshold = new Date(Date.now() - this.ORPHANED_TIMEOUT_MS).toISOString();
       
       const { data: pendingPages, error: pagesError } = await supabase
-        .from<SourcePage>('source_pages')
+        .from('source_pages')
         .select('id, url, parent_source_id, created_at')
         .eq('status', 'pending')
         .lt('created_at', orphanedThreshold);
@@ -116,7 +116,7 @@ export class JobRecoveryService {
         const pageIds = pendingPages.map((p: Pick<SourcePage, 'id' | 'url' | 'parent_source_id' | 'created_at'>) => p.id);
         
         const { data: existingJobs, error: jobsError } = await supabase
-          .from<BackgroundJob>('background_jobs')
+          .from('background_jobs')
           .select('page_id')
           .in('page_id', pageIds)
           .eq('job_type', 'process_page');
@@ -149,7 +149,7 @@ export class JobRecoveryService {
           }));
 
           const { error: insertError } = await supabase
-            .from<BackgroundJob>('background_jobs')
+            .from('background_jobs')
             .insert(newJobs);
 
           if (insertError) {
@@ -179,7 +179,7 @@ export class JobRecoveryService {
       
       // Use safe count query
       const { count: stalledCount } = await supabase
-        .from<BackgroundJob>('background_jobs')
+        .from('background_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'processing')
         .lt('started_at', stalledThreshold);
@@ -187,7 +187,7 @@ export class JobRecoveryService {
       // Use fetchMaybeSingle for potentially empty results
       const oldestStalled = await fetchMaybeSingle<Pick<BackgroundJob, 'started_at'>>(
         supabase
-          .from<BackgroundJob>('background_jobs')
+          .from('background_jobs')
           .select('started_at')
           .eq('status', 'processing')
           .lt('started_at', stalledThreshold)

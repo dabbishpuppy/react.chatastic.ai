@@ -64,7 +64,7 @@ export class CrawlApiService {
       
       // Get source info safely
       const { data: source, error: sourceError } = await supabase
-        .from<AgentSource>('agent_sources')
+        .from('agent_sources')
         .select('crawl_status, progress, total_jobs, completed_jobs, failed_jobs')
         .eq('id', parentSourceId)
         .maybeSingle();
@@ -82,7 +82,7 @@ export class CrawlApiService {
       let pages: SourcePageStatusFields[] = [];
       try {
         const { data: pagesData, error: pagesError } = await supabase
-          .from<SourcePage>('source_pages')
+          .from('source_pages')
           .select('status')
           .eq('parent_source_id', parentSourceId);
 
@@ -143,7 +143,7 @@ export class CrawlApiService {
     try {
       // Get failed source pages that haven't exceeded retry limit
       const { data: failedPages, error: fetchError } = await supabase
-        .from<SourcePage>('source_pages')
+        .from('source_pages')
         .select('id, retry_count')
         .eq('parent_source_id', parentSourceId)
         .eq('status', 'failed')
@@ -161,7 +161,7 @@ export class CrawlApiService {
       // Update each failed page to pending status with incremented retry count
       const updatePromises = failedPages.map(async (page: Pick<SourcePage, 'id' | 'retry_count'>) => {
         const { error: updateError } = await supabase
-          .from<SourcePage>('source_pages')
+          .from('source_pages')
           .update({
             status: 'pending',
             retry_count: (page.retry_count || 0) + 1,
@@ -192,7 +192,7 @@ export class CrawlApiService {
   static async getCrawlJobs(parentSourceId: string): Promise<SourcePage[]> {
     try {
       const { data: pages, error } = await supabase
-        .from<SourcePage>('source_pages')
+        .from('source_pages')
         .select('*')
         .eq('parent_source_id', parentSourceId)
         .order('created_at', { ascending: true });
