@@ -286,7 +286,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
       </div>
 
-      {/* Collapsible child sources (without the "Child Pages" text) */}
+      {/* FIXED: Collapsible child sources - use the same hasChildSources condition */}
       {hasChildSources && (
         <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
           <CollapsibleContent>
