@@ -1,18 +1,19 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from './contexts/AuthContext';
-import { TrainingNotificationProvider } from './contexts/TrainingNotificationContext';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import AgentPage from './pages/AgentPage';
+import { TrainingNotificationProvider } from './components/layout/TrainingNotificationProvider';
+import LoginPage from './pages/SignIn';
+import DashboardPage from './pages/Dashboard';
+import AgentPage from './pages/AgentEnvironment';
 import ManagementPage from './pages/ManagementPage';
-import SettingsPage from './pages/SettingsPage';
+import SettingsPage from './pages/Settings';
 import SourcesPage from './pages/SourcesPage';
-import WebsitesSourcePage from './pages/sources/WebsitesSourcePage';
-import DocumentsSourcePage from './pages/sources/DocumentsSourcePage';
-import KnowledgeBaseSourcePage from './pages/sources/KnowledgeBaseSourcePage';
-import ChatHistoryPage from './pages/ChatHistoryPage';
+import WebsitesSourcePage from './pages/SourcesPage';
+import DocumentsSourcePage from './pages/SourcesPage';
+import KnowledgeBaseSourcePage from './pages/SourcesPage';
+import ChatHistoryPage from './pages/ActivityPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MonitoringDashboard } from './components/monitoring/MonitoringDashboard';
 
@@ -108,8 +109,7 @@ function App() {
                 }
               />
               <Route path="/monitoring" element={<MonitoringDashboard />} />
-              {/* Remove the system testing route */}
-              {/* <Route path="/system-testing" element={<SystemTestingPage />} /> */}
+              {/* System testing route removed - functionality moved to monitoring dashboard */}
             </Routes>
           </BrowserRouter>
         </TrainingNotificationProvider>
