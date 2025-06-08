@@ -28,6 +28,14 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
   useEffect(() => {
+    // Load stored OpenAI API key from localStorage on component mount
+    const storedApiKey = localStorage.getItem('openai_api_key');
+    if (storedApiKey) {
+      setOpenAIApiKey(storedApiKey);
+    }
+  }, []);
+
+  useEffect(() => {
     loadUsageData();
     const interval = setInterval(loadUsageData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
@@ -66,8 +74,16 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
 
   const handleApiKeySubmit = () => {
     if (openAIApiKey.trim()) {
+      // Store the API key in localStorage for persistence
+      localStorage.setItem('openai_api_key', openAIApiKey.trim());
       setShowApiKeyInput(false);
     }
+  };
+
+  const handleApiKeyClear = () => {
+    setOpenAIApiKey('');
+    localStorage.removeItem('openai_api_key');
+    setShowApiKeyInput(true);
   };
 
   const getProviderDisplayName = (provider: Provider) => {
@@ -152,6 +168,21 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
               <Key className="h-4 w-4 mr-2" />
               Configure OpenAI API
             </Button>
+          )}
+
+          {openAIApiKey && !showApiKeyInput && (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">
+                API Key Configured
+              </Badge>
+              <Button
+                onClick={handleApiKeyClear}
+                variant="outline"
+                size="sm"
+              >
+                Clear API Key
+              </Button>
+            </div>
           )}
           
           {showApiKeyInput && (
