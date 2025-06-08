@@ -12,7 +12,8 @@ export * from './orchestration';
 // Main orchestrator
 export { RAGOrchestrator } from './ragOrchestrator';
 
-// Main types - explicitly re-export to resolve ambiguity
+// Main types - explicitly re-export RAGQueryResult from queryProcessing to resolve ambiguity
+export type { RAGQueryResult } from './queryProcessing/ragQueryEngine';
 export type { RAGRequest, RAGResponse } from './ragOrchestrator';
 
 // Export advanced RAG services
