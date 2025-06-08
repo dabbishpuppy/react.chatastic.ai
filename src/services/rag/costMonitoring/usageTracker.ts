@@ -69,6 +69,51 @@ export class UsageTracker {
   }
 
   /**
+   * Get usage metrics for a specific provider
+   */
+  static async getProviderUsageMetrics(
+    teamId: string,
+    provider: 'openai' | 'claude' | 'gemini',
+    agentId?: string,
+    timeRange?: { start: string; end: string }
+  ): Promise<UsageMetrics> {
+    try {
+      let query = supabase
+        .from('audit_logs')
+        .select('metadata, created_at')
+        .eq('action', 'query')
+        .eq('resource_type', 'llm_request');
+
+      if (agentId) {
+        query = query.eq('agent_id', agentId);
+      }
+
+      if (timeRange) {
+        query = query.gte('created_at', timeRange.start).lte('created_at', timeRange.end);
+      }
+
+      const { data: usageData, error } = await query;
+
+      if (error) {
+        console.error('❌ Failed to fetch provider usage metrics:', error);
+        return this.getEmptyMetrics(timeRange);
+      }
+
+      // Filter by provider in the aggregation
+      const filteredData = (usageData || []).filter(row => {
+        const usage = row.metadata as TokenUsage;
+        return usage.provider === provider;
+      });
+
+      return this.aggregateUsageData(filteredData, timeRange);
+
+    } catch (error) {
+      console.error('❌ Error getting provider usage metrics:', error);
+      return this.getEmptyMetrics(timeRange);
+    }
+  }
+
+  /**
    * Get usage metrics for a team/agent
    */
   static async getUsageMetrics(
