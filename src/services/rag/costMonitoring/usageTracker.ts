@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TokenUsage {
@@ -47,14 +48,14 @@ export class UsageTracker {
         timestamp: new Date().toISOString()
       };
 
-      // Store in audit table with 'query' action (closest available action type)
+      // Store in audit table with 'query' action using new_values field
       const { error } = await supabase
         .from('audit_logs')
         .insert({
           agent_id: usage.agentId,
           action: 'query',
           resource_type: 'llm_request',
-          metadata: tokenUsage
+          new_values: tokenUsage
         });
 
       if (error) {
@@ -80,7 +81,7 @@ export class UsageTracker {
     try {
       let query = supabase
         .from('audit_logs')
-        .select('metadata, created_at')
+        .select('new_values, created_at')
         .eq('action', 'query')
         .eq('resource_type', 'llm_request');
 
@@ -101,8 +102,8 @@ export class UsageTracker {
 
       // Filter by provider in the aggregation
       const filteredData = (usageData || []).filter(row => {
-        const usage = row.metadata as TokenUsage;
-        return usage.provider === provider;
+        const usage = row.new_values as TokenUsage;
+        return usage && usage.provider === provider;
       });
 
       return this.aggregateUsageData(filteredData, timeRange);
@@ -124,7 +125,7 @@ export class UsageTracker {
     try {
       let query = supabase
         .from('audit_logs')
-        .select('metadata, created_at')
+        .select('new_values, created_at')
         .eq('action', 'query')
         .eq('resource_type', 'llm_request');
 
@@ -184,7 +185,9 @@ export class UsageTracker {
     };
 
     data.forEach(row => {
-      const usage = row.metadata as TokenUsage;
+      const usage = row.new_values as TokenUsage;
+      if (!usage || typeof usage !== 'object') return;
+      
       const tokens = usage.inputTokens + usage.outputTokens;
 
       metrics.totalTokens += tokens;
