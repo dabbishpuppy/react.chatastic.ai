@@ -111,6 +111,11 @@ export class AlertingService {
     this.sendNotifications(alert);
   }
 
+  // Alias for triggerAlert to maintain compatibility
+  static createAlert(ruleId: string, message: string, severity: Alert['severity']): void {
+    this.triggerAlert(ruleId, message, severity);
+  }
+
   private static sendNotifications(alert: Alert): void {
     const enabledChannels = Array.from(this.notificationChannels.values())
       .filter(channel => channel.enabled);
@@ -137,11 +142,11 @@ export class AlertingService {
     }
   }
 
-  static acknowledgeAlert(alertId: string): void {
+  static acknowledgeAlert(alertId: string, acknowledgedBy?: string): void {
     const alert = this.activeAlerts.get(alertId);
     if (alert) {
       alert.acknowledged = true;
-      console.log(`✅ Alert acknowledged: ${alertId}`);
+      console.log(`✅ Alert acknowledged: ${alertId}${acknowledgedBy ? ` by ${acknowledgedBy}` : ''}`);
     }
   }
 
@@ -154,6 +159,29 @@ export class AlertingService {
     }
   }
 
+  // Auto-resolve alerts that meet certain criteria
+  static autoResolveAlerts(): void {
+    const alertsToResolve: string[] = [];
+    
+    this.activeAlerts.forEach((alert, alertId) => {
+      // Auto-resolve alerts older than 24 hours that are acknowledged
+      const alertAge = Date.now() - new Date(alert.timestamp).getTime();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      
+      if (alert.acknowledged && alertAge > twentyFourHours) {
+        alertsToResolve.push(alertId);
+      }
+    });
+
+    alertsToResolve.forEach(alertId => {
+      this.resolveAlert(alertId);
+    });
+
+    if (alertsToResolve.length > 0) {
+      console.log(`🔧 Auto-resolved ${alertsToResolve.length} alerts`);
+    }
+  }
+
   static getActiveAlerts(): Alert[] {
     return Array.from(this.activeAlerts.values())
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -163,6 +191,11 @@ export class AlertingService {
     return this.alertHistory
       .slice(-limit)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
+
+  static getCriticalAlertsCount(): number {
+    return Array.from(this.activeAlerts.values())
+      .filter(alert => alert.severity === 'critical' && !alert.acknowledged).length;
   }
 
   static addAlertRule(rule: AlertRule): void {

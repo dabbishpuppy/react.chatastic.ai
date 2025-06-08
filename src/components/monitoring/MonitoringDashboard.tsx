@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -158,7 +157,7 @@ export const MonitoringDashboard: React.FC = () => {
 
   const handleAcknowledgeAlert = async (alertId: string) => {
     try {
-      await AlertingService.acknowledgeAlert(alertId, 'System Admin');
+      await AlertingService.acknowledgeAlert(alertId);
       await updateDashboard();
     } catch (error) {
       console.error('Error acknowledging alert:', error);
@@ -167,7 +166,7 @@ export const MonitoringDashboard: React.FC = () => {
 
   const handleDismissAlert = async (alertId: string) => {
     try {
-      await AlertingService.acknowledgeAlert(alertId, 'System Admin');
+      await AlertingService.acknowledgeAlert(alertId);
       await updateDashboard();
     } catch (error) {
       console.error('Error dismissing alert:', error);
