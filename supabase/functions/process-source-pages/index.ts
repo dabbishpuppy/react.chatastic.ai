@@ -207,13 +207,68 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { parentSourceId, maxConcurrentJobs = 5 } = await req.json();
+    // Enhanced request body parsing with better error handling
+    let requestBody: any = {};
+    const contentType = req.headers.get('content-type');
+    
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const bodyText = await req.text();
+        console.log('📨 Raw request body:', bodyText);
+        
+        if (bodyText && bodyText.trim()) {
+          requestBody = JSON.parse(bodyText);
+        } else {
+          console.log('📭 Empty request body, using default parameters');
+        }
+      } catch (parseError) {
+        console.error('❌ JSON parsing error:', parseError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Invalid JSON in request body',
+            details: parseError.message 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+    }
 
+    const { parentSourceId, maxConcurrentJobs = 5 } = requestBody;
+
+    // If no parentSourceId provided, try to find pending pages to process
     if (!parentSourceId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'parentSourceId is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+      console.log('📨 No parentSourceId provided, looking for any pending pages to process');
+      
+      // Find any parent sources with pending pages
+      const { data: pendingSources, error: sourcesError } = await supabase
+        .from('agent_sources')
+        .select('id')
+        .eq('source_type', 'website')
+        .is('parent_source_id', null)
+        .eq('crawl_status', 'in_progress')
+        .limit(1);
+
+      if (sourcesError || !pendingSources || pendingSources.length === 0) {
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: 'No pending sources found to process',
+          processed: 0 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Process the first found source
+      const targetSourceId = pendingSources[0].id;
+      console.log(`📨 Processing found pending source: ${targetSourceId}`);
+      
+      const processor = new EnhancedJobProcessor(supabase, maxConcurrentJobs, 60000);
+      const result = await processor.processConcurrentJobs(targetSourceId);
+      
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log(`📨 Enhanced processing request for parent: ${parentSourceId}`);
@@ -224,9 +279,6 @@ serve(async (req) => {
     // Process jobs concurrently
     const result = await processor.processConcurrentJobs(parentSourceId);
 
-    // Check for any remaining completed pages without chunks
-    console.log('🔍 Checking for any remaining completed pages without chunks...');
-    
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -235,7 +287,8 @@ serve(async (req) => {
     console.error('❌ Enhanced processing error:', error);
     return new Response(JSON.stringify({ 
       success: false, 
-      error: error.message 
+      error: error.message,
+      stack: error.stack 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
