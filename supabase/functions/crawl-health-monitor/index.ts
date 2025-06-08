@@ -7,18 +7,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface HealthCheckResult {
+interface HealthReport {
   healthy: boolean;
   issues: string[];
-  stalledJobs: any[];
-  timeoutJobs: any[];
   actions: string[];
-  performance: {
-    totalJobs: number;
-    completedJobs: number;
-    failedJobs: number;
-    processingRate: number;
-  };
+  orphanedPages: number;
+  stalledJobs: number;
+  missingJobs: number;
+  queueStatus: string;
+  timestamp: string;
 }
 
 serve(async (req) => {
@@ -32,20 +29,170 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('🏥 Starting high-performance crawl health monitoring check...');
+    console.log('🏥 Starting comprehensive health check...');
 
-    const healthResult = await performHealthCheck(supabaseClient);
-    
-    if (!healthResult.healthy) {
-      console.log('🚨 Health issues detected, initiating immediate auto-recovery...');
-      await performFastRecovery(supabaseClient, healthResult);
+    const healthReport: HealthReport = {
+      healthy: true,
+      issues: [],
+      actions: [],
+      orphanedPages: 0,
+      stalledJobs: 0,
+      missingJobs: 0,
+      queueStatus: 'unknown',
+      timestamp: new Date().toISOString()
+    };
+
+    // 1. Check for orphaned pending pages (no background jobs)
+    const { data: orphanedPages, error: orphanedError } = await supabaseClient
+      .from('source_pages')
+      .select('id, parent_source_id, url, created_at')
+      .eq('status', 'pending')
+      .lt('created_at', new Date(Date.now() - 2 * 60 * 1000).toISOString()); // Older than 2 minutes
+
+    if (!orphanedError && orphanedPages) {
+      // Check which ones actually lack background jobs
+      const pageIds = orphanedPages.map(p => p.id);
+      const { data: existingJobs } = await supabaseClient
+        .from('background_jobs')
+        .select('page_id')
+        .in('page_id', pageIds)
+        .in('status', ['pending', 'processing']);
+
+      const existingJobPageIds = new Set(existingJobs?.map(j => j.page_id) || []);
+      const trulyOrphaned = orphanedPages.filter(page => !existingJobPageIds.has(page.id));
+
+      if (trulyOrphaned.length > 0) {
+        healthReport.healthy = false;
+        healthReport.issues.push(`${trulyOrphaned.length} pending pages without background jobs`);
+        healthReport.orphanedPages = trulyOrphaned.length;
+
+        // Auto-create missing jobs
+        const jobsToCreate = trulyOrphaned.map(page => ({
+          job_type: 'process_page',
+          source_id: page.parent_source_id,
+          page_id: page.id,
+          job_key: `recovery:${page.id}:${Date.now()}`,
+          payload: { 
+            childJobId: page.id,
+            url: page.url,
+            recovery: true 
+          },
+          priority: 80,
+          scheduled_at: new Date().toISOString()
+        }));
+
+        const { error: insertError } = await supabaseClient
+          .from('background_jobs')
+          .insert(jobsToCreate);
+
+        if (!insertError) {
+          healthReport.actions.push(`Created ${trulyOrphaned.length} recovery jobs for orphaned pages`);
+          console.log(`✅ Created ${trulyOrphaned.length} recovery jobs`);
+        } else {
+          console.error('❌ Failed to create recovery jobs:', insertError);
+        }
+      }
     }
+
+    // 2. Check for stalled jobs (processing too long)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: stalledJobs, error: stalledError } = await supabaseClient
+      .from('background_jobs')
+      .select('id, page_id, started_at')
+      .eq('status', 'processing')
+      .lt('started_at', fiveMinutesAgo);
+
+    if (!stalledError && stalledJobs && stalledJobs.length > 0) {
+      healthReport.healthy = false;
+      healthReport.issues.push(`${stalledJobs.length} jobs processing for over 5 minutes`);
+      healthReport.stalledJobs = stalledJobs.length;
+
+      // Reset stalled jobs
+      const { error: resetError } = await supabaseClient
+        .from('background_jobs')
+        .update({
+          status: 'pending',
+          started_at: null,
+          error_message: 'Reset from stalled state by health monitor',
+          scheduled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .in('id', stalledJobs.map(j => j.id));
+
+      if (!resetError) {
+        healthReport.actions.push(`Reset ${stalledJobs.length} stalled jobs to pending`);
+        console.log(`✅ Reset ${stalledJobs.length} stalled jobs`);
+      }
+    }
+
+    // 3. Check for stalled source pages
+    const { data: stalledPages, error: stalledPagesError } = await supabaseClient
+      .from('source_pages')
+      .select('id, parent_source_id, url')
+      .eq('status', 'in_progress')
+      .lt('started_at', fiveMinutesAgo);
+
+    if (!stalledPagesError && stalledPages && stalledPages.length > 0) {
+      healthReport.healthy = false;
+      healthReport.issues.push(`${stalledPages.length} pages stuck in processing`);
+
+      // Reset stalled pages
+      const { error: resetPagesError } = await supabaseClient
+        .from('source_pages')
+        .update({
+          status: 'pending',
+          started_at: null,
+          retry_count: supabaseClient.raw('COALESCE(retry_count, 0) + 1'),
+          updated_at: new Date().toISOString()
+        })
+        .in('id', stalledPages.map(p => p.id));
+
+      if (!resetPagesError) {
+        healthReport.actions.push(`Reset ${stalledPages.length} stalled pages to pending`);
+      }
+    }
+
+    // 4. Check queue status
+    const { data: queueStats } = await supabaseClient
+      .from('background_jobs')
+      .select('status')
+      .in('status', ['pending', 'processing']);
+
+    const pendingJobs = queueStats?.filter(j => j.status === 'pending').length || 0;
+    const processingJobs = queueStats?.filter(j => j.status === 'processing').length || 0;
+
+    if (pendingJobs > 500) {
+      healthReport.healthy = false;
+      healthReport.issues.push(`High queue backlog: ${pendingJobs} pending jobs`);
+      healthReport.queueStatus = 'overloaded';
+    } else if (pendingJobs > 100) {
+      healthReport.queueStatus = 'busy';
+    } else {
+      healthReport.queueStatus = 'normal';
+    }
+
+    // 5. Trigger processing if we fixed issues
+    if (healthReport.actions.length > 0) {
+      try {
+        const { error: triggerError } = await supabaseClient.functions.invoke('production-queue-manager', {
+          body: { healthRecovery: true, priority: 'high' }
+        });
+
+        if (!triggerError) {
+          healthReport.actions.push('Triggered queue processing for recovered jobs');
+        }
+      } catch (error) {
+        console.error('Failed to trigger processing:', error);
+      }
+    }
+
+    console.log('🎯 Health check completed:', healthReport);
 
     return new Response(
       JSON.stringify({
         success: true,
-        timestamp: new Date().toISOString(),
-        ...healthResult
+        healthy: healthReport.healthy,
+        report: healthReport
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -57,7 +204,9 @@ serve(async (req) => {
     console.error('❌ Health monitor error:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Health monitor failed',
+        success: false,
+        healthy: false,
+        error: error.message || 'Health check failed',
         timestamp: new Date().toISOString()
       }),
       {
@@ -67,174 +216,3 @@ serve(async (req) => {
     );
   }
 });
-
-async function performHealthCheck(supabaseClient: any): Promise<HealthCheckResult> {
-  const issues: string[] = [];
-  const actions: string[] = [];
-  let stalledJobs: any[] = [];
-  let timeoutJobs: any[] = [];
-
-  // Check for stalled pending jobs (>2 minutes for faster detection)
-  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const { data: pendingJobs, error: pendingError } = await supabaseClient
-    .from('source_pages')
-    .select('*')
-    .eq('status', 'pending')
-    .lt('created_at', twoMinutesAgo);
-
-  if (pendingError) {
-    console.error('Error checking pending jobs:', pendingError);
-  } else if (pendingJobs && pendingJobs.length > 0) {
-    stalledJobs = pendingJobs;
-    issues.push(`${pendingJobs.length} jobs stalled in pending state`);
-    actions.push('Restart processing pipeline immediately');
-  }
-
-  // Check for timeout in-progress jobs (>5 minutes for faster recovery)
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const { data: inProgressJobs, error: progressError } = await supabaseClient
-    .from('source_pages')
-    .select('*')
-    .eq('status', 'in_progress')
-    .lt('started_at', fiveMinutesAgo);
-
-  if (progressError) {
-    console.error('Error checking in-progress jobs:', progressError);
-  } else if (inProgressJobs && inProgressJobs.length > 0) {
-    timeoutJobs = inProgressJobs;
-    issues.push(`${inProgressJobs.length} jobs stuck in processing state`);
-    actions.push('Reset timeout jobs to pending immediately');
-  }
-
-  // Check processing rate and throughput
-  const { data: recentJobs, error: recentError } = await supabaseClient
-    .from('source_pages')
-    .select('status, completed_at')
-    .gte('updated_at', fiveMinutesAgo);
-
-  let processingRate = 0;
-  if (!recentError && recentJobs) {
-    const completedRecently = recentJobs.filter(job => job.status === 'completed').length;
-    processingRate = completedRecently / 5; // jobs per minute
-    
-    if (processingRate < 0.5 && recentJobs.length > 10) { // Less than 0.5 jobs per minute
-      issues.push(`Low processing rate: ${processingRate.toFixed(2)} jobs/min`);
-      actions.push('Scale up worker capacity');
-    }
-  }
-
-  // Get overall performance metrics
-  const { data: allJobs, error: allJobsError } = await supabaseClient
-    .from('source_pages')
-    .select('status')
-    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-  const performance = {
-    totalJobs: allJobs?.length || 0,
-    completedJobs: allJobs?.filter(j => j.status === 'completed').length || 0,
-    failedJobs: allJobs?.filter(j => j.status === 'failed').length || 0,
-    processingRate
-  };
-
-  const healthy = issues.length === 0;
-
-  console.log(`🏥 High-performance health check complete: ${healthy ? 'HEALTHY' : 'ISSUES DETECTED'}`);
-  if (issues.length > 0) {
-    console.log('Issues found:', issues);
-    console.log('Immediate actions planned:', actions);
-  }
-
-  return {
-    healthy,
-    issues,
-    stalledJobs,
-    timeoutJobs,
-    actions,
-    performance
-  };
-}
-
-async function performFastRecovery(supabaseClient: any, healthResult: HealthCheckResult): Promise<void> {
-  console.log('🚀 Starting immediate fast-recovery procedures...');
-
-  // Recovery 1: Immediately reset timeout jobs to pending
-  if (healthResult.timeoutJobs.length > 0) {
-    console.log(`⚡ Immediately resetting ${healthResult.timeoutJobs.length} timeout jobs...`);
-    
-    const jobIds = healthResult.timeoutJobs.map(job => job.id);
-    const { error } = await supabaseClient
-      .from('source_pages')
-      .update({
-        status: 'pending',
-        started_at: null,
-        error_message: 'Auto-recovered from timeout (fast recovery)',
-        retry_count: supabaseClient.raw('retry_count + 1'),
-        updated_at: new Date().toISOString()
-      })
-      .in('id', jobIds);
-
-    if (error) {
-      console.error('❌ Failed to reset timeout jobs:', error);
-    } else {
-      console.log(`✅ Reset ${healthResult.timeoutJobs.length} timeout jobs`);
-    }
-  }
-
-  // Recovery 2: Immediately trigger batch processing for stalled jobs
-  if (healthResult.stalledJobs.length > 0) {
-    console.log(`🚀 Immediately triggering processing for ${healthResult.stalledJobs.length} stalled jobs...`);
-    
-    // Group by parent source for efficient batch processing
-    const parentSources = [...new Set(healthResult.stalledJobs.map(job => job.parent_source_id))];
-    
-    // Process multiple parent sources concurrently for speed
-    const batchPromises = parentSources.map(async (parentSourceId) => {
-      try {
-        const { error } = await supabaseClient.functions.invoke('process-source-pages', {
-          body: { 
-            parentSourceId,
-            fastRecovery: true,
-            batchMode: true,
-            priority: 'high'
-          }
-        });
-        
-        if (error && !error.message?.includes('409')) {
-          console.error(`Failed to trigger processing for ${parentSourceId}:`, error);
-        } else {
-          console.log(`✅ Fast processing triggered for parent ${parentSourceId}`);
-        }
-      } catch (error) {
-        console.error(`Error in fast recovery for ${parentSourceId}:`, error);
-      }
-    });
-
-    await Promise.allSettled(batchPromises);
-  }
-
-  // Recovery 3: Scale up processing if needed
-  if (healthResult.performance.processingRate < 1.0 && healthResult.performance.totalJobs > 100) {
-    console.log('📈 Triggering scale-up procedures for low throughput...');
-    
-    // This could trigger additional worker instances or increase batch sizes
-    // For now, we'll trigger multiple processing calls to increase parallelism
-    try {
-      const scaleUpPromises = Array.from({ length: 3 }, (_, i) => 
-        supabaseClient.functions.invoke('process-source-pages', {
-          body: { 
-            scaleUp: true,
-            workerId: `scale-up-${i}`,
-            fastRecovery: true
-          }
-        })
-      );
-
-      await Promise.allSettled(scaleUpPromises);
-      console.log('✅ Scale-up procedures initiated');
-    } catch (error) {
-      console.error('❌ Failed to scale up processing:', error);
-    }
-  }
-
-  console.log('⚡ Fast recovery procedures completed');
-}

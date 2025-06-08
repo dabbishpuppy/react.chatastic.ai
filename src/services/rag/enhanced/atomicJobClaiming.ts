@@ -1,235 +1,317 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export class AtomicJobClaiming {
-  /**
-   * Atomically claim a batch of jobs to prevent race conditions
-   */
-  static async claimJobBatch(
-    jobIds: string[],
-    workerId: string,
-    maxJobs: number = 50
-  ): Promise<{ claimedJobs: any[]; conflictCount: number }> {
-    if (jobIds.length === 0) {
-      return { claimedJobs: [], conflictCount: 0 };
-    }
+export interface ClaimingStats {
+  totalClaims: number;
+  successfulClaims: number;
+  failedClaims: number;
+  conflictedClaims: number;
+  avgClaimTime: number;
+  conflictRate: number;
+  pendingJobs: number;
+  processingJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+}
 
-    // Limit batch size to prevent oversized transactions
-    const batchIds = jobIds.slice(0, maxJobs);
+export class AtomicJobClaiming {
+  private static claimingStats: ClaimingStats = {
+    totalClaims: 0,
+    successfulClaims: 0,
+    failedClaims: 0,
+    conflictedClaims: 0,
+    avgClaimTime: 0,
+    conflictRate: 0,
+    pendingJobs: 0,
+    processingJobs: 0,
+    completedJobs: 0,
+    failedJobs: 0
+  };
+
+  /**
+   * Atomically claim a job for processing
+   */
+  static async claimJob(jobId: string, workerId: string = 'default'): Promise<boolean> {
     const startTime = Date.now();
+    this.claimingStats.totalClaims++;
 
     try {
-      console.log(`🔒 Attempting to claim ${batchIds.length} jobs for worker: ${workerId}`);
-
-      // Use atomic update with WHERE clause to prevent race conditions
-      const { data: claimedJobs, error } = await supabase
+      const { data, error } = await supabase
         .from('background_jobs')
         .update({
           status: 'processing',
           started_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          // Store worker ID in metadata by merging with existing payload
-          payload: { worker_id: workerId }
+          worker_id: workerId
         })
-        .in('id', batchIds)
-        .eq('status', 'pending') // Only claim if still pending
-        .lte('scheduled_at', new Date().toISOString()) // Only claim if scheduled time has passed
+        .eq('id', jobId)
+        .eq('status', 'pending') // Critical: only claim if still pending
         .select();
 
       const claimTime = Date.now() - startTime;
-      const claimedCount = claimedJobs?.length || 0;
-      const conflictCount = batchIds.length - claimedCount;
+      this.updateClaimTiming(claimTime);
 
       if (error) {
-        console.error('❌ Job claiming failed:', error);
-        throw error;
+        console.error('❌ Job claiming error:', error);
+        this.claimingStats.failedClaims++;
+        return false;
       }
 
-      console.log(`✅ Claimed ${claimedCount}/${batchIds.length} jobs in ${claimTime}ms (${conflictCount} conflicts)`);
+      if (!data || data.length === 0) {
+        // Job was already claimed by another worker
+        console.log(`⚠️ Job ${jobId} already claimed by another worker`);
+        this.claimingStats.conflictedClaims++;
+        return false;
+      }
 
-      return {
-        claimedJobs: claimedJobs || [],
-        conflictCount
-      };
+      console.log(`🔒 Successfully claimed job ${jobId} in ${claimTime}ms`);
+      this.claimingStats.successfulClaims++;
+      return true;
+
     } catch (error) {
-      console.error('❌ Atomic job claiming failed:', error);
-      throw error;
+      console.error(`❌ Failed to claim job ${jobId}:`, error);
+      this.claimingStats.failedClaims++;
+      return false;
     }
   }
 
   /**
-   * Safely release claimed jobs back to pending state
+   * Release a job back to pending state
    */
-  static async releaseJobs(
-    jobIds: string[],
-    reason: string = 'Worker failure'
-  ): Promise<void> {
-    if (jobIds.length === 0) return;
-
+  static async releaseJob(jobId: string, reason: string = 'Released by worker'): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('background_jobs')
         .update({
           status: 'pending',
           started_at: null,
-          error_message: `Released: ${reason}`,
-          scheduled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          worker_id: null,
+          error_message: reason,
+          updated_at: new Date().toISOString(),
+          scheduled_at: new Date().toISOString()
         })
-        .in('id', jobIds)
-        .eq('status', 'processing');
+        .eq('id', jobId);
 
       if (error) {
-        console.error('❌ Job release failed:', error);
-        throw error;
+        console.error(`❌ Failed to release job ${jobId}:`, error);
+        return false;
       }
 
-      console.log(`🔓 Released ${jobIds.length} jobs: ${reason}`);
+      console.log(`🔓 Released job ${jobId}: ${reason}`);
+      return true;
+
     } catch (error) {
-      console.error('❌ Failed to release jobs:', error);
-      throw error;
+      console.error(`❌ Error releasing job ${jobId}:`, error);
+      return false;
     }
   }
 
   /**
-   * Get optimal batch size based on current system load
+   * Get next available jobs for processing
    */
-  static async getOptimalBatchSize(): Promise<number> {
+  static async getNextJobs(
+    limit: number = 10,
+    jobTypes: string[] = ['process_page'],
+    workerId: string = 'default'
+  ): Promise<any[]> {
     try {
-      // Check current system load
-      const { data: metrics, error } = await supabase
+      let query = supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('status', 'pending')
+        .lte('scheduled_at', new Date().toISOString())
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(limit);
+
+      if (jobTypes.length > 0) {
+        query = query.in('job_type', jobTypes);
+      }
+
+      const { data: jobs, error } = await query;
+
+      if (error) {
+        console.error('❌ Error fetching next jobs:', error);
+        return [];
+      }
+
+      console.log(`📋 Found ${jobs?.length || 0} jobs available for processing`);
+      return jobs || [];
+
+    } catch (error) {
+      console.error('❌ Error in getNextJobs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Process jobs with atomic claiming
+   */
+  static async processJobsAtomically(
+    jobProcessor: (job: any) => Promise<boolean>,
+    options: {
+      maxJobs?: number;
+      jobTypes?: string[];
+      workerId?: string;
+      timeoutMs?: number;
+    } = {}
+  ): Promise<{ processed: number; failed: number; conflicts: number }> {
+    const {
+      maxJobs = 10,
+      jobTypes = ['process_page'],
+      workerId = `worker-${Date.now()}`,
+      timeoutMs = 5 * 60 * 1000
+    } = options;
+
+    const stats = { processed: 0, failed: 0, conflicts: 0 };
+
+    // Get available jobs
+    const jobs = await this.getNextJobs(maxJobs, jobTypes, workerId);
+
+    if (jobs.length === 0) {
+      console.log('📭 No jobs available for processing');
+      return stats;
+    }
+
+    console.log(`🚀 Processing ${jobs.length} jobs atomically with worker ${workerId}`);
+
+    // Process each job with atomic claiming
+    for (const job of jobs) {
+      try {
+        // Attempt to claim the job
+        const claimed = await this.claimJob(job.id, workerId);
+        
+        if (!claimed) {
+          stats.conflicts++;
+          continue;
+        }
+
+        // Set up timeout for job processing
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Job processing timeout')), timeoutMs);
+        });
+
+        try {
+          // Process the job with timeout protection
+          const processingPromise = jobProcessor(job);
+          const success = await Promise.race([processingPromise, timeoutPromise]);
+
+          if (success) {
+            stats.processed++;
+            await this.markJobCompleted(job.id);
+          } else {
+            stats.failed++;
+            await this.markJobFailed(job.id, 'Job processor returned false');
+          }
+
+        } catch (processingError) {
+          console.error(`❌ Job ${job.id} processing failed:`, processingError);
+          stats.failed++;
+          await this.markJobFailed(job.id, processingError.message);
+        }
+
+      } catch (error) {
+        console.error(`❌ Error processing job ${job.id}:`, error);
+        stats.failed++;
+      }
+    }
+
+    console.log(`✅ Atomic processing completed:`, stats);
+    return stats;
+  }
+
+  /**
+   * Mark job as completed
+   */
+  private static async markJobCompleted(jobId: string): Promise<void> {
+    const { error } = await supabase
+      .from('background_jobs')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    if (error) {
+      console.error(`❌ Failed to mark job ${jobId} as completed:`, error);
+    } else {
+      console.log(`✅ Job ${jobId} marked as completed`);
+    }
+  }
+
+  /**
+   * Mark job as failed
+   */
+  private static async markJobFailed(jobId: string, errorMessage: string): Promise<void> {
+    const { error } = await supabase
+      .from('background_jobs')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    if (error) {
+      console.error(`❌ Failed to mark job ${jobId} as failed:`, error);
+    } else {
+      console.log(`💀 Job ${jobId} marked as failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Update claiming timing statistics
+   */
+  private static updateClaimTiming(claimTime: number): void {
+    const totalClaims = this.claimingStats.totalClaims;
+    const currentAvg = this.claimingStats.avgClaimTime;
+    
+    this.claimingStats.avgClaimTime = ((currentAvg * (totalClaims - 1)) + claimTime) / totalClaims;
+    this.claimingStats.conflictRate = this.claimingStats.conflictedClaims / totalClaims;
+  }
+
+  /**
+   * Get current claiming statistics
+   */
+  static async getClaimingStats(): Promise<ClaimingStats> {
+    try {
+      // Update job counts from database
+      const { data: jobCounts } = await supabase
         .from('background_jobs')
         .select('status')
-        .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
 
-      if (error) {
-        console.warn('Could not fetch metrics for batch sizing, using default');
-        return 50;
+      if (jobCounts) {
+        this.claimingStats.pendingJobs = jobCounts.filter(j => j.status === 'pending').length;
+        this.claimingStats.processingJobs = jobCounts.filter(j => j.status === 'processing').length;
+        this.claimingStats.completedJobs = jobCounts.filter(j => j.status === 'completed').length;
+        this.claimingStats.failedJobs = jobCounts.filter(j => j.status === 'failed').length;
       }
 
-      const processing = metrics.filter(m => m.status === 'processing').length;
-      const pending = metrics.filter(m => m.status === 'pending').length;
-
-      // Adaptive batch sizing based on load
-      if (processing > 1000) {
-        return 25; // Reduce batch size under high load
-      } else if (processing < 100 && pending > 500) {
-        return 100; // Increase batch size when queue is backing up
-      } else {
-        return 50; // Default batch size
-      }
+      return { ...this.claimingStats };
     } catch (error) {
-      console.warn('Error calculating optimal batch size:', error);
-      return 50;
+      console.error('❌ Error getting claiming stats:', error);
+      return { ...this.claimingStats };
     }
   }
 
   /**
-   * Check for and resolve job claiming conflicts
+   * Reset statistics (useful for testing or monitoring resets)
    */
-  static async resolveClaimingConflicts(): Promise<number> {
-    try {
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      
-      // Find jobs that have been processing too long (likely orphaned)
-      const { data: orphanedJobs, error } = await supabase
-        .from('background_jobs')
-        .select('id')
-        .eq('status', 'processing')
-        .lt('started_at', fiveMinutesAgo);
-
-      if (error) {
-        console.error('Error finding orphaned jobs:', error);
-        return 0;
-      }
-
-      if (!orphanedJobs || orphanedJobs.length === 0) {
-        return 0;
-      }
-
-      // Release orphaned jobs
-      await this.releaseJobs(
-        orphanedJobs.map(j => j.id),
-        'Orphaned job cleanup'
-      );
-
-      console.log(`🧹 Resolved ${orphanedJobs.length} claiming conflicts`);
-      return orphanedJobs.length;
-    } catch (error) {
-      console.error('❌ Failed to resolve claiming conflicts:', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Get claiming statistics for monitoring
-   */
-  static async getClaimingStats(): Promise<{
-    totalJobs: number;
-    pendingJobs: number;
-    processingJobs: number;
-    completedJobs: number;
-    failedJobs: number;
-    avgClaimTime: number;
-    conflictRate: number;
-  }> {
-    try {
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      
-      const { data: jobs, error } = await supabase
-        .from('background_jobs')
-        .select('status, created_at, started_at')
-        .gte('created_at', oneHourAgo);
-
-      if (error) {
-        throw error;
-      }
-
-      const totalJobs = jobs.length;
-      const pending = jobs.filter(j => j.status === 'pending').length;
-      const processing = jobs.filter(j => j.status === 'processing').length;
-      const completed = jobs.filter(j => j.status === 'completed').length;
-      const failed = jobs.filter(j => j.status === 'failed' || j.status === 'dead_letter').length;
-
-      // Calculate average claim time
-      const claimedJobs = jobs.filter(j => j.started_at && j.created_at);
-      const avgClaimTime = claimedJobs.length > 0
-        ? claimedJobs.reduce((sum, job) => {
-            const created = new Date(job.created_at).getTime();
-            const started = new Date(job.started_at).getTime();
-            return sum + (started - created);
-          }, 0) / claimedJobs.length
-        : 0;
-
-      // Estimate conflict rate (jobs that took longer than expected to claim)
-      const slowClaims = claimedJobs.filter(job => {
-        const created = new Date(job.created_at).getTime();
-        const started = new Date(job.started_at).getTime();
-        return (started - created) > 5000; // More than 5 seconds
-      }).length;
-      
-      const conflictRate = claimedJobs.length > 0 ? slowClaims / claimedJobs.length : 0;
-
-      return {
-        totalJobs,
-        pendingJobs: pending,
-        processingJobs: processing,
-        completedJobs: completed,
-        failedJobs: failed,
-        avgClaimTime,
-        conflictRate
-      };
-    } catch (error) {
-      console.error('❌ Failed to get claiming stats:', error);
-      return {
-        totalJobs: 0,
-        pendingJobs: 0,
-        processingJobs: 0,
-        completedJobs: 0,
-        failedJobs: 0,
-        avgClaimTime: 0,
-        conflictRate: 0
-      };
-    }
+  static resetStats(): void {
+    this.claimingStats = {
+      totalClaims: 0,
+      successfulClaims: 0,
+      failedClaims: 0,
+      conflictedClaims: 0,
+      avgClaimTime: 0,
+      conflictRate: 0,
+      pendingJobs: 0,
+      processingJobs: 0,
+      completedJobs: 0,
+      failedJobs: 0
+    };
   }
 }

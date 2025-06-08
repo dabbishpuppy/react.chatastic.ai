@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -18,9 +19,10 @@ interface QueueMetrics {
 
 class ProductionQueueProcessor {
   private supabase: any;
-  private readonly MAX_CONCURRENT_JOBS = 50; // Reduced from 2000 for stability
-  private readonly BATCH_SIZE = 20; // Reduced from 100 for stability
+  private readonly MAX_CONCURRENT_JOBS = 100; // Increased for better throughput
+  private readonly BATCH_SIZE = 25; // Optimized batch size
   private readonly PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_RETRIES = 3;
 
   constructor(supabase: any) {
     this.supabase = supabase;
@@ -29,7 +31,7 @@ class ProductionQueueProcessor {
   async processQueue(): Promise<QueueMetrics> {
     console.log('🚀 Starting production queue processing...');
 
-    // Get pending jobs with reduced concurrency for stability
+    // Get pending jobs with proper prioritization
     const { data: pendingJobs, error: jobsError } = await this.supabase
       .from('background_jobs')
       .select('*')
@@ -50,14 +52,14 @@ class ProductionQueueProcessor {
       return this.getQueueMetrics();
     }
 
-    // Process jobs in smaller, more manageable batches
+    // Process jobs in optimized batches with better error isolation
     const batches = this.createOptimizedBatches(pendingJobs);
-    const processingPromises = batches.map(batch => this.processBatch(batch));
+    const processingPromises = batches.map(batch => this.processBatchWithRetry(batch));
 
-    // Process all batches concurrently but with error isolation
+    // Process all batches with comprehensive error handling
     const results = await Promise.allSettled(processingPromises);
     
-    // Log batch results with detailed information
+    // Log detailed batch results
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         console.error(`❌ Batch ${index} failed:`, result.reason);
@@ -72,7 +74,7 @@ class ProductionQueueProcessor {
   private createOptimizedBatches(jobs: any[]): any[][] {
     const batches: any[][] = [];
     
-    // Group jobs by source for better cache locality
+    // Group jobs by source for better cache locality and processing efficiency
     const jobsBySource = new Map<string, any[]>();
     
     jobs.forEach(job => {
@@ -83,11 +85,10 @@ class ProductionQueueProcessor {
       jobsBySource.get(sourceId)!.push(job);
     });
 
-    // Create batches ensuring good distribution
+    // Create balanced batches ensuring good distribution
     let currentBatch: any[] = [];
     
     for (const [sourceId, sourceJobs] of jobsBySource) {
-      // Add jobs from this source to current batch
       for (const job of sourceJobs) {
         currentBatch.push(job);
         
@@ -107,25 +108,38 @@ class ProductionQueueProcessor {
     return batches;
   }
 
-  private async processBatch(jobs: any[]): Promise<{ processed: number; failed: number }> {
+  private async processBatchWithRetry(jobs: any[]): Promise<{ processed: number; failed: number }> {
     let processed = 0;
     let failed = 0;
 
     console.log(`🔄 Processing batch of ${jobs.length} jobs`);
 
-    // Process each job individually with proper error isolation
+    // Process each job with comprehensive error handling and retries
     for (const job of jobs) {
-      try {
-        const success = await this.processIndividualJobSafely(job);
-        if (success) {
-          processed++;
-        } else {
-          failed++;
+      let attempts = 0;
+      let success = false;
+
+      while (attempts < this.MAX_RETRIES && !success) {
+        try {
+          success = await this.processIndividualJobSafely(job);
+          if (success) {
+            processed++;
+          } else if (attempts === this.MAX_RETRIES - 1) {
+            await this.handleJobFailure(job, new Error('Max processing attempts exceeded'));
+            failed++;
+          }
+        } catch (error) {
+          console.error(`❌ Job ${job.id} attempt ${attempts + 1} failed:`, error);
+          
+          if (attempts === this.MAX_RETRIES - 1) {
+            await this.handleJobFailure(job, error);
+            failed++;
+          } else {
+            // Wait before retry with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+          }
         }
-      } catch (error) {
-        console.error(`❌ Job ${job.id} failed:`, error);
-        await this.handleJobFailure(job, error);
-        failed++;
+        attempts++;
       }
     }
 
@@ -137,7 +151,7 @@ class ProductionQueueProcessor {
     const startTime = Date.now();
     
     try {
-      // Step 1: Claim the job atomically
+      // Step 1: Claim the job atomically with enhanced conflict resolution
       const claimed = await this.claimJobAtomically(job.id);
       if (!claimed) {
         console.log(`⚠️ Job ${job.id} already claimed by another worker`);
@@ -146,8 +160,13 @@ class ProductionQueueProcessor {
 
       console.log(`🔒 Successfully claimed job ${job.id} (${job.job_type})`);
 
-      // Step 2: Process the job
-      await this.processIndividualJob(job);
+      // Step 2: Process the job with timeout protection
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Job processing timeout')), this.PROCESSING_TIMEOUT_MS);
+      });
+
+      const processingPromise = this.processIndividualJob(job);
+      await Promise.race([processingPromise, timeoutPromise]);
 
       // Step 3: Mark as completed
       await this.markJobCompleted(job.id, startTime);
@@ -204,9 +223,13 @@ class ProductionQueueProcessor {
   }
 
   private async processPageJob(job: any): Promise<void> {
-    // FIXED: Send correct parameter name 'childJobId' instead of 'pageId'
+    // FIXED: Send correct parameter name 'childJobId' with proper payload structure
     const payload = {
       childJobId: job.page_id, // This is the correct parameter name expected by child-job-processor
+      url: job.payload?.url || '',
+      parentSourceId: job.source_id,
+      teamId: job.payload?.teamId,
+      recovery: job.payload?.recovery || false
     };
 
     console.log(`📄 Processing page job ${job.id} with payload:`, payload);

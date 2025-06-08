@@ -5,6 +5,7 @@ import { validateAgent } from './agentValidator.ts';
 import { handleChildPageRecrawl } from './recrawlHandler.ts';
 import { handleUrlDiscovery } from './discoveryHandler.ts';
 import { handleParentSourceCreation, handleSourcePagesCreation } from './parentSourceHandler.ts';
+import { createBackgroundJobs, ensureJobsExist } from './jobCreator.ts';
 import { buildErrorResponse, buildSuccessResponse } from './responseBuilder.ts';
 
 // CORS headers
@@ -49,6 +50,21 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
+    }
+
+    // Handle recovery mode - ensure missing jobs exist
+    if (requestBody.mode === 'retry' && requestBody.parentSourceId) {
+      console.log('🔄 Processing retry mode for parent:', requestBody.parentSourceId);
+      
+      const jobsEnsured = await ensureJobsExist(requestBody.parentSourceId);
+      
+      return buildSuccessResponse({
+        success: true,
+        mode: 'retry',
+        parentSourceId: requestBody.parentSourceId,
+        jobsEnsured: jobsEnsured,
+        message: 'Missing jobs created for retry processing'
+      }, corsHeaders);
     }
 
     // Validate request
@@ -114,7 +130,30 @@ serve(async (req) => {
       parentSource
     );
 
-    return buildSuccessResponse(result, corsHeaders);
+    // CRITICAL: Create background jobs after source pages are created
+    console.log('🔧 Creating background jobs for discovered URLs...');
+    const jobResult = await createBackgroundJobs(
+      parentSource.id,
+      agent.team_id,
+      discoveredUrls,
+      validatedRequest.priority
+    );
+
+    if (!jobResult.success && jobResult.errors.length > 0) {
+      console.warn('⚠️ Some background jobs failed to create:', jobResult.errors);
+    }
+
+    // Enhanced result with job creation info
+    const enhancedResult = {
+      ...result,
+      backgroundJobs: {
+        created: jobResult.jobsCreated,
+        errors: jobResult.errors,
+        success: jobResult.success
+      }
+    };
+
+    return buildSuccessResponse(enhancedResult, corsHeaders);
 
   } catch (error) {
     return buildErrorResponse(error, corsHeaders);
