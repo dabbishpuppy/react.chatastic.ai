@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -53,7 +52,7 @@ export const SystemOverview: React.FC<SystemOverviewProps> = ({
         .eq('agent_id', selectedAgentId)
         .eq('is_active', true);
 
-      // Fetch latest training job for progress
+      // Fetch latest training job for progress - fix the status comparison
       const { data: trainingJob } = await supabase
         .from('agent_training_jobs')
         .select('*')
@@ -63,7 +62,7 @@ export const SystemOverview: React.FC<SystemOverviewProps> = ({
         .maybeSingle();
 
       let trainingProgress = 100;
-      if (trainingJob && trainingJob.status === 'running') {
+      if (trainingJob && trainingJob.status === 'in_progress') {
         trainingProgress = trainingJob.total_chunks > 0 
           ? (trainingJob.processed_chunks / trainingJob.total_chunks) * 100 
           : 0;

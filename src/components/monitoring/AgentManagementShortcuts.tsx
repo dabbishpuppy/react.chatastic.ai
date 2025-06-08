@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,9 +61,9 @@ export const AgentManagementShortcuts: React.FC<AgentManagementShortcutsProps> =
         .limit(1)
         .maybeSingle();
 
-      // Calculate training progress
+      // Calculate training progress - fix the status comparison
       let trainingProgress = 100;
-      if (trainingJob && trainingJob.status === 'running') {
+      if (trainingJob && trainingJob.status === 'in_progress') {
         trainingProgress = trainingJob.total_chunks > 0 
           ? (trainingJob.processed_chunks / trainingJob.total_chunks) * 100 
           : 0;
