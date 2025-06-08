@@ -37,7 +37,13 @@ export class SemanticSearchService {
             chunkId: 'test-chunk-1',
             content: 'This is a test chunk for semantic search testing.',
             similarity: 0.85,
-            metadata: { test: true },
+            metadata: { 
+              test: true,
+              sourceName: 'Test Source 1',
+              sourceType: 'text',
+              chunkIndex: 0,
+              tokenCount: 12
+            },
             sourceId: 'test-source-1',
             sourceTitle: 'Test Source 1',
             sourceType: 'text'
@@ -46,7 +52,13 @@ export class SemanticSearchService {
             chunkId: 'test-chunk-2',
             content: 'This is another test chunk for comprehensive testing.',
             similarity: 0.75,
-            metadata: { test: true },
+            metadata: { 
+              test: true,
+              sourceName: 'Test Source 2',
+              sourceType: 'text',
+              chunkIndex: 1,
+              tokenCount: 15
+            },
             sourceId: 'test-source-2',
             sourceTitle: 'Test Source 2',
             sourceType: 'text'
@@ -90,7 +102,13 @@ export class SemanticSearchService {
         chunkId: chunk.id,
         content: chunk.content,
         similarity: 0.7, // Mock similarity for now
-        metadata: chunk.metadata || {},
+        metadata: {
+          ...(chunk.metadata || {}),
+          sourceName: chunk.agent_sources.title,
+          sourceType: chunk.agent_sources.source_type,
+          chunkIndex: 0,
+          tokenCount: Math.ceil(chunk.content.length / 4)
+        },
         sourceId: chunk.agent_sources.id,
         sourceTitle: chunk.agent_sources.title,
         sourceType: chunk.agent_sources.source_type
@@ -124,7 +142,13 @@ export class SemanticSearchService {
             chunkId: 'test-keyword-chunk-1',
             content: `This chunk contains keywords: ${keywords.join(', ')}`,
             similarity: 0.65,
-            metadata: { keywords: keywords },
+            metadata: { 
+              keywords: keywords,
+              sourceName: 'Test Keyword Source',
+              sourceType: 'text',
+              chunkIndex: 0,
+              tokenCount: 20
+            },
             sourceId: 'test-source-keyword',
             sourceTitle: 'Test Keyword Source',
             sourceType: 'text'
@@ -174,7 +198,13 @@ export class SemanticSearchService {
         chunkId: chunk.id,
         content: chunk.content,
         similarity: 0.6, // Mock similarity for keyword search
-        metadata: chunk.metadata || {},
+        metadata: {
+          ...(chunk.metadata || {}),
+          sourceName: chunk.agent_sources.title,
+          sourceType: chunk.agent_sources.source_type,
+          chunkIndex: 0,
+          tokenCount: Math.ceil(chunk.content.length / 4)
+        },
         sourceId: chunk.agent_sources.id,
         sourceTitle: chunk.agent_sources.title,
         sourceType: chunk.agent_sources.source_type
@@ -187,5 +217,77 @@ export class SemanticSearchService {
       console.error('❌ Keyword search failed:', error);
       return [];
     }
+  }
+
+  static async hybridSearch(
+    query: string,
+    agentId: string,
+    filters?: SearchFilters
+  ): Promise<SemanticSearchResult[]> {
+    console.log('🔀 Hybrid search:', { 
+      query: query.substring(0, 50) + '...', 
+      agentId: agentId === 'test-agent-id' ? 'TEST-MODE' : agentId.substring(0, 8) + '...'
+    });
+
+    try {
+      // Extract keywords from query for keyword search
+      const keywords = query
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(' ')
+        .filter(word => word.length > 2)
+        .slice(0, 10);
+
+      // Perform both searches in parallel
+      const [semanticResults, keywordResults] = await Promise.all([
+        this.searchSimilarChunks(query, agentId, filters),
+        this.searchByKeywords(keywords, agentId, filters)
+      ]);
+
+      // Combine and deduplicate results
+      const combinedResults = this.combineSearchResults(semanticResults, keywordResults);
+
+      console.log('✅ Hybrid search complete:', {
+        semantic: semanticResults.length,
+        keyword: keywordResults.length,
+        combined: combinedResults.length
+      });
+
+      return combinedResults;
+
+    } catch (error) {
+      console.error('❌ Hybrid search failed:', error);
+      return [];
+    }
+  }
+
+  private static combineSearchResults(
+    semanticResults: SemanticSearchResult[],
+    keywordResults: SemanticSearchResult[]
+  ): SemanticSearchResult[] {
+    const seenChunks = new Set<string>();
+    const combined: SemanticSearchResult[] = [];
+
+    // Add semantic results first (higher priority)
+    for (const result of semanticResults) {
+      if (!seenChunks.has(result.chunkId)) {
+        seenChunks.add(result.chunkId);
+        combined.push({
+          ...result,
+          similarity: result.similarity * 1.1 // Boost semantic results slightly
+        });
+      }
+    }
+
+    // Add keyword results that aren't already included
+    for (const result of keywordResults) {
+      if (!seenChunks.has(result.chunkId)) {
+        seenChunks.add(result.chunkId);
+        combined.push(result);
+      }
+    }
+
+    // Sort by similarity
+    return combined.sort((a, b) => b.similarity - a.similarity);
   }
 }

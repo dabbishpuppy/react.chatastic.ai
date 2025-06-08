@@ -1,4 +1,3 @@
-
 import { SemanticSearchResult } from './semanticSearch';
 import { QueryContext } from './queryPreprocessor';
 
@@ -148,6 +147,15 @@ export class ContextRanker {
         authorityScore
       }, options);
 
+      // Ensure all required metadata properties are present
+      const metadata = {
+        sourceName: result.metadata.sourceName || result.sourceTitle || 'Unknown Source',
+        sourceType: result.metadata.sourceType || result.sourceType || 'text',
+        chunkIndex: result.metadata.chunkIndex || 0,
+        tokenCount: result.metadata.tokenCount || this.estimateTokenCount(result.content),
+        ...result.metadata
+      };
+
       chunks.push({
         chunkId: result.chunkId,
         sourceId: result.sourceId,
@@ -157,10 +165,7 @@ export class ContextRanker {
         recencyScore,
         authorityScore,
         finalScore,
-        metadata: {
-          ...result.metadata,
-          tokenCount: this.estimateTokenCount(result.content)
-        }
+        metadata
       });
     }
 
