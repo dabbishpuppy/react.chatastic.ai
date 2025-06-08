@@ -60,12 +60,15 @@ export class ProcessSourcePagesTestSuite {
 
   private static async testInvalidJSON(): Promise<TestResult> {
     try {
-      // This will test the edge function's ability to handle malformed JSON
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/process-source-pages`, {
+      // Use the actual Supabase URL and key from the client configuration
+      const SUPABASE_URL = "https://lndfjlkzvxbnoxfuboxz.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk";
+      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/process-source-pages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: 'invalid json{'
       });
@@ -173,37 +176,37 @@ export class ProcessSourcePagesTestSuite {
   }
 
   static generateCurlExamples(): string[] {
-    const baseUrl = supabase.supabaseUrl;
-    const authHeader = `Bearer ${supabase.supabaseKey}`;
+    const SUPABASE_URL = "https://lndfjlkzvxbnoxfuboxz.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc0OTM1MjQsImV4cCI6MjA2MzA2OTUyNH0.81qrGi1n9MpVIGNeJ8oPjyaUbuCKKKXfZXVuF90azFk";
     
     return [
       `# Test 1: Empty request body
-curl -X POST "${baseUrl}/functions/v1/process-source-pages" \\
-  -H "Authorization: ${authHeader}" \\
+curl -X POST "${SUPABASE_URL}/functions/v1/process-source-pages" \\
+  -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \\
   -H "Content-Type: application/json" \\
   -d '{}'`,
       
       `# Test 2: Invalid JSON
-curl -X POST "${baseUrl}/functions/v1/process-source-pages" \\
-  -H "Authorization: ${authHeader}" \\
+curl -X POST "${SUPABASE_URL}/functions/v1/process-source-pages" \\
+  -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \\
   -H "Content-Type: application/json" \\
   -d 'invalid json{'`,
       
       `# Test 3: Valid request with no parentSourceId
-curl -X POST "${baseUrl}/functions/v1/process-source-pages" \\
-  -H "Authorization: ${authHeader}" \\
+curl -X POST "${SUPABASE_URL}/functions/v1/process-source-pages" \\
+  -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \\
   -H "Content-Type: application/json" \\
   -d '{"maxConcurrentJobs": 3}'`,
       
       `# Test 4: Invalid parentSourceId format
-curl -X POST "${baseUrl}/functions/v1/process-source-pages" \\
-  -H "Authorization: ${authHeader}" \\
+curl -X POST "${SUPABASE_URL}/functions/v1/process-source-pages" \\
+  -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \\
   -H "Content-Type: application/json" \\
   -d '{"parentSourceId": "invalid-uuid"}'`,
       
       `# Test 5: Non-existent parentSourceId
-curl -X POST "${baseUrl}/functions/v1/process-source-pages" \\
-  -H "Authorization: ${authHeader}" \\
+curl -X POST "${SUPABASE_URL}/functions/v1/process-source-pages" \\
+  -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \\
   -H "Content-Type: application/json" \\
   -d '{"parentSourceId": "00000000-0000-0000-0000-000000000000"}'`
     ];
