@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedCrawlRequest, CrawlStatus } from "./crawlTypes";
 
@@ -105,8 +104,6 @@ export class CrawlApiService {
         totalJobs: pageStats.total,
         completedJobs: pageStats.completed,
         failedJobs: pageStats.failed,
-        pendingJobs: pageStats.pending,
-        inProgressJobs: pageStats.inProgress,
         parentSourceId
       };
 
@@ -118,8 +115,6 @@ export class CrawlApiService {
         totalJobs: 0,
         completedJobs: 0,
         failedJobs: 0,
-        pendingJobs: 0,
-        inProgressJobs: 0,
         parentSourceId,
         error: error.message
       };
