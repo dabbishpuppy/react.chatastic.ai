@@ -1,651 +1,407 @@
-
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
-import { 
-  AlertTriangle, 
-  CheckCircle, 
-  XCircle, 
-  Activity, 
-  TrendingUp, 
-  Users, 
-  Zap,
-  RefreshCw,
-  AlertCircle,
-  Database,
-  Clock,
-  BarChart3
-} from 'lucide-react';
-import { ProductionCrawlOrchestrator } from '@/services/rag/enhanced/productionCrawlOrchestrator';
-import { ProductionQueueManager } from '@/services/workflow/ProductionQueueManager';
-import { ResilientCrawlService } from '@/services/rag/enhanced/resilientCrawlService';
-import { supabase } from '@/integrations/supabase/client';
+import { RefreshCw } from 'lucide-react';
+import { ServiceOrchestrator } from '@/services/rag/enhanced/serviceOrchestrator';
+import { MetricsCollectionService } from '@/services/rag/enhanced/metricsCollectionService';
+import { AlertingService } from '@/services/rag/enhanced/alertingService';
+import { WebSocketRealtimeService } from '@/services/workflow/WebSocketRealtimeService';
+import { ServiceStatusCard } from './ServiceStatusCard';
+import { SystemOverview } from './SystemOverview';
+import { AlertsPanel } from './AlertsPanel';
+import { ServiceControlPanel } from './ServiceControlPanel';
+import { QueueMonitor } from './QueueMonitor';
+import { ProductionQueueDashboard } from './ProductionQueueDashboard';
+import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
+import { ProductionHealthCheck } from './ProductionHealthCheck';
+import { DatabaseOptimizationDashboard } from './DatabaseOptimizationDashboard';
+import { InfrastructureHealthMonitor } from './InfrastructureHealthMonitor';
+import { AgentSelector } from './AgentSelector';
+import { TestingIntegration } from './TestingIntegration';
+import { AgentManagementShortcuts } from './AgentManagementShortcuts';
+import { RAGSystemTestRunner } from '@/components/testing/RAGSystemTestRunner';
 import { useToast } from '@/hooks/use-toast';
 
-interface JobMetrics {
-  totalJobs: number;
-  pendingJobs: number;
-  inProgressJobs: number;
-  completedJobs: number;
-  failedJobs: number;
-  conflictRate: number;
-  processingRate: number;
-  lastUpdate: string;
-}
-
-interface SystemHealth {
-  crawlService: any;
-  healthMonitor: any;
-  overallHealth: 'healthy' | 'degraded' | 'critical';
-}
-
 export const MonitoringDashboard: React.FC = () => {
-  const [jobMetrics, setJobMetrics] = useState<JobMetrics>({
-    totalJobs: 0,
-    pendingJobs: 0,
-    inProgressJobs: 0,
-    completedJobs: 0,
-    failedJobs: 0,
-    conflictRate: 0,
-    processingRate: 0,
-    lastUpdate: new Date().toISOString()
-  });
-  
-  const [systemHealth, setSystemHealth] = useState<SystemHealth>({
-    crawlService: { available: true, failureCount: 0 },
-    healthMonitor: { available: true, failureCount: 0 },
-    overallHealth: 'healthy'
-  });
-  
+  const [orchestratorStatus, setOrchestratorStatus] = useState<any>(null);
+  const [systemMetrics, setSystemMetrics] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [wsStats, setWsStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [orchestratorRunning, setOrchestratorRunning] = useState(false);
-  const [queueManagerRunning, setQueueManagerRunning] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Load metrics on component mount and set up polling
-  useEffect(() => {
-    loadSystemMetrics();
-    loadSystemHealth();
+  // Initialize orchestrator and load initial state
+  const initializeOrchestrator = useCallback(() => {
+    const orchestrator = ServiceOrchestrator.getInstance({
+      enableMetrics: true,
+      enableAlerting: true,
+      enablePerformanceMonitoring: true,
+      enableInfrastructureMonitoring: true,
+      enableIPPoolMonitoring: true,
+      enableEgressManagement: true,
+      enableAutoscaling: true,
+      enableWorkerQueue: true,
+      enableConnectionPooling: true,
+      enableDatabaseOptimization: true
+    });
     
-    const interval = setInterval(() => {
-      loadSystemMetrics();
-      loadSystemHealth();
-    }, 10000); // Update every 10 seconds
+    // Load current status immediately
+    updateDashboard();
     
-    return () => clearInterval(interval);
+    return orchestrator;
   }, []);
 
-  const loadSystemMetrics = async () => {
-    try {
-      // Get job metrics from the database
-      const { data: jobs, error } = await supabase
-        .from('source_pages')
-        .select('status, created_at, updated_at')
-        .order('created_at', { ascending: false })
-        .limit(1000);
-
-      if (error) throw error;
-
-      const now = new Date();
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      
-      const recentJobs = jobs?.filter(job => 
-        new Date(job.created_at) > oneHourAgo
-      ) || [];
-
-      const totalJobs = jobs?.length || 0;
-      const pendingJobs = jobs?.filter(j => j.status === 'pending').length || 0;
-      const inProgressJobs = jobs?.filter(j => j.status === 'in_progress').length || 0;
-      const completedJobs = jobs?.filter(j => j.status === 'completed').length || 0;
-      const failedJobs = jobs?.filter(j => j.status === 'failed').length || 0;
-      
-      // Calculate conflict rate (jobs that failed vs total processed)
-      const processedJobs = completedJobs + failedJobs;
-      const conflictRate = processedJobs > 0 ? (failedJobs / processedJobs) * 100 : 0;
-      
-      // Calculate processing rate (jobs completed in last hour)
-      const recentCompleted = recentJobs.filter(j => j.status === 'completed').length;
-      const processingRate = recentCompleted;
-
-      setJobMetrics({
-        totalJobs,
-        pendingJobs,
-        inProgressJobs,
-        completedJobs,
-        failedJobs,
-        conflictRate,
-        processingRate,
-        lastUpdate: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('Failed to load system metrics:', error);
-      toast({
-        title: "Error Loading Metrics",
-        description: "Failed to load system metrics. Please try again.",
-        variant: "destructive"
-      });
+  useEffect(() => {
+    const orchestrator = initializeOrchestrator();
+    
+    let interval: NodeJS.Timeout;
+    if (autoRefresh) {
+      interval = setInterval(() => {
+        updateDashboard();
+      }, 5000); // Update every 5 seconds for better responsiveness
     }
-  };
 
-  const loadSystemHealth = () => {
-    const health = ResilientCrawlService.getSystemStatus();
-    setSystemHealth(health);
-  };
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoRefresh, initializeOrchestrator]);
 
-  const handleStartOrchestrator = async () => {
+  const updateDashboard = useCallback(async () => {
+    try {
+      const orchestrator = ServiceOrchestrator.getInstance();
+      const status = orchestrator.getOrchestratorStatus();
+      const metrics = MetricsCollectionService.getCurrentMetrics();
+      const activeAlerts = AlertingService.getActiveAlerts();
+      const webSocketStats = WebSocketRealtimeService.getStats();
+
+      setOrchestratorStatus(status);
+      setSystemMetrics(metrics.system);
+      setAlerts(activeAlerts);
+      setWsStats(webSocketStats);
+    } catch (error) {
+      console.error('Error updating dashboard:', error);
+    }
+  }, []);
+
+  const handleStartServices = async () => {
     setIsLoading(true);
     try {
-      const orchestrator = ProductionCrawlOrchestrator.getInstance();
-      await orchestrator.startOrchestrator();
-      setOrchestratorRunning(true);
+      const orchestrator = ServiceOrchestrator.getInstance();
+      await orchestrator.startServices();
       
       toast({
-        title: "Orchestrator Started",
-        description: "Production crawl orchestrator is now running.",
+        title: "Services Started",
+        description: "All enhanced services have been started successfully.",
       });
+      
+      await updateDashboard();
     } catch (error) {
-      console.error('Failed to start orchestrator:', error);
+      console.error('Error starting services:', error);
       toast({
-        title: "Start Failed",
-        description: "Failed to start orchestrator. Check console for details.",
-        variant: "destructive"
+        title: "Error Starting Services",
+        description: "Failed to start services. Check console for details.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleStartQueueManager = async () => {
+  const handleStopServices = async () => {
     setIsLoading(true);
     try {
-      const queueManager = ProductionQueueManager.getInstance();
-      await queueManager.startProductionQueue();
-      setQueueManagerRunning(true);
+      const orchestrator = ServiceOrchestrator.getInstance();
+      await orchestrator.stopServices();
       
       toast({
-        title: "Queue Manager Started",
-        description: "Production queue manager is now running.",
+        title: "Services Stopped",
+        description: "All enhanced services have been stopped.",
       });
+      
+      await updateDashboard();
     } catch (error) {
-      console.error('Failed to start queue manager:', error);
+      console.error('Error stopping services:', error);
       toast({
-        title: "Start Failed",
-        description: "Failed to start queue manager. Check console for details.",
-        variant: "destructive"
+        title: "Error Stopping Services",
+        description: "Failed to stop services. Check console for details.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEmergencyReset = async () => {
-    if (!confirm('Are you sure you want to reset all failed jobs? This will retry all failed jobs.')) {
-      return;
-    }
-
-    setIsLoading(true);
+  const handleRestartService = async (serviceName: string) => {
     try {
-      const orchestrator = ProductionCrawlOrchestrator.getInstance();
-      await orchestrator.emergencyReset();
-      
-      // Also trigger queue processing
-      const queueManager = ProductionQueueManager.getInstance();
-      await queueManager.startProductionQueue();
-      
-      await loadSystemMetrics();
+      const orchestrator = ServiceOrchestrator.getInstance();
+      await orchestrator.restartService(serviceName);
       
       toast({
-        title: "Emergency Reset Complete",
-        description: "All failed jobs have been reset and processing restarted.",
+        title: "Service Restarted",
+        description: `${serviceName} has been restarted successfully.`,
       });
+      
+      await updateDashboard();
     } catch (error) {
-      console.error('Emergency reset failed:', error);
+      console.error('Error restarting service:', error);
       toast({
-        title: "Reset Failed",
-        description: "Emergency reset failed. Check console for details.",
-        variant: "destructive"
+        title: "Error Restarting Service",
+        description: `Failed to restart ${serviceName}. Check console for details.`,
+        variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const handleForceRecovery = async () => {
-    setIsLoading(true);
+  const handleAcknowledgeAlert = async (alertId: string) => {
     try {
-      const orchestrator = ProductionCrawlOrchestrator.getInstance();
-      await orchestrator.forceRecovery();
-      
-      await loadSystemMetrics();
-      
-      toast({
-        title: "Recovery Complete",
-        description: "Forced recovery has been executed.",
-      });
+      await AlertingService.acknowledgeAlert(alertId);
+      await updateDashboard();
     } catch (error) {
-      console.error('Force recovery failed:', error);
-      toast({
-        title: "Recovery Failed",
-        description: "Force recovery failed. Check console for details.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Error acknowledging alert:', error);
     }
   };
 
-  const handleRetryFailedJobs = async () => {
-    setIsLoading(true);
+  const handleDismissAlert = async (alertId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
-        body: { 
-          mode: 'retry_failed',
-          batchSize: 50
-        }
-      });
-
-      if (error) throw error;
-
-      await loadSystemMetrics();
-      
-      toast({
-        title: "Retry Initiated",
-        description: `Retrying failed jobs. Check progress in the metrics.`,
-      });
+      await AlertingService.acknowledgeAlert(alertId);
+      await updateDashboard();
     } catch (error) {
-      console.error('Retry failed jobs error:', error);
-      toast({
-        title: "Retry Failed",
-        description: "Failed to retry jobs. Check console for details.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Error dismissing alert:', error);
     }
   };
 
-  const getHealthBadgeColor = (health: string) => {
-    switch (health) {
-      case 'healthy': return 'bg-green-500';
-      case 'degraded': return 'bg-yellow-500';
-      case 'critical': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  const getConflictRateColor = (rate: number) => {
-    if (rate > 80) return 'text-red-600';
-    if (rate > 50) return 'text-yellow-600';
-    return 'text-green-600';
+  const handleManualRefresh = () => {
+    updateDashboard();
+    toast({
+      title: "Dashboard Refreshed",
+      description: "Latest metrics and status have been loaded.",
+    });
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">System Monitoring</h1>
+          <h1 className="text-3xl font-bold">Centralized Monitoring Dashboard</h1>
           <p className="text-muted-foreground">
-            Monitor crawling performance, system health, and resolve issues
+            Complete system monitoring, testing, and agent management
           </p>
+          {orchestratorStatus && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Status: {orchestratorStatus.isRunning ? '🟢 Running' : '🔴 Stopped'} • 
+              Uptime: {Math.floor(orchestratorStatus.uptime / 60)}m {orchestratorStatus.uptime % 60}s • 
+              Health: {orchestratorStatus.overallHealth}%
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={loadSystemMetrics} 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            Auto Refresh: {autoRefresh ? 'ON' : 'OFF'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
             disabled={isLoading}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Critical Alerts */}
-      {jobMetrics.failedJobs > 0 && (
-        <Alert className="border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
-            <strong>{jobMetrics.failedJobs} failed jobs detected</strong> with {jobMetrics.conflictRate.toFixed(1)}% conflict rate. 
-            Immediate action recommended.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Agent Selection and Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <AgentSelector 
+          selectedAgentId={selectedAgentId}
+          onAgentSelect={setSelectedAgentId}
+        />
+        <TestingIntegration />
+        <AgentManagementShortcuts selectedAgentId={selectedAgentId} />
+      </div>
 
-      {systemHealth.overallHealth === 'critical' && (
-        <Alert className="border-red-200 bg-red-50">
-          <XCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
-            <strong>System health critical</strong> - Multiple services are experiencing issues.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Control Panel */}
+      <ServiceControlPanel
+        orchestratorStatus={orchestratorStatus}
+        isLoading={isLoading}
+        onStartServices={handleStartServices}
+        onStopServices={handleStopServices}
+      />
 
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+      {/* Dashboard Content */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="grid grid-cols-6 lg:grid-cols-12 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="health">Health Check</TabsTrigger>
+          <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="testing">Testing</TabsTrigger>
+          <TabsTrigger value="queue">Queue</TabsTrigger>
+          <TabsTrigger value="production">Production Queue</TabsTrigger>
           <TabsTrigger value="production-crawl">Production Crawl</TabsTrigger>
-          <TabsTrigger value="production-queue">Production Queue</TabsTrigger>
-          <TabsTrigger value="health-check">Health Check</TabsTrigger>
-          <TabsTrigger value="recovery">Recovery Actions</TabsTrigger>
+          <TabsTrigger value="database">Database</TabsTrigger>
+          <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
+          <TabsTrigger value="websockets">WebSockets</TabsTrigger>
+          <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="agent-management">Agent Mgmt</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">System Health</CardTitle>
-                <div className={`h-3 w-3 rounded-full ${getHealthBadgeColor(systemHealth.overallHealth)}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold capitalize">{systemHealth.overallHealth}</div>
-                <p className="text-xs text-muted-foreground">Overall system status</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Failed Jobs</CardTitle>
-                <XCircle className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{jobMetrics.failedJobs}</div>
-                <p className="text-xs text-muted-foreground">
-                  {jobMetrics.conflictRate.toFixed(1)}% conflict rate
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Processing Rate</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{jobMetrics.processingRate}</div>
-                <p className="text-xs text-muted-foreground">Jobs/hour completed</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Queue Status</CardTitle>
-                <Activity className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{jobMetrics.pendingJobs}</div>
-                <p className="text-xs text-muted-foreground">Pending jobs</p>
-              </CardContent>
-            </Card>
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <SystemOverview 
+                metrics={systemMetrics} 
+                overallHealth={orchestratorStatus?.overallHealth || 0}
+                selectedAgentId={selectedAgentId}
+              />
+            </div>
+            <div>
+              <AlertsPanel 
+                alerts={alerts}
+                onAcknowledge={handleAcknowledgeAlert}
+                onDismiss={handleDismissAlert}
+              />
+            </div>
           </div>
+        </TabsContent>
 
-          {/* Job Status Progress */}
+        <TabsContent value="health" className="space-y-4">
+          <ProductionHealthCheck />
+        </TabsContent>
+
+        <TabsContent value="services" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {orchestratorStatus?.services?.map((service: any) => (
+              <ServiceStatusCard
+                key={service.name}
+                service={service}
+                onRestart={handleRestartService}
+              />
+            ))}
+            {(!orchestratorStatus?.services || orchestratorStatus.services.length === 0) && (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                No services found. Start the orchestrator to see service status.
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="testing" className="space-y-4">
+          <RAGSystemTestRunner />
+        </TabsContent>
+
+        <TabsContent value="queue" className="space-y-4">
+          <QueueMonitor />
+        </TabsContent>
+
+        <TabsContent value="production" className="space-y-4">
+          <ProductionQueueDashboard />
+        </TabsContent>
+
+        <TabsContent value="production-crawl" className="space-y-4">
+          <ProductionCrawlDashboard />
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-4">
+          <DatabaseOptimizationDashboard />
+        </TabsContent>
+
+        <TabsContent value="infrastructure" className="space-y-4">
+          <InfrastructureHealthMonitor />
+        </TabsContent>
+
+        <TabsContent value="websockets" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Job Processing Status</CardTitle>
+              <CardTitle>WebSocket Connections</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-4 gap-4 text-sm">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{jobMetrics.completedJobs}</div>
-                    <div className="text-muted-foreground">Completed</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{jobMetrics.inProgressJobs}</div>
-                    <div className="text-muted-foreground">In Progress</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-600">{jobMetrics.pendingJobs}</div>
-                    <div className="text-muted-foreground">Pending</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{jobMetrics.failedJobs}</div>
-                    <div className="text-muted-foreground">Failed</div>
-                  </div>
-                </div>
-                
-                {jobMetrics.totalJobs > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Progress</span>
-                      <span>{Math.round(((jobMetrics.completedJobs + jobMetrics.failedJobs) / jobMetrics.totalJobs) * 100)}%</span>
+              {wsStats ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{wsStats.activeConnections}</div>
+                      <p className="text-xs text-muted-foreground">Active Connections</p>
                     </div>
-                    <Progress 
-                      value={((jobMetrics.completedJobs + jobMetrics.failedJobs) / jobMetrics.totalJobs) * 100} 
-                      className="h-2"
-                    />
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Production Crawl Tab */}
-        <TabsContent value="production-crawl" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Orchestrator Control</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span>Status:</span>
-                  <Badge variant={orchestratorRunning ? "default" : "secondary"}>
-                    {orchestratorRunning ? "Running" : "Stopped"}
-                  </Badge>
-                </div>
-                
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={handleStartOrchestrator}
-                    disabled={isLoading}
-                    size="sm"
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Start Orchestrator
-                  </Button>
-                </div>
-                
-                <p className="text-sm text-muted-foreground">
-                  The orchestrator manages 2000+ concurrent crawls with health monitoring and recovery.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>System Metrics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Conflict Rate</div>
-                    <div className={`text-lg font-bold ${getConflictRateColor(jobMetrics.conflictRate)}`}>
-                      {jobMetrics.conflictRate.toFixed(1)}%
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{wsStats.totalListeners}</div>
+                      <p className="text-xs text-muted-foreground">Total Listeners</p>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Processing Rate</div>
-                    <div className="text-lg font-bold">{jobMetrics.processingRate}/hour</div>
-                  </div>
-                </div>
-                
-                <div className="text-xs text-muted-foreground">
-                  Last updated: {new Date(jobMetrics.lastUpdate).toLocaleTimeString()}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Production Queue Tab */}
-        <TabsContent value="production-queue" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Queue Manager Control</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span>Queue Status:</span>
-                <Badge variant={queueManagerRunning ? "default" : "secondary"}>
-                  {queueManagerRunning ? "Active" : "Inactive"}
-                </Badge>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  onClick={handleStartQueueManager}
-                  disabled={isLoading}
-                  size="sm"
-                >
-                  <Database className="h-4 w-4 mr-2" />
-                  Start Queue Manager
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 pt-4">
-                <div className="text-center">
-                  <div className="text-xl font-bold">{jobMetrics.pendingJobs}</div>
-                  <div className="text-sm text-muted-foreground">Pending</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold">{jobMetrics.inProgressJobs}</div>
-                  <div className="text-sm text-muted-foreground">Processing</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold">{jobMetrics.completedJobs}</div>
-                  <div className="text-sm text-muted-foreground">Completed</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Health Check Tab */}
-        <TabsContent value="health-check" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Service Health</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span>Crawl Service</span>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${systemHealth.crawlService.available ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm">{systemHealth.crawlService.available ? 'Available' : 'Unavailable'}</span>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{Object.keys(wsStats.connectionsBySource || {}).length}</div>
+                      <p className="text-xs text-muted-foreground">Sources Monitored</p>
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between">
-                    <span>Health Monitor</span>
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${systemHealth.healthMonitor.available ? 'bg-green-500' : 'bg-red-500'}`} />
-                      <span className="text-sm">{systemHealth.healthMonitor.available ? 'Available' : 'Unavailable'}</span>
+                  {Object.entries(wsStats.connectionsBySource || {}).length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Connection Status by Source</h4>
+                      <div className="space-y-1">
+                        {Object.entries(wsStats.connectionsBySource || {}).map(([sourceId, status]) => (
+                          <div key={sourceId} className="flex items-center justify-between text-sm">
+                            <span className="font-mono text-xs">{sourceId.slice(0, 8)}...</span>
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              status === 'connected' ? 'bg-green-100 text-green-800' :
+                              status === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {status as string}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Error Analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span>Total Errors:</span>
-                    <span className="font-bold text-red-600">{jobMetrics.failedJobs}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Error Rate:</span>
-                    <span className={`font-bold ${getConflictRateColor(jobMetrics.conflictRate)}`}>
-                      {jobMetrics.conflictRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="text-sm text-muted-foreground pt-2">
-                    High conflict rates indicate worker coordination issues or resource contention.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Recovery Actions Tab */}
-        <TabsContent value="recovery" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recovery Actions</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Use these tools to recover from system issues and restart failed processes.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                  onClick={handleRetryFailedJobs}
-                  disabled={isLoading || jobMetrics.failedJobs === 0}
-                  variant="outline"
-                  className="justify-start"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Retry Failed Jobs ({jobMetrics.failedJobs})
-                </Button>
-
-                <Button 
-                  onClick={handleForceRecovery}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="justify-start"
-                >
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Force Recovery
-                </Button>
-
-                <Button 
-                  onClick={handleEmergencyReset}
-                  disabled={isLoading}
-                  variant="destructive"
-                  className="justify-start"
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Emergency Reset
-                </Button>
-
-                <Button 
-                  onClick={() => {
-                    loadSystemMetrics();
-                    loadSystemHealth();
-                  }}
-                  disabled={isLoading}
-                  variant="secondary"
-                  className="justify-start"
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Refresh All Data
-                </Button>
-              </div>
-
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Emergency Reset</strong> will reset all failed jobs to pending status and restart processing. 
-                  Use this as a last resort when the system is stuck.
-                </AlertDescription>
-              </Alert>
+              ) : (
+                <p className="text-muted-foreground">Loading WebSocket statistics...</p>
+              )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="alerts" className="space-y-4">
+          <AlertsPanel 
+            alerts={alerts}
+            onAcknowledge={handleAcknowledgeAlert}
+            onDismiss={handleDismissAlert}
+          />
+        </TabsContent>
+
+        <TabsContent value="agent-management" className="space-y-4">
+          {selectedAgentId ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Management - {selectedAgentId}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Quick agent management actions. For full management capabilities, 
+                  visit the dedicated agent management page.
+                </p>
+                <AgentManagementShortcuts selectedAgentId={selectedAgentId} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground text-center py-8">
+                  Select an agent from the Agent Selector above to view management options.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
