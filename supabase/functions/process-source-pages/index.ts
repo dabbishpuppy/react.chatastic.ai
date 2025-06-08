@@ -1,242 +1,199 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getSupabaseClient } from '../_shared/database-helpers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function autoRecoverStuckPages(supabaseClient: any) {
-  const { data: stuckPages, error: stuckError } = await supabaseClient
-    .from('source_pages')
-    .select('id, url, status, started_at, retry_count')
-    .eq('status', 'in_progress')
-    .lt('started_at', new Date(Date.now() - 8 * 60 * 1000).toISOString());
+// Enhanced concurrent job processor
+class EnhancedJobProcessor {
+  private supabase: any;
+  private maxConcurrentJobs: number;
+  private processingTimeoutMs: number;
 
-  if (!stuckError && stuckPages && stuckPages.length > 0) {
-    console.log(`🔄 Auto-recovering ${stuckPages.length} stuck pages...`);
+  constructor(supabase: any, maxConcurrentJobs: number = 5, processingTimeoutMs: number = 60000) {
+    this.supabase = supabase;
+    this.maxConcurrentJobs = maxConcurrentJobs;
+    this.processingTimeoutMs = processingTimeoutMs;
+  }
+
+  async processConcurrentJobs(parentSourceId: string): Promise<any> {
+    console.log(`🚀 Starting enhanced concurrent processing for parent: ${parentSourceId}`);
     
-    const { error: resetError } = await supabaseClient
+    const startTime = Date.now();
+    
+    // Get pending pages in batches
+    const { data: pendingPages, error: fetchError } = await this.supabase
       .from('source_pages')
-      .update({ 
-        status: 'pending',
-        started_at: null,
-        retry_count: 0,
-        error_message: null
-      })
-      .in('id', stuckPages.map(p => p.id));
-    
-    if (resetError) {
-      console.error('❌ Failed to auto-recover stuck pages:', resetError);
-      return 0;
-    } else {
-      console.log(`✅ Auto-recovered ${stuckPages.length} stuck pages`);
-      return stuckPages.length;
+      .select('*')
+      .eq('parent_source_id', parentSourceId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(20); // Process in batches
+
+    if (fetchError || !pendingPages) {
+      console.error('❌ Error fetching pending pages:', fetchError);
+      return { success: false, error: fetchError?.message };
     }
-  }
 
-  return 0;
-}
-
-async function resetFailedPages(supabaseClient: any) {
-  const { data: failedPages, error: failedError } = await supabaseClient
-    .from('source_pages')
-    .select('id, url, retry_count')
-    .eq('status', 'failed')
-    .lt('retry_count', 3);
-
-  if (!failedError && failedPages && failedPages.length > 0) {
-    console.log(`🔄 Resetting ${failedPages.length} failed pages for retry...`);
-    
-    const { error: resetError } = await supabaseClient
-      .from('source_pages')
-      .update({ 
-        status: 'pending',
-        started_at: null,
-        error_message: null
-      })
-      .in('id', failedPages.map(p => p.id));
-    
-    if (resetError) {
-      console.error('❌ Failed to reset failed pages:', resetError);
-      return 0;
-    } else {
-      console.log(`✅ Reset ${failedPages.length} failed pages for retry`);
-      return failedPages.length;
+    if (pendingPages.length === 0) {
+      console.log('📭 No pending pages found for processing');
+      return { success: true, processed: 0, skipped: 0, failed: 0 };
     }
-  }
 
-  return 0;
-}
+    console.log(`📋 Found ${pendingPages.length} pages to process concurrently`);
 
-async function processPendingPages(supabaseClient: any) {
-  const { data: pendingPages, error: fetchError } = await supabaseClient
-    .from('source_pages')
-    .select('*')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true })
-    .limit(15);
-
-  if (fetchError) {
-    throw new Error(`Failed to fetch pending pages: ${fetchError.message}`);
-  }
-
-  if (!pendingPages || pendingPages.length === 0) {
+    // Process pages in concurrent batches
+    const results = await this.processPagesInBatches(pendingPages);
+    
+    // Aggregate parent status after processing
+    await this.aggregateParentStatus(parentSourceId);
+    
+    const totalTime = Date.now() - startTime;
+    
+    console.log(`✅ Enhanced concurrent processing completed in ${totalTime}ms:`, results);
+    
     return {
-      processedCount: 0,
-      results: []
+      success: true,
+      ...results,
+      processingTimeMs: totalTime,
+      parentSourceId
     };
   }
 
-  console.log(`📋 Auto-processing ${pendingPages.length} pending pages...`);
+  private async processPagesInBatches(pages: any[]): Promise<any> {
+    const results = {
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      skipped: 0
+    };
 
-  const results = [];
-  
-  for (const page of pendingPages) {
-    try {
-      console.log(`🚀 Auto-processing page: ${page.url} (ID: ${page.id})`);
-      
-      // Mark as in_progress before processing
-      await supabaseClient
-        .from('source_pages')
-        .update({ 
-          status: 'in_progress',
-          started_at: new Date().toISOString()
-        })
-        .eq('id', page.id);
-      
-      console.log(`📞 Invoking child-job-processor for page ${page.id}`);
-      const { data: processingResult, error: processingError } = await supabaseClient
-        .functions.invoke('child-job-processor', {
-          body: { childJobId: page.id }
-        });
+    // Create batches for concurrent processing
+    const batches = [];
+    for (let i = 0; i < pages.length; i += this.maxConcurrentJobs) {
+      batches.push(pages.slice(i, i + this.maxConcurrentJobs));
+    }
 
-      console.log(`📋 Processing result for page ${page.id}:`, {
-        data: processingResult,
-        error: processingError,
-        success: !processingError
+    // Process each batch concurrently
+    for (const batch of batches) {
+      console.log(`🔄 Processing batch of ${batch.length} pages`);
+      
+      const batchPromises = batch.map(page => 
+        this.processPageWithTimeout(page)
+      );
+
+      const batchResults = await Promise.allSettled(batchPromises);
+
+      // Aggregate batch results
+      batchResults.forEach((result, index) => {
+        results.processed++;
+        
+        if (result.status === 'fulfilled') {
+          const pageResult = result.value;
+          if (pageResult.success) {
+            if (pageResult.skipped) {
+              results.skipped++;
+            } else {
+              results.successful++;
+            }
+          } else {
+            results.failed++;
+          }
+        } else {
+          results.failed++;
+          console.error(`❌ Page ${batch[index].id} processing failed:`, result.reason);
+        }
       });
 
-      // Handle the response (409s are now returned as 200s with skipped flag)
-      if (processingError) {
-        // For actual errors (5xx, network issues, etc), increment retry count
-        const newRetryCount = (page.retry_count || 0) + 1;
-        const shouldRetry = newRetryCount < 3;
-        
-        console.error(`❌ Actual error processing page ${page.id}: ${processingError.message}`);
-        
-        await supabaseClient
-          .from('source_pages')
-          .update({
-            status: shouldRetry ? 'pending' : 'failed',
-            error_message: processingError.message,
-            completed_at: shouldRetry ? null : new Date().toISOString(),
-            retry_count: newRetryCount,
-            started_at: null
-          })
-          .eq('id', page.id);
-        
-        results.push({
-          pageId: page.id,
-          url: page.url,
-          success: false,
-          error: processingError.message,
-          autoRetried: shouldRetry,
-          retryCount: newRetryCount
-        });
+      console.log(`✅ Batch completed: ${batch.length} pages processed`);
+      
+      // Brief pause between batches to prevent overwhelming
+      if (batches.indexOf(batch) < batches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    return results;
+  }
+
+  private async processPageWithTimeout(page: any): Promise<any> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Page processing timeout')), this.processingTimeoutMs);
+    });
+
+    const processingPromise = this.processPageJob(page);
+
+    try {
+      return await Promise.race([processingPromise, timeoutPromise]);
+    } catch (error) {
+      console.error(`❌ Page ${page.id} processing failed:`, error);
+      return { success: false, error: error.message, pageId: page.id };
+    }
+  }
+
+  private async processPageJob(page: any): Promise<any> {
+    try {
+      console.log(`🚀 Processing page: ${page.url} (ID: ${page.id})`);
+
+      // Call the enhanced child-job-processor
+      const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/child-job-processor`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({ childJobId: page.id })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      console.log(`📋 Processing result for page ${page.id}:`, {
+        data: result,
+        error: null,
+        success: response.ok
+      });
+
+      if (result.skipped) {
+        console.log(`✅ Page ${page.id} was already processed by another worker (skipped)`);
+        return { success: true, skipped: true, pageId: page.id };
+      }
+
+      if (result.success) {
+        return { success: true, skipped: false, pageId: page.id, result };
       } else {
-        // Handle successful responses (including skipped jobs)
-        if (processingResult?.skipped) {
-          console.log(`✅ Page ${page.id} was already processed by another worker (skipped)`);
-          
-          // Ensure it's marked as completed
-          await supabaseClient
-            .from('source_pages')
-            .update({
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-              error_message: null,
-              processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
-            })
-            .eq('id', page.id);
-        } else {
-          console.log(`✅ Successfully processed page ${page.id}`);
-          
-          // Verify the status was updated correctly
-          const { data: updatedPage } = await supabaseClient
-            .from('source_pages')
-            .select('status, completed_at')
-            .eq('id', page.id)
-            .single();
-          
-          if (updatedPage?.status !== 'completed') {
-            console.log(`⚠️ Page ${page.id} not marked as completed, updating status`);
-            await supabaseClient
-              .from('source_pages')
-              .update({
-                status: 'completed',
-                completed_at: new Date().toISOString(),
-                processing_time_ms: Date.now() - new Date(page.started_at || page.created_at).getTime()
-              })
-              .eq('id', page.id);
-          }
-        }
-        
-        results.push({
-          pageId: page.id,
-          url: page.url,
-          success: true,
-          result: processingResult,
-          wasSkipped: processingResult?.skipped || false
-        });
+        console.error(`❌ Page ${page.id} processing failed:`, result.error);
+        return { success: false, error: result.error, pageId: page.id };
+      }
+
+    } catch (error) {
+      console.error(`❌ Error processing page ${page.id}:`, error);
+      return { success: false, error: error.message, pageId: page.id };
+    }
+  }
+
+  private async aggregateParentStatus(parentSourceId: string): Promise<void> {
+    try {
+      console.log(`🔄 Triggering parent status aggregation for ${parentSourceId}`);
+      
+      const { error } = await this.supabase.rpc('aggregate_parent_status', {
+        parent_id: parentSourceId
+      });
+
+      if (error) {
+        console.error('❌ Failed to aggregate parent status:', error);
+      } else {
+        console.log(`✅ Aggregated status for parent: ${parentSourceId}`);
       }
     } catch (error) {
-      // Handle exceptions (should not occur for claiming conflicts anymore)
-      const newRetryCount = (page.retry_count || 0) + 1;
-      const shouldRetry = newRetryCount < 3;
-      
-      console.error(`❌ Exception processing page ${page.id}: ${error.message}`);
-      
-      await supabaseClient
-        .from('source_pages')
-        .update({
-          status: shouldRetry ? 'pending' : 'failed',
-          error_message: error.message,
-          completed_at: shouldRetry ? null : new Date().toISOString(),
-          retry_count: newRetryCount,
-          started_at: null
-        })
-        .eq('id', page.id);
-      
-      results.push({
-        pageId: page.id,
-        url: page.url,
-        success: false,
-        error: error.message,
-        autoRetried: shouldRetry,
-        retryCount: newRetryCount
-      });
+      console.error('❌ Error in parent status aggregation:', error);
     }
   }
-
-  // ENHANCED: Force parent status aggregation for all affected parents
-  const parentIds = [...new Set(pendingPages.map(p => p.parent_source_id).filter(Boolean))];
-  console.log(`🔄 Triggering parent status aggregation for ${parentIds.length} parents`);
-  
-  for (const parentId of parentIds) {
-    try {
-      await supabaseClient.rpc('aggregate_parent_status', { parent_id: parentId });
-      console.log(`✅ Aggregated status for parent: ${parentId}`);
-    } catch (error) {
-      console.error(`❌ Failed to aggregate parent ${parentId}:`, error);
-    }
-  }
-
-  return {
-    processedCount: pendingPages.length,
-    results,
-    affectedParents: parentIds.length
-  };
 }
 
 serve(async (req) => {
@@ -245,103 +202,45 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = getSupabaseClient();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('🔄 Starting automatic source pages processing...');
+    const { parentSourceId, maxConcurrentJobs = 5 } = await req.json();
 
-    // Auto-recovery first
-    const autoRecoveredCount = await autoRecoverStuckPages(supabaseClient);
-    
-    // Reset failed pages for retry
-    const resetFailedCount = await resetFailedPages(supabaseClient);
-
-    // Process pending pages
-    const processingResults = await processPendingPages(supabaseClient);
-
-    if (processingResults.processedCount === 0 && autoRecoveredCount === 0 && resetFailedCount === 0) {
-      console.log('📭 No pending source pages to process');
-      
-      // Check for missing chunks even if no pending pages
-      try {
-        const { data: missingChunksResult } = await supabaseClient
-          .functions.invoke('generate-missing-chunks');
-        
-        if (missingChunksResult?.processedCount > 0) {
-          console.log(`✅ Generated chunks for ${missingChunksResult.processedCount} completed pages`);
-        }
-      } catch (chunksError) {
-        console.error('❌ Failed to generate missing chunks:', chunksError);
-      }
-      
+    if (!parentSourceId) {
       return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No pending pages to process',
-          processedCount: 0,
-          autoRecoveredCount,
-          resetFailedCount
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
+        JSON.stringify({ success: false, error: 'parentSourceId is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    const successCount = processingResults.results.filter(r => r.success).length;
-    const failedCount = processingResults.results.filter(r => !r.success).length;
-    const autoRetriedCount = processingResults.results.filter(r => r.autoRetried).length;
-    const skippedCount = processingResults.results.filter(r => r.wasSkipped).length;
-    const totalChunksCreated = processingResults.results.reduce((sum, r) => sum + (r.result?.chunksCreated || 0), 0);
+    console.log(`📨 Enhanced processing request for parent: ${parentSourceId}`);
 
-    console.log(`📊 Processing complete: ${successCount} successful (${skippedCount} skipped), ${failedCount} failed, ${autoRetriedCount} auto-retried, ${totalChunksCreated} chunks created`);
+    // Initialize enhanced job processor
+    const processor = new EnhancedJobProcessor(supabase, maxConcurrentJobs, 60000);
+    
+    // Process jobs concurrently
+    const result = await processor.processConcurrentJobs(parentSourceId);
 
-    // Check for missing chunks after processing
-    if (successCount > 0) {
-      console.log('🔍 Checking for any remaining completed pages without chunks...');
-      try {
-        const { data: missingChunksResult } = await supabaseClient
-          .functions.invoke('generate-missing-chunks');
-        
-        if (missingChunksResult?.processedCount > 0) {
-          console.log(`✅ Additionally generated chunks for ${missingChunksResult.processedCount} completed pages`);
-        }
-      } catch (chunksError) {
-        console.error('❌ Failed to generate missing chunks:', chunksError);
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        processedCount: processingResults.processedCount,
-        successCount,
-        failedCount,
-        autoRetriedCount,
-        skippedCount,
-        autoRecoveredCount,
-        resetFailedCount,
-        totalChunksCreated,
-        results: processingResults.results,
-        affectedParents: processingResults.affectedParents
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    // Check for any remaining completed pages without chunks
+    console.log('🔍 Checking for any remaining completed pages without chunks...');
+    
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
-    console.error('❌ Auto-processing error:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+    console.error('❌ Enhanced processing error:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
+
+// Import createClient properly
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';

@@ -6,6 +6,9 @@ import SourcesMainContent from "@/components/sources/SourcesMainContent";
 import { useTabNavigation } from "@/components/sources/hooks/useTabNavigation";
 import { useWorkflowSystem } from "@/hooks/useWorkflowSystem";
 import { useWorkflowRealtime } from "@/hooks/useWorkflowRealtime";
+import { CrawlSystemManager } from "@/services/rag/enhanced/crawlSystemManager";
+import { JobRecoveryService } from "@/services/rag/enhanced/jobRecoveryService";
+import { JobAutomationService } from "@/services/rag/enhanced/jobAutomationService";
 
 const SourcesPage: React.FC = () => {
   const { getTabTitle } = useTabNavigation();
@@ -15,13 +18,50 @@ const SourcesPage: React.FC = () => {
   useWorkflowRealtime();
 
   useEffect(() => {
-    if (isInitialized) {
-      console.log('✅ Workflow system ready for Sources page');
+    let isComponentMounted = true;
+
+    const initializeEnhancedCrawlSystem = async () => {
+      try {
+        console.log('🚀 Initializing enhanced crawl system...');
+        
+        // Initialize the enhanced crawl system
+        await CrawlSystemManager.initialize();
+        
+        // Perform initial recovery of stuck jobs
+        if (isComponentMounted) {
+          console.log('🔧 Running initial job recovery...');
+          await JobRecoveryService.recoverStalledJobs();
+        }
+        
+        // Start automated job recovery and monitoring
+        if (isComponentMounted) {
+          console.log('🤖 Starting job automation service...');
+          JobAutomationService.startAutomation();
+        }
+        
+        if (isComponentMounted) {
+          console.log('✅ Enhanced crawl system with automation initialized successfully');
+        }
+      } catch (error) {
+        console.error('❌ Failed to initialize enhanced crawl system:', error);
+      }
+    };
+
+    if (isInitialized && !isInitializing) {
+      initializeEnhancedCrawlSystem();
     }
-    if (error) {
-      console.error('❌ Workflow system error:', error);
-    }
-  }, [isInitialized, error]);
+
+    // Cleanup function
+    return () => {
+      isComponentMounted = false;
+      JobAutomationService.stopAutomation();
+      CrawlSystemManager.shutdown();
+    };
+  }, [isInitialized, isInitializing]);
+
+  if (error) {
+    console.error('❌ Workflow system error:', error);
+  }
 
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Sources" showPageTitle={false}>
