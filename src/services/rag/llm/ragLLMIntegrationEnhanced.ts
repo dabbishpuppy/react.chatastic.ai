@@ -1,167 +1,144 @@
-
-import { MultiProviderLLMService, LLMRequest } from './multiProviderLLMService';
+import { LLMRouter } from './llmRouter';
+import { RAGQueryOptions, RAGQueryResult } from './llmTypes';
+import { VectorStore } from '../vectorstore/vectorStore';
+import { Metadata } from '../vectorstore/vectorStoreTypes';
+import { OpenAI } from 'openai';
+import { getMatchesFromEmbeddings } from '../utils';
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { SupabaseVectorStore } from 'langchain/vectorstores/supabase';
 import { supabase } from '@/integrations/supabase/client';
+import { Embeddings } from 'langchain/embeddings/base';
+import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { v4 as uuidv4 } from 'uuid';
+import { Document } from 'langchain/document';
+import { UsageTracker } from '../costMonitoring/usageTracker';
 
-interface LLMConfig {
-  model?: string;
-  temperature?: number;
-  systemPrompt?: string;
-}
+export class EnhancedRAGLLMIntegration {
+  private llmRouter: LLMRouter;
+  private vectorStore: VectorStore;
+  private embeddings: Embeddings;
 
-// Helper function to check if an ID is a valid UUID
-function isValidUUID(uuid: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
-}
-
-export class RAGLLMIntegrationEnhanced {
-  static async processQuery(
-    agentId: string,
-    userQuery: string,
-    context: string[]
-  ): Promise<string> {
-    try {
-      // For testing purposes, handle test agent IDs or invalid UUIDs
-      if (agentId === 'test-agent-id' || !isValidUUID(agentId)) {
-        return await this.processQueryWithConfig(agentId, userQuery, context, {
-          model: 'gpt-4o-mini',
-          temperature: 0.7,
-          systemPrompt: 'You are a helpful AI assistant.'
-        });
-      }
-
-      // Get agent's AI configuration
-      const { data: agent, error } = await supabase
-        .from('agents')
-        .select('ai_model, ai_instructions, ai_temperature')
-        .eq('id', agentId)
-        .single();
-
-      if (error || !agent) {
-        console.log('⚠️ Agent configuration not found, using defaults');
-        // Use default configuration instead of throwing error
-        return await this.processQueryWithConfig(agentId, userQuery, context, {
-          model: 'gpt-4o-mini',
-          temperature: 0.7,
-          systemPrompt: 'You are a helpful AI assistant.'
-        });
-      }
-
-      return await this.processQueryWithConfig(agentId, userQuery, context, {
-        model: agent.ai_model,
-        temperature: agent.ai_temperature,
-        systemPrompt: agent.ai_instructions
-      });
-    } catch (error) {
-      console.error('Error in RAG LLM Integration:', error);
-      // Return a fallback response instead of throwing
-      return 'I apologize, but I encountered an error while processing your request. Please try again.';
-    }
+  constructor(llmRouter: LLMRouter, vectorStore: VectorStore, embeddings?: Embeddings) {
+    this.llmRouter = llmRouter;
+    this.vectorStore = vectorStore;
+    this.embeddings = embeddings || new OpenAIEmbeddings({
+      openAIApiKey: process.env.OPENAI_API_KEY,
+    });
   }
 
-  static async processQueryWithConfig(
+  async processQuery(
+    query: string,
+    context: string,
     agentId: string,
-    userQuery: string,
-    context: string[],
-    config: LLMConfig
-  ): Promise<string> {
+    options: RAGQueryOptions = {}
+  ): Promise<RAGQueryResult> {
     try {
-      console.log('🤖 Processing query with specific model configuration:', {
-        model: config.model,
-        temperature: config.temperature,
-        hasSystemPrompt: !!config.systemPrompt,
-        contextChunks: context.length
+      const startTime = Date.now();
+      
+      // Preprocessing and setup
+      const cleanedQuery = query.trim().replaceAll('\n', ' ');
+      const metadata: Metadata = {
+        agentId: agentId,
+        query: cleanedQuery,
+        timestamp: new Date().toISOString(),
+        options: options
+      };
+
+      const response = await this.llmRouter.processQuery(query, context, {
+        ...options,
+        agentId,
+        trackUsage: true // Enable usage tracking
       });
 
-      // Prepare the context string
-      const contextString = context.length > 0
-        ? `Context information:\n${context.join('\n\n')}\n\n`
-        : '';
-
-      // Build the messages array with agent's instructions
-      const messages = [
-        {
-          role: 'system' as const,
-          content: config.systemPrompt || 'You are a helpful AI assistant. Use the provided context to answer questions accurately.'
-        },
-        {
-          role: 'user' as const,
-          content: `${contextString}User question: ${userQuery}`
+      // Track token usage after successful LLM call
+      if (response.usage) {
+        try {
+          await UsageTracker.trackTokenUsage({
+            teamId: options.teamId || 'default-team',
+            agentId: agentId,
+            provider: response.provider || 'openai',
+            model: response.model || 'gpt-4o-mini',
+            inputTokens: response.usage.prompt_tokens || 0,
+            outputTokens: response.usage.completion_tokens || 0
+          });
+        } catch (error) {
+          console.error('❌ Failed to track usage:', error);
         }
-      ];
+      }
 
-      // Create LLM request with agent's configuration
-      const request: LLMRequest = {
-        model: config.model || 'gpt-4o-mini',
-        messages,
-        temperature: config.temperature || 0.7,
-        max_tokens: 1000
+      // Response processing and return
+      const endTime = Date.now();
+      const processingTime = endTime - startTime;
+      const result: RAGQueryResult = {
+        ...response,
+        metadata: metadata,
+        processingTime: processingTime,
+        query: cleanedQuery,
+        context: context
       };
 
-      console.log('📡 Calling LLM with configuration:', {
-        model: request.model,
-        temperature: request.temperature,
-        messageCount: request.messages.length
-      });
+      return result;
 
-      // Call the appropriate LLM provider
-      try {
-        const response = await MultiProviderLLMService.callLLM(request);
-
-        console.log('✅ LLM response received:', {
-          model: request.model,
-          responseLength: response.content.length,
-          tokensUsed: response.usage?.total_tokens || 0
-        });
-
-        return response.content;
-      } catch (llmError) {
-        console.error('❌ LLM call failed:', llmError);
-        // Return a helpful fallback response
-        return `I'm having trouble processing your request right now. However, based on your question "${userQuery}", I'd be happy to help once the system is fully operational.`;
-      }
     } catch (error) {
-      console.error('❌ Error in processQueryWithConfig:', error);
-      return 'I apologize, but I encountered an error while processing your request. Please try again.';
+      console.error('❌ Error in EnhancedRAGLLMIntegration.processQuery:', error);
+      throw error;
     }
   }
 
-  static async getAgentConfiguration(agentId: string) {
-    if (agentId === 'test-agent-id' || !isValidUUID(agentId)) {
-      return {
-        ai_model: 'gpt-4o-mini',
-        ai_instructions: 'You are a helpful AI assistant.',
-        ai_temperature: 0.7,
-        ai_prompt_template: null
-      };
-    }
-
+  async generateEmbeddings(text: string): Promise<number[]> {
     try {
-      const { data, error } = await supabase
-        .from('agents')
-        .select('ai_model, ai_instructions, ai_temperature, ai_prompt_template')
-        .eq('id', agentId)
-        .single();
+      if (!text) {
+        throw new Error('Text cannot be empty for generating embeddings.');
+      }
+      
+      const result = await this.embeddings.embedQuery(text);
+      return result;
+    } catch (error) {
+      console.error('❌ Error generating embeddings:', error);
+      throw error;
+    }
+  }
 
-      if (error) {
-        console.warn('Failed to load agent AI configuration, using defaults:', error);
-        return {
-          ai_model: 'gpt-4o-mini',
-          ai_instructions: 'You are a helpful AI assistant.',
-          ai_temperature: 0.7,
-          ai_prompt_template: null
-        };
+  async findRelevantDocs(query: string, k: number = 3, filter: object | undefined = undefined): Promise<Document[]> {
+    try {
+      if (!query) {
+        throw new Error('Query cannot be empty for finding relevant docs.');
       }
 
-      return data;
+      const queryEmbedding = await this.generateEmbeddings(query);
+      const matches = await this.vectorStore.similaritySearchVectorWithScore(queryEmbedding, k, filter);
+
+      return matches.map((match) => match.pageContent);
     } catch (error) {
-      console.error('Error loading agent configuration:', error);
-      return {
-        ai_model: 'gpt-4o-mini',
-        ai_instructions: 'You are a helpful AI assistant.',
-        ai_temperature: 0.7,
-        ai_prompt_template: null
-      };
+      console.error('❌ Error finding relevant docs:', error);
+      throw error;
+    }
+  }
+
+  async ingestData(content: string, metadata: Metadata): Promise<string[]> {
+    try {
+      if (!content) {
+        throw new Error('Content cannot be empty for data ingestion.');
+      }
+
+      const textSplitter = new RecursiveCharacterTextSplitter({
+        chunkSize: 1000,
+        chunkOverlap: 200,
+      });
+      const docs = await textSplitter.splitText(content);
+
+      const ingestionPromises = docs.map(async (doc) => {
+        const uuid = uuidv4();
+        const embedding = await this.generateEmbeddings(doc);
+        await this.vectorStore.addDocument(uuid, doc, embedding, metadata);
+        return uuid;
+      });
+
+      const ids = await Promise.all(ingestionPromises);
+      return ids;
+    } catch (error) {
+      console.error('❌ Error ingesting data:', error);
+      throw error;
     }
   }
 }

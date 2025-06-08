@@ -1,67 +1,153 @@
+import { LLMProvider } from "@/types";
+import { UsageTracker } from '../costMonitoring/usageTracker';
 
-import { supabase } from '@/integrations/supabase/client';
-
-export interface LLMRequest {
-  model: string;
-  messages: Array<{
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-  }>;
-  temperature?: number;
-  max_tokens?: number;
+interface LLMService {
+  call(prompt: string, options?: any): Promise<any>;
 }
 
-export interface LLMResponse {
-  content: string;
-  usage?: {
+interface OpenAIResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  choices: {
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+    index: number;
+  }[];
+  usage: {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
   };
 }
 
+interface ClaudeResponse {
+  id: string;
+  type: string;
+  role: string;
+  content: {
+      type: string;
+      text: string;
+  }[];
+  model: string;
+  stop_reason: string;
+  stop_sequence: null;
+  usage: {
+      input_tokens: number;
+      output_tokens: number;
+  };
+}
+
 export class MultiProviderLLMService {
-  static async callLLM(request: LLMRequest): Promise<LLMResponse> {
+  async callOpenAI(prompt: string, options: any = {}): Promise<any> {
     try {
-      // Determine provider from model name
-      const provider = this.getProviderFromModel(request.model);
-      
-      // Call the appropriate edge function based on provider
-      const { data, error } = await supabase.functions.invoke(`llm-${provider}`, {
-        body: request
+      const model = options.model || 'gpt-4o-mini';
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: options.model || 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: options.temperature || 0.7,
+          max_tokens: options.maxTokens || 1000,
+        }),
       });
 
-      if (error) {
-        console.error(`Error calling ${provider} LLM:`, error);
-        throw new Error(`LLM API error: ${error.message}`);
+      const data = await response.json();
+
+      // Track usage for OpenAI calls
+      if (data.usage && options.agentId) {
+        try {
+          await UsageTracker.trackTokenUsage({
+            teamId: options.teamId || 'default-team',
+            agentId: options.agentId,
+            provider: 'openai',
+            model: options.model || 'gpt-4o-mini',
+            inputTokens: data.usage.prompt_tokens || 0,
+            outputTokens: data.usage.completion_tokens || 0
+          });
+        } catch (error) {
+          console.error('❌ Failed to track OpenAI usage:', error);
+        }
       }
 
-      return data;
+      return {
+        content: data.choices[0]?.message?.content || '',
+        usage: data.usage,
+        provider: 'openai',
+        model: options.model || 'gpt-4o-mini'
+      };
+
     } catch (error) {
-      console.error('Error in MultiProviderLLMService:', error);
+      console.error('❌ OpenAI API call failed:', error);
       throw error;
     }
   }
 
-  static getProviderFromModel(model: string): string {
-    if (model.startsWith('gpt-')) return 'openai';
-    if (model.startsWith('claude-')) return 'anthropic';
-    if (model.startsWith('gemini-')) return 'google';
-    
-    // Default to OpenAI
-    return 'openai';
+  async callClaude(prompt: string, options: any = {}): Promise<any> {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: options.model || 'claude-3-5-sonnet-20241022',
+          max_tokens: options.maxTokens || 1000,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: options.temperature || 0.7,
+        }),
+      });
+
+      const data = await response.json();
+
+      // Track usage for Claude calls
+      if (data.usage && options.agentId) {
+        try {
+          await UsageTracker.trackTokenUsage({
+            teamId: options.teamId || 'default-team',
+            agentId: options.agentId,
+            provider: 'claude',
+            model: options.model || 'claude-3-5-sonnet-20241022',
+            inputTokens: data.usage.input_tokens || 0,
+            outputTokens: data.usage.output_tokens || 0
+          });
+        } catch (error) {
+          console.error('❌ Failed to track Claude usage:', error);
+        }
+      }
+
+      return {
+        content: data.content[0]?.text || '',
+        usage: data.usage,
+        provider: 'claude',
+        model: options.model || 'claude-3-5-sonnet-20241022'
+      };
+
+    } catch (error) {
+      console.error('❌ Anthropic API call failed:', error);
+      throw error;
+    }
   }
 
-  static getSupportedModels() {
-    return [
-      { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
-      { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
-      { value: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "OpenAI" },
-      { value: "claude-3-haiku", label: "Claude 3 Haiku", provider: "Anthropic" },
-      { value: "claude-3-sonnet", label: "Claude 3 Sonnet", provider: "Anthropic" },
-      { value: "claude-3-opus", label: "Claude 3 Opus", provider: "Anthropic" },
-      { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash", provider: "Google" },
-      { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro", provider: "Google" }
-    ];
+  async callGemini(prompt: string, options: any = {}): Promise<any> {
+    try {
+      // Gemini API call implementation
+      console.warn('⚠️ Gemini API is not implemented yet');
+      return { content: 'Gemini API is not implemented yet', provider: 'gemini' };
+    } catch (error) {
+      console.error('❌ Gemini API call failed:', error);
+      throw error;
+    }
   }
 }
