@@ -85,3 +85,4 @@ export class ClaimingStatsManager {
       failedJobs: 0
     };
   }
+}

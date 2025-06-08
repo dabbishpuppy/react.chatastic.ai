@@ -85,3 +85,4 @@ export class JobProcessingOrchestrator {
     console.log(`✅ Atomic processing completed:`, stats);
     return stats;
   }
+}

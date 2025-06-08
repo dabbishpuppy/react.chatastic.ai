@@ -107,3 +107,4 @@ export class JobClaimingCore {
       return [];
     }
   }
+}

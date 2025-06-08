@@ -42,3 +42,4 @@ export class JobStatusManager {
       console.log(`💀 Job ${jobId} marked as failed: ${errorMessage}`);
     }
   }
+}
