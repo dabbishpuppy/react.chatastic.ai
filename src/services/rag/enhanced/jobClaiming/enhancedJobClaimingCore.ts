@@ -82,7 +82,7 @@ export class EnhancedJobClaimingCore {
             status: 'processing',
             started_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            attempts: supabase.rpc('increment_retry_count', { job_ids: [jobId] })
+            attempts: 1 // Simple increment since we don't have RPC
           })
           .eq('id', jobId)
           .eq('status', 'pending') // Critical: only claim if still pending
