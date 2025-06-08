@@ -3,21 +3,32 @@ export class DataFetcher {
   static async fetchParentSource(supabaseClient: any, parentSourceId: string) {
     console.log(`🚀 Fetching parent source: ${parentSourceId}`);
     
-    // Validate parentSourceId
-    if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
+    // Enhanced validation for parentSourceId
+    if (!parentSourceId || 
+        parentSourceId === 'undefined' || 
+        parentSourceId === 'null' || 
+        parentSourceId.trim() === '' ||
+        parentSourceId === 'Invalid') {
       console.error('❌ Invalid parentSourceId provided:', parentSourceId);
-      throw new Error('Invalid parent source ID');
+      throw new Error(`Invalid parent source ID: ${parentSourceId}`);
+    }
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(parentSourceId)) {
+      console.error('❌ Invalid UUID format for parentSourceId:', parentSourceId);
+      throw new Error(`Invalid UUID format for parent source ID: ${parentSourceId}`);
     }
     
     const { data: parentSource, error: parentError } = await supabaseClient
       .from('agent_sources')
       .select('crawl_status, metadata, updated_at')
       .eq('id', parentSourceId)
-      .maybeSingle(); // Use maybeSingle instead of single to handle no results gracefully
+      .maybeSingle();
 
     if (parentError) {
-      console.error('❌ Error fetching parent source:', parentError);
-      throw parentError;
+      console.error('❌ Database error fetching parent source:', parentError);
+      throw new Error(`Database error: ${parentError.message}`);
     }
 
     if (!parentSource) {
@@ -32,10 +43,13 @@ export class DataFetcher {
   static async fetchSourcePages(supabaseClient: any, parentSourceId: string) {
     console.log(`🚀 Fetching source pages for parent: ${parentSourceId}`);
     
-    // Validate parentSourceId
-    if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
+    // Enhanced validation for parentSourceId
+    if (!parentSourceId || 
+        parentSourceId === 'undefined' || 
+        parentSourceId === 'null' || 
+        parentSourceId.trim() === '') {
       console.error('❌ Invalid parentSourceId provided for pages:', parentSourceId);
-      throw new Error('Invalid parent source ID for pages fetch');
+      throw new Error(`Invalid parent source ID for pages fetch: ${parentSourceId}`);
     }
     
     const { data: pages, error: pagesError } = await supabaseClient
@@ -45,10 +59,13 @@ export class DataFetcher {
 
     if (pagesError) {
       console.error('❌ Error fetching source pages:', pagesError);
-      throw pagesError;
+      throw new Error(`Pages fetch error: ${pagesError.message}`);
     }
 
     // Return empty array if no pages found (this is valid)
+    const pageCount = pages?.length || 0;
+    console.log(`📄 Found ${pageCount} source pages for parent: ${parentSourceId}`);
+    
     return pages || [];
   }
 }

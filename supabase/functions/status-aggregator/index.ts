@@ -26,11 +26,19 @@ serve(async (req) => {
     const { parentSourceId, eventType } = await req.json();
     console.log(`📊 Status aggregator triggered for parent: ${parentSourceId}, event: ${eventType}`);
 
-    // Validate input
-    if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
-      console.error('❌ Invalid parentSourceId in request:', parentSourceId);
+    // Enhanced validation for input
+    if (!parentSourceId || 
+        parentSourceId === 'undefined' || 
+        parentSourceId === 'null' || 
+        typeof parentSourceId !== 'string' ||
+        parentSourceId.trim() === '') {
+      console.error('❌ Invalid or missing parentSourceId in request:', parentSourceId);
       return new Response(
-        JSON.stringify({ error: 'Invalid parent source ID provided' }),
+        JSON.stringify({ 
+          error: 'Invalid parent source ID provided',
+          received: parentSourceId,
+          type: typeof parentSourceId
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -38,20 +46,54 @@ serve(async (req) => {
       );
     }
 
-    // Fetch data with proper error handling
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(parentSourceId)) {
+      console.error('❌ Invalid UUID format for parentSourceId:', parentSourceId);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid UUID format for parent source ID',
+          received: parentSourceId
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
+    // Fetch data with enhanced error handling
     let parentSource, pages;
     
     try {
       parentSource = await DataFetcher.fetchParentSource(supabaseClient, parentSourceId);
     } catch (error) {
       console.error('❌ Failed to fetch parent source:', error);
-      return new Response(
-        JSON.stringify({ error: `Failed to fetch parent source: ${error.message}` }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 404,
-        }
-      );
+      
+      // Check if it's a "not found" error vs other database errors
+      if (error.message?.includes('not found')) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Parent source not found: ${parentSourceId}`,
+            suggestion: 'This source may have been deleted or the ID is incorrect'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            error: `Database error while fetching parent source: ${error.message}`,
+            parentSourceId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
+      }
     }
 
     try {
@@ -59,7 +101,10 @@ serve(async (req) => {
     } catch (error) {
       console.error('❌ Failed to fetch source pages:', error);
       return new Response(
-        JSON.stringify({ error: `Failed to fetch source pages: ${error.message}` }),
+        JSON.stringify({ 
+          error: `Failed to fetch source pages: ${error.message}`,
+          parentSourceId
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -123,7 +168,10 @@ serve(async (req) => {
     if (updateError) {
       console.error('❌ Error updating parent source:', updateError);
       return new Response(
-        JSON.stringify({ error: `Failed to update parent source: ${updateError.message}` }),
+        JSON.stringify({ 
+          error: `Failed to update parent source: ${updateError.message}`,
+          parentSourceId
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500,
@@ -173,11 +221,13 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Error in status aggregator:', error);
+    console.error('❌ Unexpected error in status aggregator:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Unknown error occurred',
-        stack: error.stack 
+        error: 'Internal server error in status aggregator',
+        details: error.message || 'Unknown error occurred',
+        stack: error.stack,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': "application/json" },
