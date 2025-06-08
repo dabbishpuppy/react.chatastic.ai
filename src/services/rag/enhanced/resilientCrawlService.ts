@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { CircuitBreaker } from './circuitBreaker';
 import { AtomicJobClaiming } from './atomicJobClaiming';
@@ -163,11 +162,12 @@ export class ResilientCrawlService {
           throw error;
         }
 
-        // Create a single source page and background job
+        // Create a single source page and background job with proper customer_id
         const { data: page, error: pageError } = await supabase
           .from('source_pages')
           .insert({
             parent_source_id: source.id,
+            customer_id: teamId, // Use teamId as customer_id
             url: url,
             status: 'pending'
           })
