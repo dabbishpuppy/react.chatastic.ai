@@ -140,7 +140,7 @@ const AgentSettingsPage: React.FC = () => {
         {/* Settings content */}
         <div className="bg-white rounded-lg p-6">
           <Routes>
-            <Route path="/" element={<Navigate to="general" replace />} />
+            <Route index element={<Navigate to="general" replace />} />
             <Route path="general" element={<GeneralSettings />} />
             <Route path="ai" element={<AISettings />} />
             <Route path="chat-interface" element={<ChatInterfaceSettings />} />
