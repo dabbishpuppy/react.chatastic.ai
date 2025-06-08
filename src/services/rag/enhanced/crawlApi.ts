@@ -87,8 +87,20 @@ export class CrawlApiService {
         inProgress: pages?.filter(p => p.status === 'in_progress').length || 0
       };
 
+      // Ensure status matches the expected union type
+      const normalizeStatus = (status: string): "pending" | "in_progress" | "completed" | "failed" => {
+        switch (status) {
+          case 'completed':
+          case 'in_progress':
+          case 'failed':
+            return status;
+          default:
+            return 'pending';
+        }
+      };
+
       return {
-        status: source.crawl_status || 'pending',
+        status: normalizeStatus(source.crawl_status || 'pending'),
         progress: source.progress || 0,
         totalJobs: pageStats.total,
         completedJobs: pageStats.completed,
@@ -101,7 +113,7 @@ export class CrawlApiService {
     } catch (error: any) {
       console.error('❌ Fallback status check failed:', error);
       return {
-        status: 'error',
+        status: 'failed',
         progress: 0,
         totalJobs: 0,
         completedJobs: 0,
