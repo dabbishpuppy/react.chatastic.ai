@@ -1,12 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { UsageTracker, type UsageMetrics } from '@/services/rag/costMonitoring/usageTracker';
-import { DollarSign, Zap, AlertTriangle, TrendingUp, Filter } from 'lucide-react';
+import { OpenAIUsageComparison } from './OpenAIUsageComparison';
+import { DollarSign, Zap, AlertTriangle, TrendingUp, Filter, Key } from 'lucide-react';
 
 interface CostMonitoringDashboardProps {
   teamId: string;
@@ -23,6 +24,8 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
   const [warnings, setWarnings] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<Provider>('all');
+  const [openAIApiKey, setOpenAIApiKey] = useState<string>('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
   useEffect(() => {
     loadUsageData();
@@ -58,6 +61,12 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
       console.error('❌ Failed to load usage data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApiKeySubmit = () => {
+    if (openAIApiKey.trim()) {
+      setShowApiKeyInput(false);
     }
   };
 
@@ -113,23 +122,53 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
 
   return (
     <div className="space-y-6">
-      {/* Provider Filter */}
+      {/* Provider Filter and OpenAI API Key */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4" />
-          <span className="text-sm font-medium">Filter by Provider:</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            <span className="text-sm font-medium">Filter by Provider:</span>
+          </div>
+          <Select value={selectedProvider} onValueChange={(value: Provider) => setSelectedProvider(value)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select provider" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Providers</SelectItem>
+              <SelectItem value="openai">OpenAI</SelectItem>
+              <SelectItem value="claude">Anthropic (Claude)</SelectItem>
+              <SelectItem value="gemini">Google (Gemini)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={selectedProvider} onValueChange={(value: Provider) => setSelectedProvider(value)}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Select provider" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Providers</SelectItem>
-            <SelectItem value="openai">OpenAI</SelectItem>
-            <SelectItem value="claude">Anthropic (Claude)</SelectItem>
-            <SelectItem value="gemini">Google (Gemini)</SelectItem>
-          </SelectContent>
-        </Select>
+        
+        <div className="flex items-center gap-2">
+          {!openAIApiKey && !showApiKeyInput && (
+            <Button
+              onClick={() => setShowApiKeyInput(true)}
+              variant="outline"
+              size="sm"
+            >
+              <Key className="h-4 w-4 mr-2" />
+              Configure OpenAI API
+            </Button>
+          )}
+          
+          {showApiKeyInput && (
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                placeholder="Enter OpenAI API Key"
+                value={openAIApiKey}
+                onChange={(e) => setOpenAIApiKey(e.target.value)}
+                className="px-3 py-1 border rounded text-sm w-48"
+              />
+              <Button onClick={handleApiKeySubmit} size="sm">
+                Save
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Alerts */}
@@ -144,6 +183,14 @@ export const CostMonitoringDashboard: React.FC<CostMonitoringDashboardProps> = (
             </div>
           </AlertDescription>
         </Alert>
+      )}
+
+      {/* OpenAI Usage Comparison */}
+      {openAIApiKey && selectedProvider === 'openai' && (
+        <OpenAIUsageComparison 
+          teamId={teamId} 
+          apiKey={openAIApiKey}
+        />
       )}
 
       {/* Overview Cards */}
