@@ -1,5 +1,3 @@
-
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TokenUsage {
@@ -45,7 +43,12 @@ export class UsageTracker {
       const cost = this.calculateCost(usage.provider, usage.model, usage.inputTokens, usage.outputTokens);
       
       const tokenUsage: TokenUsage = {
-        ...usage,
+        teamId: usage.teamId,
+        agentId: usage.agentId,
+        provider: usage.provider,
+        model: usage.model,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
         totalCost: cost,
         timestamp: new Date().toISOString()
       };
@@ -262,4 +265,3 @@ export class UsageTracker {
     return { withinLimits, usage, warnings };
   }
 }
-
