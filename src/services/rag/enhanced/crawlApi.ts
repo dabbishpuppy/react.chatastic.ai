@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedCrawlRequest, CrawlStatus } from "./crawlTypes";
 
@@ -57,37 +58,51 @@ export class CrawlApiService {
     try {
       console.log('🔄 Using fallback status check for:', parentSourceId);
       
-      // Get source info
+      // Get source info safely
       const { data: source, error: sourceError } = await supabase
         .from('agent_sources')
         .select('crawl_status, progress, total_jobs, completed_jobs, failed_jobs')
         .eq('id', parentSourceId)
-        .single();
+        .maybeSingle();
 
-      if (sourceError || !source) {
-        throw new Error(`Source not found: ${sourceError?.message}`);
+      if (sourceError) {
+        console.error('Source query error:', sourceError);
+        throw new Error(`Source query failed: ${sourceError.message}`);
       }
 
-      // Get basic page counts
-      const { data: pages, error: pagesError } = await supabase
-        .from('source_pages')
-        .select('status')
-        .eq('parent_source_id', parentSourceId);
+      if (!source) {
+        throw new Error('Source not found');
+      }
 
-      if (pagesError) {
-        console.warn('Could not fetch pages for status check:', pagesError);
+      // Get basic page counts safely
+      let pages = [];
+      try {
+        const { data: pagesData, error: pagesError } = await supabase
+          .from('source_pages')
+          .select('status')
+          .eq('parent_source_id', parentSourceId);
+
+        if (pagesError) {
+          console.warn('Could not fetch pages for status check:', pagesError);
+        } else {
+          pages = pagesData || [];
+        }
+      } catch (error) {
+        console.warn('Error fetching pages:', error);
       }
 
       const pageStats = {
-        total: pages?.length || 0,
-        completed: pages?.filter(p => p.status === 'completed').length || 0,
-        failed: pages?.filter(p => p.status === 'failed').length || 0,
-        pending: pages?.filter(p => p.status === 'pending').length || 0,
-        inProgress: pages?.filter(p => p.status === 'in_progress').length || 0
+        total: pages.length,
+        completed: pages.filter(p => p.status === 'completed').length,
+        failed: pages.filter(p => p.status === 'failed').length,
+        pending: pages.filter(p => p.status === 'pending').length,
+        inProgress: pages.filter(p => p.status === 'in_progress').length
       };
 
       // Ensure status matches the expected union type
-      const normalizeStatus = (status: string): "pending" | "in_progress" | "completed" | "failed" => {
+      const normalizeStatus = (status: string | null): "pending" | "in_progress" | "completed" | "failed" => {
+        if (!status) return 'pending';
+        
         switch (status) {
           case 'completed':
           case 'in_progress':
@@ -99,7 +114,7 @@ export class CrawlApiService {
       };
 
       return {
-        status: normalizeStatus(source.crawl_status || 'pending'),
+        status: normalizeStatus(source.crawl_status),
         progress: source.progress || 0,
         totalJobs: pageStats.total,
         completedJobs: pageStats.completed,

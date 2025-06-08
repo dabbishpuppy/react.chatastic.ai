@@ -1,5 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMaybeSingle } from "@/utils/safeSupabaseQueries";
 
 export interface JobRecoveryMetrics {
   recoveredJobs: number;
@@ -90,11 +91,13 @@ export class JobRecoveryService {
   private static async recoverOrphanedSourcePages(metrics: JobRecoveryMetrics): Promise<void> {
     try {
       // Find source pages that are "pending" but don't have corresponding background jobs
+      const orphanedThreshold = new Date(Date.now() - this.ORPHANED_TIMEOUT_MS).toISOString();
+      
       const { data: pendingPages, error: pagesError } = await supabase
         .from('source_pages')
         .select('id, url, parent_source_id, created_at')
         .eq('status', 'pending')
-        .lt('created_at', new Date(Date.now() - this.ORPHANED_TIMEOUT_MS).toISOString());
+        .lt('created_at', orphanedThreshold);
 
       if (pagesError || !pendingPages) {
         console.error('❌ Error finding orphaned pages:', pagesError);
@@ -159,7 +162,7 @@ export class JobRecoveryService {
   }
 
   /**
-   * Get recovery statistics
+   * Get recovery statistics with proper error handling
    */
   static async getRecoveryStats(): Promise<{
     stalledJobs: number;
@@ -169,20 +172,24 @@ export class JobRecoveryService {
     try {
       const stalledThreshold = new Date(Date.now() - this.STALLED_TIMEOUT_MS).toISOString();
       
+      // Use safe count query
       const { count: stalledCount } = await supabase
         .from('background_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'processing')
         .lt('started_at', stalledThreshold);
 
-      const { data: oldestStalled } = await supabase
-        .from('background_jobs')
-        .select('started_at')
-        .eq('status', 'processing')
-        .lt('started_at', stalledThreshold)
-        .order('started_at', { ascending: true })
-        .limit(1)
-        .single();
+      // Use fetchMaybeSingle for potentially empty results
+      const oldestStalled = await fetchMaybeSingle(
+        supabase
+          .from('background_jobs')
+          .select('started_at')
+          .eq('status', 'processing')
+          .lt('started_at', stalledThreshold)
+          .order('started_at', { ascending: true })
+          .limit(1),
+        'getRecoveryStats'
+      );
 
       return {
         stalledJobs: stalledCount || 0,

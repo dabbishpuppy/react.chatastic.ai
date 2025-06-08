@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { EnhancedJobClaimingCore } from './jobClaiming/enhancedJobClaimingCore';
+import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
 
 export interface ProcessingOptions {
   maxConcurrentJobs?: number;
@@ -181,31 +182,46 @@ export class ConcurrentJobProcessor {
   }
 
   /**
-   * Get processing statistics
+   * Get processing statistics with comprehensive error handling
    */
   static async getProcessingStats(): Promise<ProcessingStats> {
     try {
-      // Get recent job completion rates
+      // Get recent job completion rates with safe queries
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       
-      const { data: recentJobs, error } = await supabase
-        .from('background_jobs')
-        .select('status, created_at, started_at, completed_at')
-        .gte('created_at', oneHourAgo);
+      let recentJobs = [];
+      try {
+        const { data, error } = await supabase
+          .from('background_jobs')
+          .select('status, created_at, started_at, completed_at')
+          .gte('created_at', oneHourAgo);
 
-      if (error) {
-        console.warn('Could not fetch recent jobs for stats:', error);
+        if (error) {
+          console.warn('Could not fetch recent jobs for stats:', error);
+        } else {
+          recentJobs = data || [];
+        }
+      } catch (error) {
+        console.warn('Error fetching recent jobs:', error);
       }
 
-      const completedJobs = recentJobs?.filter(j => j.status === 'completed') || [];
-      const failedJobs = recentJobs?.filter(j => j.status === 'failed') || [];
-      const totalRecentJobs = recentJobs?.length || 0;
+      const completedJobs = recentJobs.filter(j => j.status === 'completed');
+      const failedJobs = recentJobs.filter(j => j.status === 'failed');
+      const totalRecentJobs = recentJobs.length;
 
       let avgProcessingTime = 0;
       if (completedJobs.length > 0) {
         const processingTimes = completedJobs
           .filter(j => j.started_at && j.completed_at)
-          .map(j => new Date(j.completed_at!).getTime() - new Date(j.started_at!).getTime());
+          .map(j => {
+            try {
+              return new Date(j.completed_at!).getTime() - new Date(j.started_at!).getTime();
+            } catch (error) {
+              console.warn('Invalid timestamp in job:', j);
+              return 0;
+            }
+          })
+          .filter(time => time > 0);
         
         if (processingTimes.length > 0) {
           avgProcessingTime = processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length;
