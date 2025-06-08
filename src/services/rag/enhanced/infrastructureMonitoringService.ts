@@ -132,14 +132,11 @@ export class InfrastructureMonitoringService {
 
     // Create alerts for critical issues
     if (health.overallScore < 50) {
-      await AlertingService.createAlert({
-        type: 'performance',
-        severity: 'critical',
-        title: 'Infrastructure Health Critical',
-        message: `Overall infrastructure health score dropped to ${health.overallScore}%`,
-        source: 'infrastructure-monitoring',
-        metadata: { health }
-      });
+      await AlertingService.createAlert(
+        'infrastructure_health_critical',
+        `Overall infrastructure health score dropped to ${health.overallScore}%`,
+        'critical'
+      );
     }
 
     console.log(`🏗️ Infrastructure health: ${health.overallScore}% (${this.getHealthStatusText(health.overallScore)})`);

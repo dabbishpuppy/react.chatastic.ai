@@ -309,14 +309,11 @@ export class EgressManagementService {
       .reduce((sum, m) => sum + m.rateLimitHits, 0);
 
     if (recentHits > 10) {
-      await AlertingService.createAlert({
-        type: 'performance',
-        severity: 'medium',
-        title: 'High Rate Limit Usage',
-        message: `Customer ${customerId} has hit rate limits ${recentHits} times in the last 5 minutes`,
-        source: 'egress-management',
-        metadata: { customerId, recentHits }
-      });
+      await AlertingService.createAlert(
+        'high_rate_limit_usage',
+        `Customer ${customerId} has hit rate limits ${recentHits} times in the last 5 minutes`,
+        'medium'
+      );
     }
   }
 
