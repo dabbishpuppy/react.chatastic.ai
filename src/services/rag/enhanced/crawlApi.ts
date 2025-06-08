@@ -115,8 +115,7 @@ export class CrawlApiService {
         totalJobs: 0,
         completedJobs: 0,
         failedJobs: 0,
-        parentSourceId,
-        error: error.message
+        parentSourceId
       };
     }
   }
