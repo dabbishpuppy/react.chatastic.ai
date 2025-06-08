@@ -4,17 +4,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import TrainingNotificationProvider from "@/components/layout/TrainingNotificationProvider";
+import { TrainingNotificationProvider } from "@/components/layout/TrainingNotificationProvider";
 
 // Import pages
 import DashboardPage from "@/pages/Dashboard";
-import AgentPage from "@/pages/AgentPage";
 import SourcesPage from "@/pages/SourcesPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import ActionsPage from "@/pages/ActionsPage";
 import IntegrationsPage from "@/pages/IntegrationsPage";
 import ActivityPage from "@/pages/ActivityPage";
-import ActivityLeadsPage from "@/pages/ActivityLeadsPage";
 import Settings from "@/pages/Settings";
 import AgentSettingsPage from "@/pages/AgentSettingsPage";
 import ManagementPage from "@/pages/ManagementPage";
@@ -49,11 +47,6 @@ function App() {
                 } />
                 
                 {/* Agent Routes */}
-                <Route path="/agent/:agentId" element={
-                  <ProtectedRoute>
-                    <AgentPage />
-                  </ProtectedRoute>
-                } />
                 <Route path="/agent/:agentId/sources" element={
                   <ProtectedRoute>
                     <SourcesPage />
@@ -77,11 +70,6 @@ function App() {
                 <Route path="/agent/:agentId/activity" element={
                   <ProtectedRoute>
                     <ActivityPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/agent/:agentId/activity/leads" element={
-                  <ProtectedRoute>
-                    <ActivityLeadsPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/agent/:agentId/management" element={
