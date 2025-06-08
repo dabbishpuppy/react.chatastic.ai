@@ -10,6 +10,10 @@ export interface JobRecoveryMetrics {
   totalProcessingTime: number;
 }
 
+// Partial types for selected fields
+type StalledJobFields = Pick<BackgroundJob, 'id' | 'started_at'>;
+type ExistingJobFields = Pick<BackgroundJob, 'page_id'>;
+
 export class JobRecoveryService {
   private static readonly STALLED_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly ORPHANED_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -34,7 +38,7 @@ export class JobRecoveryService {
       const stalledThreshold = new Date(Date.now() - this.STALLED_TIMEOUT_MS).toISOString();
       
       const { data: stalledJobs, error } = await supabase
-        .from('background_jobs')
+        .from<BackgroundJob>('background_jobs')
         .select('id, started_at')
         .eq('status', 'processing')
         .lt('started_at', stalledThreshold);
@@ -50,10 +54,10 @@ export class JobRecoveryService {
         console.log(`🔍 Found ${stalledJobs.length} stalled jobs`);
 
         // Reset stalled jobs back to pending
-        const jobIds = stalledJobs.map((job: BackgroundJob) => job.id);
+        const jobIds = stalledJobs.map((job: StalledJobFields) => job.id);
         
         const { error: updateError } = await supabase
-          .from('background_jobs')
+          .from<BackgroundJob>('background_jobs')
           .update({
             status: 'pending',
             started_at: null,
@@ -95,7 +99,7 @@ export class JobRecoveryService {
       const orphanedThreshold = new Date(Date.now() - this.ORPHANED_TIMEOUT_MS).toISOString();
       
       const { data: pendingPages, error: pagesError } = await supabase
-        .from('source_pages')
+        .from<SourcePage>('source_pages')
         .select('id, url, parent_source_id, created_at')
         .eq('status', 'pending')
         .lt('created_at', orphanedThreshold);
@@ -109,10 +113,10 @@ export class JobRecoveryService {
         console.log(`🔍 Found ${pendingPages.length} potentially orphaned pages`);
 
         // Check which pages don't have background jobs
-        const pageIds = pendingPages.map((p: SourcePage) => p.id);
+        const pageIds = pendingPages.map((p: Pick<SourcePage, 'id' | 'url' | 'parent_source_id' | 'created_at'>) => p.id);
         
         const { data: existingJobs, error: jobsError } = await supabase
-          .from('background_jobs')
+          .from<BackgroundJob>('background_jobs')
           .select('page_id')
           .in('page_id', pageIds)
           .eq('job_type', 'process_page');
@@ -122,14 +126,14 @@ export class JobRecoveryService {
           return;
         }
 
-        const existingPageIds = new Set(existingJobs?.map((j: BackgroundJob) => j.page_id) || []);
-        const orphanedPages = pendingPages.filter((page: SourcePage) => !existingPageIds.has(page.id));
+        const existingPageIds = new Set(existingJobs?.map((j: ExistingJobFields) => j.page_id) || []);
+        const orphanedPages = pendingPages.filter((page: Pick<SourcePage, 'id' | 'url' | 'parent_source_id' | 'created_at'>) => !existingPageIds.has(page.id));
 
         if (orphanedPages.length > 0) {
           console.log(`🔄 Creating background jobs for ${orphanedPages.length} orphaned pages`);
 
           // Create background jobs for orphaned pages
-          const newJobs = orphanedPages.map((page: SourcePage) => ({
+          const newJobs = orphanedPages.map((page: Pick<SourcePage, 'id' | 'url' | 'parent_source_id' | 'created_at'>) => ({
             job_type: 'process_page',
             source_id: page.parent_source_id,
             page_id: page.id,
@@ -145,7 +149,7 @@ export class JobRecoveryService {
           }));
 
           const { error: insertError } = await supabase
-            .from('background_jobs')
+            .from<BackgroundJob>('background_jobs')
             .insert(newJobs);
 
           if (insertError) {
@@ -175,7 +179,7 @@ export class JobRecoveryService {
       
       // Use safe count query
       const { count: stalledCount } = await supabase
-        .from('background_jobs')
+        .from<BackgroundJob>('background_jobs')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'processing')
         .lt('started_at', stalledThreshold);
@@ -183,7 +187,7 @@ export class JobRecoveryService {
       // Use fetchMaybeSingle for potentially empty results
       const oldestStalled = await fetchMaybeSingle<Pick<BackgroundJob, 'started_at'>>(
         supabase
-          .from('background_jobs')
+          .from<BackgroundJob>('background_jobs')
           .select('started_at')
           .eq('status', 'processing')
           .lt('started_at', stalledThreshold)

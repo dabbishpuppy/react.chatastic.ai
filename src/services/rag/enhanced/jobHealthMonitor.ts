@@ -27,6 +27,10 @@ export interface JobHealthMetrics {
   };
 }
 
+// Partial types for selected fields
+type JobTimestampFields = Pick<BackgroundJob, 'created_at' | 'started_at'>;
+type JobCompletedTimestampFields = Pick<BackgroundJob, 'completed_at'>;
+
 export class JobHealthMonitor {
   private static monitoringInterval: number | null = null;
   private static readonly HEALTH_CHECK_INTERVAL = 30 * 1000; // 30 seconds
@@ -112,9 +116,9 @@ export class JobHealthMonitor {
     try {
       // Use Promise.allSettled to handle individual query failures
       const [pendingResult, processingResult, failedResult] = await Promise.allSettled([
-        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
-        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'failed')
+        supabase.from<BackgroundJob>('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from<BackgroundJob>('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
+        supabase.from<BackgroundJob>('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'failed')
       ]);
 
       // Extract counts with safe fallbacks
@@ -127,7 +131,7 @@ export class JobHealthMonitor {
       try {
         const oldestPending = await fetchMaybeSingle<Pick<BackgroundJob, 'created_at'>>(
           supabase
-            .from('background_jobs')
+            .from<BackgroundJob>('background_jobs')
             .select('created_at')
             .eq('status', 'pending')
             .order('created_at', { ascending: true })
@@ -147,7 +151,7 @@ export class JobHealthMonitor {
       try {
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         const { data: recentCompleted } = await supabase
-          .from('background_jobs')
+          .from<BackgroundJob>('background_jobs')
           .select('created_at, started_at')
           .eq('status', 'completed')
           .gte('completed_at', oneHourAgo)
@@ -156,8 +160,8 @@ export class JobHealthMonitor {
 
         if (recentCompleted && recentCompleted.length > 0) {
           const waitTimes = recentCompleted
-            .filter((job: BackgroundJob) => job.started_at && job.created_at)
-            .map((job: BackgroundJob) => new Date(job.started_at!).getTime() - new Date(job.created_at!).getTime());
+            .filter((job: JobTimestampFields) => job.started_at && job.created_at)
+            .map((job: JobTimestampFields) => new Date(job.started_at!).getTime() - new Date(job.created_at!).getTime());
           
           if (waitTimes.length > 0) {
             avgQueueWaitTime = waitTimes.reduce((sum, time) => sum + time, 0) / waitTimes.length;
@@ -206,7 +210,7 @@ export class JobHealthMonitor {
       try {
         const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString();
         const { data: recentJobs } = await supabase
-          .from('background_jobs')
+          .from<BackgroundJob>('background_jobs')
           .select('completed_at')
           .eq('status', 'completed')
           .gte('completed_at', oneMinuteAgo);
@@ -252,7 +256,7 @@ export class JobHealthMonitor {
       try {
         const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
         const { count } = await supabase
-          .from('source_pages')
+          .from<SourcePage>('source_pages')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'pending')
           .lt('created_at', thirtyMinutesAgo);

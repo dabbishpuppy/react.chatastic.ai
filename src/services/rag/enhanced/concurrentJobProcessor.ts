@@ -20,6 +20,9 @@ export interface ProcessingStats {
   totalFailed: number;
 }
 
+// Partial types for selected fields
+type JobTimestampFields = Pick<BackgroundJob, 'status' | 'created_at' | 'started_at' | 'completed_at'>;
+
 export class ConcurrentJobProcessor {
   private static activeWorkers = 0;
   private static processedJobs = 0;
@@ -165,7 +168,7 @@ export class ConcurrentJobProcessor {
   private static async markJobFailed(jobId: string, errorMessage: string): Promise<void> {
     try {
       const { error } = await supabase
-        .from('background_jobs')
+        .from<BackgroundJob>('background_jobs')
         .update({
           status: 'failed',
           error_message: errorMessage,
@@ -190,10 +193,10 @@ export class ConcurrentJobProcessor {
       // Get recent job completion rates with safe queries
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       
-      let recentJobs: BackgroundJob[] = [];
+      let recentJobs: JobTimestampFields[] = [];
       try {
         const { data, error } = await supabase
-          .from('background_jobs')
+          .from<BackgroundJob>('background_jobs')
           .select('status, created_at, started_at, completed_at')
           .gte('created_at', oneHourAgo);
 
@@ -206,15 +209,15 @@ export class ConcurrentJobProcessor {
         console.warn('Error fetching recent jobs:', error);
       }
 
-      const completedJobs = recentJobs.filter((j: BackgroundJob) => j.status === 'completed');
-      const failedJobs = recentJobs.filter((j: BackgroundJob) => j.status === 'failed');
+      const completedJobs = recentJobs.filter((j: JobTimestampFields) => j.status === 'completed');
+      const failedJobs = recentJobs.filter((j: JobTimestampFields) => j.status === 'failed');
       const totalRecentJobs = recentJobs.length;
 
       let avgProcessingTime = 0;
       if (completedJobs.length > 0) {
         const processingTimes = completedJobs
-          .filter((j: BackgroundJob) => j.started_at && j.completed_at)
-          .map((j: BackgroundJob) => {
+          .filter((j: JobTimestampFields) => j.started_at && j.completed_at)
+          .map((j: JobTimestampFields) => {
             try {
               return new Date(j.completed_at!).getTime() - new Date(j.started_at!).getTime();
             } catch (error) {
