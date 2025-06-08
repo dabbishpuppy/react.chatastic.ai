@@ -137,7 +137,7 @@ export class ConcurrentJobProcessor {
         const processingTime = Date.now() - jobStartTime;
 
         if (success) {
-          await JobStatusManager.markJobCompleted(job.id, { processingTimeMs: processingTime });
+          await JobStatusManager.markJobCompleted(job.id);
           return { success: true, skipped: false };
         } else {
           await JobStatusManager.markJobFailed(job.id, 'Job processor returned false');
@@ -184,19 +184,18 @@ export class ConcurrentJobProcessor {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      // Get active workers
+      // Get active workers (count unique processing jobs)
       const { data: activeJobs } = await supabase
         .from('background_jobs')
-        .select('worker_id')
-        .eq('status', 'processing')
-        .not('worker_id', 'is', null);
+        .select('id')
+        .eq('status', 'processing');
 
-      const uniqueWorkers = new Set(activeJobs?.map(job => job.worker_id) || []);
+      const uniqueWorkers = activeJobs ? new Set(activeJobs.map(job => job.id)).size : 0;
 
       // Get recent performance stats
       const { data: recentJobs } = await supabase
         .from('background_jobs')
-        .select('status, processing_time_ms')
+        .select('status, completed_at, started_at')
         .gte('completed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
         .in('status', ['completed', 'failed']);
 
@@ -205,15 +204,18 @@ export class ConcurrentJobProcessor {
 
       if (recentJobs && recentJobs.length > 0) {
         const completedJobs = recentJobs.filter(job => job.status === 'completed');
-        const totalProcessingTime = completedJobs.reduce((sum, job) => sum + (job.processing_time_ms || 0), 0);
+        const processingTimes = completedJobs
+          .filter(job => job.completed_at && job.started_at)
+          .map(job => new Date(job.completed_at!).getTime() - new Date(job.started_at!).getTime());
         
-        avgProcessingTime = completedJobs.length > 0 ? totalProcessingTime / completedJobs.length : 0;
+        avgProcessingTime = processingTimes.length > 0 ? 
+          processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length : 0;
         successRate = completedJobs.length / recentJobs.length;
       }
 
       return {
         queueDepth: queueDepth || 0,
-        activeWorkers: uniqueWorkers.size,
+        activeWorkers: uniqueWorkers,
         avgProcessingTime,
         successRate
       };

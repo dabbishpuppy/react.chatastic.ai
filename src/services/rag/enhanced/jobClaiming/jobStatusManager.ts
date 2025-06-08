@@ -5,14 +5,21 @@ export class JobStatusManager {
   /**
    * Mark job as completed
    */
-  static async markJobCompleted(jobId: string): Promise<void> {
+  static async markJobCompleted(jobId: string, metadata?: { processingTimeMs?: number }): Promise<void> {
+    const updateData: any = {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // Add processing time to payload if provided
+    if (metadata?.processingTimeMs) {
+      updateData.payload = { processingTimeMs: metadata.processingTimeMs };
+    }
+
     const { error } = await supabase
       .from('background_jobs')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', jobId);
 
     if (error) {

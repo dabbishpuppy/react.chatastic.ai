@@ -28,12 +28,12 @@ export class JobRecoveryService {
     const startTime = Date.now();
 
     try {
-      // Find jobs that have been "in_progress" for too long
+      // Find jobs that have been "processing" for too long
       const stalledThreshold = new Date(Date.now() - this.STALLED_TIMEOUT_MS).toISOString();
       
       const { data: stalledJobs, error } = await supabase
         .from('background_jobs')
-        .select('id, started_at, worker_id')
+        .select('id, started_at')
         .eq('status', 'processing')
         .lt('started_at', stalledThreshold);
 
@@ -55,7 +55,6 @@ export class JobRecoveryService {
           .update({
             status: 'pending',
             started_at: null,
-            worker_id: null,
             error_message: 'Auto-recovered from stalled state',
             updated_at: new Date().toISOString(),
             scheduled_at: new Date().toISOString()

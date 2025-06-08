@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export class EnhancedJobClaimingCore {
   /**
-   * Atomically claim jobs using FOR UPDATE SKIP LOCKED for better concurrency
+   * Atomically claim jobs using proper database operations
    */
   static async claimJobsAtomically(
     maxJobs: number = 5,
@@ -13,21 +13,51 @@ export class EnhancedJobClaimingCore {
     try {
       console.log(`🔒 Attempting to claim up to ${maxJobs} jobs atomically...`);
 
-      // Use a transaction to atomically claim multiple jobs
-      const { data, error } = await supabase.rpc('claim_jobs_atomically', {
-        max_jobs: maxJobs,
-        job_types: jobTypes,
-        worker_id: workerId
-      });
+      // Get available jobs first
+      const { data: availableJobs, error: fetchError } = await supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('status', 'pending')
+        .lte('scheduled_at', new Date().toISOString())
+        .in('job_type', jobTypes)
+        .order('priority', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(maxJobs);
 
-      if (error) {
-        console.error('❌ Atomic job claiming failed:', error);
+      if (fetchError || !availableJobs) {
+        console.error('❌ Error fetching available jobs:', fetchError);
         return [];
       }
 
-      const claimedJobs = data || [];
-      console.log(`✅ Successfully claimed ${claimedJobs.length} jobs atomically`);
+      if (availableJobs.length === 0) {
+        console.log('📭 No jobs available for claiming');
+        return [];
+      }
+
+      // Try to claim each job atomically
+      const claimedJobs: any[] = [];
       
+      for (const job of availableJobs) {
+        const { data: claimedJob, error: claimError } = await supabase
+          .from('background_jobs')
+          .update({
+            status: 'processing',
+            started_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            attempts: job.attempts + 1
+          })
+          .eq('id', job.id)
+          .eq('status', 'pending') // Only claim if still pending
+          .select()
+          .single();
+
+        if (!claimError && claimedJob) {
+          claimedJobs.push(claimedJob);
+          console.log(`🔒 Successfully claimed job ${job.id}`);
+        }
+      }
+
+      console.log(`✅ Successfully claimed ${claimedJobs.length} jobs atomically`);
       return claimedJobs;
 
     } catch (error) {
@@ -52,8 +82,7 @@ export class EnhancedJobClaimingCore {
             status: 'processing',
             started_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            worker_id: workerId,
-            attempts: supabase.sql`attempts + 1`
+            attempts: supabase.rpc('increment_retry_count', { job_ids: [jobId] })
           })
           .eq('id', jobId)
           .eq('status', 'pending') // Critical: only claim if still pending
@@ -147,7 +176,6 @@ export class EnhancedJobClaimingCore {
         .update({
           status: 'pending',
           started_at: null,
-          worker_id: null,
           error_message: reason,
           updated_at: new Date().toISOString(),
           scheduled_at: new Date().toISOString()
