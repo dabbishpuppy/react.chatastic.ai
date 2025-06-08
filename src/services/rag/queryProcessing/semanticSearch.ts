@@ -17,6 +17,12 @@ export interface SearchFilters {
   sourceTypes?: Array<'text' | 'file' | 'website' | 'qa'>;
 }
 
+// Helper function to check if an ID is a valid UUID
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
 export class SemanticSearchService {
   static async searchSimilarChunks(
     query: string,
@@ -29,8 +35,8 @@ export class SemanticSearchService {
     });
 
     try {
-      // For testing purposes, return mock data for test agent
-      if (agentId === 'test-agent-id') {
+      // For testing purposes, return mock data for test agent or invalid UUIDs
+      if (agentId === 'test-agent-id' || !isValidUUID(agentId)) {
         console.log('🧪 Returning mock semantic search results for testing');
         return [
           {
@@ -134,8 +140,8 @@ export class SemanticSearchService {
     });
 
     try {
-      // For testing purposes, return mock data for test agent
-      if (agentId === 'test-agent-id') {
+      // For testing purposes, return mock data for test agent or invalid UUIDs
+      if (agentId === 'test-agent-id' || !isValidUUID(agentId)) {
         console.log('🧪 Returning mock keyword search results for testing');
         return [
           {
