@@ -103,14 +103,8 @@ export const EnhancedJobManager: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusColor = (load: string) => {
-    switch (load) {
-      case 'low': return 'bg-green-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'high': return 'bg-orange-500';
-      case 'critical': return 'bg-red-500';
-      default: return 'bg-gray-500';
-    }
+  const getStatusColor = (healthy: boolean) => {
+    return healthy ? 'bg-green-500' : 'bg-red-500';
   };
 
   return (
@@ -131,18 +125,18 @@ export const EnhancedJobManager: React.FC = () => {
               <p className="text-sm text-gray-600">System Status</p>
             </div>
             <div className="text-center">
-              <Badge className={getStatusColor(systemStatus.systemLoad)}>
-                {systemStatus.systemLoad}
+              <Badge className={getStatusColor(systemStatus.components.jobSync)}>
+                {systemStatus.components.jobSync ? "Running" : "Stopped"}
               </Badge>
-              <p className="text-sm text-gray-600">System Load</p>
+              <p className="text-sm text-gray-600">Job Sync</p>
             </div>
             <div className="text-center">
-              <span className="text-lg font-bold">{systemStatus.activeWorkers}</span>
-              <p className="text-sm text-gray-600">Active Workers</p>
+              <span className="text-lg font-bold">{systemStatus.metrics.activeSources}</span>
+              <p className="text-sm text-gray-600">Active Sources</p>
             </div>
             <div className="text-center">
-              <span className="text-lg font-bold">{systemStatus.queueDepth}</span>
-              <p className="text-sm text-gray-600">Queue Depth</p>
+              <span className="text-lg font-bold">{systemStatus.metrics.pendingJobs}</span>
+              <p className="text-sm text-gray-600">Pending Jobs</p>
             </div>
           </div>
         )}

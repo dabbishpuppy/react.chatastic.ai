@@ -5,6 +5,7 @@ import { RecoveryManager } from './recoveryManager';
 
 export interface CrawlSystemStatus {
   initialized: boolean;
+  isHealthy: boolean;
   components: {
     jobSync: boolean;
     healthMonitor: boolean;
@@ -125,9 +126,11 @@ export class CrawlSystemManager {
    */
   static async getSystemStatus(): Promise<CrawlSystemStatus> {
     const syncStatus = JobSynchronizationService.getStatus();
+    const healthScore = syncStatus.isRunning ? 100 : 50;
 
     return {
       initialized: this.isInitialized,
+      isHealthy: healthScore > 80,
       components: {
         jobSync: syncStatus.isRunning,
         healthMonitor: this.healthCheckInterval !== null,
@@ -136,7 +139,7 @@ export class CrawlSystemManager {
       metrics: {
         activeSources: 0, // Would query database
         pendingJobs: 0,   // Would query database
-        healthScore: syncStatus.isRunning ? 100 : 50
+        healthScore
       }
     };
   }
@@ -162,6 +165,37 @@ export class CrawlSystemManager {
     } catch (error) {
       console.error('❌ Source recovery failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Trigger system-wide recovery
+   */
+  static async triggerRecovery(): Promise<{ success: boolean; message: string; }> {
+    try {
+      console.log('🚑 Triggering system-wide recovery...');
+      
+      // Force job synchronization
+      const syncMetrics = await JobSynchronizationService.forceSynchronization();
+      
+      // Restart health monitoring if stopped
+      if (!this.healthCheckInterval) {
+        this.startHealthMonitoring();
+      }
+      
+      const message = `Recovery completed: ${syncMetrics.createdJobs} jobs created, ${syncMetrics.errors.length} errors`;
+      
+      return {
+        success: syncMetrics.errors.length === 0,
+        message
+      };
+      
+    } catch (error) {
+      console.error('❌ System recovery failed:', error);
+      return {
+        success: false,
+        message: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
     }
   }
 

@@ -22,11 +22,20 @@ export interface HealthAlert {
   timestamp: string;
 }
 
+export interface CrawlHealth {
+  healthy: boolean;
+  metrics: HealthMetrics;
+  alerts: HealthAlert[];
+  lastHealthCheck: string;
+  stalledJobs: number;
+}
+
 export class HealthMonitor {
   private static readonly STALLED_PAGE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly STALLED_JOB_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
   private static readonly HIGH_ERROR_RATE_THRESHOLD = 0.1; // 10%
   private static readonly HIGH_QUEUE_DEPTH_THRESHOLD = 100;
+  private static currentHealth: CrawlHealth | null = null;
 
   /**
    * Perform comprehensive health check
@@ -42,10 +51,26 @@ export class HealthMonitor {
     const alerts = this.analyzeMetrics(metrics);
     const healthy = alerts.filter(a => a.level === 'critical').length === 0;
 
+    // Update current health state
+    this.currentHealth = {
+      healthy,
+      metrics,
+      alerts,
+      lastHealthCheck: new Date().toISOString(),
+      stalledJobs: metrics.stalledJobs
+    };
+
     console.log(`📊 Health check completed: ${healthy ? 'HEALTHY' : 'UNHEALTHY'}`);
     console.log(`   • Alerts: ${alerts.length} (${alerts.filter(a => a.level === 'critical').length} critical)`);
 
     return { healthy, metrics, alerts };
+  }
+
+  /**
+   * Get current health status
+   */
+  static getCurrentHealth(): CrawlHealth | null {
+    return this.currentHealth;
   }
 
   /**
