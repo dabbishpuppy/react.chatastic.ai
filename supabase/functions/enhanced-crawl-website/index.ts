@@ -21,7 +21,7 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    console.log('🚀 Enhanced crawl request:', body);
+    console.log('🚀 Enhanced crawl request received:', JSON.stringify(body, null, 2));
 
     const {
       url,
@@ -30,11 +30,27 @@ serve(async (req) => {
       teamId,
       customerId,
       crawlMode = 'full-website',
-      maxPages = Number.MAX_SAFE_INTEGER,
+      maxPages = 100,
+      maxDepth,
       excludePaths = [],
       includePaths = [],
+      respectRobots = true,
+      enableCompression = true,
+      enableDeduplication = true,
+      priority = 'normal',
       mode
     } = body;
+
+    console.log('📋 Extracted parameters:', {
+      url,
+      agentId,
+      parentSourceId,
+      teamId,
+      customerId,
+      crawlMode,
+      maxPages,
+      mode
+    });
 
     // Handle recovery mode
     if (mode === 'recovery' && parentSourceId) {
@@ -57,13 +73,20 @@ serve(async (req) => {
       );
     }
 
-    // Validate required parameters - handle both agentId and parentSourceId cases
+    // Validate required parameters
     if (!url) {
+      console.error('❌ Missing required parameter: url');
       throw new Error('Missing required parameter: url');
+    }
+
+    if (!agentId && !parentSourceId) {
+      console.error('❌ Missing required parameter: either agentId or parentSourceId must be provided');
+      throw new Error('Missing required parameter: either agentId or parentSourceId must be provided');
     }
 
     let effectiveParentSourceId = parentSourceId;
     let effectiveTeamId = teamId || customerId;
+    let effectiveCustomerId = customerId;
 
     // If we have agentId but no parentSourceId, we need to create a source first
     if (agentId && !parentSourceId) {
@@ -76,11 +99,20 @@ serve(async (req) => {
         .eq('id', agentId)
         .single();
 
-      if (agentError || !agent) {
+      if (agentError) {
+        console.error('❌ Agent query error:', agentError);
+        throw new Error(`Failed to fetch agent: ${agentError.message}`);
+      }
+
+      if (!agent) {
+        console.error('❌ Agent not found:', agentId);
         throw new Error(`Agent not found: ${agentId}`);
       }
 
       effectiveTeamId = agent.team_id;
+      effectiveCustomerId = agent.team_id; // Use team_id as customer_id
+
+      console.log('✅ Agent found, team_id:', effectiveTeamId);
 
       // Create the parent source
       const { data: source, error: sourceError } = await supabaseClient
@@ -98,14 +130,25 @@ serve(async (req) => {
           metadata: {
             crawl_mode: crawlMode,
             max_pages: maxPages,
+            max_depth: maxDepth,
+            respect_robots: respectRobots,
+            enable_compression: enableCompression,
+            enable_deduplication: enableDeduplication,
+            priority: priority,
             created_via: 'enhanced_crawl'
           }
         })
         .select()
         .single();
 
-      if (sourceError || !source) {
-        throw new Error(`Failed to create source: ${sourceError?.message}`);
+      if (sourceError) {
+        console.error('❌ Source creation error:', sourceError);
+        throw new Error(`Failed to create source: ${sourceError.message}`);
+      }
+
+      if (!source) {
+        console.error('❌ No source returned from insert');
+        throw new Error('Failed to create source: No source returned');
       }
 
       effectiveParentSourceId = source.id;
@@ -113,9 +156,27 @@ serve(async (req) => {
     }
 
     // Final validation
-    if (!effectiveParentSourceId || !effectiveTeamId) {
-      throw new Error('Missing required parameters after processing: parentSourceId, teamId');
+    if (!effectiveParentSourceId) {
+      console.error('❌ No effective parent source ID after processing');
+      throw new Error('Failed to determine parent source ID');
     }
+
+    if (!effectiveTeamId) {
+      console.error('❌ No effective team ID after processing');
+      throw new Error('Failed to determine team ID');
+    }
+
+    if (!effectiveCustomerId) {
+      effectiveCustomerId = effectiveTeamId;
+    }
+
+    console.log('📊 Final effective parameters:', {
+      effectiveParentSourceId,
+      effectiveTeamId,
+      effectiveCustomerId,
+      crawlMode,
+      maxPages
+    });
 
     console.log(`🔍 Starting enhanced URL discovery for: ${url}`);
     console.log(`📊 Mode: ${crawlMode}, Max pages: ${maxPages}`);
@@ -132,6 +193,7 @@ serve(async (req) => {
     console.log(`📋 Discovery completed: ${discoveredUrls.length} URLs found`);
 
     if (discoveredUrls.length === 0) {
+      console.warn('⚠️ No URLs discovered for:', url);
       return new Response(
         JSON.stringify({
           success: false,
@@ -153,15 +215,21 @@ serve(async (req) => {
       effectiveParentSourceId,
       effectiveTeamId,
       discoveredUrls,
-      effectiveTeamId
+      effectiveCustomerId
     );
 
     if (!atomicResult.success) {
+      console.error('❌ Atomic creation failed:', atomicResult.errors);
       throw new Error(`Atomic creation failed: ${atomicResult.errors.join(', ')}`);
     }
 
+    console.log('✅ Atomic creation successful:', {
+      pagesCreated: atomicResult.pagesCreated,
+      jobsCreated: atomicResult.jobsCreated
+    });
+
     // Step 3: Mark discovery as completed and update parent
-    await supabaseClient
+    const { error: updateError } = await supabaseClient
       .from('agent_sources')
       .update({
         discovery_completed: true,
@@ -170,6 +238,12 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', effectiveParentSourceId);
+
+    if (updateError) {
+      console.error('❌ Failed to update parent source:', updateError);
+    } else {
+      console.log('✅ Updated parent source status to in_progress');
+    }
 
     // Step 4: Ensure job completeness (safety check)
     console.log('🔍 Performing job completeness verification...');
@@ -187,6 +261,7 @@ serve(async (req) => {
         recoveredJobs: completenessResult.recoveredJobs
       },
       crawlMode,
+      maxPages,
       timestamp: new Date().toISOString(),
       message: `Enhanced crawl initiated: ${atomicResult.pagesCreated} pages with guaranteed job creation`
     };
@@ -203,11 +278,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Enhanced crawl error:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Enhanced crawl failed',
+        error: error instanceof Error ? error.message : 'Enhanced crawl failed',
         timestamp: new Date().toISOString()
       }),
       {

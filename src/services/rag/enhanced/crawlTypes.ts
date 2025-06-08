@@ -1,6 +1,9 @@
 
 export interface EnhancedCrawlRequest {
-  agentId: string;
+  agentId?: string;
+  parentSourceId?: string;
+  teamId?: string;
+  customerId?: string;
   url: string;
   crawlMode?: 'full-website' | 'single-page' | 'sitemap-only';
   maxPages?: number;
@@ -11,6 +14,7 @@ export interface EnhancedCrawlRequest {
   enableCompression?: boolean;
   enableDeduplication?: boolean;
   priority?: 'normal' | 'high' | 'slow';
+  mode?: 'recovery' | 'normal';
 }
 
 export interface CrawlStatus {

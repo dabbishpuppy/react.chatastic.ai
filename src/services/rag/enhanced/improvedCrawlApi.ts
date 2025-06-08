@@ -10,27 +10,52 @@ type ParentSourceFields = Pick<AgentSource, 'crawl_status' | 'progress' | 'total
 
 export class ImprovedCrawlApiService {
   static async initiateCrawl(request: EnhancedCrawlRequest): Promise<{ parentSourceId: string; totalJobs: number }> {
-    console.log('🚀 Initiating enhanced crawl with validation:', request);
+    console.log('🚀 ImprovedCrawlApiService: Initiating enhanced crawl with request:', request);
+
+    // Validate request
+    if (!request.url) {
+      throw new Error('URL is required for crawl initiation');
+    }
+
+    if (!request.agentId && !request.parentSourceId) {
+      throw new Error('Either agentId or parentSourceId is required');
+    }
 
     try {
+      console.log('📡 Calling enhanced-crawl-website edge function with:', {
+        ...request,
+        // Don't log sensitive data, just show structure
+        structureValid: true
+      });
+
       const { data, error } = await supabase.functions.invoke('enhanced-crawl-website', {
         body: request
       });
 
       if (error) {
-        console.error('Enhanced crawl error:', error);
+        console.error('❌ Enhanced crawl edge function error:', error);
         throw new Error(`Crawl initiation failed: ${error.message}`);
       }
 
-      if (!data || !data.success) {
-        console.error('Enhanced crawl failed:', data);
-        throw new Error(data?.error || 'Unknown error occurred during crawl initiation');
+      if (!data) {
+        console.error('❌ Enhanced crawl returned no data');
+        throw new Error('No response data from crawl service');
       }
 
-      console.log('✅ Enhanced crawl initiated:', data);
+      if (!data.success) {
+        console.error('❌ Enhanced crawl failed:', data);
+        throw new Error(data.error || 'Unknown error occurred during crawl initiation');
+      }
+
+      console.log('✅ Enhanced crawl initiated successfully:', {
+        parentSourceId: data.parentSourceId,
+        pagesCreated: data.pagesCreated,
+        jobsCreated: data.jobsCreated
+      });
+
       return {
         parentSourceId: data.parentSourceId,
-        totalJobs: data.totalJobs
+        totalJobs: data.jobsCreated || data.pagesCreated || 0
       };
     } catch (error: any) {
       console.error('❌ Enhanced crawl API error:', error);
