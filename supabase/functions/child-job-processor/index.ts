@@ -15,15 +15,32 @@ serve(async (req) => {
 
   try {
     const supabaseClient = getSupabaseClient();
-    const { childJobId } = await req.json();
-
+    const requestBody = await req.json();
+    
+    // ENHANCED: Better parameter validation and fallback handling
+    const childJobId = requestBody.childJobId || requestBody.pageId || requestBody.jobId;
+    
+    console.log('📨 Received request with body:', JSON.stringify(requestBody, null, 2));
+    
     if (!childJobId) {
-      throw new Error('childJobId is required');
+      console.error('❌ Missing required parameter. Expected childJobId, pageId, or jobId');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required parameter: childJobId is required',
+          receivedParams: Object.keys(requestBody),
+          expectedParams: ['childJobId', 'pageId', 'jobId']
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
     console.log(`🚀 Processing child job: ${childJobId}`);
 
-    // ATOMIC JOB CLAIMING: Try to claim the job atomically to prevent duplicate processing
+    // ENHANCED: Better error handling for job claiming with detailed logging
     const { data: claimedJob, error: claimError } = await supabaseClient
       .from('source_pages')
       .update({
@@ -36,26 +53,51 @@ serve(async (req) => {
       .select()
       .single();
 
-    // FIXED: Return 200 success when job is already claimed (not an error)
+    // IMPROVED: Handle claim conflicts gracefully
     if (claimError || !claimedJob) {
-      console.log(`⚠️ Job ${childJobId} could not be claimed (already processed or in progress)`);
-      return new Response(
-        JSON.stringify({
-          success: true, // Changed to true - this is not an error
-          message: 'Job already claimed or completed by another worker',
-          jobId: childJobId,
-          skipped: true // Add flag to indicate it was skipped
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200, // Changed from 409 to 200
-        }
-      );
+      console.log(`⚠️ Job ${childJobId} could not be claimed:`, claimError?.message || 'Job not found or already claimed');
+      
+      // Check if job exists but is in different status
+      const { data: existingJob } = await supabaseClient
+        .from('source_pages')
+        .select('id, status, url')
+        .eq('id', childJobId)
+        .single();
+        
+      if (existingJob) {
+        console.log(`📊 Job ${childJobId} exists with status: ${existingJob.status}`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Job already processed or in progress (status: ${existingJob.status})`,
+            jobId: childJobId,
+            currentStatus: existingJob.status,
+            skipped: true
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } else {
+        console.error(`❌ Job ${childJobId} not found in source_pages table`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Job ${childJobId} not found in source_pages table`,
+            jobId: childJobId
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
     }
 
     console.log(`✅ Successfully claimed job ${childJobId} for URL: ${claimedJob.url}`);
 
-    // Get the parent source to ensure it exists
+    // Validate parent source exists
     const { data: parentSource, error: parentError } = await supabaseClient
       .from('agent_sources')
       .select('id, agent_id')
@@ -71,7 +113,7 @@ serve(async (req) => {
 
     console.log(`📄 Crawling URL: ${claimedJob.url}`);
 
-    // Check if this URL was already processed successfully for this parent
+    // ENHANCED: Check for duplicate URLs with better logging
     const { data: existingPages, error: duplicateCheckError } = await supabaseClient
       .from('source_pages')
       .select('id, status, url')
@@ -81,13 +123,13 @@ serve(async (req) => {
       .neq('id', childJobId);
 
     if (!duplicateCheckError && existingPages && existingPages.length > 0) {
-      console.log(`⚠️ URL ${claimedJob.url} already processed successfully, marking as duplicate`);
+      console.log(`⚠️ URL ${claimedJob.url} already processed successfully by page ${existingPages[0].id}`);
       
       await updateJobStatus(supabaseClient, childJobId, 'completed', {
         content_size: 0,
         chunks_created: 0,
         processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
-        error_message: 'Duplicate URL - already processed',
+        error_message: `Duplicate URL - already processed by page ${existingPages[0].id}`,
         processing_status: 'processed'
       });
 
@@ -98,7 +140,8 @@ serve(async (req) => {
           parentSourceId: claimedJob.parent_source_id,
           contentSize: 0,
           chunksCreated: 0,
-          message: 'Duplicate URL detected - skipped processing'
+          message: 'Duplicate URL detected - skipped processing',
+          duplicateOf: existingPages[0].id
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -107,13 +150,16 @@ serve(async (req) => {
       );
     }
 
-    // Fetch the page content with timeout and retries
+    // ENHANCED: Improved HTTP fetching with better retry logic
     let response;
     let attempts = 0;
     const maxAttempts = 3;
+    const fetchErrors = [];
 
     while (attempts < maxAttempts) {
       try {
+        console.log(`🌐 Fetching URL (attempt ${attempts + 1}/${maxAttempts}): ${claimedJob.url}`);
+        
         response = await fetch(claimedJob.url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; Wonderwave-Bot/1.0)',
@@ -123,26 +169,34 @@ serve(async (req) => {
         });
 
         if (response.ok) {
-          break; // Success, exit retry loop
+          console.log(`✅ Successfully fetched ${claimedJob.url} (status: ${response.status})`);
+          break;
         }
         
+        fetchErrors.push(`HTTP ${response.status}: ${response.statusText}`);
         attempts++;
+        
         if (attempts < maxAttempts) {
-          console.log(`Attempt ${attempts} failed for ${claimedJob.url}, retrying...`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+          const backoffDelay = 1000 * Math.pow(2, attempts); // 2s, 4s, 8s
+          console.log(`⏳ Retrying in ${backoffDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
         }
       } catch (error) {
+        fetchErrors.push(error.message);
         attempts++;
-        if (attempts >= maxAttempts) {
-          throw new Error(`Failed to fetch after ${maxAttempts} attempts: ${error.message}`);
+        
+        if (attempts < maxAttempts) {
+          const backoffDelay = 1000 * Math.pow(2, attempts);
+          console.log(`⏳ Fetch error, retrying in ${backoffDelay}ms:`, error.message);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
         }
-        console.log(`Attempt ${attempts} failed for ${claimedJob.url}, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
       }
     }
 
     if (!response || !response.ok) {
-      throw new Error(`HTTP ${response?.status}: ${response?.statusText}`);
+      const errorMessage = `Failed to fetch after ${maxAttempts} attempts: ${fetchErrors.join(', ')}`;
+      console.error(`❌ ${errorMessage}`);
+      throw new Error(errorMessage);
     }
 
     const htmlContent = await response.text();
@@ -151,32 +205,23 @@ serve(async (req) => {
 
     console.log(`📏 Content extracted: ${contentSize} characters from ${claimedJob.url}`);
 
-    // Enhanced content length check - allow shorter content but ensure it's not empty
+    // ENHANCED: Better content validation with title fallback
     if (contentSize < 10) {
-      console.warn(`⚠️ Very short content (${contentSize} chars) for ${claimedJob.url}, trying title fallback`);
+      console.warn(`⚠️ Very short content (${contentSize} chars) for ${claimedJob.url}, checking for title`);
       
-      // Try to get at least the page title if content is extremely short
       const title = extractTitle(htmlContent);
-      if (title && title.length > 0) {
-        const fallbackContent = `Page: ${title}`;
-        console.log(`📝 Using fallback content: "${fallbackContent}"`);
+      if (title && title.length > 5) {
+        const fallbackContent = `Page Title: ${title}\nURL: ${claimedJob.url}`;
+        console.log(`📝 Using fallback content with title: "${title}"`);
         
-        // Mark job as completed but don't create chunks yet - wait for manual training
         await updateJobStatus(supabaseClient, childJobId, 'completed', {
           content_size: fallbackContent.length,
-          chunks_created: 0, // No chunks created yet
+          chunks_created: 0,
           processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
           content_hash: await generateContentHash(fallbackContent),
-          processing_status: 'pending' // Mark as pending processing
+          processing_status: 'pending',
+          error_message: `Short content with title fallback: ${title}`
         });
-
-        // Mark parent source as requiring manual training
-        await supabaseClient
-          .from('agent_sources')
-          .update({ requires_manual_training: true })
-          .eq('id', claimedJob.parent_source_id);
-
-        console.log(`✅ Crawled page ${childJobId} - content ready for manual training`);
 
         return new Response(
           JSON.stringify({
@@ -185,7 +230,8 @@ serve(async (req) => {
             parentSourceId: claimedJob.parent_source_id,
             contentSize: fallbackContent.length,
             chunksCreated: 0,
-            message: 'Page crawled successfully - ready for manual training'
+            message: 'Page crawled with title fallback - ready for manual training',
+            title: title
           }),
           {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -193,14 +239,14 @@ serve(async (req) => {
           }
         );
       } else {
-        throw new Error(`No meaningful content found for ${claimedJob.url} (${contentSize} chars, no title)`);
+        throw new Error(`No meaningful content found for ${claimedJob.url} (${contentSize} chars, no usable title)`);
       }
     }
 
     // Generate content hash for deduplication
     const contentHash = await generateContentHash(textContent);
 
-    // Check if this exact content was already processed (content-based deduplication)
+    // ENHANCED: Content-based deduplication with better logging
     const { data: duplicateContent, error: contentDupeError } = await supabaseClient
       .from('source_pages')
       .select('id, url')
@@ -211,15 +257,15 @@ serve(async (req) => {
       .limit(1);
 
     if (!contentDupeError && duplicateContent && duplicateContent.length > 0) {
-      console.log(`⚠️ Content from ${claimedJob.url} already exists (duplicate of ${duplicateContent[0].url})`);
+      console.log(`⚠️ Content from ${claimedJob.url} matches existing page ${duplicateContent[0].id} (${duplicateContent[0].url})`);
       
       await updateJobStatus(supabaseClient, childJobId, 'completed', {
         content_size: contentSize,
         chunks_created: 0,
         processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
         content_hash: contentHash,
-        processing_status: 'processed', // Mark as processed since it's a duplicate
-        error_message: `Duplicate content of ${duplicateContent[0].url}`
+        processing_status: 'processed',
+        error_message: `Duplicate content of ${duplicateContent[0].url} (page ${duplicateContent[0].id})`
       });
 
       return new Response(
@@ -229,7 +275,8 @@ serve(async (req) => {
           parentSourceId: claimedJob.parent_source_id,
           contentSize,
           chunksCreated: 0,
-          message: 'Duplicate content detected - skipped processing'
+          message: 'Duplicate content detected - skipped processing',
+          duplicateContentOf: duplicateContent[0].id
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -238,28 +285,30 @@ serve(async (req) => {
       );
     }
 
-    // Store the crawled content but don't create chunks yet - wait for manual training
-    // Update the source_pages record with crawled content metadata
+    // Store the crawled content metadata for future processing
     await supabaseClient
       .from('source_pages')
       .update({
         content_hash: contentHash,
         content_size: contentSize,
-        processing_status: 'pending', // Mark as pending processing
+        processing_status: 'pending',
         metadata: {
           title: extractTitle(htmlContent),
           crawled_at: new Date().toISOString(),
-          ready_for_processing: true
+          ready_for_processing: true,
+          http_status: response.status,
+          content_type: response.headers.get('content-type') || 'text/html'
         }
       })
       .eq('id', childJobId);
 
-    // Mark job as completed (crawled) but processing is pending
+    // Mark job as completed (crawled successfully)
     await updateJobStatus(supabaseClient, childJobId, 'completed', {
       content_size: contentSize,
-      chunks_created: 0, // No chunks created yet
+      chunks_created: 0,
       processing_time_ms: Date.now() - new Date(claimedJob.started_at || claimedJob.created_at).getTime(),
-      content_hash: contentHash
+      content_hash: contentHash,
+      processing_status: 'pending'
     });
 
     // Mark parent source as requiring manual training
@@ -288,24 +337,28 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ Job processing error:', error);
 
-    // Try to mark job as failed if we have the ID
+    // ENHANCED: Better error handling with job status update
     try {
-      const { childJobId } = await req.json().catch(() => ({}));
+      const requestBody = await req.json().catch(() => ({}));
+      const childJobId = requestBody.childJobId || requestBody.pageId || requestBody.jobId;
+      
       if (childJobId) {
         const supabaseClient = getSupabaseClient();
         await updateJobStatus(supabaseClient, childJobId, 'failed', {
           error_message: error.message,
-          processing_time_ms: Date.now() - Date.now() // Fallback timing
+          processing_time_ms: 0
         });
+        console.log(`📝 Updated job ${childJobId} status to failed`);
       }
     } catch (updateError) {
-      console.error('Failed to update job status:', updateError);
+      console.error('❌ Failed to update job status:', updateError);
     }
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

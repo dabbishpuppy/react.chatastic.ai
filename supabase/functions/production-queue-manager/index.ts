@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -19,8 +18,8 @@ interface QueueMetrics {
 
 class ProductionQueueProcessor {
   private supabase: any;
-  private readonly MAX_CONCURRENT_JOBS = 2000; // Support 2000 simultaneous URLs
-  private readonly BATCH_SIZE = 100;
+  private readonly MAX_CONCURRENT_JOBS = 50; // Reduced from 2000 for stability
+  private readonly BATCH_SIZE = 20; // Reduced from 100 for stability
   private readonly PROCESSING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(supabase: any) {
@@ -30,7 +29,7 @@ class ProductionQueueProcessor {
   async processQueue(): Promise<QueueMetrics> {
     console.log('🚀 Starting production queue processing...');
 
-    // Get pending jobs with high concurrency support
+    // Get pending jobs with reduced concurrency for stability
     const { data: pendingJobs, error: jobsError } = await this.supabase
       .from('background_jobs')
       .select('*')
@@ -51,19 +50,19 @@ class ProductionQueueProcessor {
       return this.getQueueMetrics();
     }
 
-    // Process jobs in optimized batches
+    // Process jobs in smaller, more manageable batches
     const batches = this.createOptimizedBatches(pendingJobs);
     const processingPromises = batches.map(batch => this.processBatch(batch));
 
-    // Process all batches concurrently for maximum throughput
+    // Process all batches concurrently but with error isolation
     const results = await Promise.allSettled(processingPromises);
     
-    // Log batch results
+    // Log batch results with detailed information
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`Batch ${index} failed:`, result.reason);
+        console.error(`❌ Batch ${index} failed:`, result.reason);
       } else {
-        console.log(`Batch ${index} completed:`, result.value);
+        console.log(`✅ Batch ${index} completed:`, result.value);
       }
     });
 
@@ -77,7 +76,7 @@ class ProductionQueueProcessor {
     const jobsBySource = new Map<string, any[]>();
     
     jobs.forEach(job => {
-      const sourceId = job.source_id;
+      const sourceId = job.source_id || 'unknown';
       if (!jobsBySource.has(sourceId)) {
         jobsBySource.set(sourceId, []);
       }
@@ -104,7 +103,7 @@ class ProductionQueueProcessor {
       batches.push(currentBatch);
     }
 
-    console.log(`📦 Created ${batches.length} optimized batches`);
+    console.log(`📦 Created ${batches.length} optimized batches (max ${this.BATCH_SIZE} jobs each)`);
     return batches;
   }
 
@@ -112,76 +111,48 @@ class ProductionQueueProcessor {
     let processed = 0;
     let failed = 0;
 
-    // Claim all jobs in this batch atomically
-    const jobIds = jobs.map(job => job.id);
-    
-    const { data: claimedJobs, error: claimError } = await this.supabase
-      .from('background_jobs')
-      .update({
-        status: 'processing',
-        started_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .in('id', jobIds)
-      .eq('status', 'pending')
-      .select();
+    console.log(`🔄 Processing batch of ${jobs.length} jobs`);
 
-    if (claimError) {
-      console.error('Error claiming batch jobs:', claimError);
-      return { processed: 0, failed: jobs.length };
-    }
-
-    const actuallyClaimedIds = new Set(claimedJobs?.map(j => j.id) || []);
-    const successfullyClaimed = jobs.filter(job => actuallyClaimedIds.has(job.id));
-
-    console.log(`🔒 Claimed ${successfullyClaimed.length}/${jobs.length} jobs in batch`);
-
-    // Process each claimed job
-    for (const job of successfullyClaimed) {
+    // Process each job individually with proper error isolation
+    for (const job of jobs) {
       try {
-        await this.processIndividualJob(job);
-        processed++;
+        const success = await this.processIndividualJobSafely(job);
+        if (success) {
+          processed++;
+        } else {
+          failed++;
+        }
       } catch (error) {
-        console.error(`Job ${job.id} failed:`, error);
+        console.error(`❌ Job ${job.id} failed:`, error);
         await this.handleJobFailure(job, error);
         failed++;
       }
     }
 
+    console.log(`✅ Batch completed: ${processed} processed, ${failed} failed`);
     return { processed, failed };
   }
 
-  private async processIndividualJob(job: any): Promise<void> {
+  private async processIndividualJobSafely(job: any): Promise<boolean> {
     const startTime = Date.now();
     
     try {
-      // Dispatch based on job type
-      switch (job.job_type) {
-        case 'process_page':
-          await this.processPageJob(job);
-          break;
-        case 'crawl_pages':
-          await this.processCrawlJob(job);
-          break;
-        case 'train_pages':
-          await this.processTrainingJob(job);
-          break;
-        default:
-          throw new Error(`Unknown job type: ${job.job_type}`);
+      // Step 1: Claim the job atomically
+      const claimed = await this.claimJobAtomically(job.id);
+      if (!claimed) {
+        console.log(`⚠️ Job ${job.id} already claimed by another worker`);
+        return false; // Not an error, just already processed
       }
 
-      // Mark job as completed
-      await this.supabase
-        .from('background_jobs')
-        .update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', job.id);
+      console.log(`🔒 Successfully claimed job ${job.id} (${job.job_type})`);
 
-      const processingTime = Date.now() - startTime;
-      console.log(`✅ Job ${job.id} completed in ${processingTime}ms`);
+      // Step 2: Process the job
+      await this.processIndividualJob(job);
+
+      // Step 3: Mark as completed
+      await this.markJobCompleted(job.id, startTime);
+      
+      return true;
 
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -190,58 +161,153 @@ class ProductionQueueProcessor {
     }
   }
 
+  private async claimJobAtomically(jobId: string): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .from('background_jobs')
+        .update({
+          status: 'processing',
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId)
+        .eq('status', 'pending') // Only claim if still pending
+        .select();
+
+      if (error) {
+        console.error('Error claiming job:', error);
+        return false;
+      }
+
+      return data && data.length > 0;
+    } catch (error) {
+      console.error('Failed to claim job atomically:', error);
+      return false;
+    }
+  }
+
+  private async processIndividualJob(job: any): Promise<void> {
+    // Dispatch based on job type with proper parameter handling
+    switch (job.job_type) {
+      case 'process_page':
+        await this.processPageJob(job);
+        break;
+      case 'crawl_pages':
+        await this.processCrawlJob(job);
+        break;
+      case 'train_pages':
+        await this.processTrainingJob(job);
+        break;
+      default:
+        throw new Error(`Unknown job type: ${job.job_type}`);
+    }
+  }
+
   private async processPageJob(job: any): Promise<void> {
-    // Call the existing child job processor for page processing
+    // FIXED: Send correct parameter name 'childJobId' instead of 'pageId'
+    const payload = {
+      childJobId: job.page_id, // This is the correct parameter name expected by child-job-processor
+    };
+
+    console.log(`📄 Processing page job ${job.id} with payload:`, payload);
+
+    if (!payload.childJobId) {
+      throw new Error(`Missing page_id for process_page job ${job.id}`);
+    }
+
     const { error } = await this.supabase.functions.invoke('child-job-processor', {
-      body: { 
-        jobId: job.id,
-        pageId: job.page_id,
-        priority: 'high'
+      body: payload
+    });
+
+    if (error) {
+      console.error(`Child job processor error for job ${job.id}:`, error);
+      throw new Error(`Child job processor failed: ${error.message}`);
+    }
+
+    console.log(`✅ Page job ${job.id} processed successfully`);
+  }
+
+  private async processCrawlJob(job: any): Promise<void> {
+    console.log(`🕷️ Processing crawl job ${job.id}`);
+    
+    // Validate required payload
+    if (!job.payload || !job.source_id) {
+      throw new Error(`Missing required data for crawl job ${job.id}`);
+    }
+
+    // Trigger enhanced crawl for source
+    const { error } = await this.supabase.functions.invoke('enhanced-crawl-website', {
+      body: {
+        ...job.payload,
+        sourceId: job.source_id
       }
     });
 
     if (error) {
-      throw new Error(`Child job processor failed: ${error.message}`);
-    }
-  }
-
-  private async processCrawlJob(job: any): Promise<void> {
-    // Trigger enhanced crawl for source
-    const { error } = await this.supabase.functions.invoke('enhanced-crawl-website', {
-      body: job.payload
-    });
-
-    if (error) {
+      console.error(`Enhanced crawl error for job ${job.id}:`, error);
       throw new Error(`Enhanced crawl failed: ${error.message}`);
     }
+
+    console.log(`✅ Crawl job ${job.id} processed successfully`);
   }
 
   private async processTrainingJob(job: any): Promise<void> {
-    // Process training job (placeholder for actual training logic)
-    console.log(`🎓 Processing training job for source: ${job.source_id}`);
+    console.log(`🎓 Processing training job ${job.id} for source: ${job.source_id}`);
     
-    // This would call your actual training service
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate training
+    // Validate required data
+    if (!job.source_id) {
+      throw new Error(`Missing source_id for training job ${job.id}`);
+    }
+
+    // Simulate training processing (replace with actual training service call)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    console.log(`✅ Training job ${job.id} processed successfully`);
+  }
+
+  private async markJobCompleted(jobId: string, startTime: number): Promise<void> {
+    const processingTime = Date.now() - startTime;
+    
+    const { error } = await this.supabase
+      .from('background_jobs')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    if (error) {
+      console.error('Error marking job as completed:', error);
+      throw error;
+    }
+
+    console.log(`✅ Job ${jobId} marked as completed (${processingTime}ms)`);
   }
 
   private async handleJobFailure(job: any, error: any): Promise<void> {
-    const newAttempts = job.attempts + 1;
+    const newAttempts = (job.attempts || 0) + 1;
     const maxAttempts = job.max_attempts || 3;
 
+    console.log(`🔄 Handling failure for job ${job.id} (attempt ${newAttempts}/${maxAttempts})`);
+
     if (newAttempts >= maxAttempts) {
-      // Move to dead letter queue
+      // Move to failed state
       await this.supabase
         .from('background_jobs')
         .update({
-          status: 'dead_letter',
+          status: 'failed',
           error_message: `Max attempts reached: ${error.message}`,
+          attempts: newAttempts,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', job.id);
+        
+      console.log(`💀 Job ${job.id} moved to failed state after ${newAttempts} attempts`);
     } else {
       // Schedule retry with exponential backoff
-      const retryDelay = Math.pow(2, newAttempts) * 1000;
+      const retryDelay = Math.pow(2, newAttempts) * 5000; // 5s, 10s, 20s...
       const scheduledAt = new Date(Date.now() + retryDelay).toISOString();
       
       await this.supabase
@@ -255,6 +321,8 @@ class ProductionQueueProcessor {
           updated_at: new Date().toISOString()
         })
         .eq('id', job.id);
+
+      console.log(`🔄 Job ${job.id} scheduled for retry in ${retryDelay}ms (attempt ${newAttempts})`);
     }
   }
 
@@ -282,7 +350,7 @@ class ProductionQueueProcessor {
     const pending = metrics.filter(m => m.status === 'pending').length;
     const processing = metrics.filter(m => m.status === 'processing').length;
     const completed = metrics.filter(m => m.status === 'completed').length;
-    const failed = metrics.filter(m => m.status === 'failed' || m.status === 'dead_letter').length;
+    const failed = metrics.filter(m => m.status === 'failed').length;
 
     // Calculate throughput (completed jobs per hour)
     const throughput = completed;
@@ -302,11 +370,12 @@ class ProductionQueueProcessor {
 
     // Determine queue health
     let queueHealth: 'healthy' | 'degraded' | 'critical' = 'healthy';
-    const failureRate = failed / (completed + failed || 1);
+    const totalJobs = pending + processing + completed + failed;
+    const failureRate = totalJobs > 0 ? failed / totalJobs : 0;
     
-    if (pending > 1000 || failureRate > 0.1) {
+    if (pending > 500 || failureRate > 0.2) {
       queueHealth = 'critical';
-    } else if (pending > 500 || failureRate > 0.05) {
+    } else if (pending > 100 || failureRate > 0.1) {
       queueHealth = 'degraded';
     }
 
