@@ -16,6 +16,7 @@ import KnowledgeBaseSourcePage from './pages/SourcesPage';
 import ChatHistoryPage from './pages/ActivityPage';
 import AgentSettingsPage from './pages/AgentSettingsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
+import LeadsPage from './pages/LeadsPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MonitoringDashboard } from './components/monitoring/MonitoringDashboard';
 
@@ -66,7 +67,7 @@ function App() {
                 path="/agent/:agentId/activity/leads"
                 element={
                   <AuthProvider>
-                    <ChatHistoryPage />
+                    <LeadsPage />
                   </AuthProvider>
                 }
               />
