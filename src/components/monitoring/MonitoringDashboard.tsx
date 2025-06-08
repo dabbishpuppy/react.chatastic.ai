@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ import { InfrastructureHealthMonitor } from './InfrastructureHealthMonitor';
 import { AgentSelector } from './AgentSelector';
 import { TestingIntegration } from './TestingIntegration';
 import { AgentManagementShortcuts } from './AgentManagementShortcuts';
+import { CostMonitoringDashboard } from './CostMonitoringDashboard';
 import { RAGSystemTestRunner } from '@/components/testing/RAGSystemTestRunner';
 import { useToast } from '@/hooks/use-toast';
 
@@ -239,11 +241,12 @@ export const MonitoringDashboard: React.FC = () => {
 
       {/* Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid grid-cols-6 lg:grid-cols-12 w-full">
+        <TabsList className="grid grid-cols-7 lg:grid-cols-13 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="health">Health Check</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="testing">Testing</TabsTrigger>
+          <TabsTrigger value="costs">Cost Monitoring</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="production">Production Queue</TabsTrigger>
           <TabsTrigger value="production-crawl">Production Crawl</TabsTrigger>
@@ -296,6 +299,13 @@ export const MonitoringDashboard: React.FC = () => {
 
         <TabsContent value="testing" className="space-y-4">
           <RAGSystemTestRunner />
+        </TabsContent>
+
+        <TabsContent value="costs" className="space-y-4">
+          <CostMonitoringDashboard 
+            teamId="team-1" 
+            agentId={selectedAgentId || undefined}
+          />
         </TabsContent>
 
         <TabsContent value="queue" className="space-y-4">
