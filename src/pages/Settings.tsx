@@ -1,8 +1,14 @@
 
 import React, { useEffect } from "react";
-import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard, BarChart3 } from "lucide-react";
 import Logo from "@/components/layout/Logo";
+import GeneralSettings from "./settings/General";
+import MembersSettings from "./settings/Members";
+import PlansSettings from "./settings/Plans";
+import BillingSettings from "./settings/Billing";
+import ApiKeysSettings from "./settings/ApiKeys";
+import UsageSettings from "./settings/Usage";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -56,7 +62,14 @@ const Settings = () => {
         {/* Main content */}
         <div className="flex-1 overflow-auto p-6 bg-[#f5f5f5]">
           <div className="max-w-6xl mx-auto">
-            <Outlet />
+            <Routes>
+              <Route path="general" element={<GeneralSettings />} />
+              <Route path="members" element={<MembersSettings />} />
+              <Route path="plans" element={<PlansSettings />} />
+              <Route path="billing" element={<BillingSettings />} />
+              <Route path="api-keys" element={<ApiKeysSettings />} />
+              <Route path="usage" element={<UsageSettings />} />
+            </Routes>
           </div>
         </div>
       </div>
