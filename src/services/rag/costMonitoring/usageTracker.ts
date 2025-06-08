@@ -33,7 +33,7 @@ export class UsageTracker {
     'gemini': {
       'gemini-1.5-pro': { input: 0.00125 / 1000, output: 0.005 / 1000 }
     }
-  };
+  } as const;
 
   /**
    * Track token usage for billing
@@ -48,13 +48,12 @@ export class UsageTracker {
         timestamp: new Date().toISOString()
       };
 
-      // Store in audit table for billing
+      // Store in audit table with 'query' action (closest available action type)
       const { error } = await supabase
         .from('audit_logs')
         .insert({
-          team_id: usage.teamId,
           agent_id: usage.agentId,
-          action: 'token_usage',
+          action: 'query',
           resource_type: 'llm_request',
           metadata: tokenUsage
         });
@@ -82,8 +81,7 @@ export class UsageTracker {
       let query = supabase
         .from('audit_logs')
         .select('metadata, created_at')
-        .eq('team_id', teamId)
-        .eq('action', 'token_usage')
+        .eq('action', 'query')
         .eq('resource_type', 'llm_request');
 
       if (agentId) {
@@ -110,13 +108,21 @@ export class UsageTracker {
   }
 
   private static calculateCost(provider: string, model: string, inputTokens: number, outputTokens: number): number {
-    const costs = this.COST_PER_TOKEN[provider as keyof typeof this.COST_PER_TOKEN];
-    if (!costs || !costs[model as keyof typeof costs]) {
-      console.warn(`⚠️ Unknown cost for ${provider}/${model}, using default`);
+    type Provider = keyof typeof this.COST_PER_TOKEN;
+    
+    if (!(provider in this.COST_PER_TOKEN)) {
+      console.warn(`⚠️ Unknown provider ${provider}, using default`);
       return (inputTokens + outputTokens) * 0.001; // Default fallback
     }
 
-    const modelCosts = costs[model as keyof typeof costs];
+    const providerCosts = this.COST_PER_TOKEN[provider as Provider];
+    
+    if (!(model in providerCosts)) {
+      console.warn(`⚠️ Unknown model ${model} for provider ${provider}, using default`);
+      return (inputTokens + outputTokens) * 0.001; // Default fallback
+    }
+
+    const modelCosts = providerCosts[model as keyof typeof providerCosts];
     return (inputTokens * modelCosts.input) + (outputTokens * modelCosts.output);
   }
 
