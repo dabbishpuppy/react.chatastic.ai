@@ -1,7 +1,7 @@
 
 import React, { useEffect } from "react";
 import { Routes, Route, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard, BarChart3, Monitor } from "lucide-react";
+import { Settings as SettingsIcon, Users, Package, CreditCard, Key, LayoutDashboard, BarChart3 } from "lucide-react";
 import Logo from "@/components/layout/Logo";
 import GeneralSettings from "./settings/General";
 import MembersSettings from "./settings/Members";
@@ -9,7 +9,6 @@ import PlansSettings from "./settings/Plans";
 import BillingSettings from "./settings/Billing";
 import ApiKeysSettings from "./settings/ApiKeys";
 import UsageSettings from "./settings/Usage";
-import { MonitoringDashboard } from "@/components/monitoring/MonitoringDashboard";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -30,7 +29,6 @@ const Settings = () => {
     { to: "/settings/billing", label: "Billing", icon: <CreditCard size={18} /> },
     { to: "/settings/api-keys", label: "API Keys", icon: <Key size={18} /> },
     { to: "/settings/usage", label: "Usage", icon: <BarChart3 size={18} /> },
-    { to: "/settings/monitoring", label: "Monitoring", icon: <Monitor size={18} /> },
   ];
 
   return (
@@ -71,7 +69,6 @@ const Settings = () => {
               <Route path="billing" element={<BillingSettings />} />
               <Route path="api-keys" element={<ApiKeysSettings />} />
               <Route path="usage" element={<UsageSettings />} />
-              <Route path="monitoring" element={<MonitoringDashboard />} />
             </Routes>
           </div>
         </div>
