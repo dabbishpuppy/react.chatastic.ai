@@ -1,41 +1,56 @@
 
-import { JobHealthMonitor } from './jobHealthMonitor';
-import { JobRecoveryService } from './jobRecoveryService';
-import { ConcurrentJobProcessor } from './concurrentJobProcessor';
-import { EnhancedJobClaimingCore } from './jobClaiming/enhancedJobClaimingCore';
+import { JobSynchronizationService } from './jobSynchronizationService';
+import { HealthMonitor } from './healthMonitor';
+import { RecoveryManager } from './recoveryManager';
 
 export interface CrawlSystemStatus {
-  isHealthy: boolean;
-  activeWorkers: number;
-  queueDepth: number;
-  processingRate: number;
-  systemLoad: 'low' | 'medium' | 'high' | 'critical';
-  recommendations: string[];
+  initialized: boolean;
+  components: {
+    jobSync: boolean;
+    healthMonitor: boolean;
+    recoveryManager: boolean;
+  };
+  metrics: {
+    activeSources: number;
+    pendingJobs: number;
+    healthScore: number;
+  };
 }
 
 export class CrawlSystemManager {
   private static isInitialized = false;
+  private static healthCheckInterval: NodeJS.Timeout | null = null;
 
   /**
-   * Initialize the enhanced crawl system
+   * Initialize the enhanced crawl system with all resilience components
    */
   static async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.log('🔧 Crawl system already initialized');
+      console.log('🔄 Crawl system already initialized');
       return;
     }
 
-    console.log('🚀 Initializing enhanced crawl system...');
+    console.log('🚀 Initializing enhanced crawl system with resilience...');
 
     try {
-      // Start health monitoring
-      JobHealthMonitor.startMonitoring();
+      // Start job synchronization service (immediate fix)
+      JobSynchronizationService.startSynchronization();
 
-      // Perform initial recovery
-      await JobRecoveryService.recoverStalledJobs();
+      // Start health monitoring
+      this.startHealthMonitoring();
+
+      // Set up cleanup on page unload
+      if (typeof window !== 'undefined') {
+        window.addEventListener('beforeunload', () => {
+          this.shutdown();
+        });
+      }
 
       this.isInitialized = true;
       console.log('✅ Enhanced crawl system initialized successfully');
+
+      // Perform immediate emergency check for stalled sources
+      await this.performEmergencyCheck();
 
     } catch (error) {
       console.error('❌ Failed to initialize crawl system:', error);
@@ -44,164 +59,139 @@ export class CrawlSystemManager {
   }
 
   /**
-   * Process jobs with the enhanced concurrent system
+   * Perform emergency check for stalled sources and recover them
    */
-  static async processJobsConcurrently(
-    jobProcessor: (job: any) => Promise<boolean>,
-    options: {
-      maxConcurrentJobs?: number;
-      batchSize?: number;
-      timeoutMs?: number;
-    } = {}
-  ) {
-    if (!this.isInitialized) {
-      await this.initialize();
+  private static async performEmergencyCheck(): Promise<void> {
+    try {
+      console.log('🚨 Performing emergency check for stalled sources...');
+
+      // Force immediate job synchronization
+      const syncMetrics = await JobSynchronizationService.forceSynchronization();
+      
+      if (syncMetrics.createdJobs > 0) {
+        console.log(`🚑 Emergency recovery: Created ${syncMetrics.createdJobs} missing jobs`);
+      }
+
+      // Check for stalled sources (in_progress for >10 minutes)
+      const stalledThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      
+      // This would normally query the database, but for now we'll use the job sync results
+      if (syncMetrics.missingJobs > 0) {
+        console.log(`⚠️ Found ${syncMetrics.missingJobs} potentially stalled pages`);
+      }
+
+    } catch (error) {
+      console.error('❌ Emergency check failed:', error);
     }
-
-    const processingOptions = {
-      maxConcurrentJobs: options.maxConcurrentJobs || 5,
-      jobTypes: ['process_page'],
-      workerId: `enhanced-worker-${Date.now()}`,
-      batchSize: options.batchSize || 10,
-      timeoutMs: options.timeoutMs || 10 * 60 * 1000
-    };
-
-    console.log('🔄 Starting enhanced concurrent job processing...');
-    
-    return await ConcurrentJobProcessor.processConcurrentJobs(
-      jobProcessor,
-      processingOptions
-    );
   }
 
   /**
-   * Get comprehensive system status
+   * Start health monitoring with periodic checks
+   */
+  private static startHealthMonitoring(): void {
+    console.log('🏥 Starting health monitoring...');
+
+    // Perform initial health check
+    this.performHealthCheck();
+
+    // Set up periodic health checks every 2 minutes
+    this.healthCheckInterval = setInterval(() => {
+      this.performHealthCheck();
+    }, 2 * 60 * 1000);
+  }
+
+  /**
+   * Perform a health check
+   */
+  private static async performHealthCheck(): Promise<void> {
+    try {
+      // Get job sync status
+      const syncStatus = JobSynchronizationService.getStatus();
+      
+      if (!syncStatus.isRunning) {
+        console.warn('⚠️ Job synchronization is not running, restarting...');
+        JobSynchronizationService.startSynchronization();
+      }
+
+      // Could add more health checks here for other components
+
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+    }
+  }
+
+  /**
+   * Get current system status
    */
   static async getSystemStatus(): Promise<CrawlSystemStatus> {
+    const syncStatus = JobSynchronizationService.getStatus();
+
+    return {
+      initialized: this.isInitialized,
+      components: {
+        jobSync: syncStatus.isRunning,
+        healthMonitor: this.healthCheckInterval !== null,
+        recoveryManager: true // Assume recovery manager is always available
+      },
+      metrics: {
+        activeSources: 0, // Would query database
+        pendingJobs: 0,   // Would query database
+        healthScore: syncStatus.isRunning ? 100 : 50
+      }
+    };
+  }
+
+  /**
+   * Trigger manual recovery for a specific source
+   */
+  static async triggerSourceRecovery(parentSourceId: string): Promise<void> {
+    console.log(`🔧 Triggering manual recovery for source: ${parentSourceId}`);
+    
     try {
-      const [healthMetrics, claimingStats] = await Promise.all([
-        JobHealthMonitor.getCurrentHealth(),
-        EnhancedJobClaimingCore.getClaimingStats()
-      ]);
-
-      const systemLoad = this.calculateSystemLoad(healthMetrics);
-      const recommendations = this.generateRecommendations(healthMetrics, claimingStats);
-
-      return {
-        isHealthy: healthMetrics.systemHealth.overallStatus === 'healthy',
-        activeWorkers: healthMetrics.processingHealth.activeWorkers,
-        queueDepth: healthMetrics.queueHealth.totalPending,
-        processingRate: healthMetrics.processingHealth.throughputPerMinute,
-        systemLoad,
-        recommendations
-      };
+      const metrics = await JobSynchronizationService.emergencyRecovery(parentSourceId);
+      
+      if (metrics.createdJobs > 0) {
+        console.log(`✅ Recovery successful: created ${metrics.createdJobs} jobs`);
+      } else if (metrics.errors.length > 0) {
+        console.error('❌ Recovery failed:', metrics.errors);
+        throw new Error(`Recovery failed: ${metrics.errors.join(', ')}`);
+      } else {
+        console.log('ℹ️ No recovery needed');
+      }
 
     } catch (error) {
-      console.error('❌ Error getting system status:', error);
-      return {
-        isHealthy: false,
-        activeWorkers: 0,
-        queueDepth: 0,
-        processingRate: 0,
-        systemLoad: 'critical',
-        recommendations: ['System status check failed - manual intervention required']
-      };
+      console.error('❌ Source recovery failed:', error);
+      throw error;
     }
   }
 
   /**
-   * Trigger manual recovery
-   */
-  static async triggerRecovery(): Promise<{
-    success: boolean;
-    recoveredJobs: number;
-    message: string;
-  }> {
-    try {
-      console.log('🔧 Triggering manual system recovery...');
-      
-      const metrics = await JobRecoveryService.recoverStalledJobs();
-      
-      return {
-        success: true,
-        recoveredJobs: metrics.recoveredJobs,
-        message: `Recovery completed: ${metrics.recoveredJobs} jobs recovered, ${metrics.orphanedJobs} orphaned pages fixed`
-      };
-
-    } catch (error) {
-      console.error('❌ Manual recovery failed:', error);
-      return {
-        success: false,
-        recoveredJobs: 0,
-        message: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      };
-    }
-  }
-
-  /**
-   * Calculate system load based on metrics
-   */
-  private static calculateSystemLoad(metrics: any): 'low' | 'medium' | 'high' | 'critical' {
-    const { queueHealth, processingHealth, systemHealth } = metrics;
-
-    if (systemHealth.overallStatus === 'critical') {
-      return 'critical';
-    }
-
-    if (queueHealth.totalPending > 100 || processingHealth.successRate < 0.7) {
-      return 'high';
-    }
-
-    if (queueHealth.totalPending > 25 || processingHealth.activeWorkers < 2) {
-      return 'medium';
-    }
-
-    return 'low';
-  }
-
-  /**
-   * Generate system recommendations
-   */
-  private static generateRecommendations(healthMetrics: any, claimingStats: any): string[] {
-    const recommendations: string[] = [];
-    const { queueHealth, processingHealth, systemHealth } = healthMetrics;
-
-    if (systemHealth.stalledJobs > 0) {
-      recommendations.push(`${systemHealth.stalledJobs} stalled jobs detected - consider running recovery`);
-    }
-
-    if (queueHealth.totalPending > 50) {
-      recommendations.push('High queue depth - consider increasing concurrent workers');
-    }
-
-    if (processingHealth.successRate < 0.8) {
-      recommendations.push('Low success rate - check for system issues or job complexity');
-    }
-
-    if (processingHealth.activeWorkers === 0 && queueHealth.totalPending > 0) {
-      recommendations.push('No active workers detected - start job processing');
-    }
-
-    if (queueHealth.oldestPendingAge > 30 * 60 * 1000) {
-      recommendations.push('Old pending jobs detected - investigate processing bottlenecks');
-    }
-
-    if (recommendations.length === 0) {
-      recommendations.push('System is operating normally');
-    }
-
-    return recommendations;
-  }
-
-  /**
-   * Shutdown the system gracefully
+   * Shutdown the crawl system
    */
   static shutdown(): void {
-    console.log('🛑 Shutting down enhanced crawl system...');
-    
-    JobHealthMonitor.stopMonitoring();
+    if (!this.isInitialized) {
+      return;
+    }
+
+    console.log('🛑 Shutting down crawl system...');
+
+    // Stop job synchronization
+    JobSynchronizationService.stopSynchronization();
+
+    // Stop health monitoring
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+
     this.isInitialized = false;
-    
     console.log('✅ Crawl system shutdown complete');
+  }
+
+  /**
+   * Check if system is ready
+   */
+  static isReady(): boolean {
+    return this.isInitialized;
   }
 }

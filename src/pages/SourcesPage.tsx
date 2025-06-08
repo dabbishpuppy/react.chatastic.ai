@@ -22,9 +22,9 @@ const SourcesPage: React.FC = () => {
 
     const initializeEnhancedCrawlSystem = async () => {
       try {
-        console.log('🚀 Initializing enhanced crawl system...');
+        console.log('🚀 Initializing enhanced crawl system with resilience...');
         
-        // Initialize the enhanced crawl system
+        // Initialize the enhanced crawl system with job synchronization
         await CrawlSystemManager.initialize();
         
         // Perform initial recovery of stuck jobs
@@ -40,7 +40,7 @@ const SourcesPage: React.FC = () => {
         }
         
         if (isComponentMounted) {
-          console.log('✅ Enhanced crawl system with automation initialized successfully');
+          console.log('✅ Enhanced crawl system with resilience initialized successfully');
         }
       } catch (error) {
         console.error('❌ Failed to initialize enhanced crawl system:', error);
