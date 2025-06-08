@@ -35,19 +35,82 @@ export class CrawlApiService {
 
   static async checkCrawlStatus(parentSourceId: string): Promise<CrawlStatus> {
     try {
-      const { data, error } = await supabase.functions.invoke('crawl-status-aggregator', {
+      // Use the status-aggregator function with proper error handling
+      const { data, error } = await supabase.functions.invoke('status-aggregator', {
         body: { parentSourceId }
       });
 
       if (error) {
         console.error('Status check error:', error);
-        throw new Error(`Status check failed: ${error.message}`);
+        // Fall back to direct database query if aggregator fails
+        return await this.fallbackStatusCheck(parentSourceId);
       }
 
       return data;
     } catch (error: any) {
       console.error('❌ Status check API error:', error);
-      throw new Error(`Status check failed: ${error.message || 'Unknown error'}`);
+      // Fall back to direct database query
+      return await this.fallbackStatusCheck(parentSourceId);
+    }
+  }
+
+  private static async fallbackStatusCheck(parentSourceId: string): Promise<CrawlStatus> {
+    try {
+      console.log('🔄 Using fallback status check for:', parentSourceId);
+      
+      // Get source info
+      const { data: source, error: sourceError } = await supabase
+        .from('agent_sources')
+        .select('crawl_status, progress, total_jobs, completed_jobs, failed_jobs')
+        .eq('id', parentSourceId)
+        .single();
+
+      if (sourceError || !source) {
+        throw new Error(`Source not found: ${sourceError?.message}`);
+      }
+
+      // Get basic page counts
+      const { data: pages, error: pagesError } = await supabase
+        .from('source_pages')
+        .select('status')
+        .eq('parent_source_id', parentSourceId);
+
+      if (pagesError) {
+        console.warn('Could not fetch pages for status check:', pagesError);
+      }
+
+      const pageStats = {
+        total: pages?.length || 0,
+        completed: pages?.filter(p => p.status === 'completed').length || 0,
+        failed: pages?.filter(p => p.status === 'failed').length || 0,
+        pending: pages?.filter(p => p.status === 'pending').length || 0,
+        inProgress: pages?.filter(p => p.status === 'in_progress').length || 0
+      };
+
+      return {
+        status: source.crawl_status || 'pending',
+        progress: source.progress || 0,
+        totalJobs: pageStats.total,
+        completedJobs: pageStats.completed,
+        failedJobs: pageStats.failed,
+        pendingJobs: pageStats.pending,
+        inProgressJobs: pageStats.inProgress,
+        parentSourceId
+      };
+
+    } catch (error: any) {
+      console.error('❌ Fallback status check failed:', error);
+      return {
+        status: 'error',
+        progress: 0,
+        totalJobs: 0,
+        completedJobs: 0,
+        failedJobs: 0,
+        pendingJobs: 0,
+        inProgressJobs: 0,
+        parentSourceId,
+        error: error.message
+      };
     }
   }
 

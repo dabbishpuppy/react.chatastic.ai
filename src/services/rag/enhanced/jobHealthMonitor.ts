@@ -104,92 +104,151 @@ export class JobHealthMonitor {
   }
 
   /**
-   * Get queue health metrics
+   * Get queue health metrics with proper error handling
    */
   private static async getQueueHealth() {
-    const [pendingCount, processingCount, failedCount, oldestPending] = await Promise.all([
-      supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
-      supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'failed'),
-      supabase.from('background_jobs')
+    try {
+      const [pendingResult, processingResult, failedResult] = await Promise.all([
+        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'processing'),
+        supabase.from('background_jobs').select('*', { count: 'exact', head: true }).eq('status', 'failed')
+      ]);
+
+      // Get oldest pending job with proper error handling
+      const { data: oldestPending } = await supabase
+        .from('background_jobs')
         .select('created_at')
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
         .limit(1)
-        .single()
-    ]);
+        .maybeSingle(); // Use maybeSingle instead of single to avoid 406 errors
 
-    const oldestPendingAge = oldestPending.data 
-      ? Date.now() - new Date(oldestPending.data.created_at).getTime()
-      : 0;
+      const oldestPendingAge = oldestPending 
+        ? Date.now() - new Date(oldestPending.created_at).getTime()
+        : 0;
 
-    // Calculate average queue wait time from recent completed jobs
-    const { data: recentCompleted } = await supabase
-      .from('background_jobs')
-      .select('created_at, started_at')
-      .eq('status', 'completed')
-      .gte('completed_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
-      .not('started_at', 'is', null);
+      // Calculate average queue wait time from recent completed jobs
+      const { data: recentCompleted } = await supabase
+        .from('background_jobs')
+        .select('created_at, started_at')
+        .eq('status', 'completed')
+        .gte('completed_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
+        .not('started_at', 'is', null);
 
-    let avgQueueWaitTime = 0;
-    if (recentCompleted && recentCompleted.length > 0) {
-      const waitTimes = recentCompleted.map(job => 
-        new Date(job.started_at!).getTime() - new Date(job.created_at).getTime()
-      );
-      avgQueueWaitTime = waitTimes.reduce((sum, time) => sum + time, 0) / waitTimes.length;
+      let avgQueueWaitTime = 0;
+      if (recentCompleted && recentCompleted.length > 0) {
+        const waitTimes = recentCompleted.map(job => 
+          new Date(job.started_at!).getTime() - new Date(job.created_at).getTime()
+        );
+        avgQueueWaitTime = waitTimes.reduce((sum, time) => sum + time, 0) / waitTimes.length;
+      }
+
+      return {
+        totalPending: pendingResult.count || 0,
+        totalProcessing: processingResult.count || 0,
+        totalFailed: failedResult.count || 0,
+        oldestPendingAge,
+        avgQueueWaitTime
+      };
+
+    } catch (error) {
+      console.error('❌ Error getting queue health:', error);
+      return {
+        totalPending: 0,
+        totalProcessing: 0,
+        totalFailed: 0,
+        oldestPendingAge: 0,
+        avgQueueWaitTime: 0
+      };
     }
-
-    return {
-      totalPending: pendingCount.count || 0,
-      totalProcessing: processingCount.count || 0,
-      totalFailed: failedCount.count || 0,
-      oldestPendingAge,
-      avgQueueWaitTime
-    };
   }
 
   /**
    * Get processing health metrics
    */
   private static async getProcessingHealth() {
-    const stats = await ConcurrentJobProcessor.getProcessingStats();
-    
-    // Calculate throughput per minute
-    const { data: recentJobs } = await supabase
-      .from('background_jobs')
-      .select('completed_at')
-      .eq('status', 'completed')
-      .gte('completed_at', new Date(Date.now() - 60 * 1000).toISOString()); // Last minute
+    try {
+      // Get processing stats with fallback
+      let stats;
+      try {
+        stats = await ConcurrentJobProcessor.getProcessingStats();
+      } catch (error) {
+        console.warn('Could not get processing stats, using defaults:', error);
+        stats = {
+          activeWorkers: 0,
+          avgProcessingTime: 0,
+          successRate: 1.0
+        };
+      }
+      
+      // Calculate throughput per minute
+      const { data: recentJobs } = await supabase
+        .from('background_jobs')
+        .select('completed_at')
+        .eq('status', 'completed')
+        .gte('completed_at', new Date(Date.now() - 60 * 1000).toISOString()); // Last minute
 
-    const throughputPerMinute = recentJobs?.length || 0;
+      const throughputPerMinute = recentJobs?.length || 0;
 
-    return {
-      activeWorkers: stats.activeWorkers,
-      avgProcessingTime: stats.avgProcessingTime,
-      successRate: stats.successRate,
-      throughputPerMinute
-    };
+      return {
+        activeWorkers: stats.activeWorkers,
+        avgProcessingTime: stats.avgProcessingTime,
+        successRate: stats.successRate,
+        throughputPerMinute
+      };
+
+    } catch (error) {
+      console.error('❌ Error getting processing health:', error);
+      return {
+        activeWorkers: 0,
+        avgProcessingTime: 0,
+        successRate: 0,
+        throughputPerMinute: 0
+      };
+    }
   }
 
   /**
    * Get system health metrics
    */
   private static async getSystemHealth() {
-    const recoveryStats = await JobRecoveryService.getRecoveryStats();
-    
-    // Check for orphaned pages
-    const { count: orphanedPages } = await supabase
-      .from('source_pages')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()); // Older than 30 minutes
+    try {
+      // Get recovery stats with fallback
+      let recoveryStats;
+      try {
+        recoveryStats = await JobRecoveryService.getRecoveryStats();
+      } catch (error) {
+        console.warn('Could not get recovery stats, using defaults:', error);
+        recoveryStats = {
+          stalledJobs: 0,
+          oldestStalledJob: null,
+          recoverySuccess: true
+        };
+      }
+      
+      // Check for orphaned pages (source_pages instead of just background_jobs)
+      const { count: orphanedPages } = await supabase
+        .from('source_pages')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .lt('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString()); // Older than 30 minutes
 
-    return {
-      stalledJobs: recoveryStats.stalledJobs,
-      orphanedPages: orphanedPages || 0,
-      lastRecoveryTime: null, // We'll track this separately
-      overallStatus: 'healthy' as const
-    };
+      return {
+        stalledJobs: recoveryStats.stalledJobs,
+        orphanedPages: orphanedPages || 0,
+        lastRecoveryTime: null, // We'll track this separately
+        overallStatus: 'healthy' as const
+      };
+
+    } catch (error) {
+      console.error('❌ Error getting system health:', error);
+      return {
+        stalledJobs: 0,
+        orphanedPages: 0,
+        lastRecoveryTime: null,
+        overallStatus: 'critical' as const
+      };
+    }
   }
 
   /**

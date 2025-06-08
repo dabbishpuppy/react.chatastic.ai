@@ -1,233 +1,247 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { JobClaimingCore } from './jobClaiming/jobClaimingCore';
-import { JobStatusManager } from './jobClaiming/jobStatusManager';
+import { EnhancedJobClaimingCore } from './jobClaiming/enhancedJobClaimingCore';
 
-export interface ConcurrentProcessingOptions {
-  maxConcurrentJobs: number;
-  jobTypes: string[];
-  workerId: string;
-  batchSize: number;
-  timeoutMs: number;
+export interface ProcessingOptions {
+  maxConcurrentJobs?: number;
+  jobTypes?: string[];
+  workerId?: string;
+  batchSize?: number;
+  timeoutMs?: number;
 }
 
-export interface ProcessingResult {
+export interface ProcessingStats {
+  activeWorkers: number;
+  avgProcessingTime: number;
+  successRate: number;
   totalProcessed: number;
-  successful: number;
-  failed: number;
-  skipped: number;
-  processingTimeMs: number;
+  totalFailed: number;
 }
 
 export class ConcurrentJobProcessor {
-  private static readonly DEFAULT_OPTIONS: ConcurrentProcessingOptions = {
-    maxConcurrentJobs: 5,
-    jobTypes: ['process_page'],
-    workerId: `worker-${Date.now()}`,
-    batchSize: 10,
-    timeoutMs: 10 * 60 * 1000 // 10 minutes
-  };
+  private static activeWorkers = 0;
+  private static processedJobs = 0;
+  private static failedJobs = 0;
+  private static totalProcessingTime = 0;
 
   /**
-   * Process jobs concurrently with improved efficiency
+   * Process jobs concurrently with enhanced claiming
    */
   static async processConcurrentJobs(
     jobProcessor: (job: any) => Promise<boolean>,
-    options: Partial<ConcurrentProcessingOptions> = {}
-  ): Promise<ProcessingResult> {
-    const config = { ...this.DEFAULT_OPTIONS, ...options };
+    options: ProcessingOptions = {}
+  ): Promise<{
+    processed: number;
+    successful: number;
+    failed: number;
+    processingTimeMs: number;
+  }> {
+    const {
+      maxConcurrentJobs = 5,
+      jobTypes = ['process_page'],
+      workerId = `enhanced-worker-${Date.now()}`,
+      batchSize = 10,
+      timeoutMs = 10 * 60 * 1000 // 10 minutes
+    } = options;
+
+    console.log(`🔄 Starting concurrent job processing with ${maxConcurrentJobs} workers`);
+    
     const startTime = Date.now();
-
-    console.log(`🚀 Starting concurrent job processing with ${config.maxConcurrentJobs} workers`);
-
-    const result: ProcessingResult = {
-      totalProcessed: 0,
-      successful: 0,
-      failed: 0,
-      skipped: 0,
-      processingTimeMs: 0
-    };
+    let totalProcessed = 0;
+    let totalSuccessful = 0;
+    let totalFailed = 0;
 
     try {
-      // Get available jobs in batch
-      const availableJobs = await JobClaimingCore.getNextJobs(
-        config.batchSize,
-        config.jobTypes,
-        config.workerId
+      this.activeWorkers++;
+      
+      // Claim jobs atomically
+      const claimedJobs = await EnhancedJobClaimingCore.claimJobsAtomically(
+        batchSize,
+        jobTypes,
+        workerId
       );
 
-      if (availableJobs.length === 0) {
+      if (claimedJobs.length === 0) {
         console.log('📭 No jobs available for processing');
-        return result;
+        return {
+          processed: 0,
+          successful: 0,
+          failed: 0,
+          processingTimeMs: Date.now() - startTime
+        };
       }
 
-      console.log(`📋 Found ${availableJobs.length} jobs to process`);
+      console.log(`🔒 Successfully claimed ${claimedJobs.length} jobs`);
 
       // Process jobs in concurrent batches
-      const jobBatches = this.createBatches(availableJobs, config.maxConcurrentJobs);
+      const batches = [];
+      for (let i = 0; i < claimedJobs.length; i += maxConcurrentJobs) {
+        batches.push(claimedJobs.slice(i, i + maxConcurrentJobs));
+      }
 
-      for (const batch of jobBatches) {
+      for (const batch of batches) {
+        console.log(`🔄 Processing batch of ${batch.length} jobs`);
+        
         const batchPromises = batch.map(job => 
-          this.processJobWithClaiming(job, jobProcessor, config.workerId, config.timeoutMs)
+          this.processJobWithTimeout(job, jobProcessor, timeoutMs)
         );
 
         const batchResults = await Promise.allSettled(batchPromises);
 
-        // Aggregate results
-        batchResults.forEach((promiseResult, index) => {
-          result.totalProcessed++;
+        // Aggregate batch results
+        batchResults.forEach((result, index) => {
+          totalProcessed++;
           
-          if (promiseResult.status === 'fulfilled') {
-            const jobResult = promiseResult.value;
-            if (jobResult.success) {
-              result.successful++;
-            } else if (jobResult.skipped) {
-              result.skipped++;
-            } else {
-              result.failed++;
-            }
+          if (result.status === 'fulfilled' && result.value) {
+            totalSuccessful++;
+            this.processedJobs++;
           } else {
-            result.failed++;
-            console.error(`❌ Job ${batch[index].id} failed:`, promiseResult.reason);
+            totalFailed++;
+            this.failedJobs++;
+            console.error(`❌ Job ${batch[index].id} processing failed:`, 
+              result.status === 'rejected' ? result.reason : 'Job processor returned false');
           }
         });
 
-        console.log(`✅ Processed batch: ${batch.length} jobs`);
+        console.log(`✅ Batch completed: ${batch.length} jobs processed`);
       }
 
-    } catch (error) {
-      console.error('❌ Concurrent processing failed:', error);
-    }
+      const processingTime = Date.now() - startTime;
+      this.totalProcessingTime += processingTime;
 
-    result.processingTimeMs = Date.now() - startTime;
-    
-    console.log(`🎯 Concurrent processing completed:`, result);
-    return result;
+      console.log(`✅ Concurrent processing completed: ${totalSuccessful}/${totalProcessed} successful`);
+
+      return {
+        processed: totalProcessed,
+        successful: totalSuccessful,
+        failed: totalFailed,
+        processingTimeMs: processingTime
+      };
+
+    } catch (error) {
+      console.error('❌ Concurrent job processing failed:', error);
+      return {
+        processed: totalProcessed,
+        successful: totalSuccessful,
+        failed: totalFailed,
+        processingTimeMs: Date.now() - startTime
+      };
+    } finally {
+      this.activeWorkers--;
+    }
   }
 
   /**
-   * Process a single job with atomic claiming
+   * Process single job with timeout protection
    */
-  private static async processJobWithClaiming(
+  private static async processJobWithTimeout(
     job: any,
     jobProcessor: (job: any) => Promise<boolean>,
-    workerId: string,
     timeoutMs: number
-  ): Promise<{ success: boolean; skipped: boolean; error?: string }> {
-    const jobStartTime = Date.now();
+  ): Promise<boolean> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Job processing timeout')), timeoutMs);
+    });
+
+    const processingPromise = jobProcessor(job);
 
     try {
-      // Attempt to claim the job atomically
-      const claimed = await JobClaimingCore.claimJob(job.id, workerId);
-      
-      if (!claimed) {
-        return { success: false, skipped: true };
-      }
-
-      // Set up timeout protection
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Job processing timeout')), timeoutMs);
-      });
-
-      try {
-        // Process the job with timeout protection
-        const processingPromise = jobProcessor(job);
-        const success = await Promise.race([processingPromise, timeoutPromise]);
-
-        const processingTime = Date.now() - jobStartTime;
-
-        if (success) {
-          await JobStatusManager.markJobCompleted(job.id);
-          return { success: true, skipped: false };
-        } else {
-          await JobStatusManager.markJobFailed(job.id, 'Job processor returned false');
-          return { success: false, skipped: false };
-        }
-
-      } catch (processingError) {
-        const errorMessage = processingError instanceof Error ? processingError.message : 'Unknown error';
-        await JobStatusManager.markJobFailed(job.id, errorMessage);
-        return { success: false, skipped: false, error: errorMessage };
-      }
-
+      return await Promise.race([processingPromise, timeoutPromise]);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown claiming error';
-      console.error(`❌ Error processing job ${job.id}:`, error);
-      return { success: false, skipped: false, error: errorMessage };
+      console.error(`❌ Job ${job.id} processing failed:`, error);
+      
+      // Mark job as failed in database
+      await this.markJobFailed(job.id, error instanceof Error ? error.message : 'Unknown error');
+      
+      return false;
     }
   }
 
   /**
-   * Create batches for concurrent processing
+   * Mark job as failed in database
    */
-  private static createBatches<T>(items: T[], batchSize: number): T[][] {
-    const batches: T[][] = [];
-    for (let i = 0; i < items.length; i += batchSize) {
-      batches.push(items.slice(i, i + batchSize));
+  private static async markJobFailed(jobId: string, errorMessage: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('background_jobs')
+        .update({
+          status: 'failed',
+          error_message: errorMessage,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+
+      if (error) {
+        console.error(`Failed to update job ${jobId} status:`, error);
+      }
+    } catch (error) {
+      console.error(`Error marking job ${jobId} as failed:`, error);
     }
-    return batches;
   }
 
   /**
    * Get processing statistics
    */
-  static async getProcessingStats(): Promise<{
-    queueDepth: number;
-    activeWorkers: number;
-    avgProcessingTime: number;
-    successRate: number;
-  }> {
+  static async getProcessingStats(): Promise<ProcessingStats> {
     try {
-      // Get queue depth
-      const { count: queueDepth } = await supabase
+      // Get recent job completion rates
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      
+      const { data: recentJobs, error } = await supabase
         .from('background_jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .select('status, created_at, started_at, completed_at')
+        .gte('created_at', oneHourAgo);
 
-      // Get active workers (count unique processing jobs)
-      const { data: activeJobs } = await supabase
-        .from('background_jobs')
-        .select('id')
-        .eq('status', 'processing');
-
-      const uniqueWorkers = activeJobs ? new Set(activeJobs.map(job => job.id)).size : 0;
-
-      // Get recent performance stats
-      const { data: recentJobs } = await supabase
-        .from('background_jobs')
-        .select('status, completed_at, started_at')
-        .gte('completed_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .in('status', ['completed', 'failed']);
-
-      let avgProcessingTime = 0;
-      let successRate = 0;
-
-      if (recentJobs && recentJobs.length > 0) {
-        const completedJobs = recentJobs.filter(job => job.status === 'completed');
-        const processingTimes = completedJobs
-          .filter(job => job.completed_at && job.started_at)
-          .map(job => new Date(job.completed_at!).getTime() - new Date(job.started_at!).getTime());
-        
-        avgProcessingTime = processingTimes.length > 0 ? 
-          processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length : 0;
-        successRate = completedJobs.length / recentJobs.length;
+      if (error) {
+        console.warn('Could not fetch recent jobs for stats:', error);
       }
 
+      const completedJobs = recentJobs?.filter(j => j.status === 'completed') || [];
+      const failedJobs = recentJobs?.filter(j => j.status === 'failed') || [];
+      const totalRecentJobs = recentJobs?.length || 0;
+
+      let avgProcessingTime = 0;
+      if (completedJobs.length > 0) {
+        const processingTimes = completedJobs
+          .filter(j => j.started_at && j.completed_at)
+          .map(j => new Date(j.completed_at!).getTime() - new Date(j.started_at!).getTime());
+        
+        if (processingTimes.length > 0) {
+          avgProcessingTime = processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length;
+        }
+      }
+
+      const successRate = totalRecentJobs > 0 
+        ? completedJobs.length / totalRecentJobs 
+        : 1.0; // Default to perfect if no recent jobs
+
       return {
-        queueDepth: queueDepth || 0,
-        activeWorkers: uniqueWorkers,
+        activeWorkers: this.activeWorkers,
         avgProcessingTime,
-        successRate
+        successRate,
+        totalProcessed: this.processedJobs,
+        totalFailed: this.failedJobs
       };
 
     } catch (error) {
       console.error('❌ Error getting processing stats:', error);
       return {
-        queueDepth: 0,
-        activeWorkers: 0,
+        activeWorkers: this.activeWorkers,
         avgProcessingTime: 0,
-        successRate: 0
+        successRate: 1.0,
+        totalProcessed: this.processedJobs,
+        totalFailed: this.failedJobs
       };
     }
+  }
+
+  /**
+   * Reset statistics
+   */
+  static resetStats(): void {
+    this.processedJobs = 0;
+    this.failedJobs = 0;
+    this.totalProcessingTime = 0;
   }
 }
