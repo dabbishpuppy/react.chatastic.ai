@@ -1,3 +1,4 @@
+
 // Enhanced URL discovery with comprehensive link extraction and smart filtering
 
 interface DiscoveryConfig {
@@ -83,7 +84,7 @@ export async function discoverLinks(
   url: string,
   excludePaths: string[] = [],
   includePaths: string[] = [],
-  maxPages: number = 100
+  maxPages: number = Number.MAX_SAFE_INTEGER
 ): Promise<string[]> {
   try {
     console.log('🔍 Starting enhanced link discovery for:', url);
@@ -109,11 +110,11 @@ export async function discoverLinks(
     const allLinks = extractAllLinks(html, url);
     console.log(`🔗 Found ${allLinks.length} total links in HTML`);
     
-    // Apply filtering and normalization
+    // Apply filtering and normalization - NO LIMIT
     const filteredLinks = filterAndNormalizeUrls(allLinks, url, {
       excludePaths,
       includePaths,
-      maxPages
+      maxPages: Number.MAX_SAFE_INTEGER
     });
     
     // Add filtered links to discovered set
@@ -121,8 +122,8 @@ export async function discoverLinks(
     
     console.log(`📊 Discovery completed: ${discovered.size} URLs found after filtering`);
     
-    // Return up to maxPages URLs
-    const result = Array.from(discovered).slice(0, maxPages);
+    // Return ALL URLs without any limit
+    const result = Array.from(discovered);
     return result;
     
   } catch (error) {
@@ -193,16 +194,16 @@ export async function discoverSitemapLinks(
     
     if (allUrls.length === 0) {
       console.log('❌ No valid sitemaps found, falling back to HTML discovery');
-      return await discoverLinks(sitemapUrl, excludePaths, includePaths, 200);
+      return await discoverLinks(sitemapUrl, excludePaths, includePaths, Number.MAX_SAFE_INTEGER);
     }
     
     console.log(`🗺️ Found ${allUrls.length} URLs in sitemap(s)`);
     
-    // Apply filtering to sitemap URLs
+    // Apply filtering to sitemap URLs - NO LIMIT
     const filteredUrls = filterAndNormalizeUrls(allUrls, sitemapUrl, {
       excludePaths,
       includePaths,
-      maxPages: 500 // Higher limit for sitemap
+      maxPages: Number.MAX_SAFE_INTEGER
     });
     
     console.log(`✅ Sitemap discovery completed: ${filteredUrls.length} URLs after filtering`);
@@ -211,7 +212,7 @@ export async function discoverSitemapLinks(
   } catch (error) {
     console.error('❌ Error discovering sitemap links:', error);
     console.log('🔄 Falling back to HTML discovery');
-    return await discoverLinks(sitemapUrl, excludePaths, includePaths, 200);
+    return await discoverLinks(sitemapUrl, excludePaths, includePaths, Number.MAX_SAFE_INTEGER);
   }
 }
 
@@ -310,7 +311,7 @@ function filterAndNormalizeUrls(
   baseUrl: string, 
   config: DiscoveryConfig
 ): string[] {
-  const { excludePaths, includePaths, maxPages } = config;
+  const { excludePaths, includePaths } = config;
   const baseHostname = new URL(baseUrl).hostname;
   const normalizedUrls = new Set<string>();
   
@@ -377,11 +378,6 @@ function filterAndNormalizeUrls(
       }
       
       normalizedUrls.add(normalized);
-      
-      // Stop if we've reached max pages
-      if (normalizedUrls.size >= maxPages) {
-        break;
-      }
       
     } catch (e) {
       continue;

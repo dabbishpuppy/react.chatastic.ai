@@ -13,7 +13,7 @@ export async function handleUrlDiscovery(
   try {
     console.log(`🔍 Starting enhanced URL discovery for mode: ${crawlMode}`);
     console.log(`🎯 Target: ${url}`);
-    console.log(`📊 Max pages: ${maxPages}`);
+    console.log(`📊 Max pages: UNLIMITED (${maxPages} requested but ignored)`);
     console.log(`🚫 Exclude paths: ${excludePaths.length} patterns`);
     console.log(`✅ Include paths: ${includePaths.length} patterns (using universal defaults if none provided)`);
     
@@ -42,14 +42,14 @@ export async function handleUrlDiscovery(
             console.log('⚠️ Sitemap discovery failed, falling back to HTML crawling');
           }
           
-          // Fallback to enhanced HTML crawling
-          console.log('🔗 Using enhanced HTML link discovery');
-          return await discoverLinks(url, excludePaths, includePaths, maxPages);
+          // Fallback to enhanced HTML crawling with no limits
+          console.log('🔗 Using enhanced HTML link discovery with no limits');
+          return await discoverLinks(url, excludePaths, includePaths, Number.MAX_SAFE_INTEGER);
       }
     })();
 
     // Add timeout to discovery with longer timeout for comprehensive crawling
-    const timeoutDuration = crawlMode === 'full-website' ? 60000 : 30000; // 60s for full, 30s for others
+    const timeoutDuration = crawlMode === 'full-website' ? 120000 : 60000; // 120s for full, 60s for others
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error(`URL discovery timeout after ${timeoutDuration}ms`)), timeoutDuration);
     });
@@ -58,7 +58,7 @@ export async function handleUrlDiscovery(
     
     console.log(`📊 Discovery completed successfully:`);
     console.log(`   • Mode: ${crawlMode}`);
-    console.log(`   • URLs discovered: ${discoveredUrls.length}`);
+    console.log(`   • URLs discovered: ${discoveredUrls.length} (NO LIMITS APPLIED)`);
     console.log(`   • First 5 URLs:`, discoveredUrls.slice(0, 5));
     
   } catch (discoveryError) {
@@ -70,7 +70,7 @@ export async function handleUrlDiscovery(
     if (crawlMode === 'sitemap-only') {
       // For sitemap mode, try basic HTML discovery as fallback
       try {
-        discoveredUrls = await discoverLinks(url, excludePaths, includePaths, Math.min(maxPages, 50));
+        discoveredUrls = await discoverLinks(url, excludePaths, includePaths, Number.MAX_SAFE_INTEGER);
         console.log(`🔄 Fallback HTML discovery found ${discoveredUrls.length} URLs`);
       } catch (fallbackError) {
         console.error('❌ Fallback discovery also failed:', fallbackError);
@@ -100,7 +100,7 @@ export async function handleUrlDiscovery(
     }
   });
 
-  console.log(`🎉 Final discovery result: ${finalUrls.length} valid URLs`);
+  console.log(`🎉 Final discovery result: ${finalUrls.length} valid URLs (NO LIMITS APPLIED)`);
   
   return finalUrls;
 }
