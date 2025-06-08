@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -95,13 +96,8 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
-  // Check if source has potential child sources based on links_count OR if it's a website source that could have children
-  const hasChildSources = (source.links_count || 0) > 0 || 
-    (source.source_type === 'website' && (
-      status === 'in_progress' || 
-      status === 'crawling' || 
-      status === 'trained'
-    ));
+  // Check if source has potential child sources based on links_count
+  const hasChildSources = (source.links_count || 0) > 0;
 
   // Calculate total child source sizes for trained sources
   const totalChildSize = React.useMemo(() => {

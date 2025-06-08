@@ -1,217 +1,161 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { validateRequest } from './requestValidator.ts';
+import { validateAgent } from './agentValidator.ts';
+import { handleChildPageRecrawl } from './recrawlHandler.ts';
 import { handleUrlDiscovery } from './discoveryHandler.ts';
+import { handleParentSourceCreation, handleSourcePagesCreation } from './parentSourceHandler.ts';
+import { createBackgroundJobs, ensureJobsExist } from './jobCreator.ts';
+import { buildErrorResponse, buildSuccessResponse } from './responseBuilder.ts';
 
+// CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Method not allowed' }),
+      { 
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
+    );
   }
 
   try {
-    console.log(`📥 Enhanced crawl request received at ${new Date().toISOString()}`);
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase configuration');
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Parse request body
-    const {
-      url,
-      agentId,
-      crawlMode = 'full-website',
-      maxPages = 200, // Increased default for better discovery
-      excludePaths = [],
-      includePaths = [],
-      discoverOnly = false
-    } = await req.json();
-
-    console.log('📋 Enhanced crawl parameters:', {
-      url,
-      agentId,
-      crawlMode,
-      maxPages,
-      excludePaths: excludePaths.length,
-      includePaths: includePaths.length,
-      discoverOnly
-    });
-
-    // Validate required fields
-    if (!url || !agentId) {
-      throw new Error('Missing required fields: url and agentId');
-    }
-
-    // Fetch agent data with retries
-    let agent;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      console.log(`🔍 Fetching agent data (attempt ${attempt}/3)`);
-      
-      const { data: agentData, error: agentError } = await supabase
-        .from('agents')
-        .select('id, team_id')
-        .eq('id', agentId)
-        .single();
-
-      if (agentError) {
-        console.error(`Agent fetch error (attempt ${attempt}):`, agentError);
-        if (attempt === 3) {
-          throw new Error(`Agent not found: ${agentError.message}`);
+    // Parse request body with error handling
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('❌ Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid JSON in request body',
+          timestamp: new Date().toISOString()
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        continue;
-      }
-
-      agent = agentData;
-      break;
+      );
     }
 
-    if (!agent) {
-      throw new Error('Failed to fetch agent data after retries');
+    // Handle recovery mode - ensure missing jobs exist
+    if (requestBody.mode === 'retry' && requestBody.parentSourceId) {
+      console.log('🔄 Processing retry mode for parent:', requestBody.parentSourceId);
+      
+      const jobsEnsured = await ensureJobsExist(requestBody.parentSourceId);
+      
+      return buildSuccessResponse({
+        success: true,
+        mode: 'retry',
+        parentSourceId: requestBody.parentSourceId,
+        jobsEnsured: jobsEnsured,
+        message: 'Missing jobs created for retry processing'
+      }, corsHeaders);
     }
 
-    console.log('✅ Agent found:', { id: agent.id, team_id: agent.team_id });
+    // Validate request
+    const validatedRequest = validateRequest(requestBody);
+    console.log('🚀 Starting enhanced crawl for agent', validatedRequest.agentId, ', URL:', validatedRequest.url);
 
-    // Enhanced URL discovery
+    // Validate agent
+    const agent = await validateAgent(validatedRequest.agentId);
+
+    // Handle child page recrawl case
+    if (validatedRequest.parentSourceId && validatedRequest.crawlMode === 'single-page') {
+      console.log('🔄 Processing child page recrawl for parent:', validatedRequest.parentSourceId);
+      
+      const result = await handleChildPageRecrawl(
+        validatedRequest.parentSourceId,
+        validatedRequest.url,
+        validatedRequest.priority,
+        validatedRequest.agentId
+      );
+
+      return buildSuccessResponse(result, corsHeaders);
+    }
+
+    // Discover URLs based on crawl mode with timeout
     const discoveredUrls = await handleUrlDiscovery(
-      url,
-      crawlMode,
-      maxPages,
-      excludePaths,
-      includePaths
+      validatedRequest.url,
+      validatedRequest.crawlMode,
+      validatedRequest.maxPages,
+      validatedRequest.excludePaths,
+      validatedRequest.includePaths
     );
 
-    console.log(`📊 Enhanced discovery completed: ${discoveredUrls.length} URLs found`);
-
-    // If discovery-only mode, return URLs without creating database records
-    if (discoverOnly) {
-      return new Response(JSON.stringify({
+    // If this is discovery only, return the URLs without creating database records
+    if (validatedRequest.discoverOnly) {
+      return buildSuccessResponse({
         success: true,
-        mode: 'discovery-only',
-        totalUrlsDiscovered: discoveredUrls.length,
         urls: discoveredUrls,
-        crawlMode,
-        maxPages
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
+        message: `Discovered ${discoveredUrls.length} URLs`
+      }, corsHeaders);
     }
 
-    // Create parent source with enhanced metadata
-    const { data: parentSource, error: sourceError } = await supabase
-      .from('agent_sources')
-      .insert({
-        agent_id: agentId,
-        team_id: agent.team_id,
-        url: url,
-        title: `Enhanced Crawl: ${new URL(url).hostname}`,
-        source_type: 'website',
-        crawl_status: 'pending',
-        total_jobs: discoveredUrls.length,
-        completed_jobs: 0,
-        failed_jobs: 0,
-        progress: 0,
-        is_active: true,
-        metadata: {
-          crawlMode,
-          maxPages,
-          discoveredUrlCount: discoveredUrls.length,
-          enhancedCrawl: true,
-          excludePaths,
-          includePaths
-        },
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (sourceError) {
-      console.error('❌ Failed to create parent source:', sourceError);
-      throw new Error(`Failed to create parent source: ${sourceError.message}`);
-    }
-
-    console.log('✅ Parent source created:', parentSource.id);
-
-    // Create source pages in optimized batches
-    const batchSize = 50;
-    let totalCreated = 0;
-    
-    for (let i = 0; i < discoveredUrls.length; i += batchSize) {
-      const batch = discoveredUrls.slice(i, i + batchSize);
-      
-      const sourcePages = batch.map(discoveredUrl => ({
-        parent_source_id: parentSource.id,
-        customer_id: agent.team_id,
-        url: discoveredUrl,
-        status: 'pending' as const,
-        retry_count: 0,
-        created_at: new Date().toISOString()
-      }));
-
-      const { data: createdPages, error: pageError } = await supabase
-        .from('source_pages')
-        .insert(sourcePages)
-        .select('id');
-
-      if (pageError) {
-        console.error(`❌ Failed to create source pages batch ${i}-${i + batch.length}:`, pageError);
-        continue;
+    // Create parent source with retry logic
+    const parentSource = await handleParentSourceCreation(
+      validatedRequest.agentId,
+      agent.team_id,
+      validatedRequest.url,
+      discoveredUrls,
+      {
+        respectRobots: validatedRequest.respectRobots,
+        crawlMode: validatedRequest.crawlMode,
+        enableCompression: validatedRequest.enableCompression,
+        enableDeduplication: validatedRequest.enableDeduplication,
+        priority: validatedRequest.priority
       }
+    );
 
-      totalCreated += createdPages?.length || 0;
-      console.log(`✅ Created batch ${Math.floor(i / batchSize) + 1}: ${createdPages?.length || 0} pages`);
+    // Create source_pages with enhanced error handling and type validation
+    const result = await handleSourcePagesCreation(
+      parentSource.id,
+      agent.team_id,
+      discoveredUrls,
+      validatedRequest.priority,
+      parentSource
+    );
+
+    // CRITICAL: Create background jobs after source pages are created
+    console.log('🔧 Creating background jobs for discovered URLs...');
+    const jobResult = await createBackgroundJobs(
+      parentSource.id,
+      agent.team_id,
+      discoveredUrls,
+      validatedRequest.priority
+    );
+
+    if (!jobResult.success && jobResult.errors.length > 0) {
+      console.warn('⚠️ Some background jobs failed to create:', jobResult.errors);
     }
 
-    console.log(`📊 Total source pages created: ${totalCreated}/${discoveredUrls.length}`);
-
-    // Update parent source with final stats
-    await supabase
-      .from('agent_sources')
-      .update({
-        total_jobs: totalCreated,
-        crawl_status: totalCreated > 0 ? 'in_progress' : 'failed'
-      })
-      .eq('id', parentSource.id);
-
-    const result = {
-      success: true,
-      parentSourceId: parentSource.id,
-      totalJobs: totalCreated,
-      discoveredUrls: discoveredUrls.length,
-      crawlMode,
-      enhancedCrawl: true,
-      timestamp: new Date().toISOString()
+    // Enhanced result with job creation info
+    const enhancedResult = {
+      ...result,
+      backgroundJobs: {
+        created: jobResult.jobsCreated,
+        errors: jobResult.errors,
+        success: jobResult.success
+      }
     };
 
-    console.log('✅ Enhanced crawl initiation completed:', result);
-
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    });
+    return buildSuccessResponse(enhancedResult, corsHeaders);
 
   } catch (error) {
-    console.error('❌ Enhanced crawl error:', error);
-    
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return buildErrorResponse(error, corsHeaders);
   }
 });

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { toast } from '@/hooks/use-toast';
 import { useOptimisticWebsiteCrawl } from '@/hooks/useOptimisticWebsiteCrawl';
 import { Globe, FileText, Map } from 'lucide-react';
@@ -20,6 +20,9 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
   const [activeTab, setActiveTab] = useState('website');
   const [url, setUrl] = useState('');
   const [protocol, setProtocol] = useState('https://');
+  const [maxPages, setMaxPages] = useState(50);
+  const [maxDepth, setMaxDepth] = useState(3);
+  const [respectRobots, setRespectRobots] = useState(true);
   const [includePaths, setIncludePaths] = useState('');
   const [excludePaths, setExcludePaths] = useState('');
 
@@ -76,9 +79,9 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
       const result = await submitWebsite({
         url: fullUrl,
         crawlMode: finalCrawlMode,
-        maxPages: 250, // Use default high value
-        maxDepth: 5, // Use default high value
-        respectRobots: true, // Always respect robots.txt
+        maxPages,
+        maxDepth,
+        respectRobots,
         includePaths: includePathsArray,
         excludePaths: excludePathsArray
       });
@@ -217,6 +220,56 @@ const EnhancedWebsiteCrawlFormV3: React.FC<EnhancedWebsiteCrawlFormV3Props> = ({
                 </div>
               </div>
             </TabsContent>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="advanced">
+                <AccordionTrigger>Advanced Settings</AccordionTrigger>
+                <AccordionContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="maxPages">Max Pages</Label>
+                      <Select value={maxPages.toString()} onValueChange={value => setMaxPages(parseInt(value))} disabled={isSubmitting}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10 pages</SelectItem>
+                          <SelectItem value="25">25 pages</SelectItem>
+                          <SelectItem value="50">50 pages</SelectItem>
+                          <SelectItem value="100">100 pages</SelectItem>
+                          <SelectItem value="250">250 pages</SelectItem>
+                          <SelectItem value="500">500 pages</SelectItem>
+                          {activeTab === 'sitemap' && <SelectItem value="1000">1000 pages</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {activeTab === 'website' && <div>
+                        <Label htmlFor="maxDepth">Max Depth</Label>
+                        <Select value={maxDepth.toString()} onValueChange={value => setMaxDepth(parseInt(value))} disabled={isSubmitting}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 level</SelectItem>
+                            <SelectItem value="2">2 levels</SelectItem>
+                            <SelectItem value="3">3 levels</SelectItem>
+                            <SelectItem value="4">4 levels</SelectItem>
+                            <SelectItem value="5">5 levels</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>}
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input type="checkbox" id="respectRobots" checked={respectRobots} onChange={e => setRespectRobots(e.target.checked)} className="rounded border-gray-300" disabled={isSubmitting} />
+                    <Label htmlFor="respectRobots" className="text-sm">
+                      Respect robots.txt and crawl delays
+                    </Label>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             <div className="flex justify-end">
               <Button type="submit" disabled={isSubmitting || !url.trim()} className="px-8">
