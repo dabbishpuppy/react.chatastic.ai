@@ -104,7 +104,7 @@ function App() {
                 }
               />
               <Route
-                path="/settings"
+                path="/settings/*"
                 element={
                   <AuthProvider>
                     <SettingsPage />
