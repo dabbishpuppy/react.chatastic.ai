@@ -6,7 +6,7 @@ import { SystemOverview } from './SystemOverview';
 import { AlertsPanel } from './AlertsPanel';
 import { QueueMonitor } from './QueueMonitor';
 import { ProductionQueueDashboard } from './ProductionQueueDashboard';
-import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
+import ProductionCrawlDashboard from './ProductionCrawlDashboard';
 import { ProductionHealthCheck } from './ProductionHealthCheck';
 import { DatabaseOptimizationDashboard } from './DatabaseOptimizationDashboard';
 import { InfrastructureHealthMonitor } from './InfrastructureHealthMonitor';

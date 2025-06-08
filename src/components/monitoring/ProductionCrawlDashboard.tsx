@@ -3,19 +3,29 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProductionInfrastructure } from '@/hooks/useProductionInfrastructure';
-import QueueMonitor from './QueueMonitor';
-import SystemOverview from './SystemOverview';
-import ServiceControlPanel from './ServiceControlPanel';
+import { QueueMonitor } from './QueueMonitor';
+import { SystemOverview } from './SystemOverview';
+import { ServiceControlPanel } from './ServiceControlPanel';
 import DatabaseHealthMonitor from '@/components/sources/DatabaseHealthMonitor';
 
-const ProductionCrawlDashboard: React.FC = () => {
+export const ProductionCrawlDashboard: React.FC = () => {
   const { 
-    queueData, 
     systemHealth, 
-    isLoading, 
-    error,
-    refreshData
+    loading,
+    loadSystemHealth
   } = useProductionInfrastructure();
+
+  const isLoading = loading;
+  const error = null; // Infrastructure hook doesn't expose error currently
+  const refreshData = loadSystemHealth;
+
+  // Mock queue data for now
+  const queueData = {
+    pending: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0
+  };
 
   if (isLoading) {
     return (
@@ -55,7 +65,8 @@ const ProductionCrawlDashboard: React.FC = () => {
 
         <TabsContent value="overview" className="space-y-4">
           <SystemOverview 
-            systemHealth={systemHealth}
+            metrics={systemHealth}
+            overallHealth={systemHealth?.healthPercentage || 0}
             onRefresh={refreshData}
           />
         </TabsContent>
