@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,10 @@ import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
 import { ProductionHealthCheck } from './ProductionHealthCheck';
 import { DatabaseOptimizationDashboard } from './DatabaseOptimizationDashboard';
 import { InfrastructureHealthMonitor } from './InfrastructureHealthMonitor';
+import { AgentSelector } from './AgentSelector';
+import { TestingIntegration } from './TestingIntegration';
+import { AgentManagementShortcuts } from './AgentManagementShortcuts';
+import { RAGSystemTestRunner } from '@/components/testing/RAGSystemTestRunner';
 import { useToast } from '@/hooks/use-toast';
 
 export const MonitoringDashboard: React.FC = () => {
@@ -26,6 +31,7 @@ export const MonitoringDashboard: React.FC = () => {
   const [wsStats, setWsStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Initialize orchestrator and load initial state
@@ -181,9 +187,9 @@ export const MonitoringDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Enhanced Services Monitor</h1>
+          <h1 className="text-3xl font-bold">Centralized Monitoring Dashboard</h1>
           <p className="text-muted-foreground">
-            Real-time monitoring and management of enhanced RAG services
+            Complete system monitoring, testing, and agent management
           </p>
           {orchestratorStatus && (
             <p className="text-sm text-muted-foreground mt-1">
@@ -214,6 +220,16 @@ export const MonitoringDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Agent Selection and Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <AgentSelector 
+          selectedAgentId={selectedAgentId}
+          onAgentSelect={setSelectedAgentId}
+        />
+        <TestingIntegration />
+        <AgentManagementShortcuts selectedAgentId={selectedAgentId} />
+      </div>
+
       {/* Control Panel */}
       <ServiceControlPanel
         orchestratorStatus={orchestratorStatus}
@@ -224,10 +240,11 @@ export const MonitoringDashboard: React.FC = () => {
 
       {/* Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid grid-cols-5 lg:grid-cols-10 w-full">
+        <TabsList className="grid grid-cols-6 lg:grid-cols-12 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="health">Health Check</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
+          <TabsTrigger value="testing">Testing</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="production">Production Queue</TabsTrigger>
           <TabsTrigger value="production-crawl">Production Crawl</TabsTrigger>
@@ -235,6 +252,7 @@ export const MonitoringDashboard: React.FC = () => {
           <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
           <TabsTrigger value="websockets">WebSockets</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
+          <TabsTrigger value="agent-management">Agent Mgmt</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -243,6 +261,7 @@ export const MonitoringDashboard: React.FC = () => {
               <SystemOverview 
                 metrics={systemMetrics} 
                 overallHealth={orchestratorStatus?.overallHealth || 0}
+                selectedAgentId={selectedAgentId}
               />
             </div>
             <div>
@@ -274,6 +293,10 @@ export const MonitoringDashboard: React.FC = () => {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="testing" className="space-y-4">
+          <RAGSystemTestRunner />
         </TabsContent>
 
         <TabsContent value="queue" className="space-y-4">
@@ -352,6 +375,34 @@ export const MonitoringDashboard: React.FC = () => {
             onAcknowledge={handleAcknowledgeAlert}
             onDismiss={handleDismissAlert}
           />
+        </TabsContent>
+
+        <TabsContent value="agent-management" className="space-y-4">
+          {selectedAgentId ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Management - {selectedAgentId}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Quick agent management actions. For full management capabilities, 
+                  visit the dedicated agent management page.
+                </p>
+                <AgentManagementShortcuts selectedAgentId={selectedAgentId} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground text-center py-8">
+                  Select an agent from the Agent Selector above to view management options.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

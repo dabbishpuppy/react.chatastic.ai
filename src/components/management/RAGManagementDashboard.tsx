@@ -1,41 +1,75 @@
 
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { HealthOverview } from './HealthOverview';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RetrainingPanel } from './RetrainingPanel';
 import { MaintenancePanel } from './MaintenancePanel';
 import WorkflowStatusDashboard from '@/components/workflow/WorkflowStatusDashboard';
 import { useWorkflowRealtime } from '@/hooks/useWorkflowRealtime';
+import { ExternalLink, Monitor } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface RAGManagementDashboardProps {
   agentId: string;
 }
 
 const RAGManagementDashboard: React.FC<RAGManagementDashboardProps> = ({ agentId }) => {
-  // Set up real-time workflow updates for this agent
+  const navigate = useNavigate();
   useWorkflowRealtime();
+
+  const handleViewMonitoring = () => {
+    navigate('/monitoring');
+  };
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">RAG Management</h1>
-          <p className="text-gray-600 mt-2">
-            Monitor and manage your RAG system's health, performance, and background processes.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Agent Management</h1>
+              <p className="text-gray-600 mt-2">
+                Manage agent-specific operations, retraining, and maintenance tasks.
+              </p>
+            </div>
+            <Button onClick={handleViewMonitoring} variant="outline">
+              <Monitor className="h-4 w-4 mr-2" />
+              View Centralized Monitoring
+            </Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+        {/* Quick Navigation to Centralized Monitoring */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="h-5 w-5" />
+              Centralized Monitoring Available
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-muted-foreground">
+                  For comprehensive system monitoring, health checks, and testing, 
+                  visit the centralized monitoring dashboard.
+                </p>
+              </div>
+              <Button onClick={handleViewMonitoring}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Monitoring Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs defaultValue="workflow" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="workflow">Workflow</TabsTrigger>
             <TabsTrigger value="retraining">Retraining</TabsTrigger>
             <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            <HealthOverview agentId={agentId} />
-          </TabsContent>
 
           <TabsContent value="workflow" className="space-y-6">
             <WorkflowStatusDashboard />
