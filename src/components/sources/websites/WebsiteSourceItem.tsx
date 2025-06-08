@@ -96,8 +96,8 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
-  // Check if source has potential child sources based on links_count
-  const hasChildSources = (source.links_count || 0) > 0;
+  // FIXED: Check if source has potential child sources by checking both links_count AND actual child sources
+  const hasChildSources = (source.links_count || 0) > 0 || childSources.length > 0;
 
   // Calculate total child source sizes for trained sources
   const totalChildSize = React.useMemo(() => {
@@ -116,7 +116,10 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     url: source.url,
     last_crawled_at: JSON.stringify(source.last_crawled_at),
     updated_at: JSON.stringify(source.updated_at),
-    created_at: JSON.stringify(source.created_at)
+    created_at: JSON.stringify(source.created_at),
+    links_count: source.links_count,
+    childSources_length: childSources.length,
+    hasChildSources
   });
 
   return (
@@ -182,16 +185,16 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                     <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
                   </div>
                   
-                  {/* 2. Links count with Link icon */}
-                  {source.links_count !== undefined && source.links_count > 0 && (
+                  {/* 2. Links count with Link icon - show actual child count if available */}
+                  {(source.links_count !== undefined && source.links_count > 0) || childSources.length > 0 ? (
                     <>
                       <span>•</span>
                       <div className="flex items-center gap-1">
                         <Link className="w-3 h-3" />
-                        <span>{source.links_count} links</span>
+                        <span>{childSources.length > 0 ? `${childSources.length} pages` : `${source.links_count} links`}</span>
                       </div>
                     </>
-                  )}
+                  ) : null}
 
                   {/* 3. Child source sizes for trained sources with Database icon */}
                   {status === 'trained' && totalChildSize > 0 && (
