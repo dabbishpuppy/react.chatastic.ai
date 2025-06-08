@@ -1,4 +1,5 @@
 
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface TokenUsage {
@@ -10,6 +11,7 @@ export interface TokenUsage {
   outputTokens: number;
   totalCost: number;
   timestamp: string;
+  [key: string]: any; // Add index signature for Json compatibility
 }
 
 export interface UsageMetrics {
@@ -55,7 +57,7 @@ export class UsageTracker {
           agent_id: usage.agentId,
           action: 'query',
           resource_type: 'llm_request',
-          new_values: tokenUsage
+          new_values: tokenUsage as any // Cast to any for Json compatibility
         });
 
       if (error) {
@@ -102,8 +104,8 @@ export class UsageTracker {
 
       // Filter by provider in the aggregation
       const filteredData = (usageData || []).filter(row => {
-        const usage = row.new_values as TokenUsage;
-        return usage && usage.provider === provider;
+        const usage = row.new_values as unknown as TokenUsage;
+        return usage && typeof usage === 'object' && usage.provider === provider;
       });
 
       return this.aggregateUsageData(filteredData, timeRange);
@@ -185,8 +187,8 @@ export class UsageTracker {
     };
 
     data.forEach(row => {
-      const usage = row.new_values as TokenUsage;
-      if (!usage || typeof usage !== 'object') return;
+      const usage = row.new_values as unknown as TokenUsage;
+      if (!usage || typeof usage !== 'object' || !usage.inputTokens || !usage.outputTokens) return;
       
       const tokens = usage.inputTokens + usage.outputTokens;
 
@@ -260,3 +262,4 @@ export class UsageTracker {
     return { withinLimits, usage, warnings };
   }
 }
+
