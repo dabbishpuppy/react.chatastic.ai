@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { CrawlApiService } from '@/services/rag/enhanced/crawlApi';
+import { ImprovedCrawlApiService as CrawlApiService } from '@/services/rag/enhanced/improvedCrawlApi';
 import { EnhancedCrawlService } from '@/services/rag/enhanced/enhancedCrawlService';
 import { CrawlRecoveryService } from '@/services/rag/crawlRecoveryService';
 import type { EnhancedCrawlRequest } from '@/services/rag/enhanced/crawlTypes';
@@ -77,7 +77,22 @@ export const useCrawlInitiation = () => {
       try {
         checkCount++;
         
+        // Enhanced validation before status check
+        if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
+          console.error('Invalid parentSourceId in monitoring:', parentSourceId);
+          return;
+        }
+        
         const status = await CrawlApiService.checkCrawlStatus(parentSourceId);
+        
+        // If status check indicates the source doesn't exist, stop monitoring
+        if (status.status === 'failed' && status.totalJobs === 0 && status.completedJobs === 0) {
+          console.error('Source appears to be deleted or invalid, stopping monitoring');
+          window.dispatchEvent(new CustomEvent('crawlCompleted', {
+            detail: { agentId, parentSourceId, status: 'failed', error: true }
+          }));
+          return;
+        }
         
         if (status.status === 'completed') {
           console.log('🎉 Crawl completed successfully');
@@ -143,22 +158,27 @@ export const useCrawlInitiation = () => {
           console.log('⏰ Crawl monitoring timeout - triggering recovery check');
           
           // Trigger recovery check after timeout
-          const recoveryStatus = await CrawlRecoveryService.getRecoveryStatus(parentSourceId);
-          if (recoveryStatus.needsRecovery) {
-            toast({
-              title: "Crawl Taking Longer Than Expected",
-              description: "Auto-recovery will be triggered to complete remaining pages",
-              duration: 5000,
-            });
-            
-            setTimeout(async () => {
-              await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
-            }, 3000);
+          try {
+            const recoveryStatus = await CrawlRecoveryService.getRecoveryStatus(parentSourceId);
+            if (recoveryStatus.needsRecovery) {
+              toast({
+                title: "Crawl Taking Longer Than Expected",
+                description: "Auto-recovery will be triggered to complete remaining pages",
+                duration: 5000,
+              });
+              
+              setTimeout(async () => {
+                await CrawlRecoveryService.autoRetryFailedPages(parentSourceId);
+              }, 3000);
+            }
+          } catch (error) {
+            console.warn('Recovery check failed after timeout:', error);
           }
         }
       } catch (error) {
         console.error('Error checking crawl status:', error);
-        // Stop monitoring on error
+        // Stop monitoring on error but don't spam the user with error messages
+        // They'll see the original error from the status check
       }
     };
     

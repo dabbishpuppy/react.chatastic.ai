@@ -40,8 +40,12 @@ export class ImprovedCrawlApiService {
 
   static async checkCrawlStatus(parentSourceId: string): Promise<CrawlStatus> {
     try {
-      // Validate parent source ID first
-      if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
+      // Enhanced validation for parentSourceId
+      if (!parentSourceId || 
+          parentSourceId === 'undefined' || 
+          parentSourceId === 'null' || 
+          parentSourceId.trim() === '' ||
+          parentSourceId === 'Invalid') {
         console.error('Invalid parent source ID provided:', parentSourceId);
         return {
           status: 'failed',
@@ -53,7 +57,21 @@ export class ImprovedCrawlApiService {
         };
       }
 
-      // Check if parent source exists
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(parentSourceId)) {
+        console.error('Invalid UUID format for parentSourceId:', parentSourceId);
+        return {
+          status: 'failed',
+          progress: 0,
+          totalJobs: 0,
+          completedJobs: 0,
+          failedJobs: 0,
+          parentSourceId
+        };
+      }
+
+      // Check if parent source exists first
       const isValid = await DatabaseCleanupService.validateParentSource(parentSourceId);
       if (!isValid) {
         console.error('Parent source does not exist:', parentSourceId);
