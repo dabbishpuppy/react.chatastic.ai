@@ -97,7 +97,11 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
   // Check if source has potential child sources based on links_count OR if it's a website source that could have children
   const hasChildSources = (source.links_count || 0) > 0 || 
-    (source.source_type === 'website' && (status === 'in_progress' || status === 'trained'));
+    (source.source_type === 'website' && (
+      status === 'in_progress' || 
+      status === 'crawling' || 
+      status === 'trained'
+    ));
 
   // Calculate total child source sizes for trained sources
   const totalChildSize = React.useMemo(() => {
