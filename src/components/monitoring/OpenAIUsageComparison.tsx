@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EnhancedUsageTracker, type ComparisonMetrics } from '@/services/rag/costMonitoring/enhancedUsageTracker';
-import { Sync, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
+import { RefreshCw, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 
 interface OpenAIUsageComparisonProps {
   teamId: string;
@@ -163,7 +163,7 @@ export const OpenAIUsageComparison: React.FC<OpenAIUsageComparisonProps> = ({
               variant="outline"
               disabled={loading}
             >
-              <Sync className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Sync
             </Button>
           </div>
