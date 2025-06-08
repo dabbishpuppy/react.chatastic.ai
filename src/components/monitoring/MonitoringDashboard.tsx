@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { ServiceOrchestrator } from '@/services/rag/enhanced/serviceOrchestrator';
 import { MetricsCollectionService } from '@/services/rag/enhanced/metricsCollectionService';
@@ -7,7 +6,7 @@ import { WebSocketRealtimeService } from '@/services/workflow/WebSocketRealtimeS
 import { ServiceControlPanel } from './ServiceControlPanel';
 import { DashboardHeader } from './DashboardHeader';
 import { QuickActionsPanel } from './QuickActionsPanel';
-import { DashboardTabs } from './DashboardTabs';
+import { DashboardContent } from './DashboardContent';
 import { useToast } from '@/hooks/use-toast';
 
 export const MonitoringDashboard: React.FC = () => {
@@ -18,6 +17,7 @@ export const MonitoringDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedView, setSelectedView] = useState('overview');
   const { toast } = useToast();
 
   // Initialize orchestrator and load initial state
@@ -35,9 +35,7 @@ export const MonitoringDashboard: React.FC = () => {
       enableDatabaseOptimization: true
     });
     
-    // Load current status immediately
     updateDashboard();
-    
     return orchestrator;
   }, []);
 
@@ -183,22 +181,25 @@ export const MonitoringDashboard: React.FC = () => {
         onManualRefresh={handleManualRefresh}
       />
 
-      {/* Agent Selection and Quick Actions */}
+      {/* Agent Selection */}
       <QuickActionsPanel
         selectedAgentId={selectedAgentId}
         onAgentSelect={setSelectedAgentId}
       />
 
-      {/* Control Panel */}
+      {/* Control Panel with View Selector */}
       <ServiceControlPanel
         orchestratorStatus={orchestratorStatus}
         isLoading={isLoading}
         onStartServices={handleStartServices}
         onStopServices={handleStopServices}
+        selectedView={selectedView}
+        onViewChange={setSelectedView}
       />
 
       {/* Dashboard Content */}
-      <DashboardTabs
+      <DashboardContent
+        selectedView={selectedView}
         orchestratorStatus={orchestratorStatus}
         systemMetrics={systemMetrics}
         alerts={alerts}
