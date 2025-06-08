@@ -19,7 +19,8 @@ import {
   LayoutDashboard,
   MessageSquare,
   UserRound,
-  Cog
+  Cog,
+  Monitor
 } from "lucide-react";
 import SidebarMenuItem from "./SidebarMenuItem";
 import SidebarSubmenuItem from "./SidebarSubmenuItem";
@@ -61,13 +62,19 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     const shouldExpandActivity =
       activeTab === "activity" ||
       location.pathname.includes("/activity");
+
+    const shouldExpandManagement =
+      activeTab === "management" ||
+      location.pathname.includes("/management") ||
+      ["monitoring"].includes(currentSubmenu);
       
     setExpandedMenus(prev => ({
       ...prev,
       sources: shouldExpandSources,
       connect: shouldExpandConnect,
       settings: shouldExpandSettings,
-      activity: shouldExpandActivity
+      activity: shouldExpandActivity,
+      management: shouldExpandManagement
     }));
   }, [activeTab, location]);
 
@@ -110,7 +117,16 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
         { id: "integrations", label: "Integrations", path: "integrations", icon: <Bot size={14} /> }
       ]
     },
-    { id: "management", label: "Management", icon: <Cog size={18} /> },
+    { 
+      id: "management", 
+      label: "Management", 
+      icon: <Cog size={18} />,
+      hasSubmenu: true,
+      submenu: [
+        { id: "overview", label: "Overview", path: "management", icon: <Cog size={14} /> },
+        { id: "monitoring", label: "Monitoring", path: "monitoring", icon: <Monitor size={14} /> }
+      ]
+    },
     { 
       id: "settings", 
       label: "Settings", 
@@ -185,6 +201,12 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
       } else if (submenuId === "leads") {
         navigate(`/agent/${agentId}/activity/leads`);
       }
+    } else if (parentTabId === "management") {
+      if (submenuId === "overview") {
+        navigate(`/agent/${agentId}/management`);
+      } else if (submenuId === "monitoring") {
+        navigate(`/monitoring`);
+      }
     } else if (submenuPath === "sources") {
       navigate(`/agent/${agentId}/sources?tab=${submenuId}`);
     } else if (submenuPath === "integrations") {
@@ -206,6 +228,14 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
         return location.pathname.endsWith('/activity') && !location.pathname.includes('/leads');
       } else if (subId === "leads") {
         return location.pathname.includes('/activity/leads');
+      }
+    }
+
+    if (parentId === "management") {
+      if (subId === "overview") {
+        return location.pathname.includes('/management') && !location.pathname.includes('/monitoring');
+      } else if (subId === "monitoring") {
+        return location.pathname.includes('/monitoring');
       }
     }
     
