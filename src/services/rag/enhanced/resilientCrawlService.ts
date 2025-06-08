@@ -1,9 +1,9 @@
 
-import { HealthMonitor } from './healthMonitor';
+import { HealthMonitor, type CrawlHealth } from './healthMonitor';
 import { CrawlInitiator } from './crawlInitiator';
 import { RecoveryManager } from './recoveryManager';
 import { SystemStatusProvider } from './systemStatusProvider';
-import type { CrawlHealth, CrawlOptions, CrawlResult, RecoveryResult, SystemStatus } from './types/crawlHealthTypes';
+import type { CrawlOptions, CrawlResult, RecoveryResult, SystemStatus } from './types/crawlHealthTypes';
 
 export class ResilientCrawlService {
   private static healthCheckInterval: number | null = null;
@@ -66,4 +66,4 @@ export class ResilientCrawlService {
 }
 
 // Export the interfaces for backward compatibility
-export type { CrawlHealth, CrawlOptions, CrawlResult, RecoveryResult, SystemStatus };
+export type { CrawlOptions, CrawlResult, RecoveryResult, SystemStatus };
