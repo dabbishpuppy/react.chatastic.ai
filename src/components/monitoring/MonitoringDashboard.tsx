@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +15,8 @@ import { QueueMonitor } from './QueueMonitor';
 import { ProductionQueueDashboard } from './ProductionQueueDashboard';
 import { ProductionCrawlDashboard } from './ProductionCrawlDashboard';
 import { ProductionHealthCheck } from './ProductionHealthCheck';
+import { DatabaseOptimizationDashboard } from './DatabaseOptimizationDashboard';
+import { InfrastructureHealthMonitor } from './InfrastructureHealthMonitor';
 import { useToast } from '@/hooks/use-toast';
 
 export const MonitoringDashboard: React.FC = () => {
@@ -223,16 +224,17 @@ export const MonitoringDashboard: React.FC = () => {
 
       {/* Dashboard Content */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid grid-cols-5 lg:grid-cols-10 w-full">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="health">Health Check</TabsTrigger>
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="production">Production Queue</TabsTrigger>
           <TabsTrigger value="production-crawl">Production Crawl</TabsTrigger>
+          <TabsTrigger value="database">Database</TabsTrigger>
+          <TabsTrigger value="infrastructure">Infrastructure</TabsTrigger>
           <TabsTrigger value="websockets">WebSockets</TabsTrigger>
           <TabsTrigger value="alerts">Alerts</TabsTrigger>
-          <TabsTrigger value="metrics">Metrics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -284,6 +286,14 @@ export const MonitoringDashboard: React.FC = () => {
 
         <TabsContent value="production-crawl" className="space-y-4">
           <ProductionCrawlDashboard />
+        </TabsContent>
+
+        <TabsContent value="database" className="space-y-4">
+          <DatabaseOptimizationDashboard />
+        </TabsContent>
+
+        <TabsContent value="infrastructure" className="space-y-4">
+          <InfrastructureHealthMonitor />
         </TabsContent>
 
         <TabsContent value="websockets" className="space-y-4">
@@ -342,38 +352,6 @@ export const MonitoringDashboard: React.FC = () => {
             onAcknowledge={handleAcknowledgeAlert}
             onDismiss={handleDismissAlert}
           />
-        </TabsContent>
-
-        <TabsContent value="metrics" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SystemOverview 
-              metrics={systemMetrics} 
-              overallHealth={orchestratorStatus?.overallHealth || 0}
-            />
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance Metrics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {systemMetrics ? (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold">{systemMetrics.cpuUsage || 0}%</div>
-                        <p className="text-xs text-muted-foreground">CPU Usage</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold">{systemMetrics.memoryUsage || 0}%</div>
-                        <p className="text-xs text-muted-foreground">Memory Usage</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">Loading performance metrics...</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
