@@ -221,6 +221,21 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 source={source}
               />
 
+              {/* Child sources toggle - positioned before actions menu */}
+              {hasChildSources && (
+                <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                      {isChildSourcesOpen ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </CollapsibleTrigger>
+                </Collapsible>
+              )}
+
               {/* Actions menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -266,21 +281,6 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
-              {/* Child sources toggle - moved to right side of actions */}
-              {hasChildSources && (
-                <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      {isChildSourcesOpen ? (
-                        <ChevronDown className="h-3 w-3" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
-              )}
             </div>
           </div>
         </div>
