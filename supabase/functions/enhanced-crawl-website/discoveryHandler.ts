@@ -1,4 +1,5 @@
 
+
 import { discoverLinks, discoverSitemapLinks } from './discovery.ts';
 
 export async function handleUrlDiscovery(
@@ -11,11 +12,11 @@ export async function handleUrlDiscovery(
   let discoveredUrls: string[] = [];
   
   try {
-    console.log(`🔍 Starting enhanced URL discovery for mode: ${crawlMode}`);
+    console.log(`🔍 Starting universal URL discovery for mode: ${crawlMode}`);
     console.log(`🎯 Target: ${url}`);
     console.log(`📊 Max pages: ${maxPages}`);
     console.log(`🚫 Exclude paths: ${excludePaths.length} patterns`);
-    console.log(`✅ Include paths: ${includePaths.length} patterns`);
+    console.log(`✅ Include paths: ${includePaths.length} patterns (${includePaths.length === 0 ? 'using universal defaults' : 'custom patterns'})`);
     
     const discoveryPromise = (async () => {
       switch (crawlMode) {
@@ -24,12 +25,12 @@ export async function handleUrlDiscovery(
           return [url];
           
         case 'sitemap-only':
-          console.log('🗺️ Sitemap-only mode: processing sitemap(s) with enhanced logic');
+          console.log('🗺️ Sitemap-only mode: processing sitemap(s) with universal patterns');
           return await discoverSitemapLinks(url, excludePaths, includePaths);
           
         case 'full-website':
         default:
-          console.log('🌐 Full website mode: trying sitemap first, then HTML crawling');
+          console.log('🌐 Full website mode: comprehensive discovery with universal patterns');
           
           // Try sitemap first for full website mode
           try {
@@ -42,8 +43,8 @@ export async function handleUrlDiscovery(
             console.log('⚠️ Sitemap discovery failed, falling back to HTML crawling');
           }
           
-          // Fallback to enhanced HTML crawling
-          console.log('🔗 Using enhanced HTML link discovery');
+          // Fallback to universal HTML crawling
+          console.log('🔗 Using universal HTML link discovery');
           return await discoverLinks(url, excludePaths, includePaths, maxPages);
       }
     })();
@@ -56,7 +57,7 @@ export async function handleUrlDiscovery(
 
     discoveredUrls = await Promise.race([discoveryPromise, timeoutPromise]) as string[];
     
-    console.log(`📊 Discovery completed successfully:`);
+    console.log(`📊 Universal discovery completed successfully:`);
     console.log(`   • Mode: ${crawlMode}`);
     console.log(`   • URLs discovered: ${discoveredUrls.length}`);
     console.log(`   • First 5 URLs:`, discoveredUrls.slice(0, 5));
@@ -65,7 +66,7 @@ export async function handleUrlDiscovery(
     console.error('❌ URL discovery error:', discoveryError);
     
     // Enhanced fallback logic
-    console.log('🔄 Implementing enhanced fallback strategy...');
+    console.log('🔄 Implementing universal fallback strategy...');
     
     if (crawlMode === 'sitemap-only') {
       // For sitemap mode, try basic HTML discovery as fallback
@@ -100,7 +101,8 @@ export async function handleUrlDiscovery(
     }
   });
 
-  console.log(`🎉 Final discovery result: ${finalUrls.length} valid URLs`);
+  console.log(`🎉 Final universal discovery result: ${finalUrls.length} valid URLs`);
   
   return finalUrls;
 }
+
