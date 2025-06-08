@@ -1434,6 +1434,48 @@ export type Database = {
           },
         ]
       }
+      data_subject_requests: {
+        Row: {
+          completion_date: string | null
+          created_at: string
+          data: Json | null
+          email: string
+          id: string
+          reason: string | null
+          request_date: string
+          status: string
+          subject_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          completion_date?: string | null
+          created_at?: string
+          data?: Json | null
+          email: string
+          id?: string
+          reason?: string | null
+          request_date?: string
+          status?: string
+          subject_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          completion_date?: string | null
+          created_at?: string
+          data?: Json | null
+          email?: string
+          id?: string
+          reason?: string | null
+          request_date?: string
+          status?: string
+          subject_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       database_partitions: {
         Row: {
           created_at: string | null
@@ -1643,6 +1685,50 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: true
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      privacy_impact_assessments: {
+        Row: {
+          approved: boolean
+          created_at: string
+          data_types: string[]
+          id: string
+          mitigations: string[]
+          purpose: string
+          risk_level: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          approved?: boolean
+          created_at?: string
+          data_types?: string[]
+          id?: string
+          mitigations?: string[]
+          purpose: string
+          risk_level: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          approved?: boolean
+          created_at?: string
+          data_types?: string[]
+          id?: string
+          mitigations?: string[]
+          purpose?: string
+          risk_level?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "privacy_impact_assessments_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { UserConsent } from "@/types/rag";
 
@@ -119,5 +120,53 @@ export class GDPRService {
     }
 
     return !!consent?.consented;
+  }
+
+  // Generate data subject access report - added this method
+  static async generateDataSubjectAccessReport(
+    teamId: string,
+    subjectId: string
+  ): Promise<{
+    personalData: any[];
+    processingActivities: string[];
+    retentionPeriods: Record<string, number>;
+    thirdPartySharing: string[];
+  }> {
+    console.log(`📊 Generating data subject access report for ${subjectId}`);
+
+    // Collect all personal data
+    const personalData: any[] = [];
+
+    // Get user consents
+    const consents = await this.getUserConsents(teamId);
+    personalData.push(...consents);
+
+    // Get conversation data (if applicable)
+    const { data: conversations } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('session_id', subjectId);
+
+    if (conversations) {
+      personalData.push(...conversations);
+    }
+
+    return {
+      personalData,
+      processingActivities: [
+        'Customer support chatbot interactions',
+        'Service improvement analytics',
+        'Security monitoring'
+      ],
+      retentionPeriods: {
+        'conversations': 365,
+        'audit_logs': 2555, // 7 years
+        'user_consents': 2555
+      },
+      thirdPartySharing: [
+        'Cloud infrastructure providers (AWS, Google Cloud)',
+        'Analytics providers (if configured)'
+      ]
+    };
   }
 }
