@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ProductionWorkerQueue } from './productionWorkerQueue';
 import { MonitoringAndAlertingService } from './monitoringAndAlerting';
@@ -130,7 +131,7 @@ export class AutoscalingService {
       const queueMetrics = await ProductionWorkerQueue.getQueueMetrics();
       
       // If queue depth suddenly spikes above 500, immediately add workers
-      if (queueMetrics.queueDepth > 500 && this.currentWorkerCount < 20) {
+      if (queueMetrics.pendingJobs > 500 && this.currentWorkerCount < 20) {
         const targetWorkers = Math.min(20, this.currentWorkerCount + 5);
         await this.executeScalingAction('scale_up', targetWorkers, 'Burst scaling for queue spike');
       }
@@ -145,15 +146,18 @@ export class AutoscalingService {
     try {
       const queueMetrics = await ProductionWorkerQueue.getQueueMetrics();
       
+      // Calculate worker utilization based on running jobs vs current workers
+      const workerUtilization = this.currentWorkerCount > 0 ? queueMetrics.runningJobs / this.currentWorkerCount : 0;
+      
       // Simulate CPU and memory metrics (in production, these would come from actual monitoring)
-      const cpuUtilization = Math.min(100, (queueMetrics.workerUtilization * 100) + Math.random() * 20);
+      const cpuUtilization = Math.min(100, (workerUtilization * 100) + Math.random() * 20);
       const memoryUtilization = Math.min(100, cpuUtilization * 0.8 + Math.random() * 15);
 
       return {
         currentWorkers: this.currentWorkerCount,
         targetWorkers: this.currentWorkerCount,
-        queueDepth: queueMetrics.queueDepth,
-        avgProcessingTime: queueMetrics.averageProcessingTime,
+        queueDepth: queueMetrics.pendingJobs,
+        avgProcessingTime: queueMetrics.avgProcessingTime,
         cpuUtilization,
         memoryUtilization,
         lastScaleAction: this.lastScaleAction,

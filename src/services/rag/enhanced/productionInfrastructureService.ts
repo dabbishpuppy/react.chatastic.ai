@@ -1,3 +1,4 @@
+
 import { RealRateLimitingService } from './realRateLimitingService';
 import { RealConnectionPoolManager } from './realConnectionPoolManager';
 import { RealDatabasePartitioningService } from './realDatabasePartitioningService';
@@ -182,15 +183,6 @@ export class ProductionInfrastructureService {
       
       if (!rateLimitCheck.allowed) {
         throw new Error(`Rate limit exceeded: ${rateLimitCheck.reason}`);
-      }
-
-      // Increment concurrent requests for tracking
-      if (queryType === 'write') {
-        try {
-          await RealRateLimitingService.incrementConcurrentRequests(customerId);
-        } catch (error) {
-          // Continue without rate limiting if service fails
-        }
       }
 
       try {
