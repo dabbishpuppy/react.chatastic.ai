@@ -1,11 +1,12 @@
 
 import { RAGOrchestrator, RAGRequest } from '../ragOrchestrator';
-import { StreamingHandler, StreamingOptions } from '../llm/streamingHandler';
+import { StreamingHandler, StreamingOptions, StreamingChunk } from '../llm/streamingHandler';
 
 export interface RAGStreamingOptions extends StreamingOptions {
   enableSourceCitations?: boolean;
   contextWindow?: number;
   maxTokens?: number;
+  temperature?: number;
 }
 
 export interface RAGStreamingResult {
@@ -44,16 +45,20 @@ export class RAGStreamingProcessor {
 
       // Enhanced streaming options with RAG context
       const streamingOptions: StreamingOptions = {
-        onChunk: (chunk: string) => {
-          fullResponse += chunk;
+        onChunk: (chunk: StreamingChunk) => {
+          fullResponse += chunk.delta;
           chunkCount++;
           
           // Call user's chunk handler if provided
-          options.onChunk?.(chunk);
+          if (options.onChunk) {
+            options.onChunk(chunk);
+          }
         },
         onComplete: (response: string) => {
           console.log('🏁 RAG streaming complete');
-          options.onComplete?.(response);
+          if (options.onComplete) {
+            options.onComplete(response);
+          }
         },
         onError: options.onError,
         temperature: options.temperature,
@@ -80,7 +85,7 @@ export class RAGStreamingProcessor {
             recencyWeight: 0.2
           },
           llmOptions: {
-            temperature: 0.7
+            temperature: options.temperature || 0.7
           },
           postProcessing: {
             addSourceCitations: options.enableSourceCitations ?? true,

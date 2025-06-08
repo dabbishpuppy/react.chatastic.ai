@@ -1,6 +1,5 @@
-
 import { RAGQueryEngine, RAGQueryResult } from './queryProcessing/ragQueryEngine';
-import { RAGLLMIntegrationEnhanced } from './llm/ragLLMIntegrationEnhanced';
+import { EnhancedRAGLLMIntegration } from './llm/ragLLMIntegrationEnhanced';
 
 export interface RAGRequest {
   query: string;
@@ -96,7 +95,7 @@ export class RAGOrchestrator {
       console.log('🤖 Generating response with configured model:', request.options.llmOptions.model);
       
       const llmStartTime = Date.now();
-      const llmResponse = await RAGLLMIntegrationEnhanced.processQueryWithConfig(
+      const llmResponse = await EnhancedRAGLLMIntegration.processQueryWithConfig(
         request.agentId,
         request.query,
         contextChunks,

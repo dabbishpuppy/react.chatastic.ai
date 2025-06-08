@@ -61,4 +61,29 @@ export class EnhancedRAGLLMIntegration {
       throw error;
     }
   }
+
+  static async processQueryWithConfig(
+    agentId: string,
+    query: string,
+    contextChunks: string[],
+    llmOptions: any = {}
+  ): Promise<string> {
+    const context = contextChunks.join('\n\n');
+    const llmRouter = new LLMRouter({ 
+      multiProviderService: new (await import('./multiProviderLLMService')).MultiProviderLLMService() 
+    });
+    const integration = new EnhancedRAGLLMIntegration(llmRouter);
+    
+    const result = await integration.processQuery(query, context, agentId, {
+      provider: 'openai',
+      model: llmOptions.model || 'gpt-4o-mini',
+      temperature: llmOptions.temperature || 0.7,
+      teamId: 'default-team'
+    });
+    
+    return result.content;
+  }
 }
+
+// Also export as RAGLLMIntegrationEnhanced for compatibility
+export const RAGLLMIntegrationEnhanced = EnhancedRAGLLMIntegration;

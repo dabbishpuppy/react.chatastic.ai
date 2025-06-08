@@ -1,3 +1,4 @@
+
 // Export all RAG services for easy importing
 export * from './queryProcessing';
 export * from './llm';
@@ -11,7 +12,7 @@ export * from './orchestration';
 // Main orchestrator
 export { RAGOrchestrator } from './ragOrchestrator';
 
-// Main types
+// Main types - explicitly re-export to resolve ambiguity
 export type { RAGRequest, RAGResponse } from './ragOrchestrator';
 
 // Export advanced RAG services
