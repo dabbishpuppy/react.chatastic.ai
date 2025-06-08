@@ -14,6 +14,7 @@ import WebsitesSourcePage from './pages/SourcesPage';
 import DocumentsSourcePage from './pages/SourcesPage';
 import KnowledgeBaseSourcePage from './pages/SourcesPage';
 import ChatHistoryPage from './pages/ActivityPage';
+import AgentSettingsPage from './pages/AgentSettingsPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MonitoringDashboard } from './components/monitoring/MonitoringDashboard';
 
@@ -49,6 +50,22 @@ function App() {
                 element={
                   <AuthProvider>
                     <AgentPage />
+                  </AuthProvider>
+                }
+              />
+              <Route
+                path="/agent/:agentId/sources"
+                element={
+                  <AuthProvider>
+                    <SourcesPage />
+                  </AuthProvider>
+                }
+              />
+              <Route
+                path="/agent/:agentId/settings/*"
+                element={
+                  <AuthProvider>
+                    <AgentSettingsPage />
                   </AuthProvider>
                 }
               />
