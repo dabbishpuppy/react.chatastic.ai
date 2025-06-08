@@ -1,163 +1,125 @@
 
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from '@/components/ui/sonner';
-import { AuthProvider } from './contexts/AuthContext';
-import { TrainingNotificationProvider } from './components/layout/TrainingNotificationProvider';
-import LoginPage from './pages/SignIn';
-import DashboardPage from './pages/Dashboard';
-import AgentPage from './pages/AgentEnvironment';
-import ManagementPage from './pages/ManagementPage';
-import SettingsPage from './pages/Settings';
-import SourcesPage from './pages/SourcesPage';
-import WebsitesSourcePage from './pages/SourcesPage';
-import DocumentsSourcePage from './pages/SourcesPage';
-import KnowledgeBaseSourcePage from './pages/SourcesPage';
-import ChatHistoryPage from './pages/ActivityPage';
-import AgentSettingsPage from './pages/AgentSettingsPage';
-import IntegrationsPage from './pages/IntegrationsPage';
-import LeadsPage from './pages/LeadsPage';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MonitoringDashboard } from './components/monitoring/MonitoringDashboard';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import TrainingNotificationProvider from "@/components/layout/TrainingNotificationProvider";
 
-const queryClient = new QueryClient();
+// Import pages
+import DashboardPage from "@/pages/Dashboard";
+import AgentPage from "@/pages/AgentPage";
+import SourcesPage from "@/pages/SourcesPage";
+import AnalyticsPage from "@/pages/AnalyticsPage";
+import ActionsPage from "@/pages/ActionsPage";
+import IntegrationsPage from "@/pages/IntegrationsPage";
+import ActivityPage from "@/pages/ActivityPage";
+import ActivityLeadsPage from "@/pages/ActivityLeadsPage";
+import Settings from "@/pages/Settings";
+import AgentSettingsPage from "@/pages/AgentSettingsPage";
+import ManagementPage from "@/pages/ManagementPage";
+import MonitoringPage from "@/pages/MonitoringPage";
+
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   return (
-    <AuthProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
         <TrainingNotificationProvider>
-          <Toaster />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route
-                path="/"
-                element={
-                  <AuthProvider>
-                    <Navigate to="/dashboard" replace />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <AuthProvider>
+          <Router>
+            <div className="min-h-screen bg-background">
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                
+                {/* Protected Routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
                     <DashboardPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId"
-                element={
-                  <AuthProvider>
+                  </ProtectedRoute>
+                } />
+                
+                {/* Agent Routes */}
+                <Route path="/agent/:agentId" element={
+                  <ProtectedRoute>
                     <AgentPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId/activity"
-                element={
-                  <AuthProvider>
-                    <ChatHistoryPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId/activity/leads"
-                element={
-                  <AuthProvider>
-                    <LeadsPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId/integrations"
-                element={
-                  <AuthProvider>
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/sources" element={
+                  <ProtectedRoute>
+                    <SourcesPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/analytics" element={
+                  <ProtectedRoute>
+                    <AnalyticsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/actions" element={
+                  <ProtectedRoute>
+                    <ActionsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/integrations" element={
+                  <ProtectedRoute>
                     <IntegrationsPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId/sources"
-                element={
-                  <AuthProvider>
-                    <SourcesPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId/settings/*"
-                element={
-                  <AuthProvider>
-                    <AgentSettingsPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/agent/:agentId/management"
-                element={
-                  <AuthProvider>
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/activity" element={
+                  <ProtectedRoute>
+                    <ActivityPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/activity/leads" element={
+                  <ProtectedRoute>
+                    <ActivityLeadsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/agent/:agentId/management" element={
+                  <ProtectedRoute>
                     <ManagementPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/settings/*"
-                element={
-                  <AuthProvider>
-                    <SettingsPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/sources/:agentId"
-                element={
-                  <AuthProvider>
-                    <SourcesPage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/sources/:agentId/websites"
-                element={
-                  <AuthProvider>
-                    <WebsitesSourcePage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/sources/:agentId/documents"
-                element={
-                  <AuthProvider>
-                    <DocumentsSourcePage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/sources/:agentId/knowledge-base"
-                element={
-                  <AuthProvider>
-                    <KnowledgeBaseSourcePage />
-                  </AuthProvider>
-                }
-              />
-              <Route
-                path="/chat-history"
-                element={
-                  <AuthProvider>
-                    <ChatHistoryPage />
-                  </AuthProvider>
-                }
-              />
-              <Route path="/monitoring" element={<MonitoringDashboard />} />
-              {/* System testing route removed - functionality moved to monitoring dashboard */}
-            </Routes>
-          </BrowserRouter>
+                  </ProtectedRoute>
+                } />
+                
+                {/* Agent Settings Routes */}
+                <Route path="/agent/:agentId/settings/*" element={
+                  <ProtectedRoute>
+                    <AgentSettingsPage />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Settings Routes */}
+                <Route path="/settings/*" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Monitoring Route */}
+                <Route path="/monitoring" element={
+                  <ProtectedRoute>
+                    <MonitoringPage />
+                  </ProtectedRoute>
+                } />
+                
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </div>
+            <Toaster />
+          </Router>
         </TrainingNotificationProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
