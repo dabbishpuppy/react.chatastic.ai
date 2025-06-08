@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -24,6 +23,22 @@ class EnhancedJobProcessor {
     
     const startTime = Date.now();
     
+    // Validate parentSourceId format
+    if (!this.isValidUUID(parentSourceId)) {
+      throw new Error(`Invalid UUID format for parentSourceId: ${parentSourceId}`);
+    }
+
+    // Verify parent source exists
+    const { data: parentSource, error: parentError } = await this.supabase
+      .from('agent_sources')
+      .select('id, crawl_status')
+      .eq('id', parentSourceId)
+      .single();
+
+    if (parentError || !parentSource) {
+      throw new Error(`Parent source not found: ${parentSourceId}`);
+    }
+
     // Get pending pages in batches
     const { data: pendingPages, error: fetchError } = await this.supabase
       .from('source_pages')
@@ -33,12 +48,12 @@ class EnhancedJobProcessor {
       .order('created_at', { ascending: true })
       .limit(20); // Process in batches
 
-    if (fetchError || !pendingPages) {
+    if (fetchError) {
       console.error('❌ Error fetching pending pages:', fetchError);
-      return { success: false, error: fetchError?.message };
+      throw new Error(`Failed to fetch pending pages: ${fetchError.message}`);
     }
 
-    if (pendingPages.length === 0) {
+    if (!pendingPages || pendingPages.length === 0) {
       console.log('📭 No pending pages found for processing');
       return { success: true, processed: 0, skipped: 0, failed: 0 };
     }
@@ -61,6 +76,11 @@ class EnhancedJobProcessor {
       processingTimeMs: totalTime,
       parentSourceId
     };
+  }
+
+  private isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
   }
 
   private async processPagesInBatches(pages: any[]): Promise<any> {
@@ -197,65 +217,106 @@ class EnhancedJobProcessor {
   }
 }
 
+// Input validation helper
+function validateEnvironment() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL environment variable is not set');
+  }
+  
+  if (!supabaseKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+  }
+  
+  return { supabaseUrl, supabaseKey };
+}
+
+// Request body parser with comprehensive validation
+async function parseRequestBody(req: Request): Promise<{ parentSourceId?: string; maxConcurrentJobs: number }> {
+  const contentType = req.headers.get('content-type') || '';
+  
+  if (!contentType.includes('application/json')) {
+    console.log('📝 No JSON content-type, using default parameters');
+    return { maxConcurrentJobs: 5 };
+  }
+
+  try {
+    const bodyText = await req.text();
+    console.log('📨 Raw request body:', bodyText);
+    
+    if (!bodyText || !bodyText.trim()) {
+      console.log('📭 Empty request body, using default parameters');
+      return { maxConcurrentJobs: 5 };
+    }
+
+    const parsed = JSON.parse(bodyText);
+    console.log('✅ Parsed request body:', parsed);
+    
+    const { parentSourceId, maxConcurrentJobs = 5 } = parsed;
+    
+    // Validate maxConcurrentJobs
+    if (typeof maxConcurrentJobs !== 'number' || maxConcurrentJobs < 1 || maxConcurrentJobs > 20) {
+      throw new Error('maxConcurrentJobs must be a number between 1 and 20');
+    }
+    
+    return { parentSourceId, maxConcurrentJobs };
+  } catch (parseError) {
+    console.error('❌ JSON parsing error:', parseError);
+    throw new Error(`Invalid JSON in request body: ${parseError.message}`);
+  }
+}
+
+// Find pending sources fallback
+async function findPendingSources(supabase: any, limit = 1) {
+  console.log('🔍 Looking for any pending sources to process');
+  
+  const { data: pendingSources, error: sourcesError } = await supabase
+    .from('agent_sources')
+    .select('id')
+    .eq('source_type', 'website')
+    .is('parent_source_id', null)
+    .eq('crawl_status', 'in_progress')
+    .limit(limit);
+
+  if (sourcesError) {
+    throw new Error(`Failed to query pending sources: ${sourcesError.message}`);
+  }
+
+  return pendingSources || [];
+}
+
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    console.log(`📥 ${req.method} request received at ${new Date().toISOString()}`);
+    console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()));
+
+    // Validate environment variables
+    const { supabaseUrl, supabaseKey } = validateEnvironment();
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Enhanced request body parsing with better error handling
-    let requestBody: any = {};
-    const contentType = req.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        const bodyText = await req.text();
-        console.log('📨 Raw request body:', bodyText);
-        
-        if (bodyText && bodyText.trim()) {
-          requestBody = JSON.parse(bodyText);
-        } else {
-          console.log('📭 Empty request body, using default parameters');
-        }
-      } catch (parseError) {
-        console.error('❌ JSON parsing error:', parseError);
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Invalid JSON in request body',
-            details: parseError.message 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        );
-      }
-    }
-
-    const { parentSourceId, maxConcurrentJobs = 5 } = requestBody;
+    // Parse and validate request body
+    const { parentSourceId, maxConcurrentJobs } = await parseRequestBody(req);
 
     // If no parentSourceId provided, try to find pending pages to process
     if (!parentSourceId) {
-      console.log('📨 No parentSourceId provided, looking for any pending pages to process');
+      const pendingSources = await findPendingSources(supabase);
       
-      // Find any parent sources with pending pages
-      const { data: pendingSources, error: sourcesError } = await supabase
-        .from('agent_sources')
-        .select('id')
-        .eq('source_type', 'website')
-        .is('parent_source_id', null)
-        .eq('crawl_status', 'in_progress')
-        .limit(1);
-
-      if (sourcesError || !pendingSources || pendingSources.length === 0) {
+      if (pendingSources.length === 0) {
+        console.log('📭 No pending sources found to process');
         return new Response(JSON.stringify({ 
           success: true, 
           message: 'No pending sources found to process',
           processed: 0 
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
         });
       }
 
@@ -268,6 +329,7 @@ serve(async (req) => {
       
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
       });
     }
 
@@ -281,16 +343,28 @@ serve(async (req) => {
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
     });
 
   } catch (error) {
     console.error('❌ Enhanced processing error:', error);
+    console.error('❌ Error stack trace:', error.stack);
+    
+    // Determine if this is a client error (400) or server error (500)
+    const isClientError = error.message.includes('Invalid') || 
+                         error.message.includes('not found') ||
+                         error.message.includes('required') ||
+                         error.message.includes('must be');
+    
+    const statusCode = isClientError ? 400 : 500;
+    
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message,
-      stack: error.stack 
+      stack: error.stack,
+      timestamp: new Date().toISOString()
     }), {
-      status: 500,
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -6,8 +6,11 @@ export { CrawlJobManager } from './enhanced/crawlJobManager';
 export { CrawlSubscriptionService } from './enhanced/crawlSubscriptions';
 export { CompressionAnalyticsService } from './enhanced/compressionAnalytics';
 
-// Main service class that orchestrates all enhanced crawl functionality
-export class EnhancedCrawlService {
+// Import the enhanced service
+export { EnhancedCrawlService } from './enhanced/enhancedCrawlServiceV2';
+
+// Maintain backward compatibility
+export class LegacyEnhancedCrawlService {
   static async initiateCrawl(request: import('./enhanced/crawlTypes').EnhancedCrawlRequest) {
     const { CrawlApiService } = await import('./enhanced/crawlApi');
     return CrawlApiService.initiateCrawl(request);
@@ -40,5 +43,11 @@ export class EnhancedCrawlService {
   static async getCompressionStats(customerId: string) {
     const { CompressionAnalyticsService } = await import('./enhanced/compressionAnalytics');
     return CompressionAnalyticsService.getCompressionStats(customerId);
+  }
+
+  // New method that uses the enhanced service
+  static async startSourcePageProcessing(parentSourceId?: string) {
+    const { EnhancedCrawlService } = await import('./enhanced/enhancedCrawlServiceV2');
+    return EnhancedCrawlService.startSourcePageProcessing(parentSourceId);
   }
 }
