@@ -70,7 +70,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     }));
   }, [activeTab, location]);
 
-  // Main menu items - added the management item
+  // Main menu items
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "playground", label: "Playground", icon: <FileText size={18} /> },
@@ -128,8 +128,11 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
   ];
 
   const handleClick = (tabId: string, tabLabel: string, hasSubmenu?: boolean, e?: React.MouseEvent) => {
-    // Prevent default behavior to avoid page jumps
-    if (e) e.preventDefault();
+    // Prevent default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     if (hasSubmenu) {
       setExpandedMenus(prev => ({...prev, [tabId]: !prev[tabId]}));
@@ -139,66 +142,54 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     // Call onTabChange first to ensure state is updated
     onTabChange(tabId, tabLabel);
     
-    // Then handle navigation with replace: true to avoid page jumps
+    // Handle navigation without replace: true to prevent blank pages
     if (tabId === "dashboard") {
-      navigate(`/dashboard`, { replace: true });
+      navigate(`/dashboard`);
       return;
     }
     
-    // Use replace: true to prevent scroll restoration
+    // Navigate to the correct routes
     if (tabId === "activity") {
-      navigate(`/agent/${agentId}/activity`, { replace: true });
+      navigate(`/agent/${agentId}/activity`);
     } else if (tabId === "playground") {
-      navigate(`/agent/${agentId}`, { replace: true });
+      navigate(`/agent/${agentId}`);
     } else if (tabId === "analytics") {
-      navigate(`/agent/${agentId}/analytics`, { replace: true });
+      navigate(`/agent/${agentId}/analytics`);
     } else if (tabId === "sources") {
-      navigate(`/agent/${agentId}/sources`, { replace: true });
+      navigate(`/agent/${agentId}/sources`);
     } else if (tabId === "actions") {
-      navigate(`/agent/${agentId}/actions`, { replace: true });
+      navigate(`/agent/${agentId}/actions`);
     } else if (tabId === "connect") {
-      navigate(`/agent/${agentId}/integrations`, { replace: true });
+      navigate(`/agent/${agentId}/integrations`);
     } else if (tabId === "management") {
-      navigate(`/agent/${agentId}/management`, { replace: true });
+      navigate(`/agent/${agentId}/management`);
     } else if (tabId === "settings") {
-      navigate(`/agent/${agentId}/settings`, { replace: true });
+      navigate(`/agent/${agentId}/settings`);
     }
   };
 
   const handleSubmenuClick = (parentTabId: string, submenuPath: string, submenuId: string, e?: React.MouseEvent) => {
-    // Prevent default behavior to avoid page jumps
-    if (e) e.preventDefault();
+    // Prevent default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
     onTabChange(parentTabId, submenuId);
     
-    // Special handling for chat-interface to prevent scroll restoration
-    if (submenuId === "chat-interface") {
-      // Disable scroll restoration before navigation
-      if ('scrollRestoration' in history) {
-        history.scrollRestoration = 'manual';
-      }
-      
-      // Navigate with replace to prevent scroll restoration
-      navigate(`/agent/${agentId}/${submenuPath}`, { replace: true });
-      
-      // Force scroll to top immediately after navigation
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-      }, 0);
-    } else if (parentTabId === "activity") {
+    // Handle navigation based on parent tab and submenu
+    if (parentTabId === "activity") {
       if (submenuId === "chat-log") {
-        navigate(`/agent/${agentId}/activity`, { replace: true });
+        navigate(`/agent/${agentId}/activity`);
       } else if (submenuId === "leads") {
-        navigate(`/agent/${agentId}/activity/leads`, { replace: true });
+        navigate(`/agent/${agentId}/activity/leads`);
       }
     } else if (submenuPath === "sources") {
-      navigate(`/agent/${agentId}/sources?tab=${submenuId}`, { replace: true });
+      navigate(`/agent/${agentId}/sources?tab=${submenuId}`);
     } else if (submenuPath === "integrations") {
-      navigate(`/agent/${agentId}/integrations?tab=${submenuId}`, { replace: true });
+      navigate(`/agent/${agentId}/integrations?tab=${submenuId}`);
     } else {
-      navigate(`/agent/${agentId}/${submenuPath}`, { replace: true });
+      navigate(`/agent/${agentId}/${submenuPath}`);
     }
     
     // Keep the dropdown open
@@ -256,7 +247,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
               label={subItem.label}
               icon={subItem.icon}
               isActive={isSubmenuActive(item.id, subItem.id)}
-              onClick={() => handleSubmenuClick(item.id, subItem.path, subItem.id)}
+              onClick={(e) => handleSubmenuClick(item.id, subItem.path, subItem.id, e)}
             />
           ))}
         </SidebarMenuItem>

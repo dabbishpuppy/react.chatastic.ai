@@ -23,15 +23,22 @@ const SidebarMenuItem = ({
   onClick,
   children
 }: SidebarMenuItemProps) => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick(e);
+  };
+
   return (
     <div key={id} className="mb-1">
       <button
+        type="button"
         className={`w-full flex items-center justify-between px-6 py-2.5 text-sm ${
           isActive
             ? "bg-gray-100 font-medium"
             : "text-gray-700 hover:bg-gray-50"
         }`}
-        onClick={onClick}
+        onClick={handleClick}
       >
         <div className="flex items-center">
           <span className="mr-3 text-gray-500">{icon}</span>
