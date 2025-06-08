@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { GDPRService } from "../gdprService";
 import { DataClassificationService } from "../security/dataClassification";
@@ -25,6 +24,7 @@ export interface PrivacyImpactAssessment {
   mitigations: string[];
   approved: boolean;
   createdAt: string;
+  [key: string]: any; // Add index signature for Json compatibility
 }
 
 export class AdvancedGDPRService extends GDPRService {
@@ -108,7 +108,7 @@ export class AdvancedGDPRService extends GDPRService {
           resource_type: 'privacy_impact_assessment',
           resource_id: piaId,
           team_id: assessment.teamId,
-          new_values: pia
+          new_values: JSON.parse(JSON.stringify(pia)) // Ensure proper JSON conversion
         });
     } catch (error) {
       console.warn('Could not store PIA, using in-memory storage:', error);

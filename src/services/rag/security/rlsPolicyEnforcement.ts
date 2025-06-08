@@ -19,7 +19,6 @@ export class RLSPolicyEnforcement {
     policy?: string;
   }> {
     try {
-      // Since validate_rls_access function doesn't exist, implement basic validation
       // Check if user is authenticated
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -91,11 +90,11 @@ export class RLSPolicyEnforcement {
     metadata?: Record<string, any>;
   }): Promise<void> {
     try {
-      // Use audit_logs table instead of non-existent function
+      // Use audit_logs table with valid action enum value
       await supabase
         .from('audit_logs')
         .insert({
-          action: 'security_violation',
+          action: 'read', // Use valid audit action instead of 'security_violation'
           resource_type: 'security_policy',
           resource_id: null,
           user_id: violation.userId,
