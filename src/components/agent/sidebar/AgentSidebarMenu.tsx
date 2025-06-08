@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { 
@@ -164,7 +165,7 @@ const AgentSidebarMenu: React.FC<AgentSidebarMenuProps> = ({ activeTab, onTabCha
     } else if (tabId === "management") {
       navigate(`/agent/${agentId}/management`);
     } else if (tabId === "settings") {
-      navigate(`/agent/${agentId}/settings`);
+      navigate(`/agent/${agentId}/settings/general`);
     }
   };
 
