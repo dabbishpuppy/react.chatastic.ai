@@ -25,14 +25,15 @@ serve(async (req) => {
 
     const {
       url,
+      agentId,
       parentSourceId,
       teamId,
-      customerId = teamId, // Use teamId as customerId fallback
+      customerId,
       crawlMode = 'full-website',
-      maxPages = Number.MAX_SAFE_INTEGER, // No limits
+      maxPages = Number.MAX_SAFE_INTEGER,
       excludePaths = [],
       includePaths = [],
-      mode // Special mode for recovery operations
+      mode
     } = body;
 
     // Handle recovery mode
@@ -56,13 +57,68 @@ serve(async (req) => {
       );
     }
 
-    // Validate required parameters
-    if (!url || !parentSourceId || !teamId) {
-      throw new Error('Missing required parameters: url, parentSourceId, teamId');
+    // Validate required parameters - handle both agentId and parentSourceId cases
+    if (!url) {
+      throw new Error('Missing required parameter: url');
+    }
+
+    let effectiveParentSourceId = parentSourceId;
+    let effectiveTeamId = teamId || customerId;
+
+    // If we have agentId but no parentSourceId, we need to create a source first
+    if (agentId && !parentSourceId) {
+      console.log('🔨 Creating parent source for agentId:', agentId);
+      
+      // Get team info from agent
+      const { data: agent, error: agentError } = await supabaseClient
+        .from('agents')
+        .select('team_id')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError || !agent) {
+        throw new Error(`Agent not found: ${agentId}`);
+      }
+
+      effectiveTeamId = agent.team_id;
+
+      // Create the parent source
+      const { data: source, error: sourceError } = await supabaseClient
+        .from('agent_sources')
+        .insert({
+          agent_id: agentId,
+          team_id: effectiveTeamId,
+          url: url,
+          title: url,
+          source_type: 'website',
+          crawl_status: 'pending',
+          is_active: true,
+          exclude_paths: excludePaths,
+          include_paths: includePaths,
+          metadata: {
+            crawl_mode: crawlMode,
+            max_pages: maxPages,
+            created_via: 'enhanced_crawl'
+          }
+        })
+        .select()
+        .single();
+
+      if (sourceError || !source) {
+        throw new Error(`Failed to create source: ${sourceError?.message}`);
+      }
+
+      effectiveParentSourceId = source.id;
+      console.log('✅ Created parent source:', effectiveParentSourceId);
+    }
+
+    // Final validation
+    if (!effectiveParentSourceId || !effectiveTeamId) {
+      throw new Error('Missing required parameters after processing: parentSourceId, teamId');
     }
 
     console.log(`🔍 Starting enhanced URL discovery for: ${url}`);
-    console.log(`📊 Mode: ${crawlMode}, Max pages: UNLIMITED`);
+    console.log(`📊 Mode: ${crawlMode}, Max pages: ${maxPages}`);
 
     // Step 1: Discover URLs
     const discoveredUrls = await handleUrlDiscovery(
@@ -80,7 +136,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: 'No URLs discovered',
-          parentSourceId,
+          parentSourceId: effectiveParentSourceId,
           discoveredUrls: 0
         }),
         {
@@ -94,10 +150,10 @@ serve(async (req) => {
     console.log('🔄 Creating pages and background jobs atomically...');
     
     const atomicResult = await createPagesAndJobsAtomically(
-      parentSourceId,
-      teamId,
+      effectiveParentSourceId,
+      effectiveTeamId,
       discoveredUrls,
-      customerId
+      effectiveTeamId
     );
 
     if (!atomicResult.success) {
@@ -113,15 +169,15 @@ serve(async (req) => {
         crawl_status: 'in_progress',
         updated_at: new Date().toISOString()
       })
-      .eq('id', parentSourceId);
+      .eq('id', effectiveParentSourceId);
 
     // Step 4: Ensure job completeness (safety check)
     console.log('🔍 Performing job completeness verification...');
-    const completenessResult = await ensureJobCompleteness(parentSourceId);
+    const completenessResult = await ensureJobCompleteness(effectiveParentSourceId);
 
     const response = {
       success: true,
-      parentSourceId,
+      parentSourceId: effectiveParentSourceId,
       discoveredUrls: discoveredUrls.length,
       pagesCreated: atomicResult.pagesCreated,
       jobsCreated: atomicResult.jobsCreated,
