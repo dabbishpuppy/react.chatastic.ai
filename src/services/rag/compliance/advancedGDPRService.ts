@@ -33,7 +33,7 @@ export class AdvancedGDPRService extends GDPRService {
    */
   static async processDataSubjectRequest(request: Omit<DataSubjectRequest, 'id' | 'status'>): Promise<DataSubjectRequest> {
     try {
-      // Create request record using a generic query since the table might not be in types yet
+      // Create request record using audit_logs as fallback since data_subject_requests may not be in types yet
       const requestId = `dsr-${Date.now()}`;
       const dsrRequest: DataSubjectRequest = {
         ...request,
@@ -41,20 +41,25 @@ export class AdvancedGDPRService extends GDPRService {
         status: 'pending'
       };
 
-      // Store request using raw SQL to avoid type issues
-      const { error } = await supabase.rpc('log_security_violation', {
-        violation_data: {
-          type: 'data_subject_request',
-          request_id: requestId,
-          request_type: request.type,
-          subject_id: request.subjectId,
-          email: request.email,
-          request_date: request.requestDate
-        }
-      });
-
-      if (error) {
-        console.warn('Could not log to security table, proceeding with processing...');
+      // Store request using audit_logs as fallback
+      try {
+        await supabase
+          .from('audit_logs')
+          .insert({
+            action: 'create',
+            resource_type: 'data_subject_request',
+            resource_id: requestId,
+            new_values: {
+              type: 'data_subject_request',
+              request_id: requestId,
+              request_type: request.type,
+              subject_id: request.subjectId,
+              email: request.email,
+              request_date: request.requestDate
+            }
+          });
+      } catch (error) {
+        console.warn('Could not log to audit table, proceeding with processing...');
       }
 
       // Process based on type
@@ -94,9 +99,8 @@ export class AdvancedGDPRService extends GDPRService {
       createdAt: new Date().toISOString()
     };
 
-    // Store PIA using a fallback method
+    // Store PIA using audit_logs as fallback
     try {
-      // Try to use audit_logs as a fallback storage
       await supabase
         .from('audit_logs')
         .insert({
@@ -104,7 +108,7 @@ export class AdvancedGDPRService extends GDPRService {
           resource_type: 'privacy_impact_assessment',
           resource_id: piaId,
           team_id: assessment.teamId,
-          new_values: pia as any
+          new_values: pia
         });
     } catch (error) {
       console.warn('Could not store PIA, using in-memory storage:', error);
@@ -150,7 +154,7 @@ export class AdvancedGDPRService extends GDPRService {
         for (const source of sources) {
           const classification = DataClassificationService.classifyContent(
             source.content || '',
-            source.metadata as Record<string, any> || {}
+            (source.metadata as Record<string, any>) || {}
           );
           
           const retentionPolicy = DataClassificationService.getRetentionPolicy(
