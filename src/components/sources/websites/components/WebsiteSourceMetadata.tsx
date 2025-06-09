@@ -51,23 +51,28 @@ export const WebsiteSourceMetadata: React.FC<WebsiteSourceMetadataProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
-  // Calculate total child source sizes for trained sources
+  // Calculate total child source sizes
   const totalChildSize = React.useMemo(() => {
-    if (status === 'trained' && childSources.length > 0) {
+    if (childSources.length > 0) {
       return childSources.reduce((total, child) => {
         return total + (child.total_content_size || 0);
       }, 0);
     }
     return 0;
-  }, [status, childSources]);
+  }, [childSources]);
 
   return (
     <div className="mt-2 space-y-1">
       <div className="flex items-center gap-3 text-xs text-gray-400">
-        {/* 1. Crawled time first with Calendar icon */}
+        {/* 1. Crawled time first with Calendar icon, and total size if available */}
         <div className="flex items-center gap-1">
           <Calendar className="w-3 h-3" />
-          <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
+          <span>
+            Crawled {formatDate(source.last_crawled_at || source.updated_at)}
+            {totalChildSize > 0 && (
+              <> • {formatBytes(totalChildSize)}</>
+            )}
+          </span>
         </div>
         
         {/* 2. Links count with Link icon - show actual child count if available */}
@@ -80,17 +85,6 @@ export const WebsiteSourceMetadata: React.FC<WebsiteSourceMetadataProps> = ({
             </div>
           </>
         ) : null}
-
-        {/* 3. Child source sizes for trained sources with Database icon */}
-        {status === 'trained' && totalChildSize > 0 && (
-          <>
-            <span>•</span>
-            <div className="flex items-center gap-1">
-              <Database className="w-3 h-3" />
-              <span>{formatBytes(totalChildSize)}</span>
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
