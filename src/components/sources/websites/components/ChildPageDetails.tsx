@@ -20,10 +20,10 @@ const ChildPageDetails: React.FC<ChildPageDetailsProps> = ({
 }) => {
   const fullUrl = getFullUrl(url);
   
-  // Truncate URL if it's longer than 70 characters and add 3 dots
+  // Truncate URL if it's longer than 50 characters and add 3 dots
   const truncateUrl = (url: string) => {
-    if (url.length <= 70) return url;
-    return url.substring(0, 70) + '...';
+    if (url.length <= 50) return url;
+    return url.substring(0, 50) + '...';
   };
 
   const displayUrl = truncateUrl(fullUrl);
