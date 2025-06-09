@@ -46,6 +46,12 @@ const WebsiteSourceChildList: React.FC<WebsiteSourceChildListProps> = ({
     }
   };
 
+  // Truncate URL if it's longer than 100 characters and add 3 dots
+  const truncateUrl = (url: string) => {
+    if (url.length <= 100) return url;
+    return url.substring(0, 100) + '...';
+  };
+
   return (
     <div className="mt-4 pl-6 border-l-2 border-gray-200">
       <div className="space-y-3">
@@ -67,10 +73,10 @@ const WebsiteSourceChildList: React.FC<WebsiteSourceChildListProps> = ({
               )}
               
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate" title={childSource.url}>
+                <p className="text-sm font-medium text-gray-900" title={childSource.url}>
                   {childSource.title || formatUrl(childSource.url)}
                 </p>
-                <p className="text-xs text-gray-500 truncate">{childSource.url}</p>
+                <p className="text-xs text-gray-500" title={childSource.url}>{truncateUrl(childSource.url)}</p>
               </div>
             </div>
             
