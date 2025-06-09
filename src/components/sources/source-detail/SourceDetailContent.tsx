@@ -16,6 +16,7 @@ interface SourceDetailContentProps {
   onContentChange: (value: string) => void;
   onSave: () => void;
   onCancel: () => void;
+  isSourcePage?: boolean;
 }
 
 const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
@@ -28,11 +29,12 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   onTitleChange,
   onContentChange,
   onSave,
-  onCancel
+  onCancel,
+  isSourcePage = false
 }) => {
   const isHtmlContent = source?.metadata?.isHtml === true;
   const isFileSource = source?.source_type === 'file';
-  const isChildPage = source?.metadata?.isChildPage === true;
+  const isChildPage = source?.metadata?.isChildPage === true || isSourcePage;
 
   // Helper function to render content with proper line breaks
   const renderPlainTextContent = (content: string) => {
@@ -52,6 +54,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   console.log('🔍 Content rendering debug:', {
     isHtmlContent,
     isChildPage,
+    isSourcePage,
     contentLength: source.content?.length,
     contentPreview: source.content?.substring(0, 100),
     looksLikeHtml: source.content ? looksLikeHtml(source.content) : false
@@ -73,7 +76,9 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-start">
-              <h2 className="text-xl font-semibold">{source.title}</h2>
+              <h2 className="text-xl font-semibold">
+                {isSourcePage ? (source.url || 'Source Page Content') : source.title}
+              </h2>
               {!isFileSource && !isChildPage && (
                 <Button
                   variant="outline"
@@ -84,7 +89,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
               )}
             </div>
             
-            {isChildPage && source.metadata && (
+            {(isChildPage || isSourcePage) && source.metadata && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   {source.metadata.contentSize && (
@@ -105,6 +110,19 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                   {source.metadata.compressionRatio && (
                     <div>
                       <span className="font-medium">Compression Ratio:</span> {(source.metadata.compressionRatio * 100).toFixed(1)}%
+                    </div>
+                  )}
+                  {source.metadata.status && (
+                    <div>
+                      <span className="font-medium">Status:</span> {source.metadata.status}
+                    </div>
+                  )}
+                  {source.url && (
+                    <div className="col-span-2">
+                      <span className="font-medium">URL:</span> 
+                      <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1 break-all">
+                        {source.url}
+                      </a>
                     </div>
                   )}
                 </div>

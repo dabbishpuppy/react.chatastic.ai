@@ -3,15 +3,32 @@ import React from 'react';
 import { AgentSource } from '@/types/rag';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Clock, Globe, FileText, Hash } from 'lucide-react';
+import { Clock, Globe, FileText, Hash, ArrowRight } from 'lucide-react';
 import { formatTimeAgo, formatBytes } from '../utils/websiteUtils';
 import ManualJobProcessor from './ManualJobProcessor';
+import { useSourcePagesPaginated } from '@/hooks/useSourcePagesPaginated';
+import { Button } from '@/components/ui/button';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface WebsiteSourceDetailsProps {
   source: AgentSource;
 }
 
 const WebsiteSourceDetails: React.FC<WebsiteSourceDetailsProps> = ({ source }) => {
+  const navigate = useNavigate();
+  const { agentId } = useParams();
+  
+  const { data: pagesData, isLoading: pagesLoading } = useSourcePagesPaginated({
+    parentSourceId: source.id,
+    page: 1,
+    pageSize: 10,
+    enabled: true
+  });
+
+  const handlePageClick = (pageId: string) => {
+    navigate(`/agent/${agentId}/sources/page/${pageId}`);
+  };
+
   return (
     <div className="space-y-4">
       {/* Manual Job Processor */}
@@ -70,6 +87,45 @@ const WebsiteSourceDetails: React.FC<WebsiteSourceDetailsProps> = ({ source }) =
           )}
         </div>
       </div>
+
+      {/* Child Pages Section */}
+      {pagesData && pagesData.pages.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-3">
+            <h4 className="font-medium text-gray-900">
+              Child Pages ({pagesData.totalCount})
+            </h4>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {pagesData.pages.map((page) => (
+                <div 
+                  key={page.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => handlePageClick(page.id)}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {page.url}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {page.status} • {page.content_size ? formatBytes(page.content_size) : 'No content'}
+                      {page.chunks_created && ` • ${page.chunks_created} chunks`}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" className="flex-shrink-0">
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {pagesData.totalCount > 10 && (
+              <div className="text-xs text-gray-500 text-center">
+                Showing first 10 of {pagesData.totalCount} pages
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
 
 export const useSourceDetail = () => {
-  const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
+  const { sourceId, agentId, pageId } = useParams<{ sourceId: string; agentId: string; pageId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -20,27 +20,67 @@ export const useSourceDetail = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
 
+  // Determine if this is a source page (website child source) or regular source
+  const isSourcePage = !!pageId;
+  const currentId = isSourcePage ? pageId : sourceId;
+
   const { data: source, isLoading: loading, refetch } = useQuery({
-    queryKey: ['agent-source', sourceId],
+    queryKey: isSourcePage ? ['source-page', pageId] : ['agent-source', sourceId],
     queryFn: async () => {
-      if (!sourceId) return null;
+      if (!currentId) return null;
       
       try {
-        const data = await fetchMaybeSingle(
-          supabase
-            .from('agent_sources')
-            .select('*')
-            .eq('id', sourceId),
-          `useSourceDetail(${sourceId})`
-        ) as AgentSource | null;
-        
-        return data;
+        if (isSourcePage) {
+          // Fetch from source_pages table for website child sources
+          const data = await fetchMaybeSingle(
+            supabase
+              .from('source_pages')
+              .select('*')
+              .eq('id', pageId),
+            `useSourceDetail(page:${pageId})`
+          );
+          
+          // Transform source page data to match AgentSource interface
+          if (data) {
+            return {
+              id: data.id,
+              title: data.url || `Page ${data.id.slice(0, 8)}`,
+              content: data.content || '',
+              source_type: 'website' as const,
+              url: data.url,
+              agent_id: agentId,
+              created_at: data.created_at,
+              updated_at: data.updated_at,
+              metadata: {
+                isChildPage: true,
+                status: data.status,
+                contentSize: data.content_size,
+                chunksCreated: data.chunks_created,
+                processingTimeMs: data.processing_time_ms,
+                compressionRatio: data.compression_ratio,
+                parentSourceId: data.parent_source_id
+              }
+            } as AgentSource;
+          }
+          return null;
+        } else {
+          // Fetch from agent_sources table for regular sources
+          const data = await fetchMaybeSingle(
+            supabase
+              .from('agent_sources')
+              .select('*')
+              .eq('id', sourceId),
+            `useSourceDetail(${sourceId})`
+          ) as AgentSource | null;
+          
+          return data;
+        }
       } catch (error) {
         console.error('Failed to fetch source:', error);
         return null;
       }
     },
-    enabled: !!sourceId
+    enabled: !!currentId
   });
 
   useEffect(() => {
@@ -51,19 +91,32 @@ export const useSourceDetail = () => {
   }, [source]);
 
   const handleSave = async () => {
-    if (!sourceId || !source) return;
+    if (!currentId || !source) return;
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('agent_sources')
-        .update({
-          title: editTitle,
-          content: editContent,
-        })
-        .eq('id', sourceId);
+      if (isSourcePage) {
+        // Update source page
+        const { error } = await supabase
+          .from('source_pages')
+          .update({
+            content: editContent,
+          })
+          .eq('id', pageId);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Update regular source
+        const { error } = await supabase
+          .from('agent_sources')
+          .update({
+            title: editTitle,
+            content: editContent,
+          })
+          .eq('id', sourceId);
+
+        if (error) throw error;
+      }
 
       toast({
         title: 'Source Updated',
@@ -71,7 +124,7 @@ export const useSourceDetail = () => {
       });
 
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ['agent-source', sourceId] });
+      queryClient.invalidateQueries({ queryKey: isSourcePage ? ['source-page', pageId] : ['agent-source', sourceId] });
     } catch (error: any) {
       toast({
         title: 'Update Failed',
@@ -84,23 +137,47 @@ export const useSourceDetail = () => {
   };
 
   const handleDelete = useCallback(async () => {
-    if (!sourceId) return;
+    if (!currentId) return;
 
     setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .from('agent_sources')
-        .delete()
-        .eq('id', sourceId);
+      if (isSourcePage) {
+        // Delete source page
+        const { error } = await supabase
+          .from('source_pages')
+          .delete()
+          .eq('id', pageId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: 'Source Deleted',
-        description: 'Source has been deleted successfully.',
-      });
+        toast({
+          title: 'Page Deleted',
+          description: 'Source page has been deleted successfully.',
+        });
 
-      navigate(`/agent/${agentId}/sources`);
+        // Navigate back to parent source
+        if (source?.metadata?.parentSourceId) {
+          navigate(`/agent/${agentId}/sources/${source.metadata.parentSourceId}`);
+        } else {
+          navigate(`/agent/${agentId}/sources`);
+        }
+      } else {
+        // Delete regular source
+        const { error } = await supabase
+          .from('agent_sources')
+          .delete()
+          .eq('id', sourceId);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Source Deleted',
+          description: 'Source has been deleted successfully.',
+        });
+
+        navigate(`/agent/${agentId}/sources`);
+      }
+
       queryClient.invalidateQueries({ queryKey: ['agent-sources', agentId] });
     } catch (error: any) {
       toast({
@@ -111,10 +188,16 @@ export const useSourceDetail = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [sourceId, agentId, navigate, queryClient, toast]);
+  }, [currentId, agentId, navigate, queryClient, toast, isSourcePage, pageId, sourceId, source]);
 
   const handleBackClick = () => {
-    navigate(`/agent/${agentId}/sources`);
+    if (isSourcePage && source?.metadata?.parentSourceId) {
+      // Navigate back to parent source detail page
+      navigate(`/agent/${agentId}/sources/${source.metadata.parentSourceId}`);
+    } else {
+      // Navigate back to sources list
+      navigate(`/agent/${agentId}/sources`);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -143,6 +226,7 @@ export const useSourceDetail = () => {
     handleBackClick,
     handleCancelEdit,
     agentId: agentId!,
-    refetch
+    refetch,
+    isSourcePage
   };
 };

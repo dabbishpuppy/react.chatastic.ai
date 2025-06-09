@@ -31,7 +31,8 @@ const SourceDetailPage: React.FC = () => {
     handleBackClick,
     handleCancelEdit,
     agentId,
-    refetch
+    refetch,
+    isSourcePage
   } = useSourceDetail();
 
   // Set up real-time workflow updates for this specific source
@@ -77,15 +78,20 @@ const SourceDetailPage: React.FC = () => {
               isEditing={isEditing}
               onBackClick={handleBackClick}
               onDeleteClick={() => setShowDeleteDialog(true)}
+              isSourcePage={isSourcePage}
             />
 
             <div className="mt-8">
               <Tabs defaultValue="content" className="space-y-6">
                 <TabsList>
                   <TabsTrigger value="content">Content</TabsTrigger>
-                  <TabsTrigger value="workflow">Workflow</TabsTrigger>
-                  <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
-                  <TabsTrigger value="controls">Controls</TabsTrigger>
+                  {!isSourcePage && (
+                    <>
+                      <TabsTrigger value="workflow">Workflow</TabsTrigger>
+                      <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
+                      <TabsTrigger value="controls">Controls</TabsTrigger>
+                    </>
+                  )}
                 </TabsList>
 
                 <TabsContent value="content">
@@ -100,20 +106,25 @@ const SourceDetailPage: React.FC = () => {
                     onContentChange={setEditContent}
                     onSave={handleSave}
                     onCancel={handleCancelEdit}
+                    isSourcePage={isSourcePage}
                   />
                 </TabsContent>
 
-                <TabsContent value="workflow">
-                  <WorkflowEventTimeline sourceId={source.id} />
-                </TabsContent>
+                {!isSourcePage && (
+                  <>
+                    <TabsContent value="workflow">
+                      <WorkflowEventTimeline sourceId={source.id} />
+                    </TabsContent>
 
-                <TabsContent value="jobs">
-                  <WorkflowJobsPanel sourceId={source.id} />
-                </TabsContent>
+                    <TabsContent value="jobs">
+                      <WorkflowJobsPanel sourceId={source.id} />
+                    </TabsContent>
 
-                <TabsContent value="controls">
-                  <WorkflowControls source={source} onRefresh={refetch} />
-                </TabsContent>
+                    <TabsContent value="controls">
+                      <WorkflowControls source={source} onRefresh={refetch} />
+                    </TabsContent>
+                  </>
+                )}
               </Tabs>
             </div>
           </div>

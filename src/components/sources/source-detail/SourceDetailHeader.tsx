@@ -7,7 +7,8 @@ import {
   File,
   Link,
   MessageCircleQuestion,
-  Trash2
+  Trash2,
+  Globe
 } from 'lucide-react';
 import { AgentSource, SourceType } from '@/types/rag';
 import SourceInfoPopover from './SourceInfoPopover';
@@ -17,13 +18,15 @@ interface SourceDetailHeaderProps {
   isEditing: boolean;
   onBackClick: () => void;
   onDeleteClick: () => void;
+  isSourcePage?: boolean;
 }
 
 const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
   source,
   isEditing,
   onBackClick,
-  onDeleteClick
+  onDeleteClick,
+  isSourcePage = false
 }) => {
   const getSourceIcon = (type: SourceType) => {
     switch (type) {
@@ -32,12 +35,24 @@ const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
       case 'file':
         return <File size={16} className="text-green-600" />;
       case 'website':
-        return <Link size={16} className="text-purple-600" />;
+        return isSourcePage ? <Globe size={16} className="text-purple-600" /> : <Link size={16} className="text-purple-600" />;
       case 'qa':
         return <MessageCircleQuestion size={16} className="text-orange-600" />;
       default:
         return <FileText size={16} className="text-gray-600" />;
     }
+  };
+
+  const getTitle = () => {
+    if (isEditing) {
+      return isSourcePage ? 'Edit Source Page' : 'Edit Source';
+    }
+    
+    if (isSourcePage) {
+      return source.url || `Source Page ${source.id.slice(0, 8)}`;
+    }
+    
+    return source.title;
   };
 
   return (
@@ -54,8 +69,13 @@ const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
           </Button>
           {getSourceIcon(source.source_type)}
           <h1 className="text-3xl font-bold">
-            {isEditing ? 'Edit Source' : source.title}
+            {getTitle()}
           </h1>
+          {isSourcePage && (
+            <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+              Child Page
+            </span>
+          )}
         </div>
         
         <div className="flex items-center space-x-2">
