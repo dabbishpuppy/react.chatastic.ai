@@ -20,9 +20,9 @@ const ChildPageDetails: React.FC<ChildPageDetailsProps> = ({
 }) => {
   const fullUrl = getFullUrl(url);
   
-  // Truncate URL if it's longer than 100-120 characters
+  // Truncate URL if it's longer than 100 characters and add 3 dots
   const truncateUrl = (url: string) => {
-    if (url.length <= 120) return url;
+    if (url.length <= 100) return url;
     return url.substring(0, 100) + '...';
   };
 
@@ -31,7 +31,7 @@ const ChildPageDetails: React.FC<ChildPageDetailsProps> = ({
   return (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-gray-900 truncate" title={fullUrl}>
+        <p className="text-sm font-medium text-gray-900" title={fullUrl}>
           {displayUrl}
         </p>
         <ExternalLink 
