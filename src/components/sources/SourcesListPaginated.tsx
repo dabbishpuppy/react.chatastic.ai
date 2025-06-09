@@ -38,8 +38,8 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
   const {
     selectedItems,
     isAllSelected,
-    handleSelectAll,
-    handleSelectItem,
+    toggleSelectAll,
+    toggleItem,
     clearSelection
   } = useSelectionState(optimisticSources.map(s => s.id));
 
@@ -67,16 +67,21 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
     );
   }
 
+  const handleBulkDelete = () => {
+    console.log('Bulk delete:', selectedItems);
+  };
+
+  const handleBulkRestore = () => {
+    console.log('Bulk restore:', selectedItems);
+  };
+
   return (
     <div className="space-y-4">
       {selectedItems.length > 0 && (
         <BulkActionBar
           selectedCount={selectedItems.length}
-          onClearSelection={clearSelection}
-          onBulkDelete={() => {
-            // Handle bulk delete logic here
-            console.log('Bulk delete:', selectedItems);
-          }}
+          onDelete={handleBulkDelete}
+          onRestore={handleBulkRestore}
         />
       )}
 
@@ -87,7 +92,7 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
               <TableHead className="w-12">
                 <Checkbox
                   checked={isAllSelected}
-                  onCheckedChange={handleSelectAll}
+                  onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
               <TableHead>Name</TableHead>
@@ -103,7 +108,7 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
                 key={source.id}
                 source={source}
                 isSelected={selectedItems.includes(source.id)}
-                onSelect={(selected) => handleSelectItem(source.id, selected)}
+                onSelect={(selected) => toggleItem(source.id)}
                 onDelete={handleDeleteClick}
                 onView={handleRowClick}
                 onNavigate={handleNavigateClick}
