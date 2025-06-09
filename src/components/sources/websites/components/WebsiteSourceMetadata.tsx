@@ -18,19 +18,9 @@ export const WebsiteSourceMetadata: React.FC<WebsiteSourceMetadataProps> = ({
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Never';
     
-    // DEBUG: Log the raw date values
-    console.log('🐛 DEBUG formatDate - Raw dateString:', JSON.stringify(dateString));
-    console.log('🐛 DEBUG formatDate - Type:', typeof dateString);
-    console.log('🐛 DEBUG formatDate - Length:', dateString.length);
-    
     try {
       const parsedDate = new Date(dateString);
-      console.log('🐛 DEBUG formatDate - Parsed date:', parsedDate);
-      console.log('🐛 DEBUG formatDate - Is valid:', !isNaN(parsedDate.getTime()));
-      
       const formatted = formatDistanceToNow(parsedDate, { addSuffix: true });
-      console.log('🐛 DEBUG formatDate - Formatted result:', JSON.stringify(formatted));
-      
       return formatted;
     } catch (error) {
       console.error('🐛 DEBUG formatDate - Error:', error);
@@ -66,30 +56,44 @@ export const WebsiteSourceMetadata: React.FC<WebsiteSourceMetadataProps> = ({
     return 0;
   }, [childSources]);
 
+  // Calculate total child links from source.links_count and actual child pages
+  const totalChildLinks = React.useMemo(() => {
+    const discoveredLinks = source.links_count || 0;
+    const actualChildPages = childSources.length;
+    // Show the higher number to be more accurate
+    return Math.max(discoveredLinks, actualChildPages);
+  }, [source.links_count, childSources.length]);
+
   return (
     <div className="mt-2 space-y-1">
       <div className="flex items-center gap-3 text-xs text-gray-400">
-        {/* 1. Crawled time first with Calendar icon, and total size if available */}
+        {/* 1. Crawled time first with Calendar icon */}
         <div className="flex items-center gap-1">
           <Calendar className="w-3 h-3" />
-          <span>
-            Crawled {formatDate(source.last_crawled_at || source.updated_at)}
-            {totalChildSize > 0 && (
-              <> • {formatBytes(totalChildSize)}</>
-            )}
-          </span>
+          <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
         </div>
         
-        {/* 2. Links count with Link icon - show actual child count if available */}
-        {(source.links_count !== undefined && source.links_count > 0) || childSources.length > 0 ? (
+        {/* 2. Total content size with Database icon */}
+        {totalChildSize > 0 && (
+          <>
+            <span>•</span>
+            <div className="flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              <span className="font-medium">{formatBytes(totalChildSize)} total</span>
+            </div>
+          </>
+        )}
+        
+        {/* 3. Total child links/pages with Link icon */}
+        {totalChildLinks > 0 && (
           <>
             <span>•</span>
             <div className="flex items-center gap-1">
               <Link className="w-3 h-3" />
-              <span>{childSources.length > 0 ? `${childSources.length} pages` : `${source.links_count} links`}</span>
+              <span>{totalChildLinks} {childSources.length > 0 ? 'pages' : 'links'}</span>
             </div>
           </>
-        ) : null}
+        )}
       </div>
     </div>
   );
