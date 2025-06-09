@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -74,24 +73,39 @@ const ChildPageActions: React.FC<ChildPageActionsProps> = ({
         break;
       case 'delete':
         try {
-          // Delete from source_pages table (where child pages are stored)
-          const { error } = await supabase
+          console.log('🗑️ Starting source page deletion:', pageId);
+          
+          // Step 1: Delete background jobs first to avoid foreign key constraint violation
+          const { error: jobsError } = await supabase
+            .from('background_jobs')
+            .delete()
+            .eq('page_id', pageId);
+
+          if (jobsError) {
+            console.warn('Warning: Failed to delete background jobs:', jobsError.message);
+            // Continue with deletion even if this fails
+          } else {
+            console.log('✅ Successfully deleted background jobs for page:', pageId);
+          }
+
+          // Step 2: Now delete from source_pages table
+          const { error: pageError } = await supabase
             .from('source_pages')
             .delete()
             .eq('id', pageId);
 
-          if (error) {
-            throw new Error(`Failed to delete source page: ${error.message}`);
+          if (pageError) {
+            throw new Error(`Failed to delete source page: ${pageError.message}`);
           }
 
-          console.log('Source page deleted successfully');
+          console.log('✅ Source page deleted successfully:', pageId);
           
           // Call the onDelete callback if provided
           if (onDelete) {
             onDelete();
           }
         } catch (error) {
-          console.error('Delete failed:', error);
+          console.error('❌ Delete failed:', error);
         }
         break;
       case 'restore':
