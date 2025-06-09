@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AgentSource } from '@/types/rag';
+import { SourcePage } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
@@ -38,17 +39,19 @@ export const useSourceDetail = () => {
               .select('*')
               .eq('id', pageId),
             `useSourceDetail(page:${pageId})`
-          );
+          ) as SourcePage | null;
           
           // Transform source page data to match AgentSource interface
           if (data) {
             return {
               id: data.id,
               title: data.url || `Page ${data.id.slice(0, 8)}`,
-              content: data.content || '',
+              content: '', // Source pages don't have content in the same way
               source_type: 'website' as const,
               url: data.url,
-              agent_id: agentId,
+              agent_id: agentId!,
+              team_id: data.customer_id, // Map customer_id to team_id
+              is_active: true,
               created_at: data.created_at,
               updated_at: data.updated_at,
               metadata: {
@@ -58,7 +61,16 @@ export const useSourceDetail = () => {
                 chunksCreated: data.chunks_created,
                 processingTimeMs: data.processing_time_ms,
                 compressionRatio: data.compression_ratio,
-                parentSourceId: data.parent_source_id
+                parentSourceId: data.parent_source_id,
+                workflowStatus: data.workflow_status,
+                previousStatus: data.previous_status,
+                errorMessage: data.error_message,
+                contentHash: data.content_hash,
+                retryCount: data.retry_count,
+                maxRetries: data.max_retries,
+                duplicatesFound: data.duplicates_found,
+                startedAt: data.started_at,
+                completedAt: data.completed_at
               }
             } as AgentSource;
           }
@@ -96,11 +108,14 @@ export const useSourceDetail = () => {
     setIsSaving(true);
     try {
       if (isSourcePage) {
-        // Update source page
+        // Update source page - note: source pages don't have editable content in the same way
+        // This is mainly for future extensibility
         const { error } = await supabase
           .from('source_pages')
           .update({
-            content: editContent,
+            // Source pages don't have a content field that can be edited
+            // We could add other editable fields here in the future
+            updated_at: new Date().toISOString(),
           })
           .eq('id', pageId);
 
