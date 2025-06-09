@@ -86,13 +86,14 @@ export const useWebsiteSubmissionV2 = () => {
         console.error('❌ Crawl failed:', crawlError);
         
         // Update source status to failed
+        const currentMetadata = source.metadata && typeof source.metadata === 'object' ? source.metadata : {};
         await supabase
           .from('agent_sources')
           .update({
             crawl_status: 'failed',
             workflow_status: 'ERROR',
             metadata: {
-              ...(source.metadata || {}),
+              ...currentMetadata,
               error: crawlError.message,
               failed_at: new Date().toISOString()
             }
