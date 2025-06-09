@@ -94,14 +94,14 @@ export const useSourceDetail = () => {
     enabled: !!currentId
   });
 
-  // Fetch chunks - FIXED: Use parent source ID for source pages and filter by page
+  // Fetch chunks - FIXED: Use parent source ID for source pages and filter by specific page
   const { data: chunks } = useQuery({
-    queryKey: ['source-chunks', currentId, isSourcePage ? source?.metadata?.parentSourceId : null],
+    queryKey: ['source-chunks', currentId, isSourcePage ? source?.metadata?.parentSourceId : null, isSourcePage ? pageId : null],
     queryFn: async () => {
       if (!currentId) return [];
       
       try {
-        console.log('🔍 Fetching chunks for:', { currentId, isSourcePage, source });
+        console.log('🔍 Fetching chunks for:', { currentId, isSourcePage, pageId, source });
         
         let chunksData;
         let sourceIdForQuery = currentId;
@@ -112,11 +112,19 @@ export const useSourceDetail = () => {
           console.log('🔍 Using parent source ID for chunks:', sourceIdForQuery);
         }
         
-        const { data, error } = await supabase
+        let query = supabase
           .from('source_chunks')
           .select('*')
-          .eq('source_id', sourceIdForQuery)
-          .order('chunk_index', { ascending: true });
+          .eq('source_id', sourceIdForQuery);
+
+        // FIXED: Filter chunks by specific page ID for source pages
+        if (isSourcePage && pageId) {
+          // Add filter to only get chunks that belong to this specific page
+          query = query.eq('metadata->>page_id', pageId);
+          console.log('🔍 Filtering chunks by page_id:', pageId);
+        }
+
+        const { data, error } = await query.order('chunk_index', { ascending: true });
 
         if (error) {
           console.error('Failed to fetch chunks:', error);
@@ -125,13 +133,9 @@ export const useSourceDetail = () => {
         
         chunksData = data || [];
         
-        // For source pages, we need to filter chunks that belong to this specific page
-        // Since all child page chunks are stored under the parent, we'll show all chunks for now
-        // In the future, we could add page-specific metadata to chunks to filter them
         if (isSourcePage) {
-          console.log('✅ Found chunks for source page (showing all parent chunks):', chunksData.length);
-          // TODO: Add logic to filter chunks by specific page if needed
-          // For now, showing all chunks under the parent source
+          console.log('✅ Found page-specific chunks for source page:', chunksData.length);
+          console.log('🔍 Sample chunk metadata:', chunksData[0]?.metadata);
         } else {
           console.log('✅ Found chunks for regular source:', chunksData.length);
         }
