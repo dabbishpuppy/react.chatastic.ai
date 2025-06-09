@@ -1,21 +1,15 @@
+
 import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Edit2, Eye, EyeOff, Trash2, RotateCcw, ExternalLink, ChevronDown, ChevronRight, Calendar, Link, Database } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import WebsiteSourceStatus from './components/WebsiteSourceStatus';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import WebsiteSourceStatusBadges from './components/WebsiteSourceStatusBadges';
 import WebsiteChildSources from './components/WebsiteChildSources';
+import { WebsiteSourceHeader } from './components/WebsiteSourceHeader';
+import { WebsiteSourceMetadata } from './components/WebsiteSourceMetadata';
+import { WebsiteSourceActions } from './components/WebsiteSourceActions';
+import { WebsiteSourceToggle } from './components/WebsiteSourceToggle';
 import { SimplifiedSourceStatusService } from '@/services/SimplifiedSourceStatusService';
-import { formatDistanceToNow } from 'date-fns';
 
 interface WebsiteSourceItemProps {
   source: AgentSource;
@@ -38,75 +32,14 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
   isSelected,
   onSelectionChange
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editUrl, setEditUrl] = useState(source.url || '');
   const [isChildSourcesOpen, setIsChildSourcesOpen] = useState(false);
-
-  const handleEdit = () => {
-    if (isEditing) {
-      onEdit(source.id, editUrl);
-      setIsEditing(false);
-    } else {
-      setIsEditing(true);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditUrl(source.url || '');
-  };
 
   const status = SimplifiedSourceStatusService.getSourceStatus(source);
   const buttonState = SimplifiedSourceStatusService.determineButtonState(source);
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    
-    // DEBUG: Log the raw date values
-    console.log('🐛 DEBUG formatDate - Raw dateString:', JSON.stringify(dateString));
-    console.log('🐛 DEBUG formatDate - Type:', typeof dateString);
-    console.log('🐛 DEBUG formatDate - Length:', dateString.length);
-    
-    try {
-      const parsedDate = new Date(dateString);
-      console.log('🐛 DEBUG formatDate - Parsed date:', parsedDate);
-      console.log('🐛 DEBUG formatDate - Is valid:', !isNaN(parsedDate.getTime()));
-      
-      const formatted = formatDistanceToNow(parsedDate, { addSuffix: true });
-      console.log('🐛 DEBUG formatDate - Formatted result:', JSON.stringify(formatted));
-      
-      return formatted;
-    } catch (error) {
-      console.error('🐛 DEBUG formatDate - Error:', error);
-      return 'Invalid date';
-    }
+  const handleEditHeader = () => {
+    // This will be handled by the WebsiteSourceHeader component internally
   };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    const size = bytes / Math.pow(k, i);
-    const formattedSize = i === 0 ? size.toString() : size.toFixed(1);
-    
-    return `${formattedSize} ${sizes[i]}`;
-  };
-
-  // Check if source has potential child sources by checking both links_count AND actual child sources
-  const hasChildSources = (source.links_count || 0) > 0 || childSources.length > 0;
-
-  // Calculate total child source sizes for trained sources
-  const totalChildSize = React.useMemo(() => {
-    if (status === 'trained' && childSources.length > 0) {
-      return childSources.reduce((total, child) => {
-        return total + (child.total_content_size || 0);
-      }, 0);
-    }
-    return 0;
-  }, [status, childSources]);
 
   // DEBUG: Log source data to identify the extra "0"
   console.log('🐛 DEBUG WebsiteSourceItem - Source data:', {
@@ -134,78 +67,18 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              {/* Title only */}
-              {isEditing ? (
-                <div className="space-y-2">
-                  <input
-                    type="url"
-                    value={editUrl}
-                    onChange={(e) => setEditUrl(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="Enter website URL"
-                    autoFocus
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleEdit}>
-                      Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium text-gray-900 truncate text-sm">
-                      {source.title || source.url || 'Untitled'}
-                    </h3>
-                    {source.url && (
-                      <a
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* Header with title and URL */}
+              <WebsiteSourceHeader
+                source={source}
+                onEdit={onEdit}
+              />
 
-              {/* Metadata with icons */}
-              <div className="mt-2 space-y-1">
-                <div className="flex items-center gap-3 text-xs text-gray-400">
-                  {/* 1. Crawled time first with Calendar icon */}
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
-                  </div>
-                  
-                  {/* 2. Links count with Link icon - show actual child count if available */}
-                  {(source.links_count !== undefined && source.links_count > 0) || childSources.length > 0 ? (
-                    <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <Link className="w-3 h-3" />
-                        <span>{childSources.length > 0 ? `${childSources.length} pages` : `${source.links_count} links`}</span>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {/* 3. Child source sizes for trained sources with Database icon */}
-                  {status === 'trained' && totalChildSize > 0 && (
-                    <>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <Database className="w-3 h-3" />
-                        <span>{formatBytes(totalChildSize)}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+              {/* Metadata */}
+              <WebsiteSourceMetadata
+                source={source}
+                childSources={childSources}
+                status={status}
+              />
             </div>
 
             {/* Status badges and actions */}
@@ -221,62 +94,18 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
 
               {/* Child sources toggle - always show for website sources */}
               <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    {isChildSourcesOpen ? (
-                      <ChevronDown className="h-3 w-3" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
+                <WebsiteSourceToggle isOpen={isChildSourcesOpen} />
               </Collapsible>
 
               {/* Actions menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <MoreHorizontal className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit URL
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuItem onClick={() => onExclude(source)}>
-                    {source.is_excluded ? (
-                      <>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Include
-                      </>
-                    ) : (
-                      <>
-                        <EyeOff className="h-4 w-4 mr-2" />
-                        Exclude
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  
-                  {buttonState.canRecrawl && (
-                    <DropdownMenuItem onClick={() => onRecrawl(source)}>
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Recrawl
-                    </DropdownMenuItem>
-                  )}
-                  
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem 
-                    onClick={() => onDelete(source)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <WebsiteSourceActions
+                source={source}
+                buttonState={buttonState}
+                onEdit={handleEditHeader}
+                onExclude={onExclude}
+                onDelete={onDelete}
+                onRecrawl={onRecrawl}
+              />
             </div>
           </div>
         </div>

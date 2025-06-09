@@ -1,291 +1,77 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { 
-  RefreshCw, 
-  Trash2,
-  MoreHorizontal,
-  ChevronDown,
-  RotateCcw
-} from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
-import WebsiteActionConfirmDialog from './WebsiteActionConfirmDialog';
-import { useWebsiteSourceOperations } from '../hooks/useWebsiteSourceOperations';
-import { SimpleStatusService } from '@/services/SimpleStatusService';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
 import { AgentSource } from '@/types/rag';
+import { Button } from '@/components/ui/button';
+import { MoreHorizontal, Edit2, Eye, EyeOff, Trash2, RotateCcw } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
-  hasChildSources?: boolean;
-  isExpanded?: boolean;
+  buttonState: { canRecrawl: boolean };
   onEdit: () => void;
-  onExclude: () => void;
-  onRecrawl: () => void;
-  onDelete: () => void;
-  onToggleExpanded?: () => void;
+  onExclude: (source: AgentSource) => void;
+  onDelete: (source: AgentSource) => void;
+  onRecrawl: (source: AgentSource) => void;
 }
 
-type ConfirmationType = 'recrawl' | 'delete' | 'restore' | null;
-
-const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
+export const WebsiteSourceActions: React.FC<WebsiteSourceActionsProps> = ({
   source,
-  hasChildSources = false,
-  isExpanded = false,
+  buttonState,
   onEdit,
   onExclude,
-  onRecrawl,
   onDelete,
-  onToggleExpanded
+  onRecrawl
 }) => {
-  const [confirmationType, setConfirmationType] = useState<ConfirmationType>(null);
-  const [sourceData, setSourceData] = useState<any>(source);
-  const { handleRecrawl, handleDelete: handleDeleteOperation } = useWebsiteSourceOperations(() => {}, () => {});
-  const navigate = useNavigate();
-  const { agentId } = useParams();
-
-  // Fetch source data to determine status
-  React.useEffect(() => {
-    if (source) {
-      setSourceData(source);
-      return;
-    }
-
-    const fetchSourceData = async () => {
-      const { data } = await supabase
-        .from('agent_sources')
-        .select('*')
-        .eq('id', source.id)
-        .single();
-      
-      setSourceData(data);
-    };
-    
-    fetchSourceData();
-  }, [source.id, source]);
-
-  const displayStatus = sourceData ? SimpleStatusService.getSourceStatus(sourceData) : 'crawling';
-  const isPendingDeletion = sourceData?.pending_deletion === true;
-  const isRemoved = displayStatus === 'removed';
-
-  const handleRecrawlClick = () => {
-    setConfirmationType('recrawl');
-  };
-
-  const handleDeleteClick = () => {
-    setConfirmationType('delete');
-  };
-
-  const handleRestoreClick = () => {
-    setConfirmationType('restore');
-  };
-
-  const handleViewClick = () => {
-    if (agentId) {
-      navigate(`/agent/${agentId}/sources/page/${source.id}`);
-    }
-  };
-
-  const handleConfirm = async () => {
-    switch (confirmationType) {
-      case 'recrawl':
-        try {
-          await handleRecrawl(source);
-          onRecrawl();
-        } catch (error) {
-          console.error('Recrawl failed:', error);
-        }
-        break;
-      case 'delete':
-        try {
-          console.log('🗑️ Starting soft delete for source:', source.id);
-          
-          // Soft delete: mark as pending deletion instead of hard delete
-          const { error } = await supabase
-            .from('agent_sources')
-            .update({ pending_deletion: true })
-            .eq('id', source.id);
-          
-          if (error) {
-            console.error('Failed to mark source for deletion:', error);
-            throw error;
-          }
-          
-          console.log('✅ Source marked for deletion successfully');
-          
-          // Update local state immediately
-          setSourceData(prev => ({ ...prev, pending_deletion: true }));
-          
-          // Dispatch remove event for real-time UI updates
-          window.dispatchEvent(new CustomEvent('sourceRemoved', {
-            detail: { 
-              sourceId: source.id,
-              agentId,
-              action: 'soft_delete'
-            }
-          }));
-          
-          // Also dispatch a general source update event
-          window.dispatchEvent(new CustomEvent('sourceUpdated', {
-            detail: { sourceId: source.id }
-          }));
-          
-          console.log('📡 Remove events dispatched for real-time UI update');
-          
-          // Call the parent onDelete handler to trigger any additional UI updates
-          onDelete();
-          
-        } catch (error) {
-          console.error('❌ Soft delete failed:', error);
-        }
-        break;
-      case 'restore':
-        try {
-          console.log('🔄 Starting restore for source:', source.id);
-          
-          // Restore by removing the pending deletion flag
-          const { error } = await supabase
-            .from('agent_sources')
-            .update({ 
-              pending_deletion: false,
-              is_excluded: false 
-            })
-            .eq('id', source.id);
-          
-          if (error) {
-            console.error('Failed to restore source:', error);
-            throw error;
-          }
-          
-          console.log('✅ Source restored successfully');
-          
-          // Update local state immediately
-          setSourceData(prev => ({ 
-            ...prev, 
-            pending_deletion: false,
-            is_excluded: false 
-          }));
-          
-          // Dispatch restore event for real-time UI updates
-          window.dispatchEvent(new CustomEvent('sourceRestored', {
-            detail: { 
-              sourceId: source.id,
-              agentId,
-              action: 'restore'
-            }
-          }));
-          
-          // Also dispatch a general source update event
-          window.dispatchEvent(new CustomEvent('sourceUpdated', {
-            detail: { sourceId: source.id }
-          }));
-          
-          console.log('📡 Restore events dispatched for real-time UI update');
-          
-        } catch (error) {
-          console.error('❌ Restore failed:', error);
-        }
-        break;
-    }
-    setConfirmationType(null);
-  };
-
-  const getConfirmationConfig = () => {
-    switch (confirmationType) {
-      case 'recrawl':
-        return {
-          title: 'Confirm Recrawl',
-          description: `Are you sure you want to recrawl "${source.url}"? This will refresh the content and may take some time to complete.`,
-          confirmText: 'Recrawl',
-          isDestructive: false
-        };
-      case 'delete':
-        return {
-          title: 'Remove Source',
-          description: `Are you sure you want to remove "${source.url}"? It will be marked for deletion and removed during the next training.`,
-          confirmText: 'Remove',
-          isDestructive: true
-        };
-      case 'restore':
-        return {
-          title: 'Restore Source',
-          description: `Are you sure you want to restore "${source.url}"? It will be included in future training.`,
-          confirmText: 'Restore',
-          isDestructive: false
-        };
-      default:
-        return {
-          title: '',
-          description: '',
-          confirmText: '',
-          isDestructive: false
-        };
-    }
-  };
-
-  const confirmConfig = getConfirmationConfig();
-  const isViewEnabled = displayStatus === 'trained';
-
   return (
-    <div className="flex items-center gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0"
-          >
-            <MoreHorizontal className="w-3 h-3" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          {!isPendingDeletion && (
-            <DropdownMenuItem onClick={handleRecrawlClick}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Recrawl
-            </DropdownMenuItem>
-          )}
-          
-          {isPendingDeletion ? (
-            <DropdownMenuItem onClick={handleRestoreClick}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Restore
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={handleDeleteClick} className="text-red-600">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Remove
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Show expand/collapse button only for parent sources with children */}
-      {hasChildSources && onToggleExpanded && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToggleExpanded}
-          className="h-6 w-6 p-0"
-          title={isExpanded ? "Collapse child pages" : "Expand child pages"}
-        >
-          <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+          <MoreHorizontal className="h-3 w-3" />
         </Button>
-      )}
-
-      <WebsiteActionConfirmDialog
-        open={confirmationType !== null}
-        onOpenChange={(open) => !open && setConfirmationType(null)}
-        title={confirmConfig.title}
-        description={confirmConfig.description}
-        confirmText={confirmConfig.confirmText}
-        onConfirm={handleConfirm}
-        isDestructive={confirmConfig.isDestructive}
-        disabled={false}
-      />
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={onEdit}>
+          <Edit2 className="h-4 w-4 mr-2" />
+          Edit URL
+        </DropdownMenuItem>
+        
+        <DropdownMenuItem onClick={() => onExclude(source)}>
+          {source.is_excluded ? (
+            <>
+              <Eye className="h-4 w-4 mr-2" />
+              Include
+            </>
+          ) : (
+            <>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Exclude
+            </>
+          )}
+        </DropdownMenuItem>
+        
+        {buttonState.canRecrawl && (
+          <DropdownMenuItem onClick={() => onRecrawl(source)}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Recrawl
+          </DropdownMenuItem>
+        )}
+        
+        <DropdownMenuSeparator />
+        
+        <DropdownMenuItem 
+          onClick={() => onDelete(source)}
+          className="text-red-600 hover:text-red-700"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
-
-export default WebsiteSourceActions;

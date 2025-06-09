@@ -1,116 +1,75 @@
 
-import React from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Check, X } from 'lucide-react';
+import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
-import WebsiteSourceInfo from './WebsiteSourceInfo';
-
-interface SourcePage {
-  id: string;
-  url: string;
-  status: string;
-  created_at: string;
-  completed_at?: string;
-  error_message?: string;
-  content_size?: number;
-  chunks_created?: number;
-  processing_time_ms?: number;
-  parent_source_id: string;
-}
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
 
 interface WebsiteSourceHeaderProps {
   source: AgentSource;
-  childSources: SourcePage[];
-  isSelected: boolean;
-  isEditing: boolean;
-  editUrl: string;
-  onSelectionChange: (selected?: boolean) => void;
-  onEditUrlChange: (url: string) => void;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
+  onEdit: (sourceId: string, newUrl: string) => void;
 }
 
-const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
+export const WebsiteSourceHeader: React.FC<WebsiteSourceHeaderProps> = ({
   source,
-  childSources,
-  isSelected,
-  isEditing,
-  editUrl,
-  onSelectionChange,
-  onEditUrlChange,
-  onSaveEdit,
-  onCancelEdit
+  onEdit
 }) => {
-  const handleSelectionChange = (checked: boolean) => {
-    onSelectionChange(checked);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUrl, setEditUrl] = useState(source.url || '');
+
+  const handleEdit = () => {
+    if (isEditing) {
+      onEdit(source.id, editUrl);
+      setIsEditing(false);
+    } else {
+      setIsEditing(true);
+    }
   };
 
-  // Calculate total content size from child pages
-  const totalContentSize = childSources.reduce((total, child) => {
-    return total + (child.content_size || 0);
-  }, 0);
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditUrl(source.url || '');
+  };
 
-  // Calculate compressed content size from child pages
-  const compressedContentSize = childSources.reduce((total, child) => {
-    const originalSize = child.content_size || 0;
-    const compressionRatio = 0.3; // Default compression ratio
-    return total + Math.round(originalSize * compressionRatio);
-  }, 0);
+  if (isEditing) {
+    return (
+      <div className="space-y-2">
+        <input
+          type="url"
+          value={editUrl}
+          onChange={(e) => setEditUrl(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          placeholder="Enter website URL"
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <Button size="sm" onClick={handleEdit}>
+            Save
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-start gap-3 flex-1 min-w-0">
-      <Checkbox
-        checked={isSelected}
-        onCheckedChange={handleSelectionChange}
-        className="flex-shrink-0 mt-1"
-      />
-      
-      <div className="flex-1 min-w-0">
-        {isEditing ? (
-          <div className="flex items-center gap-2">
-            <Input
-              value={editUrl}
-              onChange={(e) => onEditUrlChange(e.target.value)}
-              className="flex-1"
-              placeholder="Enter website URL"
-            />
-            <Button 
-              size="sm" 
-              onClick={onSaveEdit}
-              className="flex-shrink-0"
-            >
-              <Check className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={onCancelEdit}
-              className="flex-shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        ) : (
-          <WebsiteSourceInfo
-            title={source.title}
-            url={source.url || ''}
-            createdAt={source.created_at}
-            linksCount={childSources.length}
-            lastCrawledAt={source.last_crawled_at}
-            crawlStatus={source.crawl_status}
-            metadata={source.metadata}
-            isChild={!!source.parent_source_id}
-            totalContentSize={totalContentSize}
-            compressedContentSize={compressedContentSize}
-            source={source}
-            sourceId={source.id}
-          />
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="font-medium text-gray-900 truncate text-sm">
+          {source.title || source.url || 'Untitled'}
+        </h3>
+        {source.url && (
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </a>
         )}
       </div>
     </div>
   );
 };
-
-export default WebsiteSourceHeader;
