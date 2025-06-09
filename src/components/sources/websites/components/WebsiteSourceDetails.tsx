@@ -53,7 +53,7 @@ const WebsiteSourceDetails: React.FC<WebsiteSourceDetailsProps> = ({ source }) =
             <span className="font-medium">Size:</span>
           </div>
           <p className="text-gray-600">
-            {source.file_size ? formatBytes(source.file_size) : 'Unknown'}
+            {source.total_content_size ? formatBytes(source.total_content_size) : 'Unknown'}
           </p>
         </div>
       </div>
