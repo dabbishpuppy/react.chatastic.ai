@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -94,7 +95,7 @@ export const useSourceDetail = () => {
     enabled: !!currentId
   });
 
-  // FIXED: Improved chunk fetching with better debugging and multiple strategies
+  // ENHANCED: Better chunk fetching with comprehensive debugging and fallback strategies
   const { data: chunks } = useQuery({
     queryKey: ['source-chunks', currentId, isSourcePage ? source?.metadata?.parentSourceId : null, isSourcePage ? pageId : null],
     queryFn: async () => {
@@ -106,7 +107,7 @@ export const useSourceDetail = () => {
           isSourcePage, 
           pageId, 
           parentSourceId: source?.metadata?.parentSourceId,
-          source 
+          pageUrl: source?.url
         });
         
         let chunksData;
@@ -190,16 +191,60 @@ export const useSourceDetail = () => {
             console.log('🔍 Strategy 5 (metadata.url match):', pageSpecificChunks.length, 'for URL:', source.url);
           }
 
-          // NEW Strategy 6: If we know chunks exist but can't find them, show all chunks for this parent
-          // This is a fallback to help diagnose the issue
-          if (pageSpecificChunks.length === 0 && allChunks && allChunks.length > 0) {
-            console.warn('⚠️ No page-specific chunks found, but parent has chunks. Showing diagnostic info:');
-            console.warn('⚠️ Page URL:', source?.url);
-            console.warn('⚠️ Page ID:', pageId);
-            console.warn('⚠️ All chunk metadata:', allChunks.map(c => c.metadata));
+          // NEW Strategy 6: Direct query for chunks with this page's URL (in case it's stored in content or different field)
+          if (pageSpecificChunks.length === 0 && source?.url) {
+            try {
+              const { data: urlBasedChunks } = await supabase
+                .from('source_chunks')
+                .select('*')
+                .eq('source_id', sourceIdForQuery)
+                .or(`content.ilike.%${source.url}%,metadata->>url.eq.${source.url}`);
+              
+              pageSpecificChunks = urlBasedChunks || [];
+              console.log('🔍 Strategy 6 (URL in content/metadata):', pageSpecificChunks.length);
+            } catch (error) {
+              console.warn('Strategy 6 failed:', error);
+            }
+          }
+
+          // NEW Strategy 7: If we know chunks should exist based on page metadata, but can't find them
+          // Check if there are any chunks created around the same time as the page
+          if (pageSpecificChunks.length === 0 && source?.metadata?.chunksCreated && source.metadata.chunksCreated > 0) {
+            console.warn('⚠️ METADATA MISMATCH INVESTIGATION:');
+            console.warn('⚠️ Page should have chunks but none found with matching metadata');
+            console.warn('⚠️ Expected chunks:', source.metadata.chunksCreated);
+            console.warn('⚠️ Page processing status:', source.metadata?.status);
+            console.warn('⚠️ Page completed at:', source.metadata?.completedAt);
             
-            // For now, don't show all chunks as it might be confusing
-            // pageSpecificChunks = allChunks;
+            // Try to find chunks created around the same time
+            if (source.metadata?.completedAt) {
+              const completedTime = new Date(source.metadata.completedAt);
+              const beforeTime = new Date(completedTime.getTime() - 60000); // 1 minute before
+              const afterTime = new Date(completedTime.getTime() + 60000); // 1 minute after
+              
+              const timeBasedChunks = allChunks?.filter(chunk => {
+                const chunkTime = new Date(chunk.created_at);
+                return chunkTime >= beforeTime && chunkTime <= afterTime;
+              }) || [];
+              
+              console.warn('⚠️ Chunks created around completion time:', timeBasedChunks.length);
+              
+              if (timeBasedChunks.length > 0) {
+                console.warn('⚠️ Found potential chunks by time, showing first few:');
+                timeBasedChunks.slice(0, 3).forEach((chunk, idx) => {
+                  console.warn(`⚠️ Time-based chunk ${idx + 1}:`, {
+                    id: chunk.id,
+                    created_at: chunk.created_at,
+                    metadata: chunk.metadata,
+                    content_preview: chunk.content?.substring(0, 150)
+                  });
+                });
+                
+                // If these look like they could be our chunks, use them as fallback
+                pageSpecificChunks = timeBasedChunks;
+                console.warn('⚠️ Using time-based chunks as fallback');
+              }
+            }
           }
 
           chunksData = pageSpecificChunks;
@@ -208,6 +253,7 @@ export const useSourceDetail = () => {
             pageId,
             pageUrl: source?.url,
             chunksFound: chunksData.length,
+            expectedChunks: source?.metadata?.chunksCreated || 0,
             sampleChunk: chunksData[0] ? {
               id: chunksData[0].id,
               metadata: chunksData[0].metadata,
@@ -222,6 +268,7 @@ export const useSourceDetail = () => {
             console.warn('⚠️ Found chunks:', 0);
             console.warn('⚠️ Total chunks in parent:', allChunks?.length || 0);
             console.warn('⚠️ This indicates a metadata storage issue during chunk creation.');
+            console.warn('⚠️ Page may need to be reprocessed or chunks may have incorrect metadata.');
           }
         } else {
           chunksData = allChunks || [];
@@ -300,8 +347,6 @@ export const useSourceDetail = () => {
       setEditContent(source.content || '');
     }
   }, [source]);
-
-  // ... keep existing code (handleSave, handleDelete, handleBackClick, handleCancelEdit functions)
 
   const handleSave = async () => {
     if (!currentId || !source) return;
