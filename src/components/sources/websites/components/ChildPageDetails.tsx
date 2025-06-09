@@ -31,9 +31,8 @@ const ChildPageDetails: React.FC<ChildPageDetailsProps> = ({
   return (
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer" 
-           title={fullUrl}
-           onClick={() => window.open(fullUrl, '_blank')}>
+        <p className="text-sm font-medium text-gray-900" 
+           title={fullUrl}>
           {displayUrl}
         </p>
         <ExternalLink 

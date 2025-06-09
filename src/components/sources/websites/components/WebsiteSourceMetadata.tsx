@@ -73,8 +73,8 @@ export const WebsiteSourceMetadata: React.FC<WebsiteSourceMetadataProps> = ({
           <span>Crawled {formatDate(source.last_crawled_at || source.updated_at)}</span>
         </div>
         
-        {/* 2. Total content size with Database icon */}
-        {totalChildSize > 0 && (
+        {/* 2. Total content size with Database icon - ALWAYS show if we have child sources */}
+        {childSources.length > 0 && (
           <>
             <span>•</span>
             <div className="flex items-center gap-1">
