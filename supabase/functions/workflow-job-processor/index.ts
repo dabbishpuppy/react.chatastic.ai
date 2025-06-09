@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -25,24 +24,49 @@ interface JobMetrics {
   failed: number;
   avgProcessingTime: number;
   queueDepth: number;
+  parallelJobs: number;
 }
 
-class EnhancedJobProcessor {
+class OptimizedJobProcessor {
   private supabase: any;
   private metrics: JobMetrics = {
     processed: 0,
     failed: 0,
     avgProcessingTime: 0,
-    queueDepth: 0
+    queueDepth: 0,
+    parallelJobs: 0
   };
 
   constructor(supabase: any) {
     this.supabase = supabase;
   }
 
-  async processJob(job: BackgroundJob): Promise<void> {
+  async processJobsParallel(jobs: BackgroundJob[]): Promise<void> {
+    if (jobs.length === 0) return;
+
+    console.log(`🚀 Processing ${jobs.length} jobs in parallel...`);
+    
+    // Process jobs in parallel with concurrency limit
+    const concurrencyLimit = Math.min(jobs.length, 20); // Max 20 concurrent jobs
+    const batches = this.createBatches(jobs, concurrencyLimit);
+    
+    for (const batch of batches) {
+      const promises = batch.map(job => this.processJobSafely(job));
+      await Promise.allSettled(promises);
+    }
+  }
+
+  private createBatches<T>(array: T[], batchSize: number): T[][] {
+    const batches: T[][] = [];
+    for (let i = 0; i < array.length; i += batchSize) {
+      batches.push(array.slice(i, i + batchSize));
+    }
+    return batches;
+  }
+
+  private async processJobSafely(job: BackgroundJob): Promise<void> {
     const startTime = Date.now();
-    console.log(`🔄 Processing job: ${job.job_type} for source: ${job.source_id}`);
+    this.metrics.parallelJobs++;
 
     try {
       await this.updateJobStatus(job.id, 'processing');
@@ -82,13 +106,15 @@ class EnhancedJobProcessor {
       this.updateMetrics(false, processingTime);
       
       await this.handleJobFailure(job, error.message);
+    } finally {
+      this.metrics.parallelJobs--;
     }
   }
 
   private async handleCrawlPages(job: BackgroundJob): Promise<void> {
     const { source_id, config } = job.payload;
     
-    console.log(`🕷️ Starting crawl for source: ${source_id}`);
+    console.log(`🕷️ Fast crawl for source: ${source_id}`);
     
     // Transition source to CRAWLING status
     await this.supabase.rpc('transition_source_status', {
@@ -105,20 +131,16 @@ class EnhancedJobProcessor {
       status: 'CRAWLING'
     });
 
-    // Simulate crawl process with progress updates
-    for (let i = 1; i <= 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      await this.broadcastEvent({
-        topic: `source:${source_id}`,
-        type: 'CRAWL_PROGRESS',
-        sourceId: source_id,
-        progress: i * 10,
-        metadata: { step: `Processing batch ${i}/10` }
-      });
-    }
+    // Remove artificial delays - direct processing
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'CRAWL_PROGRESS',
+      sourceId: source_id,
+      progress: 100,
+      metadata: { step: 'Processing completed' }
+    });
 
-    // Complete crawl
+    // Complete crawl immediately
     await this.supabase.rpc('transition_source_status', {
       p_source_id: source_id,
       p_new_status: 'COMPLETED',
@@ -137,7 +159,7 @@ class EnhancedJobProcessor {
   private async handleTrainPages(job: BackgroundJob): Promise<void> {
     const { source_id } = job.payload;
     
-    console.log(`🎓 Starting training for source: ${source_id}`);
+    console.log(`🎓 Fast training for source: ${source_id}`);
     
     await this.supabase.rpc('transition_source_status', {
       p_source_id: source_id,
@@ -153,18 +175,14 @@ class EnhancedJobProcessor {
       status: 'TRAINING'
     });
 
-    // Simulate training with progress
-    for (let i = 1; i <= 5; i++) {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      await this.broadcastEvent({
-        topic: `source:${source_id}`,
-        type: 'CRAWL_PROGRESS',
-        sourceId: source_id,
-        progress: i * 20,
-        metadata: { step: `Training phase ${i}/5` }
-      });
-    }
+    // Remove artificial delays - direct processing
+    await this.broadcastEvent({
+      topic: `source:${source_id}`,
+      type: 'CRAWL_PROGRESS',
+      sourceId: source_id,
+      progress: 100,
+      metadata: { step: 'Training completed' }
+    });
 
     await this.supabase.rpc('transition_source_status', {
       p_source_id: source_id,
@@ -184,9 +202,9 @@ class EnhancedJobProcessor {
   private async handleProcessPage(job: BackgroundJob): Promise<void> {
     const { page_id, source_id, url } = job.payload;
     
-    console.log(`📄 Processing page: ${url} (${page_id})`);
+    console.log(`📄 Fast processing page: ${url} (${page_id})`);
     
-    // Call the existing page processor function
+    // Call the existing page processor function directly
     const { data, error } = await this.supabase.functions.invoke('process-source-pages', {
       body: {
         pageId: page_id,
@@ -199,7 +217,7 @@ class EnhancedJobProcessor {
       throw new Error(`Page processing failed: ${error.message}`);
     }
 
-    console.log(`✅ Page processed successfully: ${page_id}`);
+    console.log(`✅ Page processed: ${page_id}`);
     
     await this.broadcastEvent({
       topic: `source:${source_id}`,
@@ -212,8 +230,8 @@ class EnhancedJobProcessor {
 
   private async handleJobFailure(job: BackgroundJob, errorMessage: string): Promise<void> {
     if (job.attempts < job.max_attempts) {
-      // Calculate exponential backoff delay
-      const retryDelay = Math.pow(2, job.attempts) * 1000;
+      // Reduced retry delay for faster processing
+      const retryDelay = Math.min(Math.pow(2, job.attempts) * 500, 5000); // Cap at 5 seconds
       const scheduledAt = new Date(Date.now() + retryDelay).toISOString();
       
       console.log(`🔄 Scheduling retry for job ${job.id} in ${retryDelay}ms`);
@@ -291,7 +309,7 @@ class EnhancedJobProcessor {
       (this.metrics.avgProcessingTime * (totalJobs - 1) + processingTime) / totalJobs;
   }
 
-  async pollAndProcessJobs(maxJobs: number = 10): Promise<void> {
+  async pollAndProcessJobs(maxJobs: number = 500): Promise<void> {
     console.log(`🔍 Polling for pending jobs (max: ${maxJobs})...`);
 
     const { data: jobs, error } = await this.supabase
@@ -311,15 +329,8 @@ class EnhancedJobProcessor {
     this.metrics.queueDepth = jobs?.length || 0;
 
     if (jobs && jobs.length > 0) {
-      console.log(`🚀 Processing ${jobs.length} jobs`);
-      
-      for (const job of jobs) {
-        try {
-          await this.processJob(job);
-        } catch (error) {
-          console.error(`❌ Failed to process job ${job.id}:`, error);
-        }
-      }
+      console.log(`🚀 Processing ${jobs.length} jobs in optimized parallel mode`);
+      await this.processJobsParallel(jobs);
     } else {
       console.log('📭 No pending jobs found');
     }
@@ -340,7 +351,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const processor = new EnhancedJobProcessor(supabase);
+    const processor = new OptimizedJobProcessor(supabase);
 
     // Handle both GET and POST requests
     let requestBody: any = {};
@@ -353,10 +364,10 @@ serve(async (req) => {
       }
     }
 
-    const maxJobs = requestBody.maxJobs || 50;
-    console.log(`📋 Job processor invoked with maxJobs: ${maxJobs}`);
+    const maxJobs = requestBody.maxJobs || 500; // Increased default
+    console.log(`📋 Optimized job processor invoked with maxJobs: ${maxJobs}`);
 
-    // Process pending jobs
+    // Process pending jobs with optimizations
     await processor.pollAndProcessJobs(maxJobs);
     
     const metrics = processor.getMetrics();
@@ -365,13 +376,13 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true,
       metrics,
-      message: `Job processor completed, found ${metrics.queueDepth} jobs`
+      message: `Optimized job processor completed, processed ${metrics.queueDepth} jobs`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (error) {
-    console.error('❌ Error in workflow-job-processor:', error)
+    console.error('❌ Error in optimized workflow-job-processor:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -12,7 +12,7 @@ export interface JobRecoveryStats {
 }
 
 export class JobRecoveryServiceV2 {
-  private static readonly STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+  private static readonly STUCK_THRESHOLD_MS = 2 * 60 * 1000; // Reduced to 2 minutes for faster recovery
 
   /**
    * Get comprehensive job statistics for a source
@@ -111,7 +111,7 @@ export class JobRecoveryServiceV2 {
           .update({
             status: 'pending',
             started_at: null,
-            error_message: 'Auto-recovered from stuck state',
+            error_message: 'Auto-recovered from stuck state (optimized)',
             updated_at: new Date().toISOString()
           })
           .in('id', stuckJobs.map(j => j.id));
@@ -136,17 +136,17 @@ export class JobRecoveryServiceV2 {
   }
 
   /**
-   * Trigger job processing for a source - now more reliable with cron jobs
+   * Trigger optimized job processing for a source
    */
   static async triggerJobProcessing(sourceId: string): Promise<boolean> {
     try {
-      console.log('🚀 Triggering job processing for source:', sourceId);
+      console.log('🚀 Triggering optimized job processing for source:', sourceId);
 
       const { data, error } = await supabase.functions.invoke('workflow-job-processor', {
         body: {
           action: 'process_jobs',
           sourceId: sourceId,
-          maxJobs: 50
+          maxJobs: 500 // Increased batch size
         }
       });
 
@@ -155,7 +155,7 @@ export class JobRecoveryServiceV2 {
         return false;
       }
 
-      console.log('✅ Job processing triggered successfully:', data);
+      console.log('✅ Optimized job processing triggered successfully:', data);
       return true;
     } catch (error) {
       console.error('Error triggering job processing:', error);
@@ -167,18 +167,19 @@ export class JobRecoveryServiceV2 {
    * Comprehensive recovery - recover stuck jobs and trigger processing
    */
   static async performFullRecovery(sourceId: string): Promise<JobRecoveryStats> {
-    console.log('🔄 Performing full job recovery for source:', sourceId);
+    console.log('🔄 Performing optimized full job recovery for source:', sourceId);
 
     // Step 1: Recover stuck jobs
     const stats = await this.recoverStuckJobs(sourceId);
 
     // Step 2: Trigger processing for any pending jobs
     if (stats.pendingJobs > 0) {
-      console.log(`🚀 Triggering processing for ${stats.pendingJobs} pending jobs`);
+      console.log(`🚀 Triggering optimized processing for ${stats.pendingJobs} pending jobs`);
       await this.triggerJobProcessing(sourceId);
     }
 
-    console.log('✅ Full recovery completed:', stats);
+    console.log('✅ Optimized full recovery completed:', stats);
     return stats;
   }
 }
+
