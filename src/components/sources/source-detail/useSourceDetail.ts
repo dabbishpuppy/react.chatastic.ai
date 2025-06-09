@@ -143,32 +143,36 @@ export const useSourceDetail = () => {
           let pageSpecificChunks = [];
 
           // Strategy 1: Filter by metadata.page_id
-          pageSpecificChunks = allChunks?.filter(chunk => 
-            chunk.metadata?.page_id === pageId
-          ) || [];
+          pageSpecificChunks = allChunks?.filter(chunk => {
+            const metadata = chunk.metadata as Record<string, any> | null;
+            return metadata?.page_id === pageId;
+          }) || [];
           
           console.log('🔍 Strategy 1 (metadata.page_id):', pageSpecificChunks.length);
 
           // Strategy 2: If no results, try metadata.pageId
           if (pageSpecificChunks.length === 0) {
-            pageSpecificChunks = allChunks?.filter(chunk => 
-              chunk.metadata?.pageId === pageId
-            ) || [];
+            pageSpecificChunks = allChunks?.filter(chunk => {
+              const metadata = chunk.metadata as Record<string, any> | null;
+              return metadata?.pageId === pageId;
+            }) || [];
             console.log('🔍 Strategy 2 (metadata.pageId):', pageSpecificChunks.length);
           }
 
           // Strategy 3: If still no results, try metadata.source_page_id
           if (pageSpecificChunks.length === 0) {
-            pageSpecificChunks = allChunks?.filter(chunk => 
-              chunk.metadata?.source_page_id === pageId
-            ) || [];
+            pageSpecificChunks = allChunks?.filter(chunk => {
+              const metadata = chunk.metadata as Record<string, any> | null;
+              return metadata?.source_page_id === pageId;
+            }) || [];
             console.log('🔍 Strategy 3 (metadata.source_page_id):', pageSpecificChunks.length);
           }
 
           // Strategy 4: If still no results, check if metadata contains the pageId as a value
           if (pageSpecificChunks.length === 0) {
             pageSpecificChunks = allChunks?.filter(chunk => {
-              const metadata = chunk.metadata || {};
+              const metadata = chunk.metadata as Record<string, any> | null;
+              if (!metadata) return false;
               return Object.values(metadata).includes(pageId);
             }) || [];
             console.log('🔍 Strategy 4 (pageId in metadata values):', pageSpecificChunks.length);
