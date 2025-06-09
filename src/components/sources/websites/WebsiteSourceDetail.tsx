@@ -14,6 +14,7 @@ import ManualJobProcessor from './components/ManualJobProcessor';
 import CrawlDiagnostics from './components/CrawlDiagnostics';
 import AutoRecoverySystem from './components/AutoRecoverySystem';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
+import { AgentSource } from '@/types/database';
 
 const WebsiteSourceDetail: React.FC = () => {
   const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
@@ -33,7 +34,7 @@ const WebsiteSourceDetail: React.FC = () => {
         `WebsiteSourceDetail(${sourceId})`
       );
       
-      return data;
+      return data as AgentSource | null;
     },
     enabled: !!sourceId
   });
@@ -148,7 +149,7 @@ const WebsiteSourceDetail: React.FC = () => {
         <CardContent>
           <WebsiteSourceMetadata 
             source={source} 
-            childSources={childSources || []} 
+            childSources={[]} 
             status={source.crawl_status || 'pending'} 
           />
         </CardContent>
@@ -157,8 +158,11 @@ const WebsiteSourceDetail: React.FC = () => {
       {/* Child Sources */}
       <WebsiteChildSources 
         parentSourceId={sourceId!} 
-        agentId={agentId!}
         childSources={childSources || []}
+        onEdit={() => {}}
+        onExclude={() => {}}
+        onDelete={() => {}}
+        onRecrawl={() => {}}
       />
     </div>
   );
