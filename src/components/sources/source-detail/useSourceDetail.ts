@@ -94,31 +94,53 @@ export const useSourceDetail = () => {
     enabled: !!currentId
   });
 
-  // Fetch chunks for source pages
+  // Fetch chunks for source pages - FIXED: Use correct source_id mapping
   const { data: chunks } = useQuery({
     queryKey: ['source-chunks', currentId],
     queryFn: async () => {
-      if (!currentId || !isSourcePage) return [];
+      if (!currentId) return [];
       
       try {
-        const { data: chunksData, error } = await supabase
-          .from('source_chunks')
-          .select('*')
-          .eq('source_id', currentId)
-          .order('chunk_index', { ascending: true });
+        console.log('🔍 Fetching chunks for:', { currentId, isSourcePage });
+        
+        let chunksData;
+        
+        if (isSourcePage) {
+          // For source pages, chunks are stored with the page ID as source_id
+          const { data, error } = await supabase
+            .from('source_chunks')
+            .select('*')
+            .eq('source_id', pageId) // Use pageId directly for source pages
+            .order('chunk_index', { ascending: true });
 
-        if (error) {
-          console.error('Failed to fetch chunks:', error);
-          return [];
+          if (error) {
+            console.error('Failed to fetch page chunks:', error);
+            return [];
+          }
+          chunksData = data;
+        } else {
+          // For regular sources, use sourceId
+          const { data, error } = await supabase
+            .from('source_chunks')
+            .select('*')
+            .eq('source_id', sourceId)
+            .order('chunk_index', { ascending: true });
+
+          if (error) {
+            console.error('Failed to fetch source chunks:', error);
+            return [];
+          }
+          chunksData = data;
         }
 
+        console.log('✅ Found chunks:', chunksData?.length || 0);
         return chunksData || [];
       } catch (error) {
         console.error('Failed to fetch chunks:', error);
         return [];
       }
     },
-    enabled: !!currentId && isSourcePage
+    enabled: !!currentId
   });
 
   // Combine chunks into content for source pages

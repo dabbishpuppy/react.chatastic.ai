@@ -61,7 +61,8 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
     contentLength: source.content?.length,
     contentPreview: source.content?.substring(0, 100),
     looksLikeHtml: source.content ? looksLikeHtml(source.content) : false,
-    chunksCount: chunks.length
+    chunksCount: chunks.length,
+    chunksPreview: chunks.slice(0, 2).map(c => ({ id: c.id, contentLength: c.content?.length }))
   });
 
   return (
@@ -133,74 +134,82 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
               </div>
             )}
 
-            {/* Chunks display for source pages */}
-            {isSourcePage && chunks.length > 0 && (
+            {/* Chunks display for source pages - FIXED: Show chunks even if no combined content */}
+            {isSourcePage && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg font-medium">Extracted Content Chunks</h3>
                   <Badge variant="secondary">{chunks.length} chunks</Badge>
                 </div>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {chunks.map((chunk, index) => (
-                    <div key={chunk.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-600">
-                          Chunk {index + 1}
-                        </span>
-                        <div className="flex gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {chunk.token_count} tokens
-                          </Badge>
-                          {chunk.content_hash && (
+                {chunks.length > 0 ? (
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {chunks.map((chunk, index) => (
+                      <div key={chunk.id} className="border rounded-lg p-4 bg-white">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-600">
+                            Chunk {index + 1}
+                          </span>
+                          <div className="flex gap-2">
                             <Badge variant="outline" className="text-xs">
-                              {chunk.content_hash.slice(0, 8)}...
+                              {chunk.token_count} tokens
                             </Badge>
-                          )}
+                            {chunk.content_hash && (
+                              <Badge variant="outline" className="text-xs">
+                                {chunk.content_hash.slice(0, 8)}...
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                          {chunk.content && chunk.content.length > 500 
+                            ? `${chunk.content.substring(0, 500)}...` 
+                            : chunk.content || 'No content available'
+                          }
                         </div>
                       </div>
-                      <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                        {chunk.content.length > 500 
-                          ? `${chunk.content.substring(0, 500)}...` 
-                          : chunk.content
-                        }
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-gray-500 italic p-4 border rounded-lg bg-gray-50">
+                    No chunks found for this page. This might mean the page hasn't been processed yet or there was an error during chunk creation.
+                  </div>
+                )}
               </div>
             )}
             
-            {/* Regular content display */}
-            <div className="prose max-w-none">
-              {source.content ? (
-                <>
-                  {(isHtmlContent || (isChildPage && looksLikeHtml(source.content))) ? (
-                    <div 
-                      className="font-sans text-gray-700 prose prose-headings:text-gray-900 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-sm prose-p:text-gray-700 prose-strong:text-gray-900 prose-em:italic prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4"
-                      style={{ 
-                        fontSize: '0.875rem',
-                        lineHeight: '1.5'
-                      }}
-                      dangerouslySetInnerHTML={{ __html: source.content }}
-                    />
-                  ) : (
-                    <div 
-                      className="font-sans text-gray-700 whitespace-pre-wrap"
-                      style={{ 
-                        fontSize: '0.875rem',
-                        lineHeight: '1.5'
-                      }}
-                    >
-                      {renderPlainTextContent(source.content)}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-gray-500 italic">
-                  {isSourcePage && chunks.length === 0 ? 'No chunks found for this page' : 'No content available'}
-                </div>
-              )}
-            </div>
+            {/* Regular content display - only for non-source pages or if no chunks to display */}
+            {(!isSourcePage || chunks.length === 0) && (
+              <div className="prose max-w-none">
+                {source.content ? (
+                  <>
+                    {(isHtmlContent || (isChildPage && looksLikeHtml(source.content))) ? (
+                      <div 
+                        className="font-sans text-gray-700 prose prose-headings:text-gray-900 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-sm prose-p:text-gray-700 prose-strong:text-gray-900 prose-em:italic prose-ul:list-disc prose-ol:list-decimal prose-li:ml-4"
+                        style={{ 
+                          fontSize: '0.875rem',
+                          lineHeight: '1.5'
+                        }}
+                        dangerouslySetInnerHTML={{ __html: source.content }}
+                      />
+                    ) : (
+                      <div 
+                        className="font-sans text-gray-700 whitespace-pre-wrap"
+                        style={{ 
+                          fontSize: '0.875rem',
+                          lineHeight: '1.5'
+                        }}
+                      >
+                        {renderPlainTextContent(source.content)}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-gray-500 italic">
+                    {isSourcePage ? 'No content available. Check the chunks section above for processed content.' : 'No content available'}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
