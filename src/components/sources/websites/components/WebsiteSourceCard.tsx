@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { WebsiteSourceChildList } from './WebsiteSourceChildList';
+import WebsiteSourceChildList from './WebsiteSourceChildList';
 
 import WebsiteSourceDetails from './WebsiteSourceDetails';
 
