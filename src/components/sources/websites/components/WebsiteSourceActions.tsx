@@ -10,10 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ButtonState } from '@/services/SimplifiedSourceStatusService';
 
 interface WebsiteSourceActionsProps {
   source: AgentSource;
-  buttonState: { canRecrawl: boolean };
+  buttonState: ButtonState;
   onEdit: () => void;
   onExclude: (source: AgentSource) => void;
   onDelete: (source: AgentSource) => void;
