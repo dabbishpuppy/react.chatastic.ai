@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -207,46 +206,6 @@ export const useSourceDetail = () => {
             }
           }
 
-          // NEW Strategy 7: If we know chunks should exist based on page metadata, but can't find them
-          // Check if there are any chunks created around the same time as the page
-          if (pageSpecificChunks.length === 0 && source?.metadata?.chunksCreated && source.metadata.chunksCreated > 0) {
-            console.warn('⚠️ METADATA MISMATCH INVESTIGATION:');
-            console.warn('⚠️ Page should have chunks but none found with matching metadata');
-            console.warn('⚠️ Expected chunks:', source.metadata.chunksCreated);
-            console.warn('⚠️ Page processing status:', source.metadata?.status);
-            console.warn('⚠️ Page completed at:', source.metadata?.completedAt);
-            
-            // Try to find chunks created around the same time
-            if (source.metadata?.completedAt) {
-              const completedTime = new Date(source.metadata.completedAt);
-              const beforeTime = new Date(completedTime.getTime() - 60000); // 1 minute before
-              const afterTime = new Date(completedTime.getTime() + 60000); // 1 minute after
-              
-              const timeBasedChunks = allChunks?.filter(chunk => {
-                const chunkTime = new Date(chunk.created_at);
-                return chunkTime >= beforeTime && chunkTime <= afterTime;
-              }) || [];
-              
-              console.warn('⚠️ Chunks created around completion time:', timeBasedChunks.length);
-              
-              if (timeBasedChunks.length > 0) {
-                console.warn('⚠️ Found potential chunks by time, showing first few:');
-                timeBasedChunks.slice(0, 3).forEach((chunk, idx) => {
-                  console.warn(`⚠️ Time-based chunk ${idx + 1}:`, {
-                    id: chunk.id,
-                    created_at: chunk.created_at,
-                    metadata: chunk.metadata,
-                    content_preview: chunk.content?.substring(0, 150)
-                  });
-                });
-                
-                // If these look like they could be our chunks, use them as fallback
-                pageSpecificChunks = timeBasedChunks;
-                console.warn('⚠️ Using time-based chunks as fallback');
-              }
-            }
-          }
-
           chunksData = pageSpecificChunks;
           
           console.log('✅ Found page-specific chunks:', {
@@ -261,14 +220,23 @@ export const useSourceDetail = () => {
             } : null
           });
 
-          // Enhanced warning if no chunks found but should exist
-          if (chunksData.length === 0 && source?.metadata?.chunksCreated && source.metadata.chunksCreated > 0) {
-            console.warn('⚠️ CHUNK MISMATCH DETECTED:');
-            console.warn('⚠️ Expected chunks:', source.metadata.chunksCreated);
-            console.warn('⚠️ Found chunks:', 0);
-            console.warn('⚠️ Total chunks in parent:', allChunks?.length || 0);
-            console.warn('⚠️ This indicates a metadata storage issue during chunk creation.');
-            console.warn('⚠️ Page may need to be reprocessed or chunks may have incorrect metadata.');
+          // ENHANCED: Check for incomplete chunking (major content discrepancy)
+          if (chunksData.length > 0 && source?.metadata?.chunksCreated && chunksData.length < source.metadata.chunksCreated) {
+            const expectedChunks = source.metadata.chunksCreated;
+            const foundChunks = chunksData.length;
+            const discrepancyRatio = foundChunks / expectedChunks;
+            
+            console.warn('⚠️ INCOMPLETE CHUNKING DETECTED:');
+            console.warn('⚠️ Expected chunks:', expectedChunks);
+            console.warn('⚠️ Found chunks:', foundChunks);
+            console.warn('⚠️ Discrepancy ratio:', discrepancyRatio);
+            
+            // If we have less than 50% of expected chunks, this is likely incomplete processing
+            if (discrepancyRatio < 0.5) {
+              console.warn('⚠️ CRITICAL: Less than 50% of expected chunks found');
+              console.warn('⚠️ This indicates incomplete content processing');
+              console.warn('⚠️ Automatic reprocessing may be needed');
+            }
           }
         } else {
           chunksData = allChunks || [];
@@ -303,6 +271,19 @@ export const useSourceDetail = () => {
         // Update the source object with the combined content
         if (combinedContent.trim()) {
           source.content = combinedContent;
+        }
+        
+        // Check for incomplete content and suggest reprocessing
+        if (source.metadata?.chunksCreated && chunks.length < source.metadata.chunksCreated) {
+          const discrepancyRatio = chunks.length / source.metadata.chunksCreated;
+          if (discrepancyRatio < 0.5) {
+            console.log('🔄 Significant chunk discrepancy detected - suggesting reprocessing');
+            toast({
+              title: 'Incomplete Content Detected',
+              description: `This page appears to have incomplete content (${chunks.length}/${source.metadata.chunksCreated} chunks). Consider reprocessing.`,
+              variant: 'default',
+            });
+          }
         }
       } else if (source.metadata?.status === 'completed' && source.metadata?.chunksCreated > 0) {
         // Auto-trigger reprocessing if page is completed but no chunks found
@@ -355,8 +336,6 @@ export const useSourceDetail = () => {
       });
     }
   }, [isSourcePage, pageId, toast, queryClient, refetch]);
-
-  // ... keep existing code (useEffect for setting edit values)
 
   useEffect(() => {
     if (source) {

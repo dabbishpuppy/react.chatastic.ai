@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -108,6 +109,46 @@ serve(async (req) => {
     const page = updateResult;
     console.log(`📄 Successfully locked page for processing: ${page.url}`);
 
+    // ENHANCED: Clear existing chunks before reprocessing to avoid incomplete data
+    if (forceReprocess) {
+      console.log('🗑️ Clearing existing chunks for reprocessing...');
+      
+      // More thorough chunk clearing - use multiple strategies to find and remove chunks
+      const { error: deleteError1 } = await supabase
+        .from('source_chunks')
+        .delete()
+        .eq('source_id', page.parent_source_id)
+        .like('metadata->>page_id', pageId);
+      
+      if (deleteError1) {
+        console.warn('⚠️ Method 1: Failed to clear existing chunks:', deleteError1);
+      }
+      
+      // Try alternative metadata key
+      const { error: deleteError2 } = await supabase
+        .from('source_chunks')
+        .delete()
+        .eq('source_id', page.parent_source_id)
+        .like('metadata->>pageId', pageId);
+        
+      if (deleteError2) {
+        console.warn('⚠️ Method 2: Failed to clear existing chunks:', deleteError2);
+      }
+      
+      // Try URL-based clearing
+      const { error: deleteError3 } = await supabase
+        .from('source_chunks')
+        .delete()
+        .eq('source_id', page.parent_source_id)
+        .like('metadata->>url', page.url);
+        
+      if (deleteError3) {
+        console.warn('⚠️ Method 3: Failed to clear existing chunks:', deleteError3);
+      } else {
+        console.log('✅ Existing chunks cleared via URL match');
+      }
+    }
+    
     // Re-fetch the content to process it
     let response;
     let attempts = 0;
@@ -215,22 +256,6 @@ serve(async (req) => {
       );
     }
     
-    // ENHANCED: Clear existing chunks before reprocessing
-    if (forceReprocess) {
-      console.log('🗑️ Clearing existing chunks for reprocessing...');
-      const { error: deleteError } = await supabase
-        .from('source_chunks')
-        .delete()
-        .eq('source_id', page.parent_source_id)
-        .like('metadata->>page_id', pageId);
-      
-      if (deleteError) {
-        console.warn('⚠️ Failed to clear existing chunks:', deleteError);
-      } else {
-        console.log('✅ Existing chunks cleared');
-      }
-    }
-    
     // Simple content extraction (similar to what's in child-job-processor)
     const extractTextContent = (html) => {
       let text = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
@@ -245,7 +270,8 @@ serve(async (req) => {
       return titleMatch ? titleMatch[1].trim() : '';
     };
 
-    const createSemanticChunks = (content, maxTokens = 150) => {
+    // ENHANCED: Improved semantic chunking with better size limits
+    const createSemanticChunks = (content, maxTokens = 200) => {
       const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 15);
       const chunks = [];
       let currentChunk = '';
@@ -270,7 +296,27 @@ serve(async (req) => {
         chunks.push(currentChunk.trim());
       }
       
-      return chunks.filter(chunk => chunk.length > 20);
+      // ENHANCED: Split very large chunks further if needed
+      const finalChunks = [];
+      for (const chunk of chunks) {
+        if (chunk.length > 1500) { // If chunk is too large, split by paragraphs or sentences
+          const subChunks = chunk.split(/\.\s+/).filter(s => s.length > 20);
+          let tempChunk = '';
+          for (const subChunk of subChunks) {
+            if (tempChunk.length + subChunk.length > 1200) {
+              if (tempChunk.trim()) finalChunks.push(tempChunk.trim());
+              tempChunk = subChunk;
+            } else {
+              tempChunk += (tempChunk ? '. ' : '') + subChunk;
+            }
+          }
+          if (tempChunk.trim()) finalChunks.push(tempChunk.trim());
+        } else {
+          finalChunks.push(chunk);
+        }
+      }
+      
+      return finalChunks.filter(chunk => chunk.length > 20);
     };
 
     const generateContentHash = async (content) => {
@@ -437,7 +483,7 @@ serve(async (req) => {
       contentHash = 'hash-generation-failed';
     }
 
-    // Store chunks in database
+    // Store chunks in database with better metadata
     if (chunks.length > 0) {
       const chunksToInsert = chunks.map((chunk, index) => ({
         source_id: page.parent_source_id,
@@ -446,13 +492,15 @@ serve(async (req) => {
         token_count: Math.ceil(chunk.length / 4),
         metadata: {
           url: page.url,
-          page_id: page.id,
+          page_id: page.id, // IMPORTANT: Ensure this is set for proper filtering
           content_hash: contentHash,
           extraction_method: 'semantic_chunking',
           page_title: extractTitle(htmlContent),
           processed_at: new Date().toISOString(),
           original_content_length: textContent.length,
-          reprocessed: forceReprocess
+          reprocessed: forceReprocess,
+          chunk_size: chunk.length,
+          total_chunks: chunks.length
         }
       }));
 
@@ -551,7 +599,9 @@ serve(async (req) => {
           chunksCreated: chunks.length,
           message: forceReprocess ? 'Content reprocessed successfully' : 'Content processed successfully',
           pageId,
-          reprocessed: forceReprocess
+          reprocessed: forceReprocess,
+          contentSize,
+          originalContentLength: textContent.length
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
