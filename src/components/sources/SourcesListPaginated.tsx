@@ -31,8 +31,7 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
     setDeleteSource,
     handleDeleteClick,
     handleDeleteConfirm,
-    handleRowClick,
-    handleNavigateClick
+    handleRowClick
   } = useSourcesListLogic(sources, onSourceDeleted);
 
   const {
@@ -111,7 +110,7 @@ const SourcesListPaginated: React.FC<SourcesListPaginatedProps> = ({
                 onSelect={(selected) => toggleItem(source.id)}
                 onDelete={handleDeleteClick}
                 onView={handleRowClick}
-                onNavigate={handleNavigateClick}
+                onNavigate={handleRowClick}
               />
             ))}
           </TableBody>
