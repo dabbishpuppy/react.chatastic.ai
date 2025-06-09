@@ -1,58 +1,43 @@
 
-import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AgentSource } from '@/types/rag';
 import { useRAGServices } from '@/hooks/useRAGServices';
 import { toast } from '@/hooks/use-toast';
-import { AgentSource } from '@/types/rag';
 
 export const useSourcesListLogic = (
-  sources: AgentSource[],
+  sources: AgentSource[] | undefined,
   onSourceDeleted?: (sourceId: string) => void
 ) => {
   const navigate = useNavigate();
-  const { agentId } = useParams();
   const { sources: sourceService } = useRAGServices();
-  
   const [deleteSource, setDeleteSource] = useState<AgentSource | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [optimisticSources, setOptimisticSources] = useState<AgentSource[]>(sources);
 
-  // Update optimistic sources when props change
-  React.useEffect(() => {
-    setOptimisticSources(sources);
+  // Ensure optimisticSources is always an array
+  const optimisticSources = useMemo(() => {
+    return sources || [];
   }, [sources]);
 
-  const handleDeleteClick = (source: AgentSource) => {
+  const handleDeleteClick = useCallback((source: AgentSource) => {
     setDeleteSource(source);
-  };
+  }, []);
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!deleteSource) return;
 
+    setIsDeleting(true);
     try {
-      setIsDeleting(true);
-      
-      // Optimistically remove the source from the list
-      setOptimisticSources(prev => prev.filter(s => s.id !== deleteSource.id));
-      
-      // Call the API to delete the source
       await sourceService.deleteSource(deleteSource.id);
       
       toast({
         title: "Success",
         description: "Source deleted successfully"
       });
-      
-      // Notify parent component with the source ID for efficient state updates
-      if (onSourceDeleted) {
-        onSourceDeleted(deleteSource.id);
-      }
+
+      onSourceDeleted?.(deleteSource.id);
+      setDeleteSource(null);
     } catch (error) {
-      console.error('Error deleting source:', error);
-      
-      // Revert optimistic update on error
-      setOptimisticSources(sources);
-      
       toast({
         title: "Error",
         description: "Failed to delete source",
@@ -60,17 +45,13 @@ export const useSourcesListLogic = (
       });
     } finally {
       setIsDeleting(false);
-      setDeleteSource(null);
     }
-  };
+  }, [deleteSource, sourceService, onSourceDeleted]);
 
-  const handleRowClick = (source: AgentSource) => {
-    navigate(`/agent/${agentId}/sources/${source.id}`);
-  };
-
-  const handleNavigateClick = (source: AgentSource) => {
-    navigate(`/agent/${agentId}/sources/${source.id}`);
-  };
+  const handleRowClick = useCallback((source: AgentSource) => {
+    // Navigate to source detail page
+    navigate(`/agent/${source.agent_id}/sources/${source.id}`);
+  }, [navigate]);
 
   return {
     optimisticSources,
@@ -79,7 +60,6 @@ export const useSourcesListLogic = (
     setDeleteSource,
     handleDeleteClick,
     handleDeleteConfirm,
-    handleRowClick,
-    handleNavigateClick
+    handleRowClick
   };
 };
