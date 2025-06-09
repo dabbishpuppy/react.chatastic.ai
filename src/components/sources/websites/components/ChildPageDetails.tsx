@@ -45,7 +45,8 @@ const ChildPageDetails: React.FC<ChildPageDetailsProps> = ({
           <span>Crawled {formatTimeAgo(createdAt)}</span>
         </div>
         
-        {(displayStatus === 'completed' || displayStatus === 'trained') && contentSize && (
+        {/* Only show content size for trained status (when chunks have been created) */}
+        {displayStatus === 'trained' && contentSize && (
           <>
             <span className="mx-2">•</span>
             <div className="flex items-center gap-1">

@@ -51,11 +51,16 @@ export const WebsiteSourceMetadata: React.FC<WebsiteSourceMetadataProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
-  // Calculate total child source sizes
+  // Calculate total child source sizes - only include sources that have been trained (have chunks)
   const totalChildSize = React.useMemo(() => {
     if (childSources.length > 0) {
       return childSources.reduce((total, child) => {
-        return total + (child.total_content_size || 0);
+        // Only include in total if the child has chunks created (i.e., has been trained)
+        const hasChunks = child.metadata?.chunksCreated > 0 || child.unique_chunks > 0;
+        if (hasChunks) {
+          return total + (child.total_content_size || 0);
+        }
+        return total;
       }, 0);
     }
     return 0;
