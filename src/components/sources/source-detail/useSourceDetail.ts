@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -94,14 +95,20 @@ export const useSourceDetail = () => {
     enabled: !!currentId
   });
 
-  // Fetch chunks - FIXED: Use parent source ID for source pages and filter by specific page
+  // Fetch chunks - ENHANCED: Better debugging and multiple fallback strategies
   const { data: chunks } = useQuery({
     queryKey: ['source-chunks', currentId, isSourcePage ? source?.metadata?.parentSourceId : null, isSourcePage ? pageId : null],
     queryFn: async () => {
       if (!currentId) return [];
       
       try {
-        console.log('🔍 Fetching chunks for:', { currentId, isSourcePage, pageId, source });
+        console.log('🔍 Fetching chunks for:', { 
+          currentId, 
+          isSourcePage, 
+          pageId, 
+          parentSourceId: source?.metadata?.parentSourceId,
+          source 
+        });
         
         let chunksData;
         let sourceIdForQuery = currentId;
@@ -112,31 +119,74 @@ export const useSourceDetail = () => {
           console.log('🔍 Using parent source ID for chunks:', sourceIdForQuery);
         }
         
-        let query = supabase
+        // First, let's get ALL chunks for this source to see what we have
+        const { data: allChunks, error: allChunksError } = await supabase
           .from('source_chunks')
           .select('*')
-          .eq('source_id', sourceIdForQuery);
+          .eq('source_id', sourceIdForQuery)
+          .order('chunk_index', { ascending: true });
 
-        // FIXED: Filter chunks by specific page ID for source pages
-        if (isSourcePage && pageId) {
-          // Add filter to only get chunks that belong to this specific page
-          query = query.eq('metadata->>page_id', pageId);
-          console.log('🔍 Filtering chunks by page_id:', pageId);
-        }
-
-        const { data, error } = await query.order('chunk_index', { ascending: true });
-
-        if (error) {
-          console.error('Failed to fetch chunks:', error);
+        if (allChunksError) {
+          console.error('Failed to fetch chunks:', allChunksError);
           return [];
         }
         
-        chunksData = data || [];
-        
-        if (isSourcePage) {
-          console.log('✅ Found page-specific chunks for source page:', chunksData.length);
-          console.log('🔍 Sample chunk metadata:', chunksData[0]?.metadata);
+        console.log('🔍 ALL chunks for source:', {
+          sourceId: sourceIdForQuery,
+          totalChunks: allChunks?.length || 0,
+          sampleMetadata: allChunks?.[0]?.metadata,
+          allMetadataKeys: allChunks?.map(c => Object.keys(c.metadata || {})).flat()
+        });
+
+        if (isSourcePage && pageId) {
+          // Try multiple strategies to find page-specific chunks
+          let pageSpecificChunks = [];
+
+          // Strategy 1: Filter by metadata.page_id
+          pageSpecificChunks = allChunks?.filter(chunk => 
+            chunk.metadata?.page_id === pageId
+          ) || [];
+          
+          console.log('🔍 Strategy 1 (metadata.page_id):', pageSpecificChunks.length);
+
+          // Strategy 2: If no results, try metadata.pageId
+          if (pageSpecificChunks.length === 0) {
+            pageSpecificChunks = allChunks?.filter(chunk => 
+              chunk.metadata?.pageId === pageId
+            ) || [];
+            console.log('🔍 Strategy 2 (metadata.pageId):', pageSpecificChunks.length);
+          }
+
+          // Strategy 3: If still no results, try metadata.source_page_id
+          if (pageSpecificChunks.length === 0) {
+            pageSpecificChunks = allChunks?.filter(chunk => 
+              chunk.metadata?.source_page_id === pageId
+            ) || [];
+            console.log('🔍 Strategy 3 (metadata.source_page_id):', pageSpecificChunks.length);
+          }
+
+          // Strategy 4: If still no results, check if metadata contains the pageId as a value
+          if (pageSpecificChunks.length === 0) {
+            pageSpecificChunks = allChunks?.filter(chunk => {
+              const metadata = chunk.metadata || {};
+              return Object.values(metadata).includes(pageId);
+            }) || [];
+            console.log('🔍 Strategy 4 (pageId in metadata values):', pageSpecificChunks.length);
+          }
+
+          chunksData = pageSpecificChunks;
+          
+          console.log('✅ Found page-specific chunks:', {
+            pageId,
+            chunksFound: chunksData.length,
+            sampleChunk: chunksData[0] ? {
+              id: chunksData[0].id,
+              metadata: chunksData[0].metadata,
+              contentPreview: chunksData[0].content?.substring(0, 100)
+            } : null
+          });
         } else {
+          chunksData = allChunks || [];
           console.log('✅ Found chunks for regular source:', chunksData.length);
         }
         
