@@ -1,12 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import AgentPageLayout from './AgentPageLayout';
-import FileUploadForm from '@/components/sources/FileUploadForm';
-import QASourceForm from '@/components/sources/QASourceForm';
-import SourcesList from '@/components/sources/SourcesList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useParams } from 'react-router-dom';
 import EnhancedWebsiteCrawlFormV4 from '@/components/sources/websites/components/EnhancedWebsiteCrawlFormV4';
 import RetrainAgentButton from '@/components/sources/RetrainAgentButton';
+import SourcesList from '@/components/sources/SourcesList';
 
 interface SourcesPageProps {
   sourceType?: string;
@@ -47,31 +46,19 @@ const SourcesPage: React.FC = () => {
           {/* Source type tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <div className="flex items-center justify-between">
-              <TabsList className="grid w-full grid-cols-4 max-w-md">
+              <TabsList className="grid w-full grid-cols-2 max-w-md">
                 <TabsTrigger value="all">All Sources</TabsTrigger>
                 <TabsTrigger value="websites">Websites</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
-                <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="all" className="space-y-6">
-              <SourcesList sourceType="all" />
+              <SourcesList />
             </TabsContent>
 
             <TabsContent value="websites" className="space-y-6">
               <EnhancedWebsiteCrawlFormV4 />
-              <SourcesList sourceType="website" />
-            </TabsContent>
-
-            <TabsContent value="documents" className="space-y-6">
-              <FileUploadForm />
-              <SourcesList sourceType="file" />
-            </TabsContent>
-
-            <TabsContent value="knowledge-base" className="space-y-6">
-              <QASourceForm />
-              <SourcesList sourceType="qa" />
+              <SourcesList />
             </TabsContent>
           </Tabs>
         </div>

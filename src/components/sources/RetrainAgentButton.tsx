@@ -44,10 +44,10 @@ const RetrainAgentButton: React.FC<RetrainAgentButtonProps> = ({
             title: "Retraining Complete",
             description: `Successfully processed ${progress.processedSources}/${progress.totalSources} sources`,
           });
-        } else if (progress.status === 'error') {
+        } else if (progress.status === 'failed') {
           toast({
             title: "Retraining Error",
-            description: progress.error || 'Unknown error occurred',
+            description: progress.errorMessage || 'Unknown error occurred',
             variant: "destructive"
           });
         }
