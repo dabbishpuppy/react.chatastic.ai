@@ -42,7 +42,49 @@ export class SourceDeleteService extends BaseSourceService {
 
       if (childError) throw new Error(`Failed to check child sources: ${childError.message}`);
 
-      // Step 1: Get all chunk IDs for this source (for embedding cleanup)
+      // Step 1: Get all source page IDs for this parent source
+      console.log(`📋 Getting source pages for parent: ${id}`);
+      const { data: sourcePages, error: sourcePagesQueryError } = await supabase
+        .from('source_pages')
+        .select('id')
+        .eq('parent_source_id', id);
+
+      if (sourcePagesQueryError) {
+        console.warn(`Warning: Failed to query source pages: ${sourcePagesQueryError.message}`);
+      }
+
+      const sourcePageIds = sourcePages?.map(page => page.id) || [];
+      console.log(`📄 Found ${sourcePageIds.length} source pages`);
+
+      // Step 2: Delete background jobs first (to avoid foreign key constraint)
+      console.log(`⚙️ Deleting background jobs for source: ${id}`);
+      const { error: backgroundJobsError } = await supabase
+        .from('background_jobs')
+        .delete()
+        .eq('source_id', id);
+
+      if (backgroundJobsError) {
+        console.warn(`Warning: Failed to delete background jobs: ${backgroundJobsError.message}`);
+      } else {
+        console.log(`✅ Successfully deleted background jobs for source: ${id}`);
+      }
+
+      // Step 3: Delete background jobs for source pages (if any exist)
+      if (sourcePageIds.length > 0) {
+        console.log(`⚙️ Deleting background jobs for source pages`);
+        const { error: pageJobsError } = await supabase
+          .from('background_jobs')
+          .delete()
+          .in('page_id', sourcePageIds);
+
+        if (pageJobsError) {
+          console.warn(`Warning: Failed to delete page background jobs: ${pageJobsError.message}`);
+        } else {
+          console.log(`✅ Successfully deleted background jobs for source pages`);
+        }
+      }
+
+      // Step 4: Get all chunk IDs for this source (for embedding cleanup)
       console.log(`📋 Getting chunks for source: ${id}`);
       const { data: chunks, error: chunksQueryError } = await supabase
         .from('source_chunks')
@@ -56,7 +98,7 @@ export class SourceDeleteService extends BaseSourceService {
       const chunkIds = chunks?.map(chunk => chunk.id) || [];
       console.log(`📄 Found ${chunkIds.length} chunks to delete`);
 
-      // Step 2: Delete source embeddings for all chunks
+      // Step 5: Delete source embeddings for all chunks
       if (chunkIds.length > 0) {
         console.log(`🔗 Deleting embeddings for ${chunkIds.length} chunks`);
         const { error: embeddingsError } = await supabase
@@ -71,7 +113,7 @@ export class SourceDeleteService extends BaseSourceService {
         }
       }
 
-      // Step 3: Delete all source chunks
+      // Step 6: Delete all source chunks
       console.log(`📝 Deleting chunks for source: ${id}`);
       const { error: chunksError } = await supabase
         .from('source_chunks')
@@ -84,7 +126,7 @@ export class SourceDeleteService extends BaseSourceService {
         console.log(`✅ Successfully deleted chunks for source: ${id}`);
       }
 
-      // Step 4: Delete workflow events for this source
+      // Step 7: Delete workflow events for this source
       console.log(`📡 Deleting workflow events for source: ${id}`);
       const { error: workflowEventsError } = await supabase
         .from('workflow_events')
@@ -97,20 +139,7 @@ export class SourceDeleteService extends BaseSourceService {
         console.log(`✅ Successfully deleted workflow events for source: ${id}`);
       }
 
-      // Step 5: Delete background jobs for this source
-      console.log(`⚙️ Deleting background jobs for source: ${id}`);
-      const { error: backgroundJobsError } = await supabase
-        .from('background_jobs')
-        .delete()
-        .eq('source_id', id);
-
-      if (backgroundJobsError) {
-        console.warn(`Warning: Failed to delete background jobs: ${backgroundJobsError.message}`);
-      } else {
-        console.log(`✅ Successfully deleted background jobs for source: ${id}`);
-      }
-
-      // Step 6: Delete all source pages (child pages of this parent source)
+      // Step 8: Delete all source pages (now safe after deleting background jobs)
       console.log(`📃 Deleting source pages for parent: ${id}`);
       const { error: pagesError } = await supabase
         .from('source_pages')
@@ -123,7 +152,7 @@ export class SourceDeleteService extends BaseSourceService {
         console.log(`✅ Successfully deleted source pages for parent: ${id}`);
       }
 
-      // Step 7: Delete all crawl jobs for this parent source
+      // Step 9: Delete all crawl jobs for this parent source
       console.log(`⚙️ Deleting crawl jobs for parent: ${id}`);
       const { error: crawlJobsError } = await supabase
         .from('crawl_jobs')
@@ -136,7 +165,7 @@ export class SourceDeleteService extends BaseSourceService {
         console.log(`✅ Successfully deleted crawl jobs for parent: ${id}`);
       }
 
-      // Step 8: Delete child agent sources
+      // Step 10: Delete child agent sources
       if (childSources && childSources.length > 0) {
         console.log(`👥 Deleting ${childSources.length} child sources`);
         const { error: deleteChildrenError } = await supabase
@@ -151,7 +180,7 @@ export class SourceDeleteService extends BaseSourceService {
         }
       }
 
-      // Step 9: Finally delete the parent source
+      // Step 11: Finally delete the parent source
       console.log(`🎯 Deleting parent source: ${id}`);
       const { error: parentError } = await supabase
         .from('agent_sources')
@@ -162,11 +191,11 @@ export class SourceDeleteService extends BaseSourceService {
 
       console.log(`🎉 Successfully completed comprehensive deletion of source: ${id}`);
       console.log(`📊 Deletion summary:
+        - Background jobs: Deleted for source and pages
         - Chunks: ${chunkIds.length}
         - Embeddings: ${chunkIds.length}
         - Workflow events: Deleted for source ${id}
-        - Background jobs: Deleted for source ${id}
-        - Source pages: Deleted for parent ${id}
+        - Source pages: ${sourcePageIds.length}
         - Crawl jobs: Deleted for parent ${id}
         - Child sources: ${childSources?.length || 0}
         - Parent source: 1`);
