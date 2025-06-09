@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -118,8 +117,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     updated_at: JSON.stringify(source.updated_at),
     created_at: JSON.stringify(source.created_at),
     links_count: source.links_count,
-    childSources_length: childSources.length,
-    hasChildSources
+    childSources_length: childSources.length
   });
 
   return (
@@ -284,24 +282,18 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
       </div>
 
-      {/* Collapsible child sources - always present, content changes based on data */}
+      {/* Collapsible child sources - always present, WebsiteChildSources handles its own data and empty states */}
       <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
         <CollapsibleContent>
           <div className="ml-6 mr-3 mb-3">
-            {hasChildSources ? (
-              <WebsiteChildSources
-                parentSourceId={source.id}
-                isCrawling={status === 'in_progress'}
-                onEdit={onEdit}
-                onExclude={onExclude}
-                onDelete={onDelete}
-                onRecrawl={onRecrawl}
-              />
-            ) : (
-              <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
-                No child sources crawled yet
-              </div>
-            )}
+            <WebsiteChildSources
+              parentSourceId={source.id}
+              isCrawling={status === 'in_progress'}
+              onEdit={onEdit}
+              onExclude={onExclude}
+              onDelete={onDelete}
+              onRecrawl={onRecrawl}
+            />
           </div>
         </CollapsibleContent>
       </Collapsible>
