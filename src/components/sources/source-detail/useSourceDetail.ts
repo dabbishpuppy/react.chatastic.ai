@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
 
 export const useSourceDetail = () => {
-  const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
+  const { sourceId, agentId, pageId } = useParams<{ sourceId?: string; agentId: string; pageId?: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -20,58 +20,77 @@ export const useSourceDetail = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
 
+  // Determine if we're viewing a page source or regular source
+  const isPageSource = !!pageId;
+  const targetId = pageId || sourceId;
+
   const { data: source, isLoading: loading, refetch } = useQuery({
-    queryKey: ['agent-source', sourceId],
+    queryKey: ['source-detail', targetId, isPageSource],
     queryFn: async () => {
-      if (!sourceId) return null;
+      if (!targetId) return null;
       
       try {
-        const data = await fetchMaybeSingle(
-          supabase
-            .from('agent_sources')
-            .select('*')
-            .eq('id', sourceId),
-          `useSourceDetail(${sourceId})`
-        ) as AgentSource | null;
-        
-        return data;
+        if (isPageSource) {
+          // Fetch from source_pages table
+          const data = await fetchMaybeSingle(
+            supabase
+              .from('source_pages')
+              .select('*')
+              .eq('id', targetId),
+            `useSourceDetail-page(${targetId})`
+          );
+          
+          return data;
+        } else {
+          // Fetch from agent_sources table
+          const data = await fetchMaybeSingle(
+            supabase
+              .from('agent_sources')
+              .select('*')
+              .eq('id', targetId),
+            `useSourceDetail-source(${targetId})`
+          ) as AgentSource | null;
+          
+          return data;
+        }
       } catch (error) {
         console.error('Failed to fetch source:', error);
         return null;
       }
     },
-    enabled: !!sourceId
+    enabled: !!targetId
   });
 
   useEffect(() => {
     if (source) {
-      setEditTitle(source.title);
+      setEditTitle(source.title || source.url || '');
       setEditContent(source.content || '');
     }
   }, [source]);
 
   const handleSave = async () => {
-    if (!sourceId || !source) return;
+    if (!targetId || !source) return;
 
     setIsSaving(true);
     try {
+      const tableName = isPageSource ? 'source_pages' : 'agent_sources';
       const { error } = await supabase
-        .from('agent_sources')
+        .from(tableName)
         .update({
           title: editTitle,
           content: editContent,
         })
-        .eq('id', sourceId);
+        .eq('id', targetId);
 
       if (error) throw error;
 
       toast({
-        title: 'Source Updated',
-        description: 'Source details have been updated successfully.',
+        title: `${isPageSource ? 'Page' : 'Source'} Updated`,
+        description: `${isPageSource ? 'Page' : 'Source'} details have been updated successfully.`,
       });
 
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ['agent-source', sourceId] });
+      queryClient.invalidateQueries({ queryKey: ['source-detail', targetId, isPageSource] });
     } catch (error: any) {
       toast({
         title: 'Update Failed',
@@ -84,24 +103,27 @@ export const useSourceDetail = () => {
   };
 
   const handleDelete = useCallback(async () => {
-    if (!sourceId) return;
+    if (!targetId) return;
 
     setIsDeleting(true);
     try {
+      const tableName = isPageSource ? 'source_pages' : 'agent_sources';
       const { error } = await supabase
-        .from('agent_sources')
+        .from(tableName)
         .delete()
-        .eq('id', sourceId);
+        .eq('id', targetId);
 
       if (error) throw error;
 
       toast({
-        title: 'Source Deleted',
-        description: 'Source has been deleted successfully.',
+        title: `${isPageSource ? 'Page' : 'Source'} Deleted`,
+        description: `${isPageSource ? 'Page' : 'Source'} has been deleted successfully.`,
       });
 
       navigate(`/agent/${agentId}/sources`);
-      queryClient.invalidateQueries({ queryKey: ['agent-sources', agentId] });
+      if (!isPageSource) {
+        queryClient.invalidateQueries({ queryKey: ['agent-sources', agentId] });
+      }
     } catch (error: any) {
       toast({
         title: 'Deletion Failed',
@@ -111,7 +133,7 @@ export const useSourceDetail = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [sourceId, agentId, navigate, queryClient, toast]);
+  }, [targetId, agentId, navigate, queryClient, toast, isPageSource]);
 
   const handleBackClick = () => {
     navigate(`/agent/${agentId}/sources`);
@@ -120,7 +142,7 @@ export const useSourceDetail = () => {
   const handleCancelEdit = () => {
     setIsEditing(false);
     if (source) {
-      setEditTitle(source.title);
+      setEditTitle(source.title || source.url || '');
       setEditContent(source.content || '');
     }
   };
@@ -143,6 +165,7 @@ export const useSourceDetail = () => {
     handleBackClick,
     handleCancelEdit,
     agentId: agentId!,
-    refetch
+    refetch,
+    isPageSource
   };
 };

@@ -31,7 +31,8 @@ const SourceDetailPage: React.FC = () => {
     handleBackClick,
     handleCancelEdit,
     agentId,
-    refetch
+    refetch,
+    isPageSource
   } = useSourceDetail();
 
   // Set up real-time workflow updates for this specific source
@@ -60,15 +61,17 @@ const SourceDetailPage: React.FC = () => {
       <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Source Not Found">
         <div className="p-8 bg-[#f5f5f5] min-h-screen">
           <div className="text-center">
-            <div className="text-red-500">Source not found</div>
+            <div className="text-red-500">{isPageSource ? 'Page' : 'Source'} not found</div>
           </div>
         </div>
       </AgentPageLayout>
     );
   }
 
+  const pageTitle = isPageSource ? 'Page Details' : 'Source Details';
+
   return (
-    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Source Details" showPageTitle={false}>
+    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle={pageTitle} showPageTitle={false}>
       <div className="p-8 bg-[#f5f5f5] min-h-screen">
         <div className="flex gap-8">
           <div className="flex-1">
@@ -77,15 +80,23 @@ const SourceDetailPage: React.FC = () => {
               isEditing={isEditing}
               onBackClick={handleBackClick}
               onDeleteClick={() => setShowDeleteDialog(true)}
+              isPageSource={isPageSource}
             />
 
             <div className="mt-8">
               <Tabs defaultValue="content" className="space-y-6">
                 <TabsList>
                   <TabsTrigger value="content">Content</TabsTrigger>
-                  <TabsTrigger value="workflow">Workflow</TabsTrigger>
-                  <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
-                  <TabsTrigger value="controls">Controls</TabsTrigger>
+                  {!isPageSource && (
+                    <>
+                      <TabsTrigger value="workflow">Workflow</TabsTrigger>
+                      <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
+                      <TabsTrigger value="controls">Controls</TabsTrigger>
+                    </>
+                  )}
+                  {isPageSource && (
+                    <TabsTrigger value="chunks">Chunks</TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="content">
@@ -100,20 +111,41 @@ const SourceDetailPage: React.FC = () => {
                     onContentChange={setEditContent}
                     onSave={handleSave}
                     onCancel={handleCancelEdit}
+                    isPageSource={isPageSource}
                   />
                 </TabsContent>
 
-                <TabsContent value="workflow">
-                  <WorkflowEventTimeline sourceId={source.id} />
-                </TabsContent>
+                {!isPageSource && (
+                  <>
+                    <TabsContent value="workflow">
+                      <WorkflowEventTimeline sourceId={source.id} />
+                    </TabsContent>
 
-                <TabsContent value="jobs">
-                  <WorkflowJobsPanel sourceId={source.id} />
-                </TabsContent>
+                    <TabsContent value="jobs">
+                      <WorkflowJobsPanel sourceId={source.id} />
+                    </TabsContent>
 
-                <TabsContent value="controls">
-                  <WorkflowControls source={source} onRefresh={refetch} />
-                </TabsContent>
+                    <TabsContent value="controls">
+                      <WorkflowControls source={source} onRefresh={refetch} />
+                    </TabsContent>
+                  </>
+                )}
+
+                {isPageSource && (
+                  <TabsContent value="chunks">
+                    <div className="bg-white p-6 rounded-lg border">
+                      <h3 className="text-lg font-semibold mb-4">Content Chunks</h3>
+                      <p className="text-gray-600">
+                        This page has been processed into {source.chunks_created || 0} chunks for AI training.
+                      </p>
+                      {source.content_size && (
+                        <p className="text-sm text-gray-500 mt-2">
+                          Original content size: {Math.round(source.content_size / 1024)} KB
+                        </p>
+                      )}
+                    </div>
+                  </TabsContent>
+                )}
               </Tabs>
             </div>
           </div>

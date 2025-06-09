@@ -10,6 +10,7 @@ import AgentPage from './pages/AgentEnvironment';
 import ManagementPage from './pages/ManagementPage';
 import SettingsPage from './pages/Settings';
 import SourcesPage from './pages/SourcesPage';
+import SourceDetailPage from './pages/SourceDetailPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ActionsPage from './pages/ActionsPage';
 import WebsitesSourcePage from './pages/SourcesPage';
@@ -106,6 +107,14 @@ function App() {
                 }
               />
               <Route
+                path="/agent/:agentId/sources/page/:pageId"
+                element={
+                  <AuthProvider>
+                    <SourceDetailPage />
+                  </AuthProvider>
+                }
+              />
+              <Route
                 path="/agent/:agentId/settings/*"
                 element={
                   <AuthProvider>
@@ -170,7 +179,6 @@ function App() {
                 }
               />
               <Route path="/monitoring" element={<MonitoringDashboard />} />
-              {/* System testing route removed - functionality moved to monitoring dashboard */}
             </Routes>
           </BrowserRouter>
         </TrainingNotificationProvider>
