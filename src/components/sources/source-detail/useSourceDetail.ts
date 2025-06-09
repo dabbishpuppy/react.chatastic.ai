@@ -7,26 +7,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
 
-// Define types for source pages
-interface SourcePage {
-  id: string;
-  url: string;
-  title?: string;
-  content?: string;
-  status: string;
-  parent_source_id: string;
-  created_at: string;
-  completed_at?: string;
-  content_size?: number;
-  chunks_created?: number;
-  processing_time_ms?: number;
-  error_message?: string;
-}
-
-type SourceData = AgentSource | SourcePage;
-
 export const useSourceDetail = () => {
-  const { sourceId, agentId, pageId } = useParams<{ sourceId?: string; agentId: string; pageId?: string }>();
+  const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -38,79 +20,58 @@ export const useSourceDetail = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
 
-  // Determine if we're viewing a page source or regular source
-  const isPageSource = !!pageId;
-  const targetId = pageId || sourceId;
-
   const { data: source, isLoading: loading, refetch } = useQuery({
-    queryKey: ['source-detail', targetId, isPageSource],
-    queryFn: async (): Promise<SourceData | null> => {
-      if (!targetId) return null;
+    queryKey: ['agent-source', sourceId],
+    queryFn: async () => {
+      if (!sourceId) return null;
       
       try {
-        if (isPageSource) {
-          // Fetch from source_pages table
-          const data = await fetchMaybeSingle(
-            supabase
-              .from('source_pages')
-              .select('*')
-              .eq('id', targetId),
-            `useSourceDetail-page(${targetId})`
-          );
-          
-          return data as SourcePage | null;
-        } else {
-          // Fetch from agent_sources table
-          const data = await fetchMaybeSingle(
-            supabase
-              .from('agent_sources')
-              .select('*')
-              .eq('id', targetId),
-            `useSourceDetail-source(${targetId})`
-          ) as AgentSource | null;
-          
-          return data;
-        }
+        const data = await fetchMaybeSingle(
+          supabase
+            .from('agent_sources')
+            .select('*')
+            .eq('id', sourceId),
+          `useSourceDetail(${sourceId})`
+        ) as AgentSource | null;
+        
+        return data;
       } catch (error) {
         console.error('Failed to fetch source:', error);
         return null;
       }
     },
-    enabled: !!targetId
+    enabled: !!sourceId
   });
 
   useEffect(() => {
     if (source) {
-      const title = (source as any).title || (source as any).url || '';
-      const content = (source as any).content || '';
-      setEditTitle(title);
-      setEditContent(content);
+      setEditTitle(source.title);
+      setEditContent(source.content || '');
     }
   }, [source]);
 
   const handleSave = async () => {
-    if (!targetId || !source) return;
+    if (!sourceId || !source) return;
 
     setIsSaving(true);
     try {
-      const tableName = isPageSource ? 'source_pages' : 'agent_sources';
       const { error } = await supabase
-        .from(tableName)
+        .from('agent_sources')
         .update({
           title: editTitle,
           content: editContent,
         })
-        .eq('id', targetId);
+        .eq('id', sourceId);
 
       if (error) throw error;
 
       toast({
-        title: `${isPageSource ? 'Page' : 'Source'} Updated`,
-        description: `${isPageSource ? 'Page' : 'Source'} details have been updated successfully.`,
+        title: 'Source Updated',
+        description: 'Source details have been updated successfully.',
       });
 
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ['source-detail', targetId, isPageSource] });
+      queryClient.invalidateQueries({ queryKey: ['agent-source', sourceId] });
     } catch (error: any) {
       toast({
         title: 'Update Failed',
@@ -123,27 +84,24 @@ export const useSourceDetail = () => {
   };
 
   const handleDelete = useCallback(async () => {
-    if (!targetId) return;
+    if (!sourceId) return;
 
     setIsDeleting(true);
     try {
-      const tableName = isPageSource ? 'source_pages' : 'agent_sources';
       const { error } = await supabase
-        .from(tableName)
+        .from('agent_sources')
         .delete()
-        .eq('id', targetId);
+        .eq('id', sourceId);
 
       if (error) throw error;
 
       toast({
-        title: `${isPageSource ? 'Page' : 'Source'} Deleted`,
-        description: `${isPageSource ? 'Page' : 'Source'} has been deleted successfully.`,
+        title: 'Source Deleted',
+        description: 'Source has been deleted successfully.',
       });
 
       navigate(`/agent/${agentId}/sources`);
-      if (!isPageSource) {
-        queryClient.invalidateQueries({ queryKey: ['agent-sources', agentId] });
-      }
+      queryClient.invalidateQueries({ queryKey: ['agent-sources', agentId] });
     } catch (error: any) {
       toast({
         title: 'Deletion Failed',
@@ -153,7 +111,7 @@ export const useSourceDetail = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [targetId, agentId, navigate, queryClient, toast, isPageSource]);
+  }, [sourceId, agentId, navigate, queryClient, toast]);
 
   const handleBackClick = () => {
     navigate(`/agent/${agentId}/sources`);
@@ -162,10 +120,8 @@ export const useSourceDetail = () => {
   const handleCancelEdit = () => {
     setIsEditing(false);
     if (source) {
-      const title = (source as any).title || (source as any).url || '';
-      const content = (source as any).content || '';
-      setEditTitle(title);
-      setEditContent(content);
+      setEditTitle(source.title);
+      setEditContent(source.content || '');
     }
   };
 
@@ -187,7 +143,6 @@ export const useSourceDetail = () => {
     handleBackClick,
     handleCancelEdit,
     agentId: agentId!,
-    refetch,
-    isPageSource
+    refetch
   };
 };
