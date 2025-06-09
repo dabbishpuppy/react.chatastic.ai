@@ -284,13 +284,30 @@ export const useSourceDetail = () => {
     enabled: !!currentId && (isSourcePage ? !!source?.metadata?.parentSourceId : true)
   });
 
-  // Combine chunks into content for source pages
+  // ENHANCED: Combine chunks into content for source pages and auto-process if needed
   useEffect(() => {
     if (source && isSourcePage && chunks) {
-      const combinedContent = chunks.map(chunk => chunk.content).join('\n\n');
-      // Update the source object with the combined content
-      if (combinedContent) {
-        source.content = combinedContent;
+      console.log('🔄 Processing chunks for display:', {
+        sourceId: source.id,
+        chunksLength: chunks.length,
+        expectedChunks: source.metadata?.chunksCreated
+      });
+
+      if (chunks.length > 0) {
+        // Sort chunks by index and combine content
+        const sortedChunks = [...chunks].sort((a, b) => (a.chunk_index || 0) - (b.chunk_index || 0));
+        const combinedContent = sortedChunks.map(chunk => chunk.content).filter(Boolean).join('\n\n');
+        
+        console.log('✅ Combined content length:', combinedContent.length);
+        
+        // Update the source object with the combined content
+        if (combinedContent.trim()) {
+          source.content = combinedContent;
+        }
+      } else if (source.metadata?.status === 'completed' && source.metadata?.chunksCreated > 0) {
+        // Auto-trigger reprocessing if page is completed but no chunks found
+        console.log('🔄 Auto-triggering reprocessing due to missing chunks');
+        triggerReprocessing();
       }
     }
   }, [source, chunks, isSourcePage]);

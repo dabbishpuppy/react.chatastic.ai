@@ -42,9 +42,28 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   chunks = [],
   triggerReprocessing
 }) => {
+  // Enhanced content availability logic
   const hasContent = source.content && source.content.trim().length > 0;
   const hasChunks = chunks.length > 0;
   const shouldHaveContent = source.metadata?.chunksCreated && source.metadata.chunksCreated > 0;
+  
+  // ENHANCED: Check if we have chunks but no combined content
+  const hasChunksButNoContent = hasChunks && !hasContent && isSourcePage;
+  
+  // Generate content from chunks if available but not combined
+  const displayContent = React.useMemo(() => {
+    if (hasContent) {
+      return source.content;
+    }
+    
+    if (hasChunksButNoContent && chunks.length > 0) {
+      console.log('🔄 Generating display content from chunks:', chunks.length);
+      const sortedChunks = [...chunks].sort((a, b) => (a.chunk_index || 0) - (b.chunk_index || 0));
+      return sortedChunks.map(chunk => chunk.content).filter(Boolean).join('\n\n');
+    }
+    
+    return '';
+  }, [hasContent, hasChunksButNoContent, chunks, source.content]);
 
   return (
     <div className="space-y-6">
@@ -117,12 +136,17 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 </div>
               )}
 
-              {/* Content Display with Enhanced Error Handling */}
+              {/* ENHANCED Content Display */}
               <div>
                 <Label>Content</Label>
-                {hasContent ? (
+                {displayContent && displayContent.trim() ? (
                   <div className="mt-2 p-4 bg-gray-50 rounded-lg border max-h-96 overflow-y-auto">
-                    <pre className="whitespace-pre-wrap text-sm">{source.content}</pre>
+                    <pre className="whitespace-pre-wrap text-sm">{displayContent}</pre>
+                    {hasChunksButNoContent && (
+                      <div className="mt-2 text-xs text-gray-500 italic">
+                        Content reconstructed from {chunks.length} chunks
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -133,6 +157,8 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                         <p className="text-xs text-yellow-700 mt-1">
                           {shouldHaveContent 
                             ? `This page should have ${source.metadata?.chunksCreated} chunks but no content is displayed. This might be a processing issue.`
+                            : hasChunks 
+                            ? `Found ${chunks.length} chunks but content display failed. Try reprocessing.`
                             : 'This source has not been processed yet or contains no extractable content.'
                           }
                         </p>
@@ -153,7 +179,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 )}
               </div>
 
-              {/* Chunks Information */}
+              {/* ENHANCED Chunks Information */}
               {isSourcePage && (
                 <div>
                   <Label>Chunks Information</Label>
@@ -162,6 +188,9 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                       <span>Found Chunks: <Badge variant="outline">{hasChunks ? chunks.length : 0}</Badge></span>
                       {source.metadata?.chunksCreated && (
                         <span>Expected: <Badge variant="outline">{source.metadata.chunksCreated}</Badge></span>
+                      )}
+                      {hasChunks && displayContent && (
+                        <span>Content Length: <Badge variant="secondary">{displayContent.length} chars</Badge></span>
                       )}
                     </div>
                     
