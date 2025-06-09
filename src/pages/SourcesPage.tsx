@@ -1,12 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import AgentPageLayout from './AgentPageLayout';
-import FileUploadForm from '@/components/sources/FileUploadForm';
-import QASourceForm from '@/components/sources/QASourceForm';
 import SourcesList from '@/components/sources/SourcesList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useParams } from 'react-router-dom';
 import EnhancedWebsiteCrawlFormV4 from '@/components/sources/websites/components/EnhancedWebsiteCrawlFormV4';
 import RetrainAgentButton from '@/components/sources/RetrainAgentButton';
+import FilesContainer from '@/components/sources/files/FilesContainer';
 
 interface SourcesPageProps {
   sourceType?: string;
@@ -56,22 +56,22 @@ const SourcesPage: React.FC = () => {
             </div>
 
             <TabsContent value="all" className="space-y-6">
-              <SourcesList sourceType="all" />
+              <SourcesList />
             </TabsContent>
 
             <TabsContent value="websites" className="space-y-6">
               <EnhancedWebsiteCrawlFormV4 />
-              <SourcesList sourceType="website" />
+              <SourcesList />
             </TabsContent>
 
             <TabsContent value="documents" className="space-y-6">
-              <FileUploadForm />
-              <SourcesList sourceType="file" />
+              <FilesContainer />
             </TabsContent>
 
             <TabsContent value="knowledge-base" className="space-y-6">
-              <QASourceForm />
-              <SourcesList sourceType="qa" />
+              <div className="text-center text-gray-500 p-8">
+                <p>Knowledge Base functionality coming soon</p>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
