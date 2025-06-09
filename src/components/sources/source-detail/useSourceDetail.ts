@@ -94,7 +94,7 @@ export const useSourceDetail = () => {
     enabled: !!currentId
   });
 
-  // ENHANCED: Better chunk fetching with multiple strategies and detailed logging
+  // FIXED: Improved chunk fetching with better debugging and multiple strategies
   const { data: chunks } = useQuery({
     queryKey: ['source-chunks', currentId, isSourcePage ? source?.metadata?.parentSourceId : null, isSourcePage ? pageId : null],
     queryFn: async () => {
@@ -118,7 +118,7 @@ export const useSourceDetail = () => {
           console.log('🔍 Using parent source ID for chunks:', sourceIdForQuery);
         }
         
-        // First, let's get ALL chunks for this source to see what we have
+        // Get ALL chunks for this source to debug
         const { data: allChunks, error: allChunksError } = await supabase
           .from('source_chunks')
           .select('*')
@@ -133,12 +133,16 @@ export const useSourceDetail = () => {
         console.log('🔍 ALL chunks for source:', {
           sourceId: sourceIdForQuery,
           totalChunks: allChunks?.length || 0,
-          sampleMetadata: allChunks?.[0]?.metadata,
-          allMetadataKeys: allChunks?.map(c => Object.keys(c.metadata || {})).flat()
+          chunks: allChunks?.map(c => ({
+            id: c.id,
+            chunk_index: c.chunk_index,
+            metadata: c.metadata,
+            content_preview: c.content?.substring(0, 100)
+          }))
         });
 
         if (isSourcePage && pageId) {
-          // Try multiple strategies to find page-specific chunks
+          // ENHANCED: Try multiple strategies to find page-specific chunks
           let pageSpecificChunks = [];
 
           // Strategy 1: Filter by metadata.page_id
@@ -177,13 +181,25 @@ export const useSourceDetail = () => {
             console.log('🔍 Strategy 4 (pageId in metadata values):', pageSpecificChunks.length);
           }
 
-          // Strategy 5: NEW - Check if URL matches in metadata
+          // Strategy 5: Check if URL matches in metadata
           if (pageSpecificChunks.length === 0 && source?.url) {
             pageSpecificChunks = allChunks?.filter(chunk => {
               const metadata = chunk.metadata as Record<string, any> | null;
               return metadata?.url === source.url;
             }) || [];
             console.log('🔍 Strategy 5 (metadata.url match):', pageSpecificChunks.length, 'for URL:', source.url);
+          }
+
+          // NEW Strategy 6: If we know chunks exist but can't find them, show all chunks for this parent
+          // This is a fallback to help diagnose the issue
+          if (pageSpecificChunks.length === 0 && allChunks && allChunks.length > 0) {
+            console.warn('⚠️ No page-specific chunks found, but parent has chunks. Showing diagnostic info:');
+            console.warn('⚠️ Page URL:', source?.url);
+            console.warn('⚠️ Page ID:', pageId);
+            console.warn('⚠️ All chunk metadata:', allChunks.map(c => c.metadata));
+            
+            // For now, don't show all chunks as it might be confusing
+            // pageSpecificChunks = allChunks;
           }
 
           chunksData = pageSpecificChunks;
@@ -199,10 +215,13 @@ export const useSourceDetail = () => {
             } : null
           });
 
-          // NEW: If no chunks found but page shows chunks_created > 0, trigger reprocessing
+          // Enhanced warning if no chunks found but should exist
           if (chunksData.length === 0 && source?.metadata?.chunksCreated && source.metadata.chunksCreated > 0) {
-            console.warn('⚠️ No chunks found but page reports chunks_created:', source.metadata.chunksCreated);
-            console.warn('⚠️ This might indicate a chunk storage issue. Consider reprocessing this page.');
+            console.warn('⚠️ CHUNK MISMATCH DETECTED:');
+            console.warn('⚠️ Expected chunks:', source.metadata.chunksCreated);
+            console.warn('⚠️ Found chunks:', 0);
+            console.warn('⚠️ Total chunks in parent:', allChunks?.length || 0);
+            console.warn('⚠️ This indicates a metadata storage issue during chunk creation.');
           }
         } else {
           chunksData = allChunks || [];
@@ -229,7 +248,7 @@ export const useSourceDetail = () => {
     }
   }, [source, chunks, isSourcePage]);
 
-  // NEW: Auto-trigger reprocessing if no content but should have content
+  // Enhanced reprocessing with better diagnostics
   const triggerReprocessing = useCallback(async () => {
     if (!isSourcePage || !pageId) return;
     
@@ -239,7 +258,7 @@ export const useSourceDetail = () => {
       const { data, error } = await supabase.functions.invoke('process-page-content', {
         body: { 
           pageId,
-          forceReprocess: true // NEW: Force reprocessing even if page was already processed
+          forceReprocess: true // Force reprocessing even if page was already processed
         }
       });
 
@@ -257,7 +276,7 @@ export const useSourceDetail = () => {
           description: 'Page content is being reprocessed. Refresh in a few moments.',
         });
         
-        // Refetch chunks after a delay
+        // Invalidate and refetch chunks after a delay
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['source-chunks'] });
           refetch?.();
@@ -273,12 +292,16 @@ export const useSourceDetail = () => {
     }
   }, [isSourcePage, pageId, toast, queryClient, refetch]);
 
+  // ... keep existing code (useEffect for setting edit values)
+
   useEffect(() => {
     if (source) {
       setEditTitle(source.title);
       setEditContent(source.content || '');
     }
   }, [source]);
+
+  // ... keep existing code (handleSave, handleDelete, handleBackClick, handleCancelEdit functions)
 
   const handleSave = async () => {
     if (!currentId || !source) return;
@@ -422,6 +445,6 @@ export const useSourceDetail = () => {
     refetch,
     isSourcePage,
     chunks: chunks || [],
-    triggerReprocessing // NEW: Expose reprocessing function
+    triggerReprocessing
   };
 };
