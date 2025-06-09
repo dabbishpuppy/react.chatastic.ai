@@ -42,7 +42,7 @@ class EnhancedJobProcessor {
 
   async processJob(job: BackgroundJob): Promise<void> {
     const startTime = Date.now();
-    console.log(`Processing job: ${job.job_type} for source: ${job.source_id}`);
+    console.log(`🔄 Processing job: ${job.job_type} for source: ${job.source_id}`);
 
     try {
       await this.updateJobStatus(job.id, 'processing');
@@ -73,10 +73,10 @@ class EnhancedJobProcessor {
       const processingTime = Date.now() - startTime;
       this.updateMetrics(true, processingTime);
       
-      console.log(`Job completed: ${job.id} in ${processingTime}ms`);
+      console.log(`✅ Job completed: ${job.id} in ${processingTime}ms`);
 
     } catch (error) {
-      console.error(`Job failed: ${job.id}`, error);
+      console.error(`❌ Job failed: ${job.id}`, error);
       
       const processingTime = Date.now() - startTime;
       this.updateMetrics(false, processingTime);
@@ -88,7 +88,7 @@ class EnhancedJobProcessor {
   private async handleCrawlPages(job: BackgroundJob): Promise<void> {
     const { source_id, config } = job.payload;
     
-    console.log(`Starting crawl for source: ${source_id}`);
+    console.log(`🕷️ Starting crawl for source: ${source_id}`);
     
     // Transition source to CRAWLING status
     await this.supabase.rpc('transition_source_status', {
@@ -137,7 +137,7 @@ class EnhancedJobProcessor {
   private async handleTrainPages(job: BackgroundJob): Promise<void> {
     const { source_id } = job.payload;
     
-    console.log(`Starting training for source: ${source_id}`);
+    console.log(`🎓 Starting training for source: ${source_id}`);
     
     await this.supabase.rpc('transition_source_status', {
       p_source_id: source_id,
@@ -182,10 +182,24 @@ class EnhancedJobProcessor {
   }
 
   private async handleProcessPage(job: BackgroundJob): Promise<void> {
-    const { page_id, source_id } = job.payload;
+    const { page_id, source_id, url } = job.payload;
     
-    // Simulate page processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(`📄 Processing page: ${url} (${page_id})`);
+    
+    // Call the existing page processor function
+    const { data, error } = await this.supabase.functions.invoke('process-source-pages', {
+      body: {
+        pageId: page_id,
+        parentSourceId: source_id,
+        url: url
+      }
+    });
+
+    if (error) {
+      throw new Error(`Page processing failed: ${error.message}`);
+    }
+
+    console.log(`✅ Page processed successfully: ${page_id}`);
     
     await this.broadcastEvent({
       topic: `source:${source_id}`,
@@ -202,7 +216,7 @@ class EnhancedJobProcessor {
       const retryDelay = Math.pow(2, job.attempts) * 1000;
       const scheduledAt = new Date(Date.now() + retryDelay).toISOString();
       
-      console.log(`Scheduling retry for job ${job.id} in ${retryDelay}ms`);
+      console.log(`🔄 Scheduling retry for job ${job.id} in ${retryDelay}ms`);
       
       await this.supabase
         .from('background_jobs')
@@ -277,31 +291,37 @@ class EnhancedJobProcessor {
       (this.metrics.avgProcessingTime * (totalJobs - 1) + processingTime) / totalJobs;
   }
 
-  async pollAndProcessJobs(): Promise<void> {
-    console.log('Polling for pending jobs...');
+  async pollAndProcessJobs(maxJobs: number = 10): Promise<void> {
+    console.log(`🔍 Polling for pending jobs (max: ${maxJobs})...`);
 
     const { data: jobs, error } = await this.supabase
       .from('background_jobs')
       .select('*')
       .eq('status', 'pending')
       .lte('scheduled_at', new Date().toISOString())
-      .order('priority', { ascending: true })
+      .order('priority', { ascending: false })
       .order('created_at', { ascending: true })
-      .limit(10);
+      .limit(maxJobs);
 
     if (error) {
-      console.error('Error fetching jobs:', error);
+      console.error('❌ Error fetching jobs:', error);
       return;
     }
 
     this.metrics.queueDepth = jobs?.length || 0;
 
     if (jobs && jobs.length > 0) {
-      console.log(`Processing ${jobs.length} jobs`);
+      console.log(`🚀 Processing ${jobs.length} jobs`);
       
       for (const job of jobs) {
-        await this.processJob(job);
+        try {
+          await this.processJob(job);
+        } catch (error) {
+          console.error(`❌ Failed to process job ${job.id}:`, error);
+        }
       }
+    } else {
+      console.log('📭 No pending jobs found');
     }
   }
 
@@ -322,31 +342,36 @@ serve(async (req) => {
 
     const processor = new EnhancedJobProcessor(supabase);
 
+    // Handle both GET and POST requests
+    let requestBody: any = {};
     if (req.method === 'POST') {
-      // Manual job processing trigger
-      await processor.pollAndProcessJobs();
-      return new Response(JSON.stringify({ 
-        success: true,
-        metrics: processor.getMetrics()
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      try {
+        requestBody = await req.json();
+      } catch (e) {
+        // Ignore JSON parse errors for cron jobs
+        requestBody = {};
+      }
     }
 
-    if (req.method === 'GET') {
-      // Health check with metrics
-      return new Response(JSON.stringify({ 
-        status: 'healthy',
-        metrics: processor.getMetrics()
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const maxJobs = requestBody.maxJobs || 50;
+    console.log(`📋 Job processor invoked with maxJobs: ${maxJobs}`);
 
-    return new Response('Method not allowed', { status: 405 })
+    // Process pending jobs
+    await processor.pollAndProcessJobs(maxJobs);
+    
+    const metrics = processor.getMetrics();
+    console.log(`📊 Processing metrics:`, metrics);
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      metrics,
+      message: `Job processor completed, found ${metrics.queueDepth} jobs`
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
 
   } catch (error) {
-    console.error('Error in workflow-job-processor:', error)
+    console.error('❌ Error in workflow-job-processor:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

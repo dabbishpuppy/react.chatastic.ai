@@ -43,6 +43,12 @@ verify_jwt = false
 [functions.generate-missing-chunks]
 verify_jwt = false
 
+[functions.workflow-job-processor]
+verify_jwt = false
+
+[functions.auto-job-trigger]
+verify_jwt = false
+
 [edge-runtime]
 ip_version = "ipv4"
 
@@ -52,3 +58,9 @@ schedule = "*/30 * * * * *"  # Every 30 seconds for faster recovery
 endpoint = "https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/crawl-health-monitor"
 headers = { "Content-Type" = "application/json", "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzQ5MzUyNCwiZXhwIjoyMDYzMDY5NTI0fQ.bYaY5RjUd2fhX5kxePbD1vI7lsYG8R4KkOHhLgJ4Yb8" }
 body = "{}"
+
+[cron.workflow-job-processor]
+schedule = "*/30 * * * * *"  # Every 30 seconds to process pending jobs
+endpoint = "https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/workflow-job-processor"
+headers = { "Content-Type" = "application/json", "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzQ5MzUyNCwiZXhwIjoyMDYzMDY5NTI0fQ.bYaY5RjUd2fhX5kxePbD1vI7lsYG8R4KkOHhLgJ4Yb8" }
+body = "{\"action\": \"process_jobs\", \"maxJobs\": 50}"

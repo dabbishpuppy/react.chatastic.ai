@@ -136,7 +136,7 @@ export class JobRecoveryServiceV2 {
   }
 
   /**
-   * Trigger job processing for a source
+   * Trigger job processing for a source - now more reliable with cron jobs
    */
   static async triggerJobProcessing(sourceId: string): Promise<boolean> {
     try {
@@ -172,8 +172,9 @@ export class JobRecoveryServiceV2 {
     // Step 1: Recover stuck jobs
     const stats = await this.recoverStuckJobs(sourceId);
 
-    // Step 2: Trigger processing if there are pending jobs
+    // Step 2: Trigger processing for any pending jobs
     if (stats.pendingJobs > 0) {
+      console.log(`🚀 Triggering processing for ${stats.pendingJobs} pending jobs`);
       await this.triggerJobProcessing(sourceId);
     }
 
