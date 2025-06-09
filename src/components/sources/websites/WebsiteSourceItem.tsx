@@ -96,7 +96,7 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     return `${formattedSize} ${sizes[i]}`;
   };
 
-  // FIXED: Check if source has potential child sources by checking both links_count AND actual child sources
+  // Check if source has potential child sources by checking both links_count AND actual child sources
   const hasChildSources = (source.links_count || 0) > 0 || childSources.length > 0;
 
   // Calculate total child source sizes for trained sources
@@ -221,20 +221,18 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 source={source}
               />
 
-              {/* Child sources toggle - positioned before actions menu */}
-              {hasChildSources && (
-                <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      {isChildSourcesOpen ? (
-                        <ChevronDown className="h-3 w-3" />
-                      ) : (
-                        <ChevronRight className="h-3 w-3" />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                </Collapsible>
-              )}
+              {/* Child sources toggle - always show for website sources */}
+              <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                    {isChildSourcesOpen ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                  </Button>
+                </CollapsibleTrigger>
+              </Collapsible>
 
               {/* Actions menu */}
               <DropdownMenu>
@@ -286,11 +284,11 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
       </div>
 
-      {/* FIXED: Collapsible child sources - use the same hasChildSources condition */}
-      {hasChildSources && (
-        <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
-          <CollapsibleContent>
-            <div className="ml-6 mr-3 mb-3">
+      {/* Collapsible child sources - always present, content changes based on data */}
+      <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
+        <CollapsibleContent>
+          <div className="ml-6 mr-3 mb-3">
+            {hasChildSources ? (
               <WebsiteChildSources
                 parentSourceId={source.id}
                 isCrawling={status === 'in_progress'}
@@ -299,10 +297,14 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
                 onDelete={onDelete}
                 onRecrawl={onRecrawl}
               />
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
+            ) : (
+              <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
+                No child sources crawled yet
+              </div>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 };
