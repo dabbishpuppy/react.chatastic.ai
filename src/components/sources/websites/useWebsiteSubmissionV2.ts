@@ -92,7 +92,7 @@ export const useWebsiteSubmissionV2 = () => {
             crawl_status: 'failed',
             workflow_status: 'ERROR',
             metadata: {
-              ...source.metadata,
+              ...(source.metadata || {}),
               error: crawlError.message,
               failed_at: new Date().toISOString()
             }

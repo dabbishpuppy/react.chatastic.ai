@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useParams } from 'react-router-dom';
 import EnhancedWebsiteCrawlFormV4 from '@/components/sources/websites/components/EnhancedWebsiteCrawlFormV4';
 import RetrainAgentButton from '@/components/sources/RetrainAgentButton';
-import SourcesList from '@/components/sources/SourcesList';
+import { useOptimizedAgentSources } from '@/hooks/useOptimizedAgentSources';
+import SourcesListPaginated from '@/components/sources/SourcesListPaginated';
 
 interface SourcesPageProps {
   sourceType?: string;
@@ -14,6 +15,7 @@ interface SourcesPageProps {
 const SourcesPage: React.FC = () => {
   const { agentId } = useParams();
   const [activeTab, setActiveTab] = useState('all');
+  const { sources, loading, error } = useOptimizedAgentSources();
 
   useEffect(() => {
     // Set active tab based on URL parameter (if provided)
@@ -22,6 +24,14 @@ const SourcesPage: React.FC = () => {
       setActiveTab(tab);
     }
   }, []);
+
+  // Filter sources based on active tab
+  const getFilteredSources = () => {
+    if (activeTab === 'websites') {
+      return sources.filter(source => source.source_type === 'website');
+    }
+    return sources; // Show all sources for 'all' tab
+  };
 
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Knowledge Sources">
@@ -53,12 +63,20 @@ const SourcesPage: React.FC = () => {
             </div>
 
             <TabsContent value="all" className="space-y-6">
-              <SourcesList />
+              <SourcesListPaginated 
+                sources={getFilteredSources()}
+                loading={loading}
+                error={error}
+              />
             </TabsContent>
 
             <TabsContent value="websites" className="space-y-6">
               <EnhancedWebsiteCrawlFormV4 />
-              <SourcesList />
+              <SourcesListPaginated 
+                sources={getFilteredSources()}
+                loading={loading}
+                error={error}
+              />
             </TabsContent>
           </Tabs>
         </div>
