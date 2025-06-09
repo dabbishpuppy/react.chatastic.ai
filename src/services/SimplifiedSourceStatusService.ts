@@ -1,4 +1,3 @@
-
 export interface SourceStatusSummary {
   totalSources: number;
   hasCrawledSources: boolean;
@@ -55,6 +54,9 @@ export class SimplifiedSourceStatusService {
           return 'pending';
         case 'in_progress':
           return 'in_progress';
+        case 'crawled':
+          // New mapping for "crawled" status - this is the key fix
+          return source.requires_manual_training ? 'ready_for_training' : 'completed';
         case 'completed':
           return source.requires_manual_training ? 'ready_for_training' : 'completed';
         case 'ready_for_training':
@@ -81,11 +83,11 @@ export class SimplifiedSourceStatusService {
   static analyzeSourceStatus(sources: any[]): SourceStatusSummary {
     const totalSources = sources.length;
     const hasCrawledSources = sources.some(s => 
-      s.crawl_status === 'completed' || s.crawl_status === 'ready_for_training'
+      s.crawl_status === 'completed' || s.crawl_status === 'ready_for_training' || s.crawl_status === 'crawled'
     );
     const hasTrainingSources = sources.some(s => s.requires_manual_training === true);
     const allSourcesCompleted = sources.length > 0 && sources.every(s => 
-      s.crawl_status === 'completed' || s.crawl_status === 'training_completed'
+      s.crawl_status === 'completed' || s.crawl_status === 'training_completed' || s.crawl_status === 'crawled'
     );
 
     return {
