@@ -44,7 +44,7 @@ export const useCrawlInitiation = () => {
       // Start automatic source page processing every 5 seconds
       const processingInterval = setInterval(async () => {
         try {
-          await EnhancedCrawlService.startSourcePageProcessing(result.parentSourceId);
+          await EnhancedCrawlService.startSourcePageProcessing();
           console.log('🔄 Automatic source page processing triggered');
         } catch (error) {
           console.warn('⚠️ Automatic processing warning (may be normal):', error);
