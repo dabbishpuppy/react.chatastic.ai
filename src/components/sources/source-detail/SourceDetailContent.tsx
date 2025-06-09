@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,6 +53,24 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
     return /<[^>]+>/.test(content);
   };
 
+  // Show current phase for website sources
+  const getCurrentPhase = () => {
+    if (source.source_type !== 'website') return null;
+    
+    const hasCompletedPages = source.completed_jobs && source.completed_jobs > 0;
+    const hasChunks = chunks.length > 0;
+    
+    if (!hasCompletedPages) {
+      return { phase: 'crawling', status: source.crawl_status || 'pending' };
+    } else if (!hasChunks) {
+      return { phase: 'ready_for_training', status: 'crawled' };
+    } else {
+      return { phase: 'trained', status: 'trained' };
+    }
+  };
+
+  const currentPhase = getCurrentPhase();
+
   console.log('🔍 Content rendering debug:', {
     isHtmlContent,
     isChildPage,
@@ -92,7 +109,24 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 </Button>
               )}
             </div>
+
+            {/* Phase indicator for website sources */}
+            {currentPhase && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm">
+                <div className="font-medium text-blue-900">
+                  Current Phase: {currentPhase.phase === 'crawling' ? 'Crawling' : 
+                                 currentPhase.phase === 'ready_for_training' ? 'Ready for Training' : 
+                                 'Trained'}
+                </div>
+                <div className="text-blue-700 mt-1">
+                  {currentPhase.phase === 'crawling' && 'Pages are being crawled. Please wait for completion.'}
+                  {currentPhase.phase === 'ready_for_training' && 'Crawling complete! Click "Retrain Agent" to create chunks and embeddings.'}
+                  {currentPhase.phase === 'trained' && 'Agent has been trained with chunks from this source.'}
+                </div>
+              </div>
+            )}
             
+            {/* Existing metadata display */}
             {(isChildPage || isSourcePage) && source.metadata && (
               <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
                 <div className="grid grid-cols-2 gap-2">
@@ -166,6 +200,16 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Show message if no chunks for website source */}
+            {source.source_type === 'website' && !isSourcePage && chunks.length === 0 && currentPhase?.phase === 'ready_for_training' && (
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="text-yellow-800 font-medium">No chunks created yet</div>
+                <div className="text-yellow-700 text-sm mt-1">
+                  This source has been crawled but not yet chunked. Click "Retrain Agent" to create chunks and embeddings.
                 </div>
               </div>
             )}

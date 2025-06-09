@@ -1,73 +1,81 @@
+import React, { useState, useEffect } from 'react';
+import AgentPageLayout from './AgentPageLayout';
+import FileUploadForm from '@/components/sources/FileUploadForm';
+import QASourceForm from '@/components/sources/QASourceForm';
+import SourcesList from '@/components/sources/SourcesList';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useParams } from 'react-router-dom';
+import EnhancedWebsiteCrawlFormV4 from '@/components/sources/websites/components/EnhancedWebsiteCrawlFormV4';
+import RetrainAgentButton from '@/components/sources/RetrainAgentButton';
 
-import React, { useEffect } from "react";
-import AgentPageLayout from "./AgentPageLayout";
-import SourcesPageLayout from "@/components/sources/SourcesPageLayout";
-import SourcesMainContent from "@/components/sources/SourcesMainContent";
-import { useTabNavigation } from "@/components/sources/hooks/useTabNavigation";
-import { useWorkflowSystem } from "@/hooks/useWorkflowSystem";
-import { useWorkflowRealtime } from "@/hooks/useWorkflowRealtime";
-import { CrawlSystemManager } from "@/services/rag/enhanced/crawlSystemManager";
-import { JobRecoveryService } from "@/services/rag/enhanced/jobRecoveryService";
-import { JobAutomationService } from "@/services/rag/enhanced/jobAutomationService";
+interface SourcesPageProps {
+  sourceType?: string;
+}
 
 const SourcesPage: React.FC = () => {
-  const { getTabTitle } = useTabNavigation();
-  const { isInitialized, isInitializing, error } = useWorkflowSystem();
-  
-  // Enable workflow real-time updates
-  useWorkflowRealtime();
+  const { agentId } = useParams();
+  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
-    let isComponentMounted = true;
-
-    const initializeEnhancedCrawlSystem = async () => {
-      try {
-        console.log('🚀 Initializing enhanced crawl system with resilience...');
-        
-        // Initialize the enhanced crawl system with job synchronization
-        await CrawlSystemManager.initialize();
-        
-        // Perform initial recovery of stuck jobs
-        if (isComponentMounted) {
-          console.log('🔧 Running initial job recovery...');
-          await JobRecoveryService.recoverStalledJobs();
-        }
-        
-        // Start automated job recovery and monitoring
-        if (isComponentMounted) {
-          console.log('🤖 Starting job automation service...');
-          JobAutomationService.startAutomation();
-        }
-        
-        if (isComponentMounted) {
-          console.log('✅ Enhanced crawl system with resilience initialized successfully');
-        }
-      } catch (error) {
-        console.error('❌ Failed to initialize enhanced crawl system:', error);
-      }
-    };
-
-    if (isInitialized && !isInitializing) {
-      initializeEnhancedCrawlSystem();
+    // Set active tab based on URL parameter (if provided)
+    if (window.location.hash) {
+      const tab = window.location.hash.substring(1);
+      setActiveTab(tab);
     }
-
-    // Cleanup function
-    return () => {
-      isComponentMounted = false;
-      JobAutomationService.stopAutomation();
-      CrawlSystemManager.shutdown();
-    };
-  }, [isInitialized, isInitializing]);
-
-  if (error) {
-    console.error('❌ Workflow system error:', error);
-  }
+  }, []);
 
   return (
-    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Sources" showPageTitle={false}>
-      <SourcesPageLayout title={getTabTitle()}>
-        <SourcesMainContent />
-      </SourcesPageLayout>
+    <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Knowledge Sources">
+      <div className="p-8 bg-[#f5f5f5] min-h-screen">
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Header with retrain button */}
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Knowledge Sources</h1>
+              <p className="text-gray-600 mt-2">
+                Manage your agent's knowledge sources. First crawl websites, then retrain the agent to create chunks.
+              </p>
+            </div>
+            <RetrainAgentButton 
+              onTrainingComplete={() => {
+                // Refresh sources after training
+                window.location.reload();
+              }}
+            />
+          </div>
+
+          {/* Source type tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <div className="flex items-center justify-between">
+              <TabsList className="grid w-full grid-cols-4 max-w-md">
+                <TabsTrigger value="all">All Sources</TabsTrigger>
+                <TabsTrigger value="websites">Websites</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="all" className="space-y-6">
+              <SourcesList sourceType="all" />
+            </TabsContent>
+
+            <TabsContent value="websites" className="space-y-6">
+              <EnhancedWebsiteCrawlFormV4 />
+              <SourcesList sourceType="website" />
+            </TabsContent>
+
+            <TabsContent value="documents" className="space-y-6">
+              <FileUploadForm />
+              <SourcesList sourceType="file" />
+            </TabsContent>
+
+            <TabsContent value="knowledge-base" className="space-y-6">
+              <QASourceForm />
+              <SourcesList sourceType="qa" />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </AgentPageLayout>
   );
 };
