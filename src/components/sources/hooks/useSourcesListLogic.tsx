@@ -68,8 +68,7 @@ export const useSourcesListLogic = (
     navigate(`/agent/${agentId}/sources/${source.id}`);
   };
 
-  const handleNavigateClick = (source: AgentSource, event: React.MouseEvent) => {
-    event.stopPropagation();
+  const handleNavigateClick = (source: AgentSource) => {
     navigate(`/agent/${agentId}/sources/${source.id}`);
   };
 

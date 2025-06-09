@@ -10,6 +10,7 @@ import AgentPage from './pages/AgentEnvironment';
 import ManagementPage from './pages/ManagementPage';
 import SettingsPage from './pages/Settings';
 import SourcesPage from './pages/SourcesPage';
+import SourceDetailPage from './pages/SourceDetailPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import ActionsPage from './pages/ActionsPage';
 import WebsitesSourcePage from './pages/SourcesPage';
@@ -102,6 +103,14 @@ function App() {
                 element={
                   <AuthProvider>
                     <SourcesPage />
+                  </AuthProvider>
+                }
+              />
+              <Route
+                path="/agent/:agentId/sources/:sourceId"
+                element={
+                  <AuthProvider>
+                    <SourceDetailPage />
                   </AuthProvider>
                 }
               />

@@ -22,6 +22,7 @@ interface SourceTableRowProps {
   onSelect: (selected: boolean) => void;
   onDelete: (source: AgentSource) => void;
   onView?: (source: AgentSource) => void;
+  onNavigate?: (source: AgentSource) => void;
 }
 
 const SourceTableRow: React.FC<SourceTableRowProps> = ({
@@ -29,11 +30,19 @@ const SourceTableRow: React.FC<SourceTableRowProps> = ({
   isSelected,
   onSelect,
   onDelete,
-  onView
+  onView,
+  onNavigate
 }) => {
   const handleRowClick = () => {
     if (onView) {
       onView(source);
+    }
+  };
+
+  const handleArrowClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onNavigate) {
+      onNavigate(source);
     }
   };
 
@@ -74,7 +83,7 @@ const SourceTableRow: React.FC<SourceTableRowProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onView && onView(source)}
+            onClick={handleArrowClick}
             className="h-8 w-8 p-0"
           >
             <ArrowRight className="h-4 w-4" />
