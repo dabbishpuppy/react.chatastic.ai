@@ -32,7 +32,8 @@ const SourceDetailPage: React.FC = () => {
     handleCancelEdit,
     agentId,
     refetch,
-    isSourcePage
+    isSourcePage,
+    chunks
   } = useSourceDetail();
 
   // Set up real-time workflow updates for this specific source
@@ -107,6 +108,7 @@ const SourceDetailPage: React.FC = () => {
                     onSave={handleSave}
                     onCancel={handleCancelEdit}
                     isSourcePage={isSourcePage}
+                    chunks={chunks}
                   />
                 </TabsContent>
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -46,7 +45,7 @@ export const useSourceDetail = () => {
             return {
               id: data.id,
               title: data.url || `Page ${data.id.slice(0, 8)}`,
-              content: '', // Source pages don't have content in the same way
+              content: '', // Will be populated with chunks below
               source_type: 'website' as const,
               url: data.url,
               agent_id: agentId!,
@@ -94,6 +93,44 @@ export const useSourceDetail = () => {
     },
     enabled: !!currentId
   });
+
+  // Fetch chunks for source pages
+  const { data: chunks } = useQuery({
+    queryKey: ['source-chunks', currentId],
+    queryFn: async () => {
+      if (!currentId || !isSourcePage) return [];
+      
+      try {
+        const { data: chunksData, error } = await supabase
+          .from('source_chunks')
+          .select('*')
+          .eq('source_id', currentId)
+          .order('chunk_index', { ascending: true });
+
+        if (error) {
+          console.error('Failed to fetch chunks:', error);
+          return [];
+        }
+
+        return chunksData || [];
+      } catch (error) {
+        console.error('Failed to fetch chunks:', error);
+        return [];
+      }
+    },
+    enabled: !!currentId && isSourcePage
+  });
+
+  // Combine chunks into content for source pages
+  useEffect(() => {
+    if (source && isSourcePage && chunks) {
+      const combinedContent = chunks.map(chunk => chunk.content).join('\n\n');
+      // Update the source object with the combined content
+      if (combinedContent) {
+        source.content = combinedContent;
+      }
+    }
+  }, [source, chunks, isSourcePage]);
 
   useEffect(() => {
     if (source) {
@@ -242,6 +279,7 @@ export const useSourceDetail = () => {
     handleCancelEdit,
     agentId: agentId!,
     refetch,
-    isSourcePage
+    isSourcePage,
+    chunks: chunks || []
   };
 };

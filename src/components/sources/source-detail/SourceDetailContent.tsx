@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { AgentSource } from '@/types/rag';
 import SourceEditForm from './SourceEditForm';
 
@@ -17,6 +18,7 @@ interface SourceDetailContentProps {
   onSave: () => void;
   onCancel: () => void;
   isSourcePage?: boolean;
+  chunks?: any[];
 }
 
 const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
@@ -30,7 +32,8 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   onContentChange,
   onSave,
   onCancel,
-  isSourcePage = false
+  isSourcePage = false,
+  chunks = []
 }) => {
   const isHtmlContent = source?.metadata?.isHtml === true;
   const isFileSource = source?.source_type === 'file';
@@ -57,7 +60,8 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
     isSourcePage,
     contentLength: source.content?.length,
     contentPreview: source.content?.substring(0, 100),
-    looksLikeHtml: source.content ? looksLikeHtml(source.content) : false
+    looksLikeHtml: source.content ? looksLikeHtml(source.content) : false,
+    chunksCount: chunks.length
   });
 
   return (
@@ -128,7 +132,45 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Chunks display for source pages */}
+            {isSourcePage && chunks.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-medium">Extracted Content Chunks</h3>
+                  <Badge variant="secondary">{chunks.length} chunks</Badge>
+                </div>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {chunks.map((chunk, index) => (
+                    <div key={chunk.id} className="border rounded-lg p-4 bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-600">
+                          Chunk {index + 1}
+                        </span>
+                        <div className="flex gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {chunk.token_count} tokens
+                          </Badge>
+                          {chunk.content_hash && (
+                            <Badge variant="outline" className="text-xs">
+                              {chunk.content_hash.slice(0, 8)}...
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                        {chunk.content.length > 500 
+                          ? `${chunk.content.substring(0, 500)}...` 
+                          : chunk.content
+                        }
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             
+            {/* Regular content display */}
             <div className="prose max-w-none">
               {source.content ? (
                 <>
@@ -154,7 +196,9 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                   )}
                 </>
               ) : (
-                <div className="text-gray-500 italic">No content available</div>
+                <div className="text-gray-500 italic">
+                  {isSourcePage && chunks.length === 0 ? 'No chunks found for this page' : 'No content available'}
+                </div>
               )}
             </div>
           </div>
