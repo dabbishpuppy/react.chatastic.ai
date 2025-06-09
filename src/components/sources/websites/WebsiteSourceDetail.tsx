@@ -14,7 +14,7 @@ import ManualJobProcessor from './components/ManualJobProcessor';
 import CrawlDiagnostics from './components/CrawlDiagnostics';
 import AutoRecoverySystem from './components/AutoRecoverySystem';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
-import { AgentSource } from '@/types/database';
+import { AgentSource } from '@/types/rag';
 
 const WebsiteSourceDetail: React.FC = () => {
   const { sourceId, agentId } = useParams<{ sourceId: string; agentId: string }>();
@@ -158,7 +158,6 @@ const WebsiteSourceDetail: React.FC = () => {
       {/* Child Sources */}
       <WebsiteChildSources 
         parentSourceId={sourceId!} 
-        childSources={childSources || []}
         onEdit={() => {}}
         onExclude={() => {}}
         onDelete={() => {}}
