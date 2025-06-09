@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.7';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -32,7 +31,7 @@ serve(async (req) => {
       );
     }
 
-    const { pageId } = requestBody;
+    const { pageId, forceReprocess = false } = requestBody;
 
     if (!pageId) {
       return new Response(
@@ -47,28 +46,57 @@ serve(async (req) => {
       );
     }
 
-    console.log(`🔄 Processing content for page: ${pageId}`);
+    console.log(`🔄 Processing content for page: ${pageId} (force: ${forceReprocess})`);
 
-    // FIXED: Use atomic update with proper concurrency control for processing_status
+    // ENHANCED: More flexible processing conditions
+    let updateConditions = ['id = ?', pageId];
+    let updateParams = [pageId];
+
+    if (forceReprocess) {
+      // For forced reprocessing, allow any page that exists
+      console.log('🔄 Force reprocessing enabled - will process any existing page');
+    } else {
+      // Original logic - only process completed crawled pages that aren't being processed
+      updateConditions.push("status = 'completed'");
+      updateConditions.push("processing_status IN ('pending') OR processing_status IS NULL");
+    }
+
+    // FIXED: Use more flexible atomic update for processing_status
     const { data: updateResult, error: lockError } = await supabase
       .from('source_pages')
       .update({ 
         processing_status: 'processing',
-        started_at: new Date().toISOString()
+        started_at: new Date().toISOString(),
+        error_message: null // Clear any previous errors
       })
       .eq('id', pageId)
-      .eq('status', 'completed') // Only process completed crawled pages
-      .in('processing_status', ['pending', null]) // Only update if not already being processed
+      .or(forceReprocess 
+        ? 'status.in.(completed,failed,processed)' // Allow reprocessing of completed, failed, or processed pages
+        : 'status.eq.completed,processing_status.is.null,processing_status.eq.pending'
+      )
       .select()
       .single();
 
     if (lockError || !updateResult) {
-      console.log(`⏭️ Page ${pageId} already being processed, not crawled yet, or doesn't exist`);
+      console.log(`⏭️ Page ${pageId} cannot be processed: ${lockError?.message || 'conditions not met'}`);
+      
+      // Get page info for better error message
+      const { data: pageInfo } = await supabase
+        .from('source_pages')
+        .select('status, processing_status, url')
+        .eq('id', pageId)
+        .single();
+
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Page is already being processed, not crawled yet, or does not exist',
-          pageId
+          message: forceReprocess 
+            ? `Page cannot be reprocessed: ${lockError?.message || 'unknown error'}`
+            : 'Page is already being processed, not crawled yet, or does not exist',
+          pageId,
+          currentStatus: pageInfo?.status,
+          currentProcessingStatus: pageInfo?.processing_status,
+          pageUrl: pageInfo?.url
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -187,6 +215,22 @@ serve(async (req) => {
       );
     }
     
+    // ENHANCED: Clear existing chunks before reprocessing
+    if (forceReprocess) {
+      console.log('🗑️ Clearing existing chunks for reprocessing...');
+      const { error: deleteError } = await supabase
+        .from('source_chunks')
+        .delete()
+        .eq('source_id', page.parent_source_id)
+        .like('metadata->>page_id', pageId);
+      
+      if (deleteError) {
+        console.warn('⚠️ Failed to clear existing chunks:', deleteError);
+      } else {
+        console.log('✅ Existing chunks cleared');
+      }
+    }
+    
     // Simple content extraction (similar to what's in child-job-processor)
     const extractTextContent = (html) => {
       let text = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
@@ -261,7 +305,8 @@ serve(async (req) => {
               extraction_method: 'title_fallback',
               page_title: title,
               processed_at: new Date().toISOString(),
-              original_content_length: textContent.length
+              original_content_length: textContent.length,
+              reprocessed: forceReprocess
             }
           }];
 
@@ -349,7 +394,8 @@ serve(async (req) => {
             data: {
               chunksCreated: 1,
               message: 'Processed with title fallback',
-              pageId
+              pageId,
+              reprocessed: forceReprocess
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -405,7 +451,8 @@ serve(async (req) => {
           extraction_method: 'semantic_chunking',
           page_title: extractTitle(htmlContent),
           processed_at: new Date().toISOString(),
-          original_content_length: textContent.length
+          original_content_length: textContent.length,
+          reprocessed: forceReprocess
         }
       }));
 
@@ -502,8 +549,9 @@ serve(async (req) => {
         success: true,
         data: {
           chunksCreated: chunks.length,
-          message: 'Content processed successfully',
-          pageId
+          message: forceReprocess ? 'Content reprocessed successfully' : 'Content processed successfully',
+          pageId,
+          reprocessed: forceReprocess
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

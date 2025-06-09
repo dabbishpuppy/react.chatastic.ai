@@ -237,7 +237,10 @@ export const useSourceDetail = () => {
       console.log('🔄 Triggering reprocessing for page:', pageId);
       
       const { data, error } = await supabase.functions.invoke('process-page-content', {
-        body: { pageId }
+        body: { 
+          pageId,
+          forceReprocess: true // NEW: Force reprocessing even if page was already processed
+        }
       });
 
       if (error) {
@@ -257,12 +260,18 @@ export const useSourceDetail = () => {
         // Refetch chunks after a delay
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: ['source-chunks'] });
+          refetch?.();
         }, 5000);
       }
     } catch (error) {
       console.error('Error triggering reprocessing:', error);
+      toast({
+        title: 'Reprocessing Failed',
+        description: 'An unexpected error occurred while triggering reprocessing.',
+        variant: 'destructive',
+      });
     }
-  }, [isSourcePage, pageId, toast, queryClient]);
+  }, [isSourcePage, pageId, toast, queryClient, refetch]);
 
   useEffect(() => {
     if (source) {
