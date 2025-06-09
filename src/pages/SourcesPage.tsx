@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import AgentPageLayout from './AgentPageLayout';
+import FileUploadForm from '@/components/sources/FileUploadForm';
+import QASourceForm from '@/components/sources/QASourceForm';
+import SourcesList from '@/components/sources/SourcesList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useParams } from 'react-router-dom';
 import EnhancedWebsiteCrawlFormV4 from '@/components/sources/websites/components/EnhancedWebsiteCrawlFormV4';
 import RetrainAgentButton from '@/components/sources/RetrainAgentButton';
-import { useOptimizedAgentSources } from '@/hooks/useOptimizedAgentSources';
-import SourcesListPaginated from '@/components/sources/SourcesListPaginated';
 
 interface SourcesPageProps {
   sourceType?: string;
@@ -15,7 +15,6 @@ interface SourcesPageProps {
 const SourcesPage: React.FC = () => {
   const { agentId } = useParams();
   const [activeTab, setActiveTab] = useState('all');
-  const { sources, loading, error } = useOptimizedAgentSources();
 
   useEffect(() => {
     // Set active tab based on URL parameter (if provided)
@@ -24,14 +23,6 @@ const SourcesPage: React.FC = () => {
       setActiveTab(tab);
     }
   }, []);
-
-  // Filter sources based on active tab
-  const getFilteredSources = () => {
-    if (activeTab === 'websites') {
-      return sources.filter(source => source.source_type === 'website');
-    }
-    return sources; // Show all sources for 'all' tab
-  };
 
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle="Knowledge Sources">
@@ -56,27 +47,31 @@ const SourcesPage: React.FC = () => {
           {/* Source type tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <div className="flex items-center justify-between">
-              <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsList className="grid w-full grid-cols-4 max-w-md">
                 <TabsTrigger value="all">All Sources</TabsTrigger>
                 <TabsTrigger value="websites">Websites</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsTrigger value="knowledge-base">Knowledge Base</TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="all" className="space-y-6">
-              <SourcesListPaginated 
-                sources={getFilteredSources()}
-                loading={loading}
-                error={error}
-              />
+              <SourcesList sourceType="all" />
             </TabsContent>
 
             <TabsContent value="websites" className="space-y-6">
               <EnhancedWebsiteCrawlFormV4 />
-              <SourcesListPaginated 
-                sources={getFilteredSources()}
-                loading={loading}
-                error={error}
-              />
+              <SourcesList sourceType="website" />
+            </TabsContent>
+
+            <TabsContent value="documents" className="space-y-6">
+              <FileUploadForm />
+              <SourcesList sourceType="file" />
+            </TabsContent>
+
+            <TabsContent value="knowledge-base" className="space-y-6">
+              <QASourceForm />
+              <SourcesList sourceType="qa" />
             </TabsContent>
           </Tabs>
         </div>
