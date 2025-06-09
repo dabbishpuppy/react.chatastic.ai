@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -95,7 +94,7 @@ export const useSourceDetail = () => {
     enabled: !!currentId
   });
 
-  // Fetch chunks - ENHANCED: Better debugging and multiple fallback strategies
+  // ENHANCED: Better chunk fetching with multiple strategies and detailed logging
   const { data: chunks } = useQuery({
     queryKey: ['source-chunks', currentId, isSourcePage ? source?.metadata?.parentSourceId : null, isSourcePage ? pageId : null],
     queryFn: async () => {
@@ -178,10 +177,20 @@ export const useSourceDetail = () => {
             console.log('🔍 Strategy 4 (pageId in metadata values):', pageSpecificChunks.length);
           }
 
+          // Strategy 5: NEW - Check if URL matches in metadata
+          if (pageSpecificChunks.length === 0 && source?.url) {
+            pageSpecificChunks = allChunks?.filter(chunk => {
+              const metadata = chunk.metadata as Record<string, any> | null;
+              return metadata?.url === source.url;
+            }) || [];
+            console.log('🔍 Strategy 5 (metadata.url match):', pageSpecificChunks.length, 'for URL:', source.url);
+          }
+
           chunksData = pageSpecificChunks;
           
           console.log('✅ Found page-specific chunks:', {
             pageId,
+            pageUrl: source?.url,
             chunksFound: chunksData.length,
             sampleChunk: chunksData[0] ? {
               id: chunksData[0].id,
@@ -189,6 +198,12 @@ export const useSourceDetail = () => {
               contentPreview: chunksData[0].content?.substring(0, 100)
             } : null
           });
+
+          // NEW: If no chunks found but page shows chunks_created > 0, trigger reprocessing
+          if (chunksData.length === 0 && source?.metadata?.chunksCreated && source.metadata.chunksCreated > 0) {
+            console.warn('⚠️ No chunks found but page reports chunks_created:', source.metadata.chunksCreated);
+            console.warn('⚠️ This might indicate a chunk storage issue. Consider reprocessing this page.');
+          }
         } else {
           chunksData = allChunks || [];
           console.log('✅ Found chunks for regular source:', chunksData.length);
@@ -213,6 +228,41 @@ export const useSourceDetail = () => {
       }
     }
   }, [source, chunks, isSourcePage]);
+
+  // NEW: Auto-trigger reprocessing if no content but should have content
+  const triggerReprocessing = useCallback(async () => {
+    if (!isSourcePage || !pageId) return;
+    
+    try {
+      console.log('🔄 Triggering reprocessing for page:', pageId);
+      
+      const { data, error } = await supabase.functions.invoke('process-page-content', {
+        body: { pageId }
+      });
+
+      if (error) {
+        console.error('Failed to trigger reprocessing:', error);
+        toast({
+          title: 'Reprocessing Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        console.log('✅ Reprocessing triggered successfully:', data);
+        toast({
+          title: 'Reprocessing Started',
+          description: 'Page content is being reprocessed. Refresh in a few moments.',
+        });
+        
+        // Refetch chunks after a delay
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['source-chunks'] });
+        }, 5000);
+      }
+    } catch (error) {
+      console.error('Error triggering reprocessing:', error);
+    }
+  }, [isSourcePage, pageId, toast, queryClient]);
 
   useEffect(() => {
     if (source) {
@@ -362,6 +412,7 @@ export const useSourceDetail = () => {
     agentId: agentId!,
     refetch,
     isSourcePage,
-    chunks: chunks || []
+    chunks: chunks || [],
+    triggerReprocessing // NEW: Expose reprocessing function
   };
 };
