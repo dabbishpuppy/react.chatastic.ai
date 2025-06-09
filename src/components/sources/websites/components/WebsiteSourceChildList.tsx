@@ -76,7 +76,9 @@ const WebsiteSourceChildList: React.FC<WebsiteSourceChildListProps> = ({
                 <p className="text-sm font-medium text-gray-900" title={childSource.url}>
                   {childSource.title || formatUrl(childSource.url)}
                 </p>
-                <p className="text-xs text-gray-500" title={childSource.url}>{truncateUrl(childSource.url)}</p>
+                <p className="text-xs text-gray-500" title={childSource.url}>
+                  {truncateUrl(childSource.url)}
+                </p>
               </div>
             </div>
             
