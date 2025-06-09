@@ -40,10 +40,20 @@ export const useCrawlInitiation = () => {
           console.warn('⚠️ Source page processing warning (may be normal):', error);
         }
       }, 2000);
-      
-      // Monitor crawl completion and show completion toast (Phase 2)
+
+      // Start automatic source page processing every 5 seconds
+      const processingInterval = setInterval(async () => {
+        try {
+          await EnhancedCrawlService.startSourcePageProcessing(result.parentSourceId);
+          console.log('🔄 Automatic source page processing triggered');
+        } catch (error) {
+          console.warn('⚠️ Automatic processing warning (may be normal):', error);
+        }
+      }, 5000);
+
+      // Start monitoring crawl completion after 5 seconds
       setTimeout(() => {
-        monitorCrawlCompletion(result.parentSourceId, request.agentId);
+        monitorCrawlCompletion(result.parentSourceId, request.agentId, processingInterval);
       }, 5000);
       
       return result;
@@ -69,7 +79,7 @@ export const useCrawlInitiation = () => {
     }
   };
 
-  const monitorCrawlCompletion = async (parentSourceId: string, agentId: string) => {
+  const monitorCrawlCompletion = async (parentSourceId: string, agentId: string, processingInterval: NodeJS.Timeout) => {
     let checkCount = 0;
     const maxChecks = 60; // 5 minutes of monitoring
     
@@ -80,6 +90,7 @@ export const useCrawlInitiation = () => {
         // Enhanced validation before status check
         if (!parentSourceId || parentSourceId === 'undefined' || parentSourceId === 'null') {
           console.error('Invalid parentSourceId in monitoring:', parentSourceId);
+          clearInterval(processingInterval);
           return;
         }
         
@@ -88,6 +99,7 @@ export const useCrawlInitiation = () => {
         // If status check indicates the source doesn't exist, stop monitoring
         if (status.status === 'failed' && status.totalJobs === 0 && status.completedJobs === 0) {
           console.error('Source appears to be deleted or invalid, stopping monitoring');
+          clearInterval(processingInterval);
           window.dispatchEvent(new CustomEvent('crawlCompleted', {
             detail: { agentId, parentSourceId, status: 'failed', error: true }
           }));
@@ -96,6 +108,9 @@ export const useCrawlInitiation = () => {
         
         if (status.status === 'completed') {
           console.log('🎉 Crawl completed successfully');
+          
+          // Clear the processing interval
+          clearInterval(processingInterval);
           
           // Check if recovery is needed before showing success
           const recoveryStatus = await CrawlRecoveryService.getRecoveryStatus(parentSourceId);
@@ -136,6 +151,9 @@ export const useCrawlInitiation = () => {
         } else if (status.status === 'failed') {
           console.log('❌ Crawl failed');
           
+          // Clear the processing interval
+          clearInterval(processingInterval);
+          
           // Show crawl failed toast
           toast({
             title: "Crawling Failed",
@@ -155,7 +173,10 @@ export const useCrawlInitiation = () => {
         if ((status.status === 'in_progress' || status.status === 'pending') && checkCount < maxChecks) {
           setTimeout(checkCompletion, 5000); // Check every 5 seconds
         } else if (checkCount >= maxChecks) {
-          console.log('⏰ Crawl monitoring timeout - triggering recovery check');
+          console.log('⏰ Crawl monitoring timeout - clearing processing interval');
+          
+          // Clear the processing interval on timeout
+          clearInterval(processingInterval);
           
           // Trigger recovery check after timeout
           try {
@@ -179,6 +200,7 @@ export const useCrawlInitiation = () => {
         console.error('Error checking crawl status:', error);
         // Stop monitoring on error but don't spam the user with error messages
         // They'll see the original error from the status check
+        clearInterval(processingInterval);
       }
     };
     
