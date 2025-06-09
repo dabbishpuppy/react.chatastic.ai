@@ -7,6 +7,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { fetchMaybeSingle } from '@/utils/safeSupabaseQueries';
 
+// Define types for source pages
+interface SourcePage {
+  id: string;
+  url: string;
+  title?: string;
+  content?: string;
+  status: string;
+  parent_source_id: string;
+  created_at: string;
+  completed_at?: string;
+  content_size?: number;
+  chunks_created?: number;
+  processing_time_ms?: number;
+  error_message?: string;
+}
+
+type SourceData = AgentSource | SourcePage;
+
 export const useSourceDetail = () => {
   const { sourceId, agentId, pageId } = useParams<{ sourceId?: string; agentId: string; pageId?: string }>();
   const navigate = useNavigate();
@@ -26,7 +44,7 @@ export const useSourceDetail = () => {
 
   const { data: source, isLoading: loading, refetch } = useQuery({
     queryKey: ['source-detail', targetId, isPageSource],
-    queryFn: async () => {
+    queryFn: async (): Promise<SourceData | null> => {
       if (!targetId) return null;
       
       try {
@@ -40,7 +58,7 @@ export const useSourceDetail = () => {
             `useSourceDetail-page(${targetId})`
           );
           
-          return data;
+          return data as SourcePage | null;
         } else {
           // Fetch from agent_sources table
           const data = await fetchMaybeSingle(
@@ -63,8 +81,10 @@ export const useSourceDetail = () => {
 
   useEffect(() => {
     if (source) {
-      setEditTitle(source.title || source.url || '');
-      setEditContent(source.content || '');
+      const title = (source as any).title || (source as any).url || '';
+      const content = (source as any).content || '';
+      setEditTitle(title);
+      setEditContent(content);
     }
   }, [source]);
 
@@ -142,8 +162,10 @@ export const useSourceDetail = () => {
   const handleCancelEdit = () => {
     setIsEditing(false);
     if (source) {
-      setEditTitle(source.title || source.url || '');
-      setEditContent(source.content || '');
+      const title = (source as any).title || (source as any).url || '';
+      const content = (source as any).content || '';
+      setEditTitle(title);
+      setEditContent(content);
     }
   };
 

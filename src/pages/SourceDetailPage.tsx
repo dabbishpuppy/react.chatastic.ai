@@ -37,7 +37,7 @@ const SourceDetailPage: React.FC = () => {
 
   // Set up real-time workflow updates for this specific source
   useWorkflowRealtime({ 
-    sourceId: source?.id,
+    sourceId: source ? (source as any).id : undefined,
     onEvent: (event) => {
       console.log('Source detail workflow event:', event);
       refetch?.(); // Refresh source data when workflow events occur
@@ -69,6 +69,7 @@ const SourceDetailPage: React.FC = () => {
   }
 
   const pageTitle = isPageSource ? 'Page Details' : 'Source Details';
+  const sourceData = source as any;
 
   return (
     <AgentPageLayout defaultActiveTab="sources" defaultPageTitle={pageTitle} showPageTitle={false}>
@@ -76,7 +77,7 @@ const SourceDetailPage: React.FC = () => {
         <div className="flex gap-8">
           <div className="flex-1">
             <SourceDetailHeader
-              source={source}
+              source={sourceData}
               isEditing={isEditing}
               onBackClick={handleBackClick}
               onDeleteClick={() => setShowDeleteDialog(true)}
@@ -87,7 +88,7 @@ const SourceDetailPage: React.FC = () => {
               <Tabs defaultValue="content" className="space-y-6">
                 <TabsList>
                   <TabsTrigger value="content">Content</TabsTrigger>
-                  {!isPageSource && (
+                  {!isPageSource && sourceData.source_type === 'website' && (
                     <>
                       <TabsTrigger value="workflow">Workflow</TabsTrigger>
                       <TabsTrigger value="jobs">Background Jobs</TabsTrigger>
@@ -101,7 +102,7 @@ const SourceDetailPage: React.FC = () => {
 
                 <TabsContent value="content">
                   <SourceDetailContent
-                    source={source}
+                    source={sourceData}
                     isEditing={isEditing}
                     editTitle={editTitle}
                     editContent={editContent}
@@ -115,18 +116,18 @@ const SourceDetailPage: React.FC = () => {
                   />
                 </TabsContent>
 
-                {!isPageSource && (
+                {!isPageSource && sourceData.source_type === 'website' && (
                   <>
                     <TabsContent value="workflow">
-                      <WorkflowEventTimeline sourceId={source.id} />
+                      <WorkflowEventTimeline sourceId={sourceData.id} />
                     </TabsContent>
 
                     <TabsContent value="jobs">
-                      <WorkflowJobsPanel sourceId={source.id} />
+                      <WorkflowJobsPanel sourceId={sourceData.id} />
                     </TabsContent>
 
                     <TabsContent value="controls">
-                      <WorkflowControls source={source} onRefresh={refetch} />
+                      <WorkflowControls source={sourceData} onRefresh={refetch} />
                     </TabsContent>
                   </>
                 )}
@@ -136,11 +137,11 @@ const SourceDetailPage: React.FC = () => {
                     <div className="bg-white p-6 rounded-lg border">
                       <h3 className="text-lg font-semibold mb-4">Content Chunks</h3>
                       <p className="text-gray-600">
-                        This page has been processed into {source.chunks_created || 0} chunks for AI training.
+                        This page has been processed into {sourceData.chunks_created || 0} chunks for AI training.
                       </p>
-                      {source.content_size && (
+                      {sourceData.content_size && (
                         <p className="text-sm text-gray-500 mt-2">
-                          Original content size: {Math.round(source.content_size / 1024)} KB
+                          Original content size: {Math.round(sourceData.content_size / 1024)} KB
                         </p>
                       )}
                     </div>
@@ -159,7 +160,7 @@ const SourceDetailPage: React.FC = () => {
           open={showDeleteDialog}
           onOpenChange={setShowDeleteDialog}
           onConfirm={handleDelete}
-          sourceTitle={source.title}
+          sourceTitle={sourceData.title || sourceData.url || 'Source'}
           isDeleting={isDeleting}
         />
       </div>

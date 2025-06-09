@@ -32,11 +32,45 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
   onCancel,
   isPageSource = false
 }) => {
+  const getContentTypeLabel = () => {
+    if (isPageSource) return 'Page Content';
+    
+    switch (source.source_type) {
+      case 'website':
+        return 'Website Content';
+      case 'text':
+        return 'Text Content';
+      case 'file':
+        return 'File Content';
+      case 'qa':
+        return 'Q&A Content';
+      default:
+        return 'Source Content';
+    }
+  };
+
+  const getEmptyContentMessage = () => {
+    if (isPageSource) return 'No content available for this page.';
+    
+    switch (source.source_type) {
+      case 'website':
+        return 'No content available for this website source.';
+      case 'text':
+        return 'No text content available.';
+      case 'file':
+        return 'No file content available.';
+      case 'qa':
+        return 'No Q&A content available.';
+      default:
+        return 'No content available for this source.';
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold">
-          {isPageSource ? 'Page Content' : 'Source Content'}
+          {getContentTypeLabel()}
         </h2>
         {!isEditing && (
           <Button variant="outline" size="sm" onClick={onStartEdit}>
@@ -87,7 +121,7 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {source.title || source.url}
+              {source.title || source.url || 'Untitled'}
             </h3>
           </div>
 
@@ -107,13 +141,14 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 </pre>
               ) : (
                 <p className="text-gray-500 italic">
-                  {isPageSource ? 'No content available for this page.' : 'No content available for this source.'}
+                  {getEmptyContentMessage()}
                 </p>
               )}
             </div>
           </div>
 
-          {isPageSource && (
+          {/* Show different metrics based on source type */}
+          {(isPageSource || source.source_type === 'website') && (
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h4 className="font-medium text-blue-900 mb-1">Processing Status</h4>
@@ -123,6 +158,32 @@ const SourceDetailContent: React.FC<SourceDetailContentProps> = ({
                 <h4 className="font-medium text-green-900 mb-1">Chunks Created</h4>
                 <p className="text-green-700">{source.chunks_created || 0}</p>
               </div>
+            </div>
+          )}
+
+          {/* Show source type specific information */}
+          {source.source_type === 'text' && (
+            <div className="bg-green-50 p-4 rounded-lg">
+              <h4 className="font-medium text-green-900 mb-1">Text Source</h4>
+              <p className="text-green-700">
+                Content length: {source.content ? source.content.length : 0} characters
+              </p>
+            </div>
+          )}
+
+          {source.source_type === 'file' && (
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <h4 className="font-medium text-purple-900 mb-1">File Source</h4>
+              {source.file_path && (
+                <p className="text-purple-700">File: {source.file_path}</p>
+              )}
+            </div>
+          )}
+
+          {source.source_type === 'qa' && (
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h4 className="font-medium text-orange-900 mb-1">Q&A Source</h4>
+              <p className="text-orange-700">Knowledge base content</p>
             </div>
           )}
         </div>

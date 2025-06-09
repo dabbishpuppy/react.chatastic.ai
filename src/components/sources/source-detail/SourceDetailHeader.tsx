@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trash2, Globe, FileText } from 'lucide-react';
+import { ArrowLeft, Trash2, Globe, FileText, File, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface SourceDetailHeaderProps {
@@ -36,6 +36,40 @@ const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
     );
   };
 
+  const getSourceIcon = () => {
+    if (isPageSource) {
+      return <FileText className="h-5 w-5 text-blue-600" />;
+    }
+    
+    switch (source.source_type) {
+      case 'website':
+        return <Globe className="h-5 w-5 text-blue-600" />;
+      case 'text':
+        return <MessageSquare className="h-5 w-5 text-green-600" />;
+      case 'file':
+        return <File className="h-5 w-5 text-purple-600" />;
+      default:
+        return <FileText className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  const getSourceTypeLabel = () => {
+    if (isPageSource) return 'Page';
+    
+    switch (source.source_type) {
+      case 'website':
+        return 'Website';
+      case 'text':
+        return 'Text';
+      case 'file':
+        return 'File';
+      case 'qa':
+        return 'Q&A';
+      default:
+        return 'Source';
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg border p-6">
       <div className="flex items-start justify-between">
@@ -52,15 +86,12 @@ const SourceDetailHeader: React.FC<SourceDetailHeaderProps> = ({
 
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              {isPageSource ? (
-                <FileText className="h-5 w-5 text-blue-600" />
-              ) : (
-                <Globe className="h-5 w-5 text-blue-600" />
-              )}
+              {getSourceIcon()}
               <h1 className="text-2xl font-bold text-gray-900">
-                {source.title || source.url}
+                {source.title || source.url || 'Untitled'}
               </h1>
               {getStatusBadge()}
+              <Badge variant="outline">{getSourceTypeLabel()}</Badge>
             </div>
 
             <div className="space-y-1">

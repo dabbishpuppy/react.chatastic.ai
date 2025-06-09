@@ -107,6 +107,14 @@ function App() {
                 }
               />
               <Route
+                path="/agent/:agentId/sources/:sourceId"
+                element={
+                  <AuthProvider>
+                    <SourceDetailPage />
+                  </AuthProvider>
+                }
+              />
+              <Route
                 path="/agent/:agentId/sources/page/:pageId"
                 element={
                   <AuthProvider>
