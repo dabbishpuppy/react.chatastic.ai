@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CrawlJob {
@@ -24,6 +25,21 @@ export interface QueueMetrics {
   completedJobs: number;
   failedJobs: number;
   avgProcessingTime: number;
+}
+
+// Type for the job payload stored in background_jobs
+interface CrawlJobPayload {
+  agentId: string;
+  batchUrls: string[];
+  priority: 'low' | 'normal' | 'high';
+  domain: string;
+  userId?: string;
+  metadata: {
+    crawlConfig: any;
+    totalPages: number;
+    processedPages: number;
+    estimatedCompletion?: string;
+  };
 }
 
 export class DistributedCrawlQueue {
@@ -91,16 +107,18 @@ export class DistributedCrawlQueue {
     }
 
     const job = data[0];
+    const payload = job.payload as CrawlJobPayload;
+    
     return {
       id: job.id,
       parentSourceId: job.source_id,
-      agentId: job.payload.agentId,
-      batchUrls: job.payload.batchUrls,
-      priority: job.payload.priority,
+      agentId: payload.agentId,
+      batchUrls: payload.batchUrls,
+      priority: payload.priority,
       retryCount: job.attempts,
-      domain: job.payload.domain,
-      userId: job.payload.userId,
-      metadata: job.payload.metadata
+      domain: payload.domain,
+      userId: payload.userId,
+      metadata: payload.metadata
     };
   }
 
@@ -134,7 +152,7 @@ export class DistributedCrawlQueue {
         .from('background_jobs')
         .update({
           status: 'pending',
-          attempts: supabase.sql`attempts + 1`,
+          attempts: (await supabase.from('background_jobs').select('attempts').eq('id', jobId).single()).data?.attempts || 0 + 1,
           error_message: error,
           scheduled_at: new Date(Date.now() + this.calculateRetryDelay()).toISOString(),
           updated_at: new Date().toISOString()
@@ -245,3 +263,4 @@ export class DistributedCrawlQueue {
     return Math.pow(2, 1) * 1000;
   }
 }
+
