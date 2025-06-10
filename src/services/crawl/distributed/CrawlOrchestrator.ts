@@ -201,9 +201,7 @@ export class CrawlOrchestrator {
           metadata: {
             crawlConfig: session.metadata.crawlConfig,
             totalPages: urls.length,
-            processedPages: 0,
-            batchNumber: i + 1,
-            totalBatches: batches.length
+            processedPages: 0
           }
         });
         
@@ -245,9 +243,9 @@ export class CrawlOrchestrator {
           return;
         }
 
-        const completed = jobs.filter(j => j.status === 'completed').length;
-        const failed = jobs.filter(j => j.status === 'failed').length;
-        const total = jobs.length;
+        const completed = jobs?.filter(j => j.status === 'completed').length || 0;
+        const failed = jobs?.filter(j => j.status === 'failed').length || 0;
+        const total = jobs?.length || 0;
         
         const progress = Math.round(((completed + failed) / total) * 100);
         
@@ -373,7 +371,10 @@ export class CrawlOrchestrator {
     const { error } = await supabase
       .from('agent_sources')
       .update({
-        metadata: supabase.sql`metadata || ${JSON.stringify({ crawlStatus: status, lastUpdated: new Date().toISOString() })}`,
+        metadata: {
+          crawlStatus: status,
+          lastUpdated: new Date().toISOString()
+        },
         updated_at: new Date().toISOString()
       })
       .eq('metadata->>sessionId', sessionId);
@@ -390,7 +391,10 @@ export class CrawlOrchestrator {
     const { error } = await supabase
       .from('agent_sources')
       .update({
-        metadata: supabase.sql`metadata || ${JSON.stringify({ discoveredUrls: urls.length, totalPages: urls.length })}`,
+        metadata: {
+          discoveredUrls: urls.length,
+          totalPages: urls.length
+        },
         updated_at: new Date().toISOString()
       })
       .eq('metadata->>sessionId', sessionId);

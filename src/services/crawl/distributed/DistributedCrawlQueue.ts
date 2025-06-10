@@ -70,9 +70,16 @@ export class DistributedCrawlQueue {
    * Get next available job with domain-based coordination
    */
   static async getNextJob(): Promise<CrawlJob | null> {
-    const { data, error } = await supabase.rpc('get_next_crawl_job', {
-      max_concurrent: this.MAX_CONCURRENT_JOBS
-    });
+    // Use existing background_jobs table instead of custom function
+    const { data, error } = await supabase
+      .from('background_jobs')
+      .select('*')
+      .eq('status', 'pending')
+      .eq('job_type', 'crawl_batch')
+      .lte('scheduled_at', new Date().toISOString())
+      .order('priority', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(1);
 
     if (error) {
       console.error('❌ Failed to get next job:', error);
@@ -163,10 +170,50 @@ export class DistributedCrawlQueue {
    * Get queue metrics for monitoring
    */
   static async getQueueMetrics(): Promise<QueueMetrics> {
-    const { data, error } = await supabase.rpc('get_queue_metrics');
+    try {
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .select('status, created_at, completed_at')
+        .eq('job_type', 'crawl_batch');
 
-    if (error) {
-      console.error('❌ Failed to get queue metrics:', error);
+      if (error) {
+        console.error('❌ Failed to get queue metrics:', error);
+        return {
+          pendingJobs: 0,
+          activeJobs: 0,
+          completedJobs: 0,
+          failedJobs: 0,
+          avgProcessingTime: 0
+        };
+      }
+
+      const jobs = data || [];
+      const pending = jobs.filter(j => j.status === 'pending').length;
+      const active = jobs.filter(j => j.status === 'processing').length;
+      const completed = jobs.filter(j => j.status === 'completed').length;
+      const failed = jobs.filter(j => j.status === 'failed').length;
+
+      // Calculate average processing time
+      const completedJobs = jobs.filter(j => j.status === 'completed' && j.completed_at);
+      let avgProcessingTime = 0;
+      if (completedJobs.length > 0) {
+        const totalTime = completedJobs.reduce((sum, job) => {
+          const start = new Date(job.created_at).getTime();
+          const end = new Date(job.completed_at!).getTime();
+          return sum + (end - start);
+        }, 0);
+        avgProcessingTime = totalTime / completedJobs.length;
+      }
+
+      return {
+        pendingJobs: pending,
+        activeJobs: active,
+        completedJobs: completed,
+        failedJobs: failed,
+        avgProcessingTime
+      };
+    } catch (error) {
+      console.error('❌ Error getting queue metrics:', error);
       return {
         pendingJobs: 0,
         activeJobs: 0,
@@ -175,8 +222,6 @@ export class DistributedCrawlQueue {
         avgProcessingTime: 0
       };
     }
-
-    return data;
   }
 
   private static calculatePriority(batchSize: number, requestedPriority: string): 'low' | 'normal' | 'high' {

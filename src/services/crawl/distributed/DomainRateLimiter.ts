@@ -24,7 +24,7 @@ export class DomainRateLimiter {
   private static readonly WORKER_ID = `worker-${Math.random().toString(36).substr(2, 9)}`;
 
   /**
-   * Acquire a rate limit lock for a domain
+   * Acquire a rate limit lock for a domain (simplified for existing DB)
    */
   static async acquireDomainLock(domain: string): Promise<DomainLock | null> {
     const lockId = `lock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -33,32 +33,55 @@ export class DomainRateLimiter {
     console.log(`🔒 Attempting to acquire lock for domain: ${domain}`);
 
     try {
-      const { data, error } = await supabase.rpc('acquire_domain_lock', {
-        p_domain: domain,
-        p_lock_id: lockId,
-        p_worker_id: this.WORKER_ID,
-        p_expires_at: expiresAt,
-        p_max_concurrent: this.DEFAULT_CONCURRENT
-      });
+      // Use metadata field in agent_sources to track domain locks
+      const { data: existingLocks, error: queryError } = await supabase
+        .from('agent_sources')
+        .select('metadata')
+        .like('metadata->domain_lock->domain', domain)
+        .gt('metadata->domain_lock->expires_at', new Date().toISOString())
+        .limit(this.DEFAULT_CONCURRENT);
+
+      if (queryError) {
+        console.error('❌ Failed to check existing locks:', queryError);
+        return null;
+      }
+
+      const activeLocks = existingLocks?.length || 0;
+      if (activeLocks >= this.DEFAULT_CONCURRENT) {
+        console.log(`⏳ Domain ${domain} is rate limited, lock not acquired`);
+        return null;
+      }
+
+      // Create a temporary lock record using background_jobs table
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .insert({
+          job_type: 'domain_lock',
+          source_id: lockId, // Use as lock identifier
+          payload: {
+            domain,
+            lockId,
+            workerId: this.WORKER_ID,
+            expiresAt
+          },
+          scheduled_at: expiresAt // Use for expiration
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ Failed to acquire domain lock:', error);
         return null;
       }
 
-      if (data) {
-        console.log(`✅ Acquired lock for domain: ${domain}, lockId: ${lockId}`);
-        return {
-          domain,
-          lockId,
-          workerId: this.WORKER_ID,
-          acquiredAt: new Date().toISOString(),
-          expiresAt
-        };
-      }
-
-      console.log(`⏳ Domain ${domain} is rate limited, lock not acquired`);
-      return null;
+      console.log(`✅ Acquired lock for domain: ${domain}, lockId: ${lockId}`);
+      return {
+        domain,
+        lockId,
+        workerId: this.WORKER_ID,
+        acquiredAt: new Date().toISOString(),
+        expiresAt
+      };
 
     } catch (error) {
       console.error('❌ Error acquiring domain lock:', error);
@@ -73,11 +96,11 @@ export class DomainRateLimiter {
     console.log(`🔓 Releasing lock for domain: ${lock.domain}, lockId: ${lock.lockId}`);
 
     try {
-      const { error } = await supabase.rpc('release_domain_lock', {
-        p_domain: lock.domain,
-        p_lock_id: lock.lockId,
-        p_worker_id: this.WORKER_ID
-      });
+      const { error } = await supabase
+        .from('background_jobs')
+        .delete()
+        .eq('source_id', lock.lockId)
+        .eq('job_type', 'domain_lock');
 
       if (error) {
         console.error('❌ Failed to release domain lock:', error);
@@ -98,17 +121,20 @@ export class DomainRateLimiter {
    */
   static async checkDomainAvailability(domain: string): Promise<boolean> {
     try {
-      const { data, error } = await supabase.rpc('check_domain_availability', {
-        p_domain: domain,
-        p_max_concurrent: this.DEFAULT_CONCURRENT
-      });
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .select('id')
+        .eq('job_type', 'domain_lock')
+        .like('payload->domain', domain)
+        .gt('scheduled_at', new Date().toISOString());
 
       if (error) {
         console.error('❌ Failed to check domain availability:', error);
         return false;
       }
 
-      return data || false;
+      const activeLocks = data?.length || 0;
+      return activeLocks < this.DEFAULT_CONCURRENT;
 
     } catch (error) {
       console.error('❌ Error checking domain availability:', error);
@@ -146,14 +172,19 @@ export class DomainRateLimiter {
    */
   static async cleanupExpiredLocks(): Promise<number> {
     try {
-      const { data, error } = await supabase.rpc('cleanup_expired_domain_locks');
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .delete()
+        .eq('job_type', 'domain_lock')
+        .lt('scheduled_at', new Date().toISOString())
+        .select('id');
 
       if (error) {
         console.error('❌ Failed to cleanup expired locks:', error);
         return 0;
       }
 
-      const cleanedCount = data || 0;
+      const cleanedCount = data?.length || 0;
       if (cleanedCount > 0) {
         console.log(`🧹 Cleaned up ${cleanedCount} expired domain locks`);
       }
