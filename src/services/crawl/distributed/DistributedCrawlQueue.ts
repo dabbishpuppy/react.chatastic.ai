@@ -1,5 +1,4 @@
 
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface CrawlJob {
@@ -107,7 +106,8 @@ export class DistributedCrawlQueue {
     }
 
     const job = data[0];
-    const payload = job.payload as CrawlJobPayload;
+    // Safely cast the payload through unknown first
+    const payload = job.payload as unknown as CrawlJobPayload;
     
     return {
       id: job.id,
@@ -263,4 +263,3 @@ export class DistributedCrawlQueue {
     return Math.pow(2, 1) * 1000;
   }
 }
-
