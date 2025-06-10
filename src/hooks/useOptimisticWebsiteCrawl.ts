@@ -45,7 +45,6 @@ export const useOptimisticWebsiteCrawl = () => {
         excludePaths: data.excludePaths
       });
 
-      // Return both the result and clientId for reconciliation
       return {
         ...result,
         clientId: data.clientId
@@ -59,21 +58,22 @@ export const useOptimisticWebsiteCrawl = () => {
 
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({
-        queryKey: ['sources-paginated', agentId, 'website']
+        queryKey: ['agent-sources-paginated', agentId, 'website']
       });
 
       // Snapshot previous value
-      const previousData = queryClient.getQueryData(['sources-paginated', agentId, 'website', 1, 25]);
+      const previousData = queryClient.getQueryData(['agent-sources-paginated', agentId, 'website', 1, 25]);
 
-      // Create optimistic source
+      // Create optimistic source with a temporary real-looking ID
+      const tempId = uuidv4();
       const optimisticSource: OptimisticSource = {
-        id: clientId,
+        id: tempId,
         agent_id: agentId!,
-        team_id: 'temp-team-id', // Add the required team_id
+        team_id: 'temp-team-id',
         title: url,
         url: url,
         source_type: 'website',
-        crawl_status: 'submitting',
+        crawl_status: 'pending',
         progress: 0,
         is_active: true,
         requires_manual_training: false,
@@ -87,9 +87,16 @@ export const useOptimisticWebsiteCrawl = () => {
         }
       };
 
-      // Optimistically update the cache
-      queryClient.setQueryData(['sources-paginated', agentId, 'website', 1, 25], (old: any) => {
-        if (!old) return old;
+      // Optimistically update both paginated sources and stats
+      queryClient.setQueryData(['agent-sources-paginated', agentId, 'website', 1, 25], (old: any) => {
+        if (!old) {
+          return {
+            sources: [optimisticSource],
+            totalCount: 1,
+            totalPages: 1,
+            currentPage: 1
+          };
+        }
         
         return {
           ...old,
@@ -98,39 +105,55 @@ export const useOptimisticWebsiteCrawl = () => {
         };
       });
 
-      console.log('✅ Optimistic source added to cache');
+      // Also update stats immediately
+      queryClient.setQueryData(['agent-source-stats', agentId], (old: any) => {
+        if (!old) return old;
+        
+        return {
+          ...old,
+          totalSources: old.totalSources + 1,
+          sourcesByType: {
+            ...old.sourcesByType,
+            website: {
+              count: (old.sourcesByType.website?.count || 0) + 1,
+              size: old.sourcesByType.website?.size || 0
+            }
+          }
+        };
+      });
 
-      // Return context for rollback
-      return { previousData, clientId };
+      console.log('✅ Optimistic source added to cache with temp ID:', tempId);
+
+      return { previousData, clientId, tempId };
     },
 
     onSuccess: (result, variables, context) => {
       const { parentSourceId } = result;
-      const { clientId } = context || {};
+      const { clientId, tempId } = context || {};
 
-      console.log('🎉 Crawl initiated successfully, reconciling optimistic update:', {
+      console.log('🎉 Crawl initiated successfully, keeping optimistic source:', {
         clientId,
+        tempId,
         realSourceId: parentSourceId
       });
 
-      // Replace optimistic entry with real data
-      queryClient.setQueryData(['sources-paginated', agentId, 'website', 1, 25], (old: any) => {
+      // Don't remove the optimistic source - let the real-time subscription handle updates
+      // Just update the source to mark it as no longer optimistic
+      queryClient.setQueryData(['agent-sources-paginated', agentId, 'website', 1, 25], (old: any) => {
         if (!old) return old;
 
         const updatedSources = old.sources.map((source: OptimisticSource) => {
-          if (source.clientId === clientId) {
-            // Replace optimistic source with real data
+          if (source.clientId === clientId || source.id === tempId) {
             return {
               ...source,
-              id: parentSourceId,
+              id: parentSourceId || source.id,
               crawl_status: 'pending',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
               isOptimistic: false,
               metadata: {
                 ...source.metadata,
                 optimistic: false,
-                submitting: false
+                submitting: false,
+                realSourceId: parentSourceId
               }
             };
           }
@@ -143,12 +166,22 @@ export const useOptimisticWebsiteCrawl = () => {
         };
       });
 
+      // Trigger a refetch after a short delay to get the real data
+      setTimeout(() => {
+        queryClient.invalidateQueries({
+          queryKey: ['agent-sources-paginated', agentId, 'website']
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['agent-source-stats', agentId]
+        });
+      }, 2000);
+
       toast({
         title: "Crawl Started",
         description: `Website crawling initiated for ${variables.url}`
       });
 
-      console.log('✅ Optimistic update reconciled with real data');
+      console.log('✅ Optimistic update maintained, real-time will handle updates');
     },
 
     onError: (error, variables, context) => {
@@ -156,19 +189,25 @@ export const useOptimisticWebsiteCrawl = () => {
 
       // Rollback optimistic update
       if (context?.previousData) {
-        queryClient.setQueryData(['sources-paginated', agentId, 'website', 1, 25], context.previousData);
-      } else {
-        // Fallback: remove the optimistic entry
-        queryClient.setQueryData(['sources-paginated', agentId, 'website', 1, 25], (old: any) => {
-          if (!old) return old;
-          
-          return {
-            ...old,
-            sources: old.sources.filter((source: OptimisticSource) => source.clientId !== context?.clientId),
-            totalCount: Math.max(0, old.totalCount - 1)
-          };
-        });
+        queryClient.setQueryData(['agent-sources-paginated', agentId, 'website', 1, 25], context.previousData);
       }
+
+      // Also rollback stats
+      queryClient.setQueryData(['agent-source-stats', agentId], (old: any) => {
+        if (!old) return old;
+        
+        return {
+          ...old,
+          totalSources: Math.max(0, old.totalSources - 1),
+          sourcesByType: {
+            ...old.sourcesByType,
+            website: {
+              count: Math.max(0, (old.sourcesByType.website?.count || 0) - 1),
+              size: old.sourcesByType.website?.size || 0
+            }
+          }
+        };
+      });
 
       toast({
         title: "Crawl Failed",

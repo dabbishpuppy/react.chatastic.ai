@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-// Centralized real-time subscription with race condition prevention
+// Centralized real-time subscription with better source filtering
 export const useAgentSourcesRealtime = () => {
   const { agentId } = useParams();
   const queryClient = useQueryClient();
@@ -35,15 +35,12 @@ export const useAgentSourcesRealtime = () => {
       }
       
       debounceTimerRef.current = setTimeout(() => {
-        // Only log important events
-        if (eventType.includes('completed') || eventType.includes('inserted')) {
-          console.log(`📡 Source update: ${eventType}`);
-        }
+        console.log(`📡 Real-time source update: ${eventType}`);
         
-        queryClient.refetchQueries({
+        queryClient.invalidateQueries({
           queryKey: ['agent-source-stats', agentId]
         });
-        queryClient.refetchQueries({
+        queryClient.invalidateQueries({
           queryKey: ['agent-sources-paginated', agentId]
         });
       }, delay);
@@ -60,17 +57,24 @@ export const useAgentSourcesRealtime = () => {
           filter: `agent_id=eq.${agentId}`
         },
         (payload) => {
-          const crawlStatus = payload.new && typeof payload.new === 'object' && 'crawl_status' in payload.new
-            ? payload.new.crawl_status
-            : 'unknown';
+          console.log('📡 Agent source change:', payload.eventType, payload.new);
           
-          // Immediate refresh for important status changes
-          if (payload.eventType === 'UPDATE' && crawlStatus === 'completed') {
-            debouncedRefresh('source-completed', 100);
-          } else if (payload.eventType === 'INSERT') {
-            debouncedRefresh('source-inserted', 200);
-          } else {
-            debouncedRefresh('source-updated', 1000);
+          // Handle different events with appropriate delays
+          if (payload.eventType === 'INSERT') {
+            // New source created - refresh immediately but gently
+            debouncedRefresh('source-inserted', 500);
+          } else if (payload.eventType === 'UPDATE') {
+            const crawlStatus = payload.new && typeof payload.new === 'object' && 'crawl_status' in payload.new
+              ? payload.new.crawl_status
+              : 'unknown';
+            
+            if (crawlStatus === 'completed') {
+              debouncedRefresh('source-completed', 200);
+            } else {
+              debouncedRefresh('source-updated', 1500);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            debouncedRefresh('source-deleted', 300);
           }
         }
       )
@@ -82,17 +86,13 @@ export const useAgentSourcesRealtime = () => {
           table: 'source_pages'
         },
         (payload) => {
+          // Only refresh for significant page events
           const pageStatus = payload.new && typeof payload.new === 'object' && 'status' in payload.new
             ? payload.new.status
             : 'unknown';
           
-          // Immediate refresh for page completion
           if (payload.eventType === 'UPDATE' && pageStatus === 'completed') {
-            debouncedRefresh('page-completed', 200);
-          } else if (payload.eventType === 'INSERT') {
-            debouncedRefresh('page-inserted', 300);
-          } else {
-            debouncedRefresh('page-updated', 1500);
+            debouncedRefresh('page-completed', 1000);
           }
         }
       )
