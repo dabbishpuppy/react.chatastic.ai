@@ -14,6 +14,8 @@ export interface ProgressEvent {
     totalPages?: number;
     results?: any[];
     error?: any;
+    failedPages?: number;
+    estimatedCompletion?: string;
     [key: string]: any;
   };
 }
@@ -50,7 +52,7 @@ export class CrawlProgressPublisher {
         detail: progressEvent
       }));
 
-      // Also store in database for persistence
+      // Also store in database for persistence using existing tables
       await this.persistProgressEvent(progressEvent);
 
     } catch (error) {
@@ -132,20 +134,22 @@ export class CrawlProgressPublisher {
   }
 
   /**
-   * Persist progress event to database for history/recovery
+   * Persist progress event to database using existing workflow_events table
    */
   private async persistProgressEvent(event: any): Promise<void> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
       const { error } = await supabase
-        .from('crawl_progress_events')
+        .from('workflow_events')
         .insert({
           source_id: this.sourceId,
           event_type: event.type,
-          status: event.status,
-          progress: event.progress,
-          metadata: event.metadata,
+          to_status: event.status,
+          metadata: {
+            progress: event.progress,
+            ...event.metadata
+          },
           created_at: new Date().toISOString()
         });
 
@@ -159,16 +163,17 @@ export class CrawlProgressPublisher {
   }
 
   /**
-   * Get progress history for a source
+   * Get progress history for a source using workflow_events table
    */
   static async getProgressHistory(sourceId: string, limit: number = 50): Promise<any[]> {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
       const { data, error } = await supabase
-        .from('crawl_progress_events')
+        .from('workflow_events')
         .select('*')
         .eq('source_id', sourceId)
+        .eq('event_type', 'CRAWL_PROGRESS')
         .order('created_at', { ascending: false })
         .limit(limit);
 

@@ -52,7 +52,7 @@ export class CrawlOrchestrator {
     const domain = new URL(request.url).hostname;
 
     try {
-      // Create crawl session
+      // Create crawl session using existing tables
       const session = await this.createCrawlSession(sessionId, request, domain);
       
       // Start discovery phase
@@ -67,7 +67,7 @@ export class CrawlOrchestrator {
   }
 
   /**
-   * Create a new crawl session
+   * Create a new crawl session using existing agent_sources table
    */
   private static async createCrawlSession(
     sessionId: string, 
@@ -89,17 +89,20 @@ export class CrawlOrchestrator {
       }
     };
 
-    // Persist session to database
+    // Update existing agent_sources record with session metadata
     const { error } = await supabase
-      .from('crawl_sessions')
-      .insert({
-        session_id: sessionId,
-        source_id: request.parentSourceId,
-        agent_id: request.agentId,
-        status: session.status,
-        metadata: session.metadata,
-        created_at: new Date().toISOString()
-      });
+      .from('agent_sources')
+      .update({
+        metadata: {
+          sessionId,
+          crawlStatus: session.status,
+          domain,
+          startedAt: new Date().toISOString(),
+          crawlConfig: request.crawlConfig || {}
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', request.parentSourceId);
 
     if (error) {
       console.error('❌ Failed to create crawl session:', error);
@@ -199,7 +202,6 @@ export class CrawlOrchestrator {
             crawlConfig: session.metadata.crawlConfig,
             totalPages: urls.length,
             processedPages: 0,
-            sessionId: session.sessionId,
             batchNumber: i + 1,
             totalBatches: batches.length
           }
@@ -365,16 +367,16 @@ export class CrawlOrchestrator {
   }
 
   /**
-   * Update session status
+   * Update session status using agent_sources metadata
    */
   private static async updateSessionStatus(sessionId: string, status: CrawlSession['status']): Promise<void> {
     const { error } = await supabase
-      .from('crawl_sessions')
+      .from('agent_sources')
       .update({
-        status,
+        metadata: supabase.sql`metadata || ${JSON.stringify({ crawlStatus: status, lastUpdated: new Date().toISOString() })}`,
         updated_at: new Date().toISOString()
       })
-      .eq('session_id', sessionId);
+      .eq('metadata->>sessionId', sessionId);
 
     if (error) {
       console.error('❌ Failed to update session status:', error);
@@ -386,12 +388,12 @@ export class CrawlOrchestrator {
    */
   private static async updateSessionUrls(sessionId: string, urls: string[]): Promise<void> {
     const { error } = await supabase
-      .from('crawl_sessions')
+      .from('agent_sources')
       .update({
-        metadata: supabase.sql`metadata || ${JSON.stringify({ discoveredUrls: urls.length })}`,
+        metadata: supabase.sql`metadata || ${JSON.stringify({ discoveredUrls: urls.length, totalPages: urls.length })}`,
         updated_at: new Date().toISOString()
       })
-      .eq('session_id', sessionId);
+      .eq('metadata->>sessionId', sessionId);
 
     if (error) {
       console.error('❌ Failed to update session URLs:', error);
@@ -404,9 +406,9 @@ export class CrawlOrchestrator {
   static async getSessionStatus(sessionId: string): Promise<CrawlSession | null> {
     try {
       const { data, error } = await supabase
-        .from('crawl_sessions')
+        .from('agent_sources')
         .select('*')
-        .eq('session_id', sessionId)
+        .eq('metadata->>sessionId', sessionId)
         .single();
 
       if (error) {
@@ -414,15 +416,16 @@ export class CrawlOrchestrator {
         return null;
       }
 
+      const metadata = data.metadata as any;
       return {
-        sessionId: data.session_id,
-        parentSourceId: data.source_id,
+        sessionId: metadata.sessionId,
+        parentSourceId: data.id,
         agentId: data.agent_id,
-        status: data.status,
-        totalPages: data.metadata?.discoveredUrls || 0,
+        status: metadata.crawlStatus || 'pending',
+        totalPages: metadata.totalPages || 0,
         processedPages: 0, // Would be calculated from job progress
         failedPages: 0,
-        metadata: data.metadata
+        metadata: metadata
       };
 
     } catch (error) {

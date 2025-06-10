@@ -44,7 +44,9 @@ export const useDistributedCrawl = () => {
       setState(prev => ({
         ...prev,
         progress: progressData.progress,
-        status: progressData.status === 'processing' ? 'crawling' : progressData.status,
+        status: progressData.status === 'processing' ? 'crawling' : 
+                progressData.status === 'pending' ? 'discovering' : 
+                progressData.status as 'idle' | 'discovering' | 'crawling' | 'completed' | 'failed',
         message: progressData.message,
         totalPages: progressData.metadata?.totalPages || prev.totalPages,
         processedPages: progressData.metadata?.completedPages || prev.processedPages,

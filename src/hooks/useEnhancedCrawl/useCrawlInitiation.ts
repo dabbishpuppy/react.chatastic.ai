@@ -14,9 +14,9 @@ export const useCrawlInitiation = () => {
     try {
       console.log('🚀 Initiating enhanced crawl with distributed system:', request);
       
-      // Convert to distributed crawl format
+      // Convert to distributed crawl format with proper type casting
       const distributedRequest = {
-        parentSourceId: request.agentId, // Note: This might need adjustment based on your data model
+        parentSourceId: request.agentId,
         agentId: request.agentId,
         url: request.url,
         crawlConfig: {
@@ -26,7 +26,7 @@ export const useCrawlInitiation = () => {
           includePaths: request.includePaths || [],
           respectRobots: request.respectRobots !== false
         },
-        priority: request.priority === 'high' ? 'high' : 'normal'
+        priority: (request.priority === 'high' ? 'high' : 'normal') as 'low' | 'normal' | 'high'
       };
 
       // Use the new distributed crawl system
@@ -35,7 +35,7 @@ export const useCrawlInitiation = () => {
       console.log('✅ Distributed crawl initiated with session ID:', sessionId);
       
       return {
-        parentSourceId: sessionId, // Return session ID as parent source ID for compatibility
+        parentSourceId: sessionId,
         sessionId
       };
       
