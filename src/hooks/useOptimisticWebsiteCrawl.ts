@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/hooks/use-toast';
 import { AgentSource } from '@/types/rag';
-import { useEnhancedCrawl } from '@/hooks/useEnhancedCrawl';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OptimisticCrawlData {
   url: string;
@@ -27,28 +27,88 @@ interface OptimisticSource extends Omit<AgentSource, 'id' | 'created_at' | 'upda
 export const useOptimisticWebsiteCrawl = () => {
   const { agentId } = useParams();
   const queryClient = useQueryClient();
-  const { initiateCrawl } = useEnhancedCrawl();
 
   const mutation = useMutation({
     mutationFn: async (data: OptimisticCrawlData & { clientId: string }) => {
       console.log('🚀 Starting crawl with clientId:', data.clientId);
       
-      // Call the actual crawl initiation
-      const result = await initiateCrawl({
-        url: data.url,
-        agentId: agentId!,
-        crawlMode: data.crawlMode,
-        maxPages: data.maxPages,
-        maxDepth: data.maxDepth,
-        respectRobots: data.respectRobots,
-        includePaths: data.includePaths,
-        excludePaths: data.excludePaths
-      });
+      // First, create the actual agent source in the database
+      const { data: agentData, error: agentError } = await supabase
+        .from('agents')
+        .select('team_id')
+        .eq('id', agentId!)
+        .single();
 
-      return {
-        ...result,
-        clientId: data.clientId
-      };
+      if (agentError || !agentData) {
+        throw new Error('Failed to get agent data: ' + agentError?.message);
+      }
+
+      // Create the real source in the database first
+      const { data: sourceData, error: sourceError } = await supabase
+        .from('agent_sources')
+        .insert({
+          agent_id: agentId!,
+          team_id: agentData.team_id,
+          url: data.url,
+          title: data.url,
+          source_type: 'website',
+          crawl_status: 'pending',
+          is_active: true,
+          metadata: {
+            crawlMode: data.crawlMode,
+            maxPages: data.maxPages,
+            maxDepth: data.maxDepth,
+            respectRobots: data.respectRobots,
+            includePaths: data.includePaths,
+            excludePaths: data.excludePaths,
+            clientId: data.clientId,
+            optimistic: false
+          }
+        })
+        .select()
+        .single();
+
+      if (sourceError || !sourceData) {
+        throw new Error('Failed to create source: ' + sourceError?.message);
+      }
+
+      console.log('✅ Real source created in database:', sourceData.id);
+
+      // Now start the distributed crawl with the real source ID
+      try {
+        const { default: CrawlOrchestrator } = await import('@/services/crawl/distributed/CrawlOrchestrator');
+        
+        const sessionId = await CrawlOrchestrator.initiateCrawl({
+          parentSourceId: sourceData.id,
+          agentId: agentId!,
+          url: data.url,
+          crawlConfig: {
+            maxPages: data.maxPages,
+            maxDepth: data.maxDepth,
+            excludePaths: data.excludePaths,
+            includePaths: data.includePaths,
+            respectRobots: data.respectRobots
+          },
+          priority: 'normal' as 'low' | 'normal' | 'high'
+        });
+
+        return {
+          parentSourceId: sourceData.id,
+          sessionId,
+          realSource: sourceData,
+          clientId: data.clientId
+        };
+      } catch (crawlError) {
+        console.error('❌ Crawl initiation failed, cleaning up source:', crawlError);
+        
+        // Clean up the source if crawl initiation fails
+        await supabase
+          .from('agent_sources')
+          .delete()
+          .eq('id', sourceData.id);
+        
+        throw crawlError;
+      }
     },
 
     onMutate: async (variables) => {
@@ -64,8 +124,8 @@ export const useOptimisticWebsiteCrawl = () => {
       // Snapshot previous value
       const previousData = queryClient.getQueryData(['agent-sources-paginated', agentId, 'website', 1, 25]);
 
-      // Create optimistic source with a temporary real-looking ID
-      const tempId = uuidv4();
+      // Create optimistic source with a temporary ID that won't conflict
+      const tempId = `temp-${clientId}`;
       const optimisticSource: OptimisticSource = {
         id: tempId,
         agent_id: agentId!,
@@ -83,7 +143,8 @@ export const useOptimisticWebsiteCrawl = () => {
         clientId: clientId,
         metadata: {
           optimistic: true,
-          submitting: true
+          submitting: true,
+          message: 'Creating source...'
         }
       };
 
@@ -128,32 +189,29 @@ export const useOptimisticWebsiteCrawl = () => {
     },
 
     onSuccess: (result, variables, context) => {
-      const { parentSourceId } = result;
+      const { parentSourceId, realSource } = result;
       const { clientId, tempId } = context || {};
 
-      console.log('🎉 Crawl initiated successfully, keeping optimistic source:', {
+      console.log('🎉 Crawl initiated successfully with real source:', {
         clientId,
         tempId,
         realSourceId: parentSourceId
       });
 
-      // Don't remove the optimistic source - let the real-time subscription handle updates
-      // Just update the source to mark it as no longer optimistic
+      // Replace the optimistic source with the real one
       queryClient.setQueryData(['agent-sources-paginated', agentId, 'website', 1, 25], (old: any) => {
         if (!old) return old;
 
         const updatedSources = old.sources.map((source: OptimisticSource) => {
           if (source.clientId === clientId || source.id === tempId) {
             return {
-              ...source,
-              id: parentSourceId || source.id,
-              crawl_status: 'pending',
+              ...realSource,
               isOptimistic: false,
               metadata: {
-                ...source.metadata,
+                ...realSource.metadata,
                 optimistic: false,
                 submitting: false,
-                realSourceId: parentSourceId
+                message: 'Crawl initiated successfully'
               }
             };
           }
@@ -166,22 +224,17 @@ export const useOptimisticWebsiteCrawl = () => {
         };
       });
 
-      // Trigger a refetch after a short delay to get the real data
-      setTimeout(() => {
-        queryClient.invalidateQueries({
-          queryKey: ['agent-sources-paginated', agentId, 'website']
-        });
-        queryClient.invalidateQueries({
-          queryKey: ['agent-source-stats', agentId]
-        });
-      }, 2000);
+      // Update stats to reflect real data
+      queryClient.invalidateQueries({
+        queryKey: ['agent-source-stats', agentId]
+      });
 
       toast({
         title: "Crawl Started",
         description: `Website crawling initiated for ${variables.url}`
       });
 
-      console.log('✅ Optimistic update maintained, real-time will handle updates');
+      console.log('✅ Source successfully created and crawl initiated');
     },
 
     onError: (error, variables, context) => {
