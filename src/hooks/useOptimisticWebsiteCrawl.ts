@@ -160,7 +160,7 @@ export const useOptimisticWebsiteCrawl = () => {
         
         return {
           ...old,
-          sources: [optimisticSource, ...old.sources],
+          sources: [optimisticSource, ...(old.sources || [])],
           totalCount: old.totalCount + 1
         };
       });
@@ -201,7 +201,7 @@ export const useOptimisticWebsiteCrawl = () => {
 
       // Replace the optimistic source with the real one
       queryClient.setQueryData(['agent-sources-paginated', agentId, 'website', 1, 25], (old: any) => {
-        if (!old) return old;
+        if (!old || !old.sources) return old;
 
         const updatedSources = old.sources.map((source: OptimisticSource) => {
           if (source.clientId === clientId || source.id === tempId) {
