@@ -209,7 +209,7 @@ export const useOptimisticWebsiteCrawl = () => {
               ...realSource,
               isOptimistic: false,
               metadata: {
-                ...realSource.metadata,
+                ...(realSource.metadata || {}),
                 optimistic: false,
                 submitting: false,
                 message: 'Crawl initiated successfully'
