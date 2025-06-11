@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/hooks/use-toast';
 import { AgentSource } from '@/types/rag';
 import { supabase } from '@/integrations/supabase/client';
+import { CrawlOrchestrator } from '@/services/crawl/distributed/CrawlOrchestrator';
 
 interface OptimisticCrawlData {
   url: string;
@@ -76,8 +77,6 @@ export const useOptimisticWebsiteCrawl = () => {
 
       // Now start the distributed crawl with the real source ID
       try {
-        const { default: CrawlOrchestrator } = await import('@/services/crawl/distributed/CrawlOrchestrator');
-        
         const sessionId = await CrawlOrchestrator.initiateCrawl({
           parentSourceId: sourceData.id,
           agentId: agentId!,
@@ -189,8 +188,10 @@ export const useOptimisticWebsiteCrawl = () => {
     },
 
     onSuccess: (result, variables, context) => {
+      if (!result || !context) return;
+      
       const { parentSourceId, realSource } = result;
-      const { clientId, tempId } = context || {};
+      const { clientId, tempId } = context;
 
       console.log('🎉 Crawl initiated successfully with real source:', {
         clientId,
