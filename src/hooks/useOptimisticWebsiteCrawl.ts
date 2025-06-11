@@ -1,9 +1,8 @@
-
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/hooks/use-toast';
-import { AgentSource } from '@/types/rag';
+import { AgentSource, OptimisticSource } from '@/types/rag';
 import { supabase } from '@/integrations/supabase/client';
 import { CrawlOrchestrator } from '@/services/crawl/distributed/CrawlOrchestrator';
 
@@ -15,14 +14,6 @@ interface OptimisticCrawlData {
   respectRobots: boolean;
   includePaths: string[];
   excludePaths: string[];
-}
-
-interface OptimisticSource extends Omit<AgentSource, 'id' | 'created_at' | 'updated_at'> {
-  id: string;
-  created_at: string;
-  updated_at: string;
-  isOptimistic?: boolean;
-  clientId?: string;
 }
 
 export const useOptimisticWebsiteCrawl = () => {
@@ -205,11 +196,16 @@ export const useOptimisticWebsiteCrawl = () => {
 
         const updatedSources = old.sources.map((source: OptimisticSource) => {
           if (source.clientId === clientId || source.id === tempId) {
+            // Ensure realSource.metadata is an object before spreading
+            const sourceMetadata = realSource.metadata && typeof realSource.metadata === 'object' 
+              ? realSource.metadata as Record<string, any>
+              : {};
+
             return {
               ...realSource,
               isOptimistic: false,
               metadata: {
-                ...(realSource.metadata || {}),
+                ...sourceMetadata,
                 optimistic: false,
                 submitting: false,
                 message: 'Crawl initiated successfully'
