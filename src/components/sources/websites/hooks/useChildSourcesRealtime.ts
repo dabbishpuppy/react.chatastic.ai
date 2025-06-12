@@ -18,12 +18,21 @@ interface SourcePage {
 export const useChildSourcesRealtime = (parentSourceId: string, initialChildSources: SourcePage[] = []) => {
   const [childSources, setChildSources] = useState<SourcePage[]>(initialChildSources);
 
+  // Update state when initial data changes
   useEffect(() => {
+    console.log('📡 useChildSourcesRealtime: Initial data updated', {
+      parentSourceId,
+      newInitialCount: initialChildSources.length,
+      currentCount: childSources.length
+    });
     setChildSources(initialChildSources);
-  }, [initialChildSources]);
+  }, [initialChildSources.length, parentSourceId]); // Depend on length to avoid infinite loops
 
   useEffect(() => {
-    if (!parentSourceId) return;
+    if (!parentSourceId) {
+      console.log('📡 useChildSourcesRealtime: No parentSourceId, skipping subscription');
+      return;
+    }
 
     console.log(`📡 Setting up real-time subscription for child pages of parent: ${parentSourceId}`);
 
@@ -44,8 +53,11 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
           setChildSources(prev => {
             // Check if page already exists to avoid duplicates
             const exists = prev.some(page => page.id === newPage.id);
-            if (exists) return prev;
-            console.log(`✅ Adding new child page: ${newPage.url}`);
+            if (exists) {
+              console.log(`📡 Page ${newPage.id} already exists, skipping duplicate`);
+              return prev;
+            }
+            console.log(`✅ Adding new child page: ${newPage.url} (${newPage.id})`);
             return [...prev, newPage];
           });
         }
@@ -61,11 +73,13 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
         (payload) => {
           console.log('📡 Child page UPDATE:', payload);
           const updatedPage = payload.new as SourcePage;
-          setChildSources(prev => 
-            prev.map(page => 
+          setChildSources(prev => {
+            const updated = prev.map(page => 
               page.id === updatedPage.id ? updatedPage : page
-            )
-          );
+            );
+            console.log(`📡 Updated child page: ${updatedPage.url} (${updatedPage.id})`);
+            return updated;
+          });
         }
       )
       .on(
@@ -79,9 +93,11 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
         (payload) => {
           console.log('📡 Child page DELETE:', payload);
           const deletedPage = payload.old as SourcePage;
-          setChildSources(prev => 
-            prev.filter(page => page.id !== deletedPage.id)
-          );
+          setChildSources(prev => {
+            const filtered = prev.filter(page => page.id !== deletedPage.id);
+            console.log(`📡 Deleted child page: ${deletedPage.id}`);
+            return filtered;
+          });
         }
       )
       .subscribe((status) => {
@@ -98,6 +114,12 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
       supabase.removeChannel(channel);
     };
   }, [parentSourceId]);
+
+  console.log('📡 useChildSourcesRealtime returning:', {
+    parentSourceId,
+    count: childSources.length,
+    pages: childSources.map(p => ({ id: p.id, url: p.url, status: p.status }))
+  });
 
   return childSources;
 };

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,15 +40,14 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     // This will be handled by the WebsiteSourceHeader component internally
   };
 
-  // DEBUG: Log source data to identify the extra "0"
-  console.log('🐛 DEBUG WebsiteSourceItem - Source data:', {
-    id: source.id,
-    title: source.title,
-    url: source.url,
-    last_crawled_at: JSON.stringify(source.last_crawled_at),
-    updated_at: JSON.stringify(source.updated_at),
-    created_at: JSON.stringify(source.created_at),
-    links_count: source.links_count,
+  // Check if crawling based on status or if child sources are still being processed
+  const isCrawling = status === 'in_progress' || source.crawl_status === 'in_progress' || source.crawl_status === 'pending';
+
+  console.log('🐛 DEBUG WebsiteSourceItem - Status info:', {
+    sourceId: source.id,
+    status,
+    crawl_status: source.crawl_status,
+    isCrawling,
     childSources_length: childSources.length
   });
 
@@ -111,13 +109,13 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
         </div>
       </div>
 
-      {/* Collapsible child sources - always present, WebsiteChildSources handles its own data and empty states */}
+      {/* Collapsible child sources - pass the correct crawling state */}
       <Collapsible open={isChildSourcesOpen} onOpenChange={setIsChildSourcesOpen}>
         <CollapsibleContent>
           <div className="ml-6 mr-3 mb-3">
             <WebsiteChildSources
               parentSourceId={source.id}
-              isCrawling={status === 'in_progress'}
+              isCrawling={isCrawling}
               onEdit={onEdit}
               onExclude={onExclude}
               onDelete={onDelete}
