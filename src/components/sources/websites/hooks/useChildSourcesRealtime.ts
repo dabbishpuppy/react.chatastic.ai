@@ -33,39 +33,64 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'source_pages',
           filter: `parent_source_id=eq.${parentSourceId}`
         },
         (payload) => {
-          console.log('📡 Child page update:', payload);
-          
-          if (payload.eventType === 'INSERT') {
-            const newPage = payload.new as SourcePage;
-            setChildSources(prev => {
-              // Check if page already exists to avoid duplicates
-              const exists = prev.some(page => page.id === newPage.id);
-              if (exists) return prev;
-              return [...prev, newPage];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedPage = payload.new as SourcePage;
-            setChildSources(prev => 
-              prev.map(page => 
-                page.id === updatedPage.id ? updatedPage : page
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            const deletedPage = payload.old as SourcePage;
-            setChildSources(prev => 
-              prev.filter(page => page.id !== deletedPage.id)
-            );
-          }
+          console.log('📡 Child page INSERT:', payload);
+          const newPage = payload.new as SourcePage;
+          setChildSources(prev => {
+            // Check if page already exists to avoid duplicates
+            const exists = prev.some(page => page.id === newPage.id);
+            if (exists) return prev;
+            console.log(`✅ Adding new child page: ${newPage.url}`);
+            return [...prev, newPage];
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `parent_source_id=eq.${parentSourceId}`
+        },
+        (payload) => {
+          console.log('📡 Child page UPDATE:', payload);
+          const updatedPage = payload.new as SourcePage;
+          setChildSources(prev => 
+            prev.map(page => 
+              page.id === updatedPage.id ? updatedPage : page
+            )
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'source_pages',
+          filter: `parent_source_id=eq.${parentSourceId}`
+        },
+        (payload) => {
+          console.log('📡 Child page DELETE:', payload);
+          const deletedPage = payload.old as SourcePage;
+          setChildSources(prev => 
+            prev.filter(page => page.id !== deletedPage.id)
+          );
         }
       )
       .subscribe((status) => {
         console.log(`📡 Child pages subscription status for ${parentSourceId}:`, status);
+        if (status === 'SUBSCRIBED') {
+          console.log(`✅ Successfully subscribed to child pages for parent: ${parentSourceId}`);
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`❌ Channel error for parent: ${parentSourceId}`);
+        }
       });
 
     return () => {

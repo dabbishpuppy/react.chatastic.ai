@@ -1,7 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useParams } from 'react-router-dom';
 
 interface SourcePage {
   id: string;
@@ -16,49 +15,73 @@ interface SourcePage {
   parent_source_id: string;
 }
 
-interface UseSourcePagesPaginatedProps {
-  parentSourceId?: string;
-  page?: number;
-  pageSize?: number;
+interface UseSourcePagesPaginatedOptions {
+  parentSourceId: string;
+  page: number;
+  pageSize: number;
   enabled?: boolean;
+}
+
+interface PaginatedPagesResult {
+  pages: SourcePage[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
 }
 
 export const useSourcePagesPaginated = ({
   parentSourceId,
-  page = 1,
-  pageSize = 25,
+  page,
+  pageSize,
   enabled = true
-}: UseSourcePagesPaginatedProps) => {
-  const { agentId } = useParams();
-
+}: UseSourcePagesPaginatedOptions) => {
   return useQuery({
-    queryKey: ['source-pages', agentId, parentSourceId, page, pageSize],
-    queryFn: async () => {
+    queryKey: ['source-pages-paginated', parentSourceId, page, pageSize],
+    queryFn: async (): Promise<PaginatedPagesResult> => {
+      console.log('🔍 Fetching source pages:', {
+        parentSourceId,
+        page,
+        pageSize,
+        enabled
+      });
+
       if (!parentSourceId) {
-        return { pages: [], totalCount: 0, totalPages: 0 };
+        throw new Error('Parent source ID is required');
       }
 
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
+      const offset = (page - 1) * pageSize;
+      
       const { data, error, count } = await supabase
         .from('source_pages')
         .select('*', { count: 'exact' })
         .eq('parent_source_id', parentSourceId)
         .order('created_at', { ascending: true })
-        .range(from, to);
+        .range(offset, offset + pageSize - 1);
 
       if (error) {
-        console.error('Error fetching source pages:', error);
+        console.error('❌ Error fetching source pages:', error);
         throw error;
       }
+
+      console.log('📋 Source pages fetched:', {
+        count: data?.length || 0,
+        totalCount: count || 0,
+        parentSourceId
+      });
+
+      const totalPages = Math.ceil((count || 0) / pageSize);
 
       return {
         pages: data || [],
         totalCount: count || 0,
-        totalPages: Math.ceil((count || 0) / pageSize)
+        totalPages,
+        currentPage: page
       };
     },
-    enabled: enabled && !!parentSourceId && !!agentId
+    enabled: enabled && !!parentSourceId,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 2 * 60 * 1000, // Keep in cache for 2 minutes
   });
 };
