@@ -20,13 +20,16 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
 
   // Update state when initial data changes
   useEffect(() => {
-    console.log('📡 useChildSourcesRealtime: Initial data updated', {
+    console.log('📡 useChildSourcesRealtime: Updating initial data', {
       parentSourceId,
       newInitialCount: initialChildSources.length,
       currentCount: childSources.length
     });
-    setChildSources(initialChildSources);
-  }, [initialChildSources.length, parentSourceId]); // Depend on length to avoid infinite loops
+    
+    if (initialChildSources.length > 0) {
+      setChildSources(initialChildSources);
+    }
+  }, [initialChildSources.length, parentSourceId]);
 
   useEffect(() => {
     if (!parentSourceId) {

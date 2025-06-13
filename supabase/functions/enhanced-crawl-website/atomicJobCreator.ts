@@ -1,183 +1,162 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-export interface AtomicJobCreationResult {
+interface AtomicResult {
   success: boolean;
   pagesCreated: number;
   jobsCreated: number;
-  errors: string[];
   transactionId: string;
+  errors: string[];
 }
 
 export async function createPagesAndJobsAtomically(
   parentSourceId: string,
   teamId: string,
   urls: string[],
-  customerId: string
-): Promise<AtomicJobCreationResult> {
+  customerId?: string
+): Promise<AtomicResult> {
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const transactionId = `atomic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const result: AtomicJobCreationResult = {
-    success: false,
-    pagesCreated: 0,
-    jobsCreated: 0,
-    errors: [],
-    transactionId
-  };
+  const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  console.log(`🔄 Starting atomic creation with transaction ID: ${transactionId}`);
+  console.log(`📊 URLs to process: ${urls.length}`);
 
-  console.log(`🔄 Starting atomic job creation for ${urls.length} URLs (Transaction: ${transactionId})`);
+  if (urls.length === 0) {
+    return {
+      success: false,
+      pagesCreated: 0,
+      jobsCreated: 0,
+      transactionId,
+      errors: ['No URLs provided for processing']
+    };
+  }
 
   try {
-    // Begin transaction by creating all pages first
-    const pagesToCreate = urls.map(url => ({
+    // Step 1: Create source_pages records
+    const sourcePageRecords = urls.map(url => ({
       parent_source_id: parentSourceId,
-      customer_id: customerId,
+      customer_id: customerId || teamId,
       url: url,
       status: 'pending',
-      created_at: new Date().toISOString()
+      priority: 'normal'
     }));
 
+    console.log(`📝 Creating ${sourcePageRecords.length} source page records...`);
+    
     const { data: createdPages, error: pagesError } = await supabaseClient
       .from('source_pages')
-      .insert(pagesToCreate)
+      .insert(sourcePageRecords)
       .select('id, url');
 
     if (pagesError) {
-      result.errors.push(`Failed to create source pages: ${pagesError.message}`);
-      return result;
+      console.error('❌ Failed to create source pages:', pagesError);
+      throw new Error(`Source pages creation failed: ${pagesError.message}`);
     }
 
     if (!createdPages || createdPages.length === 0) {
-      result.errors.push('No pages were created');
-      return result;
+      throw new Error('No source pages were created');
     }
 
-    result.pagesCreated = createdPages.length;
-    console.log(`✅ Created ${createdPages.length} source pages`);
+    console.log(`✅ Created ${createdPages.length} source page records`);
 
-    // Immediately create corresponding background jobs
-    const jobsToCreate = createdPages.map(page => ({
+    // Step 2: Create individual background jobs for each page
+    const backgroundJobs = createdPages.map(page => ({
       job_type: 'process_page',
       source_id: parentSourceId,
       page_id: page.id,
-      job_key: `atomic:${page.id}:${Date.now()}`,
+      job_key: `process_page:${page.id}:${transactionId}`,
       payload: {
         childJobId: page.id,
         url: page.url,
         parentSourceId: parentSourceId,
-        teamId: teamId,
-        customerId: customerId,
-        atomicCreation: true,
         transactionId: transactionId
       },
       priority: 100,
-      scheduled_at: new Date().toISOString(),
-      created_at: new Date().toISOString()
+      status: 'pending'
     }));
 
-    const { error: jobsError } = await supabaseClient
+    console.log(`🔧 Creating ${backgroundJobs.length} background jobs...`);
+
+    const { data: createdJobs, error: jobsError } = await supabaseClient
       .from('background_jobs')
-      .insert(jobsToCreate);
+      .insert(backgroundJobs)
+      .select('id');
 
     if (jobsError) {
-      console.error(`❌ Failed to create background jobs: ${jobsError.message}`);
+      console.error('❌ Failed to create background jobs:', jobsError);
+      // Clean up created pages if job creation fails
+      await supabaseClient
+        .from('source_pages')
+        .delete()
+        .in('id', createdPages.map(p => p.id));
       
-      // Attempt to rollback by deleting the created pages
-      try {
-        const pageIds = createdPages.map(p => p.id);
-        await supabaseClient
-          .from('source_pages')
-          .delete()
-          .in('id', pageIds);
-        
-        result.errors.push(`Failed to create jobs, rolled back ${createdPages.length} pages: ${jobsError.message}`);
-      } catch (rollbackError) {
-        result.errors.push(`Failed to create jobs AND rollback failed: ${jobsError.message}`);
-        console.error('❌ Rollback failed:', rollbackError);
-      }
-      
-      return result;
+      throw new Error(`Background jobs creation failed: ${jobsError.message}`);
     }
 
-    result.jobsCreated = jobsToCreate.length;
-    result.success = true;
+    if (!createdJobs || createdJobs.length === 0) {
+      throw new Error('No background jobs were created');
+    }
 
-    console.log(`✅ Atomic creation successful: ${result.pagesCreated} pages + ${result.jobsCreated} jobs`);
+    console.log(`✅ Created ${createdJobs.length} background jobs`);
+
+    return {
+      success: true,
+      pagesCreated: createdPages.length,
+      jobsCreated: createdJobs.length,
+      transactionId,
+      errors: []
+    };
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    result.errors.push(`Atomic creation failed: ${errorMessage}`);
-    console.error('❌ Atomic job creation error:', error);
+    console.error(`❌ Atomic creation failed for transaction ${transactionId}:`, error);
+    return {
+      success: false,
+      pagesCreated: 0,
+      jobsCreated: 0,
+      transactionId,
+      errors: [error instanceof Error ? error.message : 'Unknown error in atomic creation']
+    };
   }
-
-  return result;
 }
 
-export async function ensureJobCompleteness(parentSourceId: string): Promise<{
-  orphanedPages: number;
-  recoveredJobs: number;
-  errors: string[];
-}> {
+export async function ensureJobCompleteness(parentSourceId: string): Promise<{ orphanedPages: number; recoveredJobs: number }> {
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   );
 
-  const result = {
-    orphanedPages: 0,
-    recoveredJobs: 0,
-    errors: []
-  };
+  console.log(`🔍 Checking job completeness for parent: ${parentSourceId}`);
 
   try {
-    console.log(`🔍 Ensuring job completeness for parent: ${parentSourceId}`);
-
-    // Find pending pages without background jobs
-    const { data: pendingPages, error: pagesError } = await supabaseClient
+    // Find pages without corresponding background jobs
+    const { data: orphanedPages, error: orphanError } = await supabaseClient
       .from('source_pages')
-      .select('id, url, customer_id')
+      .select('id, url')
       .eq('parent_source_id', parentSourceId)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .not('id', 'in', `(
+        SELECT DISTINCT page_id 
+        FROM background_jobs 
+        WHERE page_id IS NOT NULL 
+        AND status IN ('pending', 'processing')
+      )`);
 
-    if (pagesError) {
-      result.errors.push(`Failed to fetch pending pages: ${pagesError.message}`);
-      return result;
+    if (orphanError) {
+      console.error('❌ Error finding orphaned pages:', orphanError);
+      return { orphanedPages: 0, recoveredJobs: 0 };
     }
 
-    if (!pendingPages || pendingPages.length === 0) {
-      console.log('✅ No pending pages found');
-      return result;
+    if (!orphanedPages || orphanedPages.length === 0) {
+      console.log('✅ No orphaned pages found');
+      return { orphanedPages: 0, recoveredJobs: 0 };
     }
 
-    // Check which ones lack background jobs
-    const pageIds = pendingPages.map(p => p.id);
-    const { data: existingJobs, error: jobsError } = await supabaseClient
-      .from('background_jobs')
-      .select('page_id')
-      .in('page_id', pageIds)
-      .in('status', ['pending', 'processing']);
+    console.log(`🔧 Found ${orphanedPages.length} orphaned pages, creating recovery jobs...`);
 
-    if (jobsError) {
-      result.errors.push(`Failed to check existing jobs: ${jobsError.message}`);
-      return result;
-    }
-
-    const existingJobPageIds = new Set(existingJobs?.map(j => j.page_id) || []);
-    const orphanedPages = pendingPages.filter(page => !existingJobPageIds.has(page.id));
-
-    result.orphanedPages = orphanedPages.length;
-
-    if (orphanedPages.length === 0) {
-      console.log('✅ All pending pages have corresponding jobs');
-      return result;
-    }
-
-    console.log(`🔧 Creating ${orphanedPages.length} missing jobs for completeness`);
-
+    // Create recovery jobs for orphaned pages
     const recoveryJobs = orphanedPages.map(page => ({
       job_type: 'process_page',
       source_id: parentSourceId,
@@ -187,29 +166,30 @@ export async function ensureJobCompleteness(parentSourceId: string): Promise<{
         childJobId: page.id,
         url: page.url,
         parentSourceId: parentSourceId,
-        customerId: page.customer_id,
-        recoveryCreation: true
+        recovery: true
       },
-      priority: 80,
-      scheduled_at: new Date().toISOString()
+      priority: 90
     }));
 
-    const { error: insertError } = await supabaseClient
+    const { data: createdRecoveryJobs, error: recoveryError } = await supabaseClient
       .from('background_jobs')
-      .insert(recoveryJobs);
+      .insert(recoveryJobs)
+      .select('id');
 
-    if (insertError) {
-      result.errors.push(`Recovery job creation failed: ${insertError.message}`);
-    } else {
-      result.recoveredJobs = recoveryJobs.length;
-      console.log(`✅ Created ${recoveryJobs.length} recovery jobs`);
+    if (recoveryError) {
+      console.error('❌ Failed to create recovery jobs:', recoveryError);
+      return { orphanedPages: orphanedPages.length, recoveredJobs: 0 };
     }
 
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    result.errors.push(`Job completeness check failed: ${errorMessage}`);
-    console.error('❌ Job completeness error:', error);
-  }
+    console.log(`✅ Created ${createdRecoveryJobs?.length || 0} recovery jobs`);
 
-  return result;
+    return {
+      orphanedPages: orphanedPages.length,
+      recoveredJobs: createdRecoveryJobs?.length || 0
+    };
+
+  } catch (error) {
+    console.error('❌ Error in job completeness check:', error);
+    return { orphanedPages: 0, recoveredJobs: 0 };
+  }
 }

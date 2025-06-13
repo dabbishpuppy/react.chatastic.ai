@@ -1,31 +1,14 @@
 
-project_id = "lndfjlkzvxbnoxfuboxz"
-
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
+project_id = "jqjjolwssfybybvqclpo"
 
 [auth]
 enabled = true
-port = 54324
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://lndfjlkzvxbnoxfuboxz.supabase.co"]
-jwt_expiry = 3600
-enable_signup = true
-enable_confirmations = false
-
-[auth.external.google]
-enabled = false
-client_id = ""
-secret = ""
-
-[db]
-port = 54322
 
 [functions.enhanced-crawl-website]
+verify_jwt = false
+
+[functions.background-job-processor]
 verify_jwt = false
 
 [functions.child-job-processor]
@@ -34,34 +17,5 @@ verify_jwt = false
 [functions.process-source-pages]
 verify_jwt = false
 
-[functions.status-aggregator]
-verify_jwt = false
-
-[functions.crawl-health-monitor]
-verify_jwt = false
-
-[functions.generate-missing-chunks]
-verify_jwt = false
-
 [functions.workflow-job-processor]
 verify_jwt = false
-
-[functions.auto-job-trigger]
-verify_jwt = false
-
-[edge-runtime]
-ip_version = "ipv4"
-
-[cron]
-[cron.crawl-health-monitor]
-schedule = "*/5 * * * * *"  # Every 5 seconds for faster recovery
-endpoint = "https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/crawl-health-monitor"
-headers = { "Content-Type" = "application/json", "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzQ5MzUyNCwiZXhwIjoyMDYzMDY5NTI0fQ.bYaY5RjUd2fhX5kxePbD1vI7lsYG8R4KkOHhLgJ4Yb8" }
-body = "{}"
-
-[cron.workflow-job-processor]
-schedule = "*/5 * * * * *"  # Every 5 seconds for rapid job processing
-endpoint = "https://lndfjlkzvxbnoxfuboxz.supabase.co/functions/v1/workflow-job-processor"
-headers = { "Content-Type" = "application/json", "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxuZGZqbGt6dnhibm94ZnVib3h6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzQ5MzUyNCwiZXhwIjoyMDYzMDY5NTI0fQ.bYaY5RjUd2fhX5kxePbD1vI7lsYG8R4KkOHhLgJ4Yb8" }
-body = "{\"action\": \"process_jobs\", \"maxJobs\": 500}"
-

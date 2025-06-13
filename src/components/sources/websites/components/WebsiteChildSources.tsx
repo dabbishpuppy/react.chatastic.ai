@@ -31,7 +31,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     enabled: !!parentSourceId
   });
 
-  // Use real-time updates starting with initial data
+  // Use real-time updates with initial data
   const realtimeChildSources = useChildSourcesRealtime(
     parentSourceId,
     pagesData?.pages || []
@@ -43,12 +43,10 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     isLoading,
     initialPagesCount: pagesData?.pages?.length || 0,
     realtimeCount: realtimeChildSources.length,
-    totalCount: pagesData?.totalCount || 0,
-    pagesData: pagesData?.pages || [],
-    realtimeData: realtimeChildSources
+    totalCount: pagesData?.totalCount || 0
   });
 
-  // Show loading state only when initially loading and no data
+  // Show loading state when initially loading and no data exists yet
   if (isLoading && realtimeChildSources.length === 0) {
     return (
       <div className="mt-4 p-4 flex justify-center items-center bg-gray-50 rounded-lg border">
@@ -64,12 +62,12 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
         <div className="flex items-center justify-center gap-2">
           <Loader2 className="animate-spin" size={14} />
-          <span>Crawling in progress. Child pages will appear here as they are discovered.</span>
+          <span>Discovering pages... Child pages will appear here as they are found.</span>
         </div>
       </div>
     ) : (
       <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
-        No child pages found. Try refreshing or check if the crawl completed successfully.
+        No child pages found. The crawl may still be starting or may have encountered an issue.
       </div>
     );
   }

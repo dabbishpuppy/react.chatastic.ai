@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AgentSource } from '@/types/rag';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -40,15 +41,22 @@ export const WebsiteSourceItem: React.FC<WebsiteSourceItemProps> = ({
     // This will be handled by the WebsiteSourceHeader component internally
   };
 
-  // Check if crawling based on status or if child sources are still being processed
-  const isCrawling = status === 'in_progress' || source.crawl_status === 'in_progress' || source.crawl_status === 'pending';
+  // Improved crawling detection
+  const isCrawling = status === 'in_progress' || 
+                     status === 'pending' || 
+                     source.crawl_status === 'in_progress' || 
+                     source.crawl_status === 'pending' ||
+                     source.workflow_status === 'CRAWLING';
 
   console.log('🐛 DEBUG WebsiteSourceItem - Status info:', {
     sourceId: source.id,
     status,
     crawl_status: source.crawl_status,
+    workflow_status: source.workflow_status,
     isCrawling,
-    childSources_length: childSources.length
+    total_jobs: source.total_jobs,
+    total_children: source.total_children,
+    progress: source.progress
   });
 
   return (
