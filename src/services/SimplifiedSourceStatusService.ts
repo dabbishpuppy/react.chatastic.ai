@@ -1,5 +1,4 @@
 
-
 import { AgentSource } from '@/types/rag';
 
 export interface ButtonState {
@@ -15,6 +14,8 @@ export interface SourceStatusSummary {
   hasTrainingSources: boolean;
   allSourcesCompleted: boolean;
   isEmpty: boolean;
+  canTrain: boolean;
+  isTraining: boolean;
 }
 
 export class SimplifiedSourceStatusService {
@@ -166,7 +167,9 @@ export class SimplifiedSourceStatusService {
         hasCrawledSources: false,
         hasTrainingSources: false,
         allSourcesCompleted: false,
-        isEmpty: true
+        isEmpty: true,
+        canTrain: false,
+        isTraining: false
       };
     }
 
@@ -180,7 +183,9 @@ export class SimplifiedSourceStatusService {
       hasCrawledSources,
       hasTrainingSources,
       allSourcesCompleted,
-      isEmpty: false
+      isEmpty: false,
+      canTrain: hasCrawledSources && !hasTrainingSources,
+      isTraining: hasTrainingSources
     };
   }
 
@@ -216,4 +221,3 @@ export class SimplifiedSourceStatusService {
     };
   }
 }
-
