@@ -92,7 +92,26 @@ export const useSimplifiedFlow = () => {
       
       const { data: sources, error } = await supabase
         .from('agent_sources')
-        .select('id, source_type, crawl_status, requires_manual_training, metadata, parent_source_id')
+        .select(`
+          id,
+          agent_id,
+          team_id,
+          source_type,
+          title,
+          url,
+          content,
+          is_active,
+          crawl_status,
+          requires_manual_training,
+          metadata,
+          parent_source_id,
+          workflow_status,
+          progress,
+          total_jobs,
+          total_children,
+          created_at,
+          updated_at
+        `)
         .eq('agent_id', agentId)
         .eq('is_active', true);
 
@@ -171,7 +190,7 @@ export const useSimplifiedFlow = () => {
     };
   }, [updateSourceStatus]);
 
-  const buttonState = SimplifiedSourceStatusService.determineButtonState(statusSummary);
+  const buttonState = SimplifiedSourceStatusService.determineButtonStateFromSummary(statusSummary);
 
   return {
     statusSummary,
@@ -181,3 +200,4 @@ export const useSimplifiedFlow = () => {
     updateSourceStatus
   };
 };
+

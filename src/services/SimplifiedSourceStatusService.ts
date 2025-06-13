@@ -1,4 +1,5 @@
 
+
 import { AgentSource } from '@/types/rag';
 
 export interface ButtonState {
@@ -183,7 +184,7 @@ export class SimplifiedSourceStatusService {
     };
   }
 
-  static determineButtonState(summary: SourceStatusSummary): {
+  static determineButtonStateFromSummary(summary: SourceStatusSummary): {
     showButton: boolean;
     buttonText: string;
     disabled: boolean;
@@ -215,3 +216,4 @@ export class SimplifiedSourceStatusService {
     };
   }
 }
+
