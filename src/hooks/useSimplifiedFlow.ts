@@ -19,9 +19,12 @@ export const useSimpleFlow = () => {
   const { agentId } = useParams();
   const [statusSummary, setStatusSummary] = useState<SourceStatusSummary>({
     totalSources: 0,
+    hasCrawledSources: false,
+    hasTrainingSources: false,
+    allSourcesCompleted: false,
+    isEmpty: true,
     canTrain: false,
-    isTraining: false,
-    isEmpty: true
+    isTraining: false
   });
   const [isTraining, setIsTraining] = useState(false);
 
