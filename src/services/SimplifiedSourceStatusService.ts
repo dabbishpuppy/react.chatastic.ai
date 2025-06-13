@@ -1,6 +1,21 @@
 
 import { AgentSource } from '@/types/rag';
 
+export interface ButtonState {
+  showProgress?: boolean;
+  canRecrawl: boolean;
+  canTrain: boolean;
+  canDelete: boolean;
+}
+
+export interface SourceStatusSummary {
+  totalSources: number;
+  hasCrawledSources: boolean;
+  hasTrainingSources: boolean;
+  allSourcesCompleted: boolean;
+  isEmpty: boolean;
+}
+
 export class SimplifiedSourceStatusService {
   static getSourceStatus(source: AgentSource): string {
     // Handle workflow-enabled sources
@@ -67,23 +82,50 @@ export class SimplifiedSourceStatusService {
     }
   }
 
-  static determineButtonState(source: AgentSource): 'crawl' | 'train' | 'recrawl' | 'disabled' {
+  static determineButtonState(source: AgentSource): ButtonState {
     const status = this.getSourceStatus(source);
+
+    const baseState: ButtonState = {
+      showProgress: false,
+      canRecrawl: false,
+      canTrain: false,
+      canDelete: true
+    };
 
     switch (status) {
       case 'pending':
-        return 'crawl';
+        return {
+          ...baseState,
+          canRecrawl: true
+        };
       case 'in_progress':
       case 'training':
-        return 'disabled';
+        return {
+          ...baseState,
+          showProgress: true,
+          canRecrawl: false,
+          canTrain: false,
+          canDelete: false
+        };
       case 'crawled':
-        return 'train';
+        return {
+          ...baseState,
+          canRecrawl: true,
+          canTrain: true
+        };
       case 'trained':
-        return 'recrawl';
+        return {
+          ...baseState,
+          canRecrawl: true,
+          canTrain: false
+        };
       case 'failed':
-        return 'recrawl';
+        return {
+          ...baseState,
+          canRecrawl: true
+        };
       default:
-        return 'crawl';
+        return baseState;
     }
   }
 
@@ -111,5 +153,65 @@ export class SimplifiedSourceStatusService {
       default:
         return status;
     }
+  }
+
+  static analyzeSourceStatus(sources: AgentSource[]): SourceStatusSummary {
+    const totalSources = sources.length;
+    const isEmpty = totalSources === 0;
+    
+    if (isEmpty) {
+      return {
+        totalSources: 0,
+        hasCrawledSources: false,
+        hasTrainingSources: false,
+        allSourcesCompleted: false,
+        isEmpty: true
+      };
+    }
+
+    const statuses = sources.map(s => this.getSourceStatus(s));
+    const hasCrawledSources = statuses.some(s => s === 'crawled' || s === 'trained');
+    const hasTrainingSources = statuses.some(s => s === 'training');
+    const allSourcesCompleted = statuses.every(s => s === 'crawled' || s === 'trained' || s === 'failed');
+    
+    return {
+      totalSources,
+      hasCrawledSources,
+      hasTrainingSources,
+      allSourcesCompleted,
+      isEmpty: false
+    };
+  }
+
+  static determineButtonState(summary: SourceStatusSummary): {
+    showButton: boolean;
+    buttonText: string;
+    disabled: boolean;
+    variant: 'default' | 'outline';
+  } {
+    if (summary.isEmpty) {
+      return {
+        showButton: true,
+        buttonText: 'Retrain Agent',
+        disabled: true,
+        variant: 'outline'
+      };
+    }
+
+    if (summary.hasTrainingSources) {
+      return {
+        showButton: true,
+        buttonText: 'Training Agent...',
+        disabled: true,
+        variant: 'outline'
+      };
+    }
+
+    return {
+      showButton: true,
+      buttonText: 'Retrain Agent',
+      disabled: !summary.hasCrawledSources,
+      variant: summary.hasCrawledSources ? 'default' : 'outline'
+    };
   }
 }
