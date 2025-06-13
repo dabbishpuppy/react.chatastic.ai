@@ -15,8 +15,8 @@ interface SourcePage {
   parent_source_id: string;
 }
 
-export const useChildSourcesRealtime = (parentSourceId: string, initialChildSources: SourcePage[] = []) => {
-  const [childSources, setChildSources] = useState<SourcePage[]>(initialChildSources);
+export const useChildSourcesRealtime = (parentSourceId: string) => {
+  const [childSources, setChildSources] = useState<SourcePage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch initial data when parentSourceId changes
