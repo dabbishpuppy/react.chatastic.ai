@@ -4,7 +4,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2 } from 'lucide-react';
 import { useChildSourcesRealtime } from '../hooks/useChildSourcesRealtime';
 import ChildPageCard from './ChildPageCard';
-import { useSourcePagesPaginated } from '@/hooks/useSourcePagesPaginated';
 
 interface WebsiteChildSourcesProps {
   parentSourceId: string;
@@ -23,31 +22,18 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
 }) => {
   console.log('🔍 WebsiteChildSources rendered with parentSourceId:', parentSourceId);
 
-  // Use the paginated hook for initial data
-  const { data: pagesData, isLoading, refetch } = useSourcePagesPaginated({
-    parentSourceId,
-    page: 1,
-    pageSize: 100,
-    enabled: !!parentSourceId
-  });
-
-  // Use real-time updates with initial data
-  const realtimeChildSources = useChildSourcesRealtime(
-    parentSourceId,
-    pagesData?.pages || []
-  );
+  const { childSources, isLoading } = useChildSourcesRealtime(parentSourceId);
 
   console.log('🔍 WebsiteChildSources data:', {
     parentSourceId,
     isCrawling,
     isLoading,
-    initialPagesCount: pagesData?.pages?.length || 0,
-    realtimeCount: realtimeChildSources.length,
-    totalCount: pagesData?.totalCount || 0
+    childSourcesCount: childSources.length,
+    childSources: childSources.map(p => ({ id: p.id, url: p.url, status: p.status }))
   });
 
-  // Show loading state when initially loading and no data exists yet
-  if (isLoading && realtimeChildSources.length === 0) {
+  // Show loading state when initially loading
+  if (isLoading) {
     return (
       <div className="mt-4 p-4 flex justify-center items-center bg-gray-50 rounded-lg border">
         <Loader2 className="animate-spin mr-2" size={16} />
@@ -56,8 +42,8 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
     );
   }
 
-  // Show empty state based on crawling status
-  if (realtimeChildSources.length === 0) {
+  // Show empty state based on crawling status and actual data
+  if (childSources.length === 0) {
     return isCrawling ? (
       <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
         <div className="flex items-center justify-center gap-2">
@@ -67,7 +53,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       </div>
     ) : (
       <div className="mt-4 p-4 text-sm text-gray-500 text-center bg-gray-50 rounded-lg border">
-        No child pages found. The crawl may still be starting or may have encountered an issue.
+        No child pages found. The crawl may have completed without discovering additional pages.
       </div>
     );
   }
@@ -75,7 +61,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
   return (
     <div className="mt-4 border-t border-gray-200 pt-4">
       <div className="text-sm font-medium mb-3 text-gray-700 flex items-center justify-between">
-        <span>Child Pages ({realtimeChildSources.length})</span>
+        <span>Child Pages ({childSources.length})</span>
         {isCrawling && (
           <div className="flex items-center gap-1 text-blue-600">
             <Loader2 className="animate-spin" size={12} />
@@ -86,7 +72,7 @@ const WebsiteChildSources: React.FC<WebsiteChildSourcesProps> = ({
       <div className="relative bg-gray-50 rounded-lg border p-3">
         <ScrollArea className="h-96 w-full">
           <div className="space-y-2 pr-4">
-            {realtimeChildSources.map((page) => (
+            {childSources.map((page) => (
               <ChildPageCard
                 key={page.id}
                 page={page}

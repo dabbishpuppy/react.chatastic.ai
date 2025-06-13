@@ -17,29 +17,54 @@ interface SourcePage {
 
 export const useChildSourcesRealtime = (parentSourceId: string, initialChildSources: SourcePage[] = []) => {
   const [childSources, setChildSources] = useState<SourcePage[]>(initialChildSources);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Update state when initial data changes
-  useEffect(() => {
-    console.log('📡 useChildSourcesRealtime: Updating initial data', {
-      parentSourceId,
-      newInitialCount: initialChildSources.length,
-      currentCount: childSources.length
-    });
-    
-    if (initialChildSources.length > 0) {
-      setChildSources(initialChildSources);
-    }
-  }, [initialChildSources.length, parentSourceId]);
-
+  // Fetch initial data when parentSourceId changes
   useEffect(() => {
     if (!parentSourceId) {
-      console.log('📡 useChildSourcesRealtime: No parentSourceId, skipping subscription');
+      console.log('📡 useChildSourcesRealtime: No parentSourceId provided');
+      setChildSources([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchInitialChildSources = async () => {
+      console.log(`📡 Fetching initial child pages for parent: ${parentSourceId}`);
+      setIsLoading(true);
+      
+      try {
+        const { data, error } = await supabase
+          .from('source_pages')
+          .select('*')
+          .eq('parent_source_id', parentSourceId)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('❌ Error fetching child pages:', error);
+          setChildSources([]);
+        } else {
+          console.log(`✅ Fetched ${data?.length || 0} child pages for parent ${parentSourceId}:`, data);
+          setChildSources(data || []);
+        }
+      } catch (error) {
+        console.error('❌ Exception fetching child pages:', error);
+        setChildSources([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialChildSources();
+  }, [parentSourceId]);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    if (!parentSourceId) {
       return;
     }
 
     console.log(`📡 Setting up real-time subscription for child pages of parent: ${parentSourceId}`);
 
-    // Subscribe to source_pages changes for children of this parent
     const channel = supabase
       .channel(`child-pages-${parentSourceId}`)
       .on(
@@ -54,14 +79,13 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
           console.log('📡 Child page INSERT:', payload);
           const newPage = payload.new as SourcePage;
           setChildSources(prev => {
-            // Check if page already exists to avoid duplicates
             const exists = prev.some(page => page.id === newPage.id);
             if (exists) {
               console.log(`📡 Page ${newPage.id} already exists, skipping duplicate`);
               return prev;
             }
             console.log(`✅ Adding new child page: ${newPage.url} (${newPage.id})`);
-            return [...prev, newPage];
+            return [...prev, newPage].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
           });
         }
       )
@@ -77,11 +101,9 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
           console.log('📡 Child page UPDATE:', payload);
           const updatedPage = payload.new as SourcePage;
           setChildSources(prev => {
-            const updated = prev.map(page => 
+            return prev.map(page => 
               page.id === updatedPage.id ? updatedPage : page
             );
-            console.log(`📡 Updated child page: ${updatedPage.url} (${updatedPage.id})`);
-            return updated;
           });
         }
       )
@@ -97,9 +119,7 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
           console.log('📡 Child page DELETE:', payload);
           const deletedPage = payload.old as SourcePage;
           setChildSources(prev => {
-            const filtered = prev.filter(page => page.id !== deletedPage.id);
-            console.log(`📡 Deleted child page: ${deletedPage.id}`);
-            return filtered;
+            return prev.filter(page => page.id !== deletedPage.id);
           });
         }
       )
@@ -121,8 +141,9 @@ export const useChildSourcesRealtime = (parentSourceId: string, initialChildSour
   console.log('📡 useChildSourcesRealtime returning:', {
     parentSourceId,
     count: childSources.length,
+    isLoading,
     pages: childSources.map(p => ({ id: p.id, url: p.url, status: p.status }))
   });
 
-  return childSources;
+  return { childSources, isLoading };
 };
